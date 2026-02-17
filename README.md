@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v1.5.0)
+# Ars 'n' Spells (v1.5.2)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -191,6 +191,11 @@ The mod hides redundant mana bars based on mode:
 - **hybrid**: Shows the bar selected by `hybrid_mana_bar`.
 - **separate / disabled**: Both bars may show.
 
+## Changelog
+
+### v1.5.2
+- Fixed crash on world join caused by MixinArsManaRegen targeting non-existent `tick` method in ManaCap. Mixin now correctly targets `ManaCapEvents.playerOnTick` to suppress native Ars mana regeneration in ISS_PRIMARY mode.
+
 ## Troubleshooting
 
 - **Ars mana not changing in iss_primary**: Ensure Iron's is installed (3.15.x). Check logs for mixin failures.
@@ -209,7 +214,7 @@ The mod hides redundant mana bars based on mode:
 .\gradlew.bat build
 ```
 
-Output jar: `build/libs/ars_n_spells-1.5.0.jar`
+Output jar: `build/libs/ars_n_spells-1.5.2.jar`
 
 ## License
 
