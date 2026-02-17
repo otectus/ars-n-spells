@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v1.3.0)
+# Ars 'n' Spells (v1.5.0)
 
 Ars 'n' Spells bridges Ars Nouveau and Iron's Spells 'n Spellbooks for Minecraft 1.20.1 (Forge). It unifies mana behavior, scaling, and progression while keeping each mod playable on its own.
 
