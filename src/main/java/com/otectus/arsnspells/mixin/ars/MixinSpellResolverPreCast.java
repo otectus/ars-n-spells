@@ -1,7 +1,11 @@
 package com.otectus.arsnspells.mixin.ars;
 
+import com.hollingsworth.arsnouveau.api.ArsNouveauAPI;
+import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.hollingsworth.arsnouveau.api.spell.SpellContext;
 import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
+import com.hollingsworth.arsnouveau.api.spell.SpellValidationError;
+import com.hollingsworth.arsnouveau.common.util.PortUtil;
 import com.otectus.arsnspells.aura.AuraManager;
 import com.otectus.arsnspells.casting.CastingAuthority;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
@@ -20,6 +24,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.List;
+
 /**
  * PRE-CAST VALIDATION MIXIN
  *
@@ -29,12 +35,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Injects at the HEAD of SpellResolver.canCast() to validate BEFORE
  * any spell logic executes. canCast() is called by onCast(), onCastOnBlock(),
  * and onCastOnEntity() — covering all Ars Nouveau cast paths.
+ *
+ * IMPORTANT: Since we cancel the native canCast() entirely to prevent
+ * stale ManaCap data from failing enoughMana(), we must replicate the
+ * native spell recipe validation (spellValidator.validate) ourselves.
  */
 @Mixin(value = SpellResolver.class, remap = false)
 public abstract class MixinSpellResolverPreCast {
     private static final Logger LOGGER = LoggerFactory.getLogger(MixinSpellResolverPreCast.class);
 
     @Shadow public SpellContext spellContext;
+    @Shadow public Spell spell;
+    @Shadow public boolean silent;
     @Shadow public abstract int getResolveCost();
 
     /**
@@ -58,10 +70,28 @@ public abstract class MixinSpellResolverPreCast {
             return;
         }
 
+        // Replicate native spell recipe validation since we bypass the rest of canCast().
+        // This checks: non-empty recipe, starts with cast method, max one cast method,
+        // augment caps, and glyph limits — matching Ars Nouveau's StandardSpellValidator.
+        List<SpellValidationError> validationErrors = ArsNouveauAPI.getInstance()
+            .getSpellCastingSpellValidator()
+            .validate(this.spell.recipe);
+
+        if (!validationErrors.isEmpty()) {
+            if (!this.silent) {
+                PortUtil.sendMessageNoSpam(entity, validationErrors.get(0).makeTextComponentExisting());
+            }
+            cir.setReturnValue(false);
+            cir.cancel();
+            return;
+        }
+
         SpellResolver resolver = (SpellResolver) (Object) this;
         int cost = resolver.getResolveCost();
 
         if (player.isCreative()) {
+            cir.setReturnValue(true);
+            cir.cancel();
             return;
         }
 
@@ -82,22 +112,27 @@ public abstract class MixinSpellResolverPreCast {
                             boolean deathPenalty = AnsConfig.DEATH_ON_INSUFFICIENT_LP.get();
                             if (deathPenalty) {
                                 LPDeathPrevention.markSpellCast(player);
+                                cir.setReturnValue(true);
+                                cir.cancel();
                                 return;
                             }
 
                             LOGGER.warn("SPELL CAST DENIED (LP) for {}", player.getName().getString());
-                            cir.setReturnValue(false);
-                            cir.cancel();
                             CursedRingHandler.clearPendingLPCost(player);
-
                             SanctifiedLegacyCompat.applySilentHealthLoss(player, 2.0f);
 
                             if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
                                 player.displayClientMessage(
                                     Component.literal("\u00a7cInsufficient LP - Spell Cancelled"), true);
                             }
+                            cir.setReturnValue(false);
+                            cir.cancel();
+                            return;
                         } else {
                             LPDeathPrevention.markSpellCast(player);
+                            cir.setReturnValue(true);
+                            cir.cancel();
+                            return;
                         }
                     }
                 }
@@ -112,8 +147,6 @@ public abstract class MixinSpellResolverPreCast {
                         boolean hasEnough = AuraManager.hasEnoughAura(player, pendingAuraCost);
                         if (!hasEnough) {
                             LOGGER.warn("SPELL CAST DENIED (Aura) for {}", player.getName().getString());
-                            cir.setReturnValue(false);
-                            cir.cancel();
                             VirtueRingHandler.clearPendingAuraCost(player);
 
                             if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
@@ -123,22 +156,39 @@ public abstract class MixinSpellResolverPreCast {
                                         + ", have " + currentAura),
                                     true);
                             }
+                            cir.setReturnValue(false);
+                            cir.cancel();
+                            return;
                         }
+                        // Aura is sufficient — allow the cast
+                        cir.setReturnValue(true);
+                        cir.cancel();
+                        return;
                     }
                 }
             }
+            // Zero-cost spell with no ring — always allow, bypass native enoughMana()
+            cir.setReturnValue(true);
+            cir.cancel();
             return;
         }
 
         LOGGER.debug("PRE-CAST VALIDATION: Player={}, Cost={}", player.getName().getString(), cost);
 
-        // HARD GATE: Validate resources BEFORE spell execution
+        // HARD GATE: Validate resources BEFORE spell execution.
+        // We MUST take full ownership of the canCast result here.
+        // If we return without cancelling, Ars's native enoughMana() will run
+        // and check ManaCap.getCurrentMana() which may return stale data (0)
+        // because playerOnTick is suppressed in ISS_PRIMARY mode.
         boolean canCast = CastingAuthority.canCastArsSpell(player, resolver);
 
         if (!canCast) {
             LOGGER.warn("SPELL CAST DENIED for {}", player.getName().getString());
-            cir.setReturnValue(false);
-            cir.cancel();
         }
+
+        // Always set the return value — both pass and fail — to prevent
+        // Ars's native enoughMana() from running with stale ManaCap data.
+        cir.setReturnValue(canCast);
+        cir.cancel();
     }
 }
