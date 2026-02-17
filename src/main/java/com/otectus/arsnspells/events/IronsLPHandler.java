@@ -69,9 +69,9 @@ public class IronsLPHandler {
         SpellRarity rarity = spell.getRarity(spellLevel);
         int lpCost = SanctifiedLegacyCompat.calculateIronsLPCost(manaCost, spellLevel, rarity.name());
 
-        LOGGER.info("Cursed Ring active for Iron's spell on {}", player.getName().getString());
-        LOGGER.info("Iron's spell: {}, Level: {}, Rarity: {}", event.getSpellId(), spellLevel, rarity.name());
-        LOGGER.info("Calculated LP cost: {} (base mana: {})", lpCost, manaCost);
+        LOGGER.debug("Cursed Ring active for Iron's spell on {}", player.getName().getString());
+        LOGGER.debug("Iron's spell: {}, Level: {}, Rarity: {}", event.getSpellId(), spellLevel, rarity.name());
+        LOGGER.debug("Calculated LP cost: {} (base mana: {})", lpCost, manaCost);
 
         boolean hasEnough = SanctifiedLegacyCompat.hasEnoughLP(player, lpCost);
         if (!hasEnough) {
@@ -170,7 +170,7 @@ public class IronsLPHandler {
                 true
             );
         }
-        LOGGER.info("Iron's spell cast - {} LP consumed", pending.lpCost);
+        LOGGER.debug("Iron's spell cast - {} LP consumed", pending.lpCost);
     }
 
     /**

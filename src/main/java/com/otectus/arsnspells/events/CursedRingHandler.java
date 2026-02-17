@@ -56,12 +56,12 @@ public class CursedRingHandler {
         }
 
         
-        LOGGER.info("🔴 CURSED RING DETECTED on {} - Spell will use LP instead of mana", 
+        LOGGER.debug("Cursed Ring detected on {} - Spell will use LP instead of mana",
             player.getName().getString());
         
         int manaCost = event.currentCost;
         if (manaCost <= 0) {
-            LOGGER.info("   Zero cost spell - allowing");
+            LOGGER.debug("Zero cost spell - allowing");
             return;
         }
 
@@ -80,10 +80,10 @@ public class CursedRingHandler {
         if (blasphemyMultiplier < 1.0) {
             int originalCost = lpCost;
             lpCost = (int) Math.max(100, Math.round(lpCost * blasphemyMultiplier));
-            LOGGER.info("   Blasphemy discount applied: {} LP -> {} LP", originalCost, lpCost);
+            LOGGER.debug("Blasphemy discount applied: {} LP -> {} LP", originalCost, lpCost);
         }
         
-        LOGGER.info("   Spell will cost {} LP (base mana: {})", lpCost, manaCost);
+        LOGGER.debug("Spell will cost {} LP (base mana: {})", lpCost, manaCost);
         
         // Store the LP cost for consumption in the resolve event
         pendingCosts.put(player.getUUID(), new PendingLPCost(lpCost, System.currentTimeMillis()));
@@ -91,7 +91,7 @@ public class CursedRingHandler {
         // Set mana cost to 0 so Ars Nouveau doesn't consume mana
         event.currentCost = 0;
         
-        LOGGER.info("   Mana cost set to 0 (LP will be consumed on spell resolve)");
+        LOGGER.debug("Mana cost set to 0 (LP will be consumed on spell resolve)");
     }
 
     /**
@@ -164,7 +164,7 @@ public class CursedRingHandler {
             return;
         }
         
-        LOGGER.info("💉 Consuming {} LP from {}'s Soul Network", pending.lpCost, player.getName().getString());
+        LOGGER.debug("Consuming {} LP from {}'s Soul Network", pending.lpCost, player.getName().getString());
         
         // Attempt to consume LP
         boolean success = SanctifiedLegacyCompat.consumeLP(player, pending.lpCost);
@@ -202,7 +202,7 @@ public class CursedRingHandler {
                 }
             }
         } else {
-            LOGGER.info("   ✅ LP consumed successfully - spell will execute");
+            LOGGER.debug("LP consumed successfully - spell will execute");
             pending.consumed = true;
             
             if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
