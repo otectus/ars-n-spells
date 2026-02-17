@@ -14,13 +14,14 @@
     "ars.MixinArsManaRegen",
     "ars.MixinArsPotionEffects",
     "irons.MixinIronsSpellDamage",
-    "irons.MixinIronsMagicDataMana"
+    "irons.MixinIronsMagicDataMana",
+    "irons.MixinScrollItem"
   ],
   "client": [
     "ars.MixinArsManaHud",
     "irons.MixinIronsManaBarOverlay"
   ],
   "injectors": {
-    "defaultRequire": 0
+    "defaultRequire": 1
   }
 }

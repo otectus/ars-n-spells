@@ -129,6 +129,23 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue IRONS_LP_LEGENDARY_MULTIPLIER;
 
     // ========================================
+    // AURA SYSTEM (Ring of Seven Virtues)
+    // ========================================
+    public static final ForgeConfigSpec.IntValue AURA_MAX_DEFAULT;
+    public static final ForgeConfigSpec.DoubleValue AURA_REGEN_RATE;
+    public static final ForgeConfigSpec.DoubleValue AURA_BASE_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue AURA_TIER1_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue AURA_TIER2_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue AURA_TIER3_MULTIPLIER;
+    public static final ForgeConfigSpec.IntValue AURA_MINIMUM_COST;
+    public static final ForgeConfigSpec.BooleanValue SHOW_AURA_MESSAGES;
+
+    // ========================================
+    // SCROLL COST SYSTEM
+    // ========================================
+    public static final ForgeConfigSpec.ConfigValue<String> SCROLL_COST_MODE;
+
+    // ========================================
     // PERFORMANCE TUNING
     // ========================================
     public static final ForgeConfigSpec.IntValue MANA_SYNC_INTERVAL;
@@ -493,12 +510,11 @@ public class AnsConfig {
         LP_SOURCE_MODE = BUILDER
             .comment(
                 "Where to consume LP from when wearing the Cursed Ring:",
-                "  BLOOD_MAGIC_ONLY - Only use Blood Magic Soul Network (authentic behavior)",
-                "  BLOOD_MAGIC_PRIORITY - Use Blood Magic if available, fall back to health",
-                "  HEALTH_ONLY - Always use player health (100 LP = 10 health = 5 hearts)",
-                "Default: BLOOD_MAGIC_ONLY - Requires Blood Magic for Cursed Ring to function"
+                "  BLOOD_MAGIC_PRIORITY - Use Blood Magic if available, fall back to health (DEFAULT)",
+                "  BLOOD_MAGIC_ONLY - Only use Blood Magic Soul Network (fails if Blood Magic not installed)",
+                "  HEALTH_ONLY - Always use player health (100 LP = 10 health = 5 hearts)"
             )
-            .define("lp_source_mode", "BLOOD_MAGIC_ONLY");
+            .define("lp_source_mode", "BLOOD_MAGIC_PRIORITY");
 
         DEATH_ON_INSUFFICIENT_LP = BUILDER
             .comment(
@@ -602,6 +618,69 @@ public class AnsConfig {
             .comment("LP multiplier for LEGENDARY rarity spells")
             .defineInRange("irons_lp_legendary_multiplier", 5.0, 0.1, 100.0);
         
+        BUILDER.pop();
+
+        // ========================================
+        // AURA SYSTEM (Ring of Seven Virtues)
+        // ========================================
+        BUILDER.push("Aura System");
+        BUILDER.comment(
+            "Aura resource system for Ring of Seven Virtues.",
+            "When wearing the Virtue Ring, spell mana costs are replaced with aura costs.",
+            "Aura regenerates passively over time."
+        );
+
+        AURA_MAX_DEFAULT = BUILDER
+            .comment("Default maximum aura pool")
+            .defineInRange("aura_max_default", 1000, 100, 100000);
+
+        AURA_REGEN_RATE = BUILDER
+            .comment("Aura regenerated per tick (20 ticks = 1 second). 0.5 = 10 aura/sec")
+            .defineInRange("aura_regen_rate", 0.5, 0.0, 100.0);
+
+        AURA_BASE_MULTIPLIER = BUILDER
+            .comment("Base conversion from mana cost to aura cost (mana x this = base aura)")
+            .defineInRange("aura_base_multiplier", 1.0, 0.1, 100.0);
+
+        AURA_TIER1_MULTIPLIER = BUILDER
+            .comment("Aura cost multiplier for Tier 1 glyphs")
+            .defineInRange("aura_tier1_multiplier", 1.0, 0.1, 10.0);
+
+        AURA_TIER2_MULTIPLIER = BUILDER
+            .comment("Aura cost multiplier for Tier 2 glyphs")
+            .defineInRange("aura_tier2_multiplier", 1.5, 0.1, 10.0);
+
+        AURA_TIER3_MULTIPLIER = BUILDER
+            .comment("Aura cost multiplier for Tier 3 glyphs")
+            .defineInRange("aura_tier3_multiplier", 2.0, 0.1, 10.0);
+
+        AURA_MINIMUM_COST = BUILDER
+            .comment("Minimum aura cost for any spell")
+            .defineInRange("aura_minimum_cost", 5, 1, 10000);
+
+        SHOW_AURA_MESSAGES = BUILDER
+            .comment("Show aura cost messages in action bar when casting spells")
+            .define("show_aura_messages", true);
+
+        BUILDER.pop();
+
+        // ========================================
+        // SCROLL COST SYSTEM
+        // ========================================
+        BUILDER.push("Scroll Cost System");
+        BUILDER.comment(
+            "Controls resource costs when casting Iron's Spellbooks spells from scrolls."
+        );
+
+        SCROLL_COST_MODE = BUILDER
+            .comment(
+                "Cost mode for Iron's Spellbooks scroll usage:",
+                "  full - Scrolls consume mana and LP just like normal casting",
+                "  lp_only - Scrolls are free of mana cost but still consume LP if Cursed Ring equipped",
+                "  free - Scrolls have no resource cost (LP from Cursed Ring still applies)"
+            )
+            .define("scroll_cost_mode", "full");
+
         BUILDER.pop();
 
         // ========================================

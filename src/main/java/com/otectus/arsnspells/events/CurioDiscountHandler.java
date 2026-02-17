@@ -82,32 +82,23 @@ public class CurioDiscountHandler {
      */
     private static double calculateDiscountMultiplier(Player player, SpellCostCalcEvent event) {
         double multiplier = 1.0;
-        
-        // Check for Ring of Virtue discount
-        boolean hasVirtue = SanctifiedLegacyCompat.hasVirtueRing(player);
-        if (hasVirtue) {
-            double virtueDiscount = AnsConfig.VIRTUE_RING_DISCOUNT.get();
-            multiplier *= (1.0 - virtueDiscount);
-            
-            logDebug("Ring of Virtue discount applied: {:.1f}%", virtueDiscount * 100);
-        }
-        
+
+        // Virtue Ring no longer provides a mana discount — it converts mana to aura via
+        // VirtueRingHandler. If the Virtue Ring is active, the cost has already been zeroed
+        // by VirtueRingHandler at HIGHEST priority, so this handler won't be reached (cost <= 0).
+        // Only Blasphemy discounts apply here (for non-ring or Cursed Ring users).
+
         // Check for Blasphemy discount
         String spellSchool = determineSpellSchool(event);
         BlasphemyDiscountResult blasphemyResult = calculateBlasphemyDiscount(player, spellSchool);
-        
+
         if (blasphemyResult.hasBlasphemy) {
-            if (AnsConfig.ALLOW_DISCOUNT_STACKING.get() || !hasVirtue) {
-                // Apply Blasphemy discount (stacking multiplicatively if allowed)
-                multiplier *= (1.0 - blasphemyResult.totalDiscount);
-                
-                logDebug("Blasphemy discount applied: {:.1f}% (school: {}, matching: {})",
-                    blasphemyResult.totalDiscount * 100, spellSchool, blasphemyResult.isMatching);
-            } else {
-                logDebug("Blasphemy discount skipped (stacking disabled and Virtue Ring active)");
-            }
+            multiplier *= (1.0 - blasphemyResult.totalDiscount);
+
+            logDebug("Blasphemy discount applied: {:.1f}% (school: {}, matching: {})",
+                blasphemyResult.totalDiscount * 100, spellSchool, blasphemyResult.isMatching);
         }
-        
+
         return multiplier;
     }
     

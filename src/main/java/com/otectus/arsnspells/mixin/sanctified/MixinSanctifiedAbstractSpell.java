@@ -51,10 +51,12 @@ public abstract class MixinSanctifiedAbstractSpell {
             return;
         }
         
-        LOGGER.info("🔍 Intercepting Sanctified Legacy's LP check for {}", player.getName().getString());
-        
-        // Let Sanctified Legacy's mixin run, but we'll handle the death penalty ourselves
-        // We can't easily prevent their death penalty here, so we'll use a different approach
-        // in the spell cast event
+        LOGGER.debug("Intercepting Sanctified Legacy LP check for {}", player.getName().getString());
+
+        // Our LP system (IronsLPHandler / CursedRingHandler) handles this player's LP costs.
+        // Return true to bypass Sanctified Legacy's native LP check and death penalty.
+        // This prevents the "instant death" bug when scrolls or spells trigger
+        // Sanctified Legacy's handler before our system processes the cost.
+        cir.setReturnValue(true);
     }
 }
