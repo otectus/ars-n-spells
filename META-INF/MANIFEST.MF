@@ -1,9 +1,0 @@
-Manifest-Version: 1.0
-Specification-Title: ars_n_spells
-Specification-Vendor: Oetectus
-Specification-Version: 1
-Implementation-Title: ars_n_spells
-Implementation-Version: 1.1.2
-Implementation-Vendor: Oetectus
-MixinConfigs: ars_n_spells.mixins.json
-

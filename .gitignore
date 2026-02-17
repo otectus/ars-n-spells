@@ -1,12 +1,27 @@
+# IDE / editor
 .blackboxcli/
 .gradle/
 .vscode/
+.idea/
+*.iml
+
+# Build output
 build/
+out/
 logs/
+run/
+
+# Dependencies & local copies
 dependencies/
 mods/
 io/
 gradle-8.4/
 gradle-8.4-bin.zip
 *.jar
+
+# Root META-INF (build artifact, not src/main/resources one)
+/META-INF/
+
+# Misc
 $null
+*.log
