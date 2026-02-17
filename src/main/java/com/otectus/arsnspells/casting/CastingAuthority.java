@@ -56,7 +56,7 @@ public class CastingAuthority {
             
             if (hasCursed) {
                 // Cursed Ring replaces mana cost with Blood Magic LP
-                LOGGER.info("🔴 CURSED RING DETECTED - Using LP instead of mana for {}", player.getName().getString());
+                LOGGER.debug("Cursed Ring detected - Using LP instead of mana for {}", player.getName().getString());
                 return validateCursedRingCost(player, resolver, manaCost);
             }
         } else {
@@ -92,46 +92,45 @@ public class CastingAuthority {
      * @return true if LP was successfully consumed
      */
     private static boolean validateCursedRingCost(Player player, SpellResolver resolver, int manaCost) {
-        LOGGER.info("🔴 validateCursedRingCost called for player: {}, mana cost: {}", 
+        LOGGER.debug("validateCursedRingCost called for player: {}, mana cost: {}",
             player.getName().getString(), manaCost);
-        
+
         // Get the first spell part for tier/rarity info
         AbstractSpellPart spellPart = null;
         if (resolver.spell != null && resolver.spell.recipe != null && !resolver.spell.recipe.isEmpty()) {
             spellPart = resolver.spell.recipe.get(0);
-            LOGGER.info("   Spell part: {}", spellPart.getRegistryName());
+            LOGGER.debug("Spell part: {}", spellPart.getRegistryName());
         } else {
-            LOGGER.warn("   No spell part found in resolver");
+            LOGGER.debug("No spell part found in resolver");
         }
-        
+
         // Calculate LP cost
         int lpCost = SanctifiedLegacyCompat.calculateLPCost(manaCost, spellPart);
-        LOGGER.info("   Calculated LP cost: {} (base mana: {})", lpCost, manaCost);
-        
+        LOGGER.debug("Calculated LP cost: {} (base mana: {})", lpCost, manaCost);
+
         // Determine spell school for Blasphemy multiplier
         String spellSchool = SanctifiedLegacyCompat.determineSpellSchool(spellPart);
-        LOGGER.info("   Detected spell school: {}", spellSchool);
-        
+        LOGGER.debug("Detected spell school: {}", spellSchool);
+
         // Apply Blasphemy multiplier if applicable
         double blasphemyMultiplier = SanctifiedLegacyCompat.getBlasphemyMultiplier(player, spellSchool);
         if (blasphemyMultiplier < 1.0) {
             int originalCost = lpCost;
             lpCost = (int) Math.max(100, Math.round(lpCost * blasphemyMultiplier));
-            LOGGER.info("   Blasphemy multiplier applied: {:.2f} ({} LP -> {} LP)", 
+            LOGGER.debug("Blasphemy multiplier applied: {} ({} LP -> {} LP)",
                 blasphemyMultiplier, originalCost, lpCost);
         }
-        
-        LOGGER.info("   Final LP cost: {}", lpCost);
+
+        LOGGER.debug("Final LP cost: {}", lpCost);
 
         // Check if player has enough LP (don't consume yet - event handlers will do that)
-        LOGGER.info("   Checking LP availability...");
         boolean hasEnough = SanctifiedLegacyCompat.hasEnoughLP(player, lpCost);
 
         if (hasEnough) {
-            LOGGER.info("   ✅ Player has sufficient LP!");
+            LOGGER.debug("Player has sufficient LP");
         } else {
-            LOGGER.warn("   ❌ Insufficient LP!");
-            sendDenialMessage(player, "§cInsufficient Life Points (LP): Need " + lpCost + " LP");
+            LOGGER.debug("Insufficient LP");
+            sendDenialMessage(player, "\u00a7cInsufficient Life Points (LP): Need " + lpCost + " LP");
         }
 
         return hasEnough;

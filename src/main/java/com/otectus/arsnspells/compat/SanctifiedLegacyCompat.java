@@ -81,7 +81,7 @@ public class SanctifiedLegacyCompat {
     private static void initBloodMagicReflection() {
         try {
             // Try to find Blood Magic's NetworkHelper class
-            bloodMagicNetworkClass = Class.forName("wayoftime.bloodmagic.common.util.helper.NetworkHelper");
+            bloodMagicNetworkClass = Class.forName("wayoftime.bloodmagic.util.helper.NetworkHelper");
             getSoulNetworkMethod = bloodMagicNetworkClass.getMethod("getSoulNetwork", java.util.UUID.class);
 
             // Get SoulNetwork class methods
@@ -170,37 +170,19 @@ public class SanctifiedLegacyCompat {
     private static boolean hasCurio(Player player, String curioId) {
         try {
             ResourceLocation itemId = new ResourceLocation(curioId);
-            
-            LOGGER.info("      Checking for curio: {}", curioId);
-            LOGGER.info("      Target ID: namespace='{}', path='{}'", itemId.getNamespace(), itemId.getPath());
-            
-            // Use Ars Nouveau's CuriosUtil to get all worn items
-            boolean found = CuriosUtil.getAllWornItems(player).map(handler -> {
-                LOGGER.info("      Curio handler found, slots: {}", handler.getSlots());
+
+            return CuriosUtil.getAllWornItems(player).map(handler -> {
                 for (int i = 0; i < handler.getSlots(); i++) {
                     ItemStack stack = handler.getStackInSlot(i);
                     if (!stack.isEmpty()) {
                         ResourceLocation stackId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(stack.getItem());
-                        LOGGER.info("      Slot {}: {}", i, stackId);
-                        LOGGER.info("         Stack ID: namespace='{}', path='{}'", 
-                            stackId != null ? stackId.getNamespace() : "null", 
-                            stackId != null ? stackId.getPath() : "null");
-                        LOGGER.info("         Equals check: {}", stackId != null && stackId.equals(itemId));
-                        LOGGER.info("         Namespace match: {}", stackId != null && stackId.getNamespace().equals(itemId.getNamespace()));
-                        LOGGER.info("         Path match: {}", stackId != null && stackId.getPath().equals(itemId.getPath()));
-                        
                         if (stackId != null && stackId.equals(itemId)) {
-                            LOGGER.info("      ✅ FOUND matching curio at slot {}!", i);
                             return true;
                         }
                     }
                 }
-                LOGGER.info("      ❌ Curio not found in any slot");
                 return false;
             }).orElse(false);
-            
-            LOGGER.info("      Final result: {}", found);
-            return found;
         } catch (Exception e) {
             LOGGER.error("Failed to check for curio {}: {}", curioId, e.getMessage(), e);
             return false;
@@ -378,24 +360,24 @@ public class SanctifiedLegacyCompat {
         if (mode == LPSourceMode.BLOOD_MAGIC_PRIORITY || mode == LPSourceMode.BLOOD_MAGIC_ONLY) {
             if (isBloodMagicAvailable()) {
                 int currentLP = getBloodMagicLP(player);
-                LOGGER.info("💉 Attempting to consume {} LP from {}'s Soul Network (has {} LP)",
+                LOGGER.debug("Attempting to consume {} LP from {}'s Soul Network (has {} LP)",
                     lpCost, player.getName().getString(), currentLP);
 
                 if (currentLP >= lpCost) {
                     boolean success = consumeBloodMagicLP(player, lpCost);
                     if (success) {
-                        LOGGER.info("   ✅ Successfully consumed {} LP from Soul Network", lpCost);
+                        LOGGER.debug("Successfully consumed {} LP from Soul Network", lpCost);
                         return true;
                     }
                 }
 
                 // If Blood Magic only mode and failed, don't fall back to health
                 if (mode == LPSourceMode.BLOOD_MAGIC_ONLY) {
-                    LOGGER.warn("   ❌ Insufficient LP in Soul Network: need {} but only have {}", lpCost, currentLP);
+                    LOGGER.debug("Insufficient LP in Soul Network: need {} but only have {}", lpCost, currentLP);
                     return false;
                 }
 
-                LOGGER.info("   Insufficient Soul Network LP, falling back to health");
+                LOGGER.debug("Insufficient Soul Network LP, falling back to health");
             } else if (mode == LPSourceMode.BLOOD_MAGIC_ONLY) {
                 LOGGER.warn("Blood Magic not available but LP_SOURCE_MODE is BLOOD_MAGIC_ONLY");
                 return false;
@@ -407,12 +389,12 @@ public class SanctifiedLegacyCompat {
         float currentHealth = player.getHealth();
         float maxHealth = player.getMaxHealth();
 
-        LOGGER.info("💉 Attempting to consume {} LP ({} health) from {}'s health",
+        LOGGER.debug("Attempting to consume {} LP ({} health) from {}'s health",
             lpCost, healthCost, player.getName().getString());
-        LOGGER.info("   Current health: {}/{}", currentHealth, maxHealth);
+        LOGGER.debug("Current health: {}/{}", currentHealth, maxHealth);
 
         if (currentHealth <= healthCost + 1.0f) {
-            LOGGER.warn("   ❌ Insufficient health: need {} but only have {} (keeping 1 HP buffer)",
+            LOGGER.debug("Insufficient health: need {} but only have {} (keeping 1 HP buffer)",
                 healthCost, currentHealth);
             return false;
         }
@@ -420,7 +402,7 @@ public class SanctifiedLegacyCompat {
         float newHealth = currentHealth - healthCost;
         player.setHealth(newHealth);
 
-        LOGGER.info("   ✅ Successfully consumed {} LP ({} health) - new health: {}",
+        LOGGER.debug("Successfully consumed {} LP ({} health) - new health: {}",
             lpCost, healthCost, newHealth);
 
         return true;
