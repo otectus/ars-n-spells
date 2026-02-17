@@ -1,5 +1,7 @@
 package com.otectus.arsnspells;
 
+import com.otectus.arsnspells.aura.AuraCapabilityProvider;
+import com.otectus.arsnspells.aura.IAuraCapability;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
@@ -52,7 +54,9 @@ public class ArsNSpells {
         MinecraftForge.EVENT_BUS.register(EquipmentHandler.class);
         MinecraftForge.EVENT_BUS.register(CurioDiscountHandler.class);
         MinecraftForge.EVENT_BUS.register(CursedRingHandler.class);
+        MinecraftForge.EVENT_BUS.register(VirtueRingHandler.class);
         MinecraftForge.EVENT_BUS.register(LPDeathPrevention.class);
+        MinecraftForge.EVENT_BUS.register(AuraCapabilityProvider.class);
 
         if (ModList.get().isLoaded("irons_spellbooks")) {
             MinecraftForge.EVENT_BUS.register(new IronsCooldownHandler());
@@ -69,6 +73,7 @@ public class ArsNSpells {
     private void registerCaps(RegisterCapabilitiesEvent event) {
         event.register(AffinityData.class);
         event.register(CooldownData.class);
+        event.register(IAuraCapability.class);
     }
 
     private void onAttachCapabilities(AttachCapabilitiesEvent<Entity> event) {

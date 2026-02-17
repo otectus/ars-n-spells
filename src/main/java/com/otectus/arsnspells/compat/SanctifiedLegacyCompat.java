@@ -66,7 +66,14 @@ public class SanctifiedLegacyCompat {
                 initBloodMagicReflection();
             }
 
-            LOGGER.info("✅ Sanctified Legacy compatibility layer initialized successfully");
+            // Warn if LP_SOURCE_MODE is BLOOD_MAGIC_ONLY but Blood Magic isn't installed
+            LPSourceMode lpMode = getLPSourceMode();
+            if (lpMode == LPSourceMode.BLOOD_MAGIC_ONLY && !isBloodMagicLoaded) {
+                LOGGER.warn("  LP_SOURCE_MODE is BLOOD_MAGIC_ONLY but Blood Magic is not installed!");
+                LOGGER.warn("  Cursed Ring LP costs will ALWAYS fail. Change to BLOOD_MAGIC_PRIORITY or HEALTH_ONLY.");
+            }
+
+            LOGGER.info("Sanctified Legacy compatibility layer initialized successfully");
         } else {
             LOGGER.info("Sanctified Legacy compatibility skipped: covenant_of_the_seven={}, enigmaticlegacy={}",
                 isLoaded, isEnigmaticLegacyLoaded);

@@ -30,7 +30,8 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("MixinIronsSpellDamage")
             || mixinClassName.endsWith("MixinIronsManaBarOverlay")
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
-            || mixinClassName.endsWith("MixinSpellStatsPotency")) {
+            || mixinClassName.endsWith("MixinSpellStatsPotency")
+            || mixinClassName.endsWith("MixinScrollItem")) {
             return ironsPresent;
         }
         return true;

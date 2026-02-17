@@ -189,6 +189,16 @@ public class IronsLPHandler {
     }
 
     /**
+     * Store a pending LP cost for scroll-based casting.
+     * Called by MixinScrollItem to integrate with the LP tracking system.
+     */
+    public static void storePendingScrollLP(Player player, int lpCost, int manaCost) {
+        if (player != null) {
+            pendingCosts.put(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
+        }
+    }
+
+    /**
      * Container for pending Iron's spell LP costs.
      */
     private static class PendingIronsLP {

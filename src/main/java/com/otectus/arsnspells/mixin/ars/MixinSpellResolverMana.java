@@ -24,21 +24,22 @@ public abstract class MixinSpellResolverMana {
 
     @Inject(method = "expendMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$expendMana(CallbackInfo ci) {
-        // SANCTIFIED LEGACY INTEGRATION: Skip mana consumption ONLY for Cursed Ring
-        // (Cursed Ring consumes health instead of mana via CastingAuthority)
-        // Virtue Ring still uses mana but with a discount applied by CurioDiscountHandler
+        // SANCTIFIED LEGACY INTEGRATION: Skip mana consumption for Cursed Ring and Virtue Ring
+        // - Cursed Ring: LP was consumed in CursedRingHandler.onSpellResolve
+        // - Virtue Ring: Aura was consumed in VirtueRingHandler.onSpellResolve
         if (spellContext != null) {
             LivingEntity caster = spellContext.getUnwrappedCaster();
             if (caster instanceof Player player) {
                 if (SanctifiedLegacyCompat.isAvailable()) {
                     if (SanctifiedLegacyCompat.isWearingCursedRing(player)) {
-                        // LP (health) was already consumed in CastingAuthority pre-cast validation
-                        // Skip mana consumption entirely for Cursed Ring users
                         ci.cancel();
                         return;
                     }
-                    // NOTE: Virtue Ring users continue to mana consumption below
-                    // Their mana cost was already discounted by CurioDiscountHandler
+                    if (SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
+                        // Aura was already consumed by VirtueRingHandler
+                        ci.cancel();
+                        return;
+                    }
                 }
             }
         }
