@@ -1,122 +1,203 @@
 # Ars 'n' Spells (v1.5.0)
 
-Ars 'n' Spells bridges Ars Nouveau and Iron's Spells 'n Spellbooks for Minecraft 1.20.1 (Forge). It unifies mana behavior, scaling, and progression while keeping each mod playable on its own.
-
-This README describes the current implementation in this repository (not marketing plans).
+Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
 ## Requirements
 
-- Minecraft 1.20.1
-- Forge 47.2.0
-- Ars Nouveau 4.12.7 (required)
-- Iron's Spells 'n Spellbooks 3.15.x (optional)
+| Mod | Version | Required |
+| --- | --- | --- |
+| Minecraft (Forge) | 1.20.1 / 47.2.0+ | Yes |
+| Ars Nouveau | 4.12.7 | Yes |
+| Iron's Spells 'n Spellbooks | 3.15.x | No |
+| Covenant of the Seven | Any | No |
+| Blood Magic | Any | No |
+| Curios API | Any | Included via Ars |
 
-If Iron's is not installed, Ars 'n' Spells falls back to native Ars behavior.
+If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior.
 
 ## Features
 
-### Mana unification modes
+### Mana unification
 
-Configured by `mana_unification_mode` in `config/ars_n_spells-common.toml`:
+Five modes are available via the `mana_unification_mode` config:
 
-- `iss_primary` (default): Iron's mana is the single source of truth. Ars mana reads and drains Iron's mana.
-- `ars_primary`: Ars mana is the single source of truth. Iron's spells drain Ars mana.
-- `hybrid`: Shared pool with Iron's as the primary reader, Ars as secondary for sync.
-- `separate`: Separate pools. Cross-mod spell casts require dual costs.
-- `disabled`: No mana integration.
+| Mode | Behavior |
+| --- | --- |
+| `iss_primary` (default) | Iron's mana is the single source of truth. Ars reads and drains Iron's pool. |
+| `ars_primary` | Ars mana is authoritative. Iron's spells drain Ars mana. |
+| `hybrid` | Shared bidirectional pool. A config option (`hybrid_mana_bar`) controls which HUD bar is displayed. |
+| `separate` | Independent pools. Cross-mod casts split costs between both pools. |
+| `disabled` | No mana integration; each mod uses its own pool. |
+
+Conversion rates (`conversion_rate_ars_to_iron`, `conversion_rate_iron_to_ars`) and dual-cost percentages are configurable.
 
 ### Gear perks and enchantments
 
-Ars and Iron's gear can grant mana bonuses. This mod routes those bonuses to the active mana source:
+Ars and Iron's gear bonuses are routed to the active mana source:
 
-- `iss_primary` / `hybrid`: Ars gear perks are applied to Iron's attributes (MAX_MANA and MANA_REGEN).
-- `ars_primary`: Iron's gear perks are applied to Ars mana calculations.
-- `separate`: Each mod's gear affects its own pool only (normal behavior).
+- **iss_primary / hybrid** -- Ars gear perks apply to Iron's attributes.
+- **ars_primary** -- Iron's gear perks apply to Ars calculations.
+- **separate** -- Each mod's gear affects its own pool only.
 
-Bonuses are sourced from:
-- Attribute modifiers on equipment (Ars perk attributes and Iron's mana attributes).
-- Ars `IManaEquipment` implementations.
-- Mana-related enchantments (heuristic name match).
-- Curios items, if Curios is present (reads worn items).
+Bonuses come from attribute modifiers, `IManaEquipment` implementations, mana-related enchantments, and Curios items.
 
 ### Spell scaling
 
-- Ars spell potency scales with Iron's spell power attributes.
-- Elemental spell power attributes are applied when the first glyph indicates an element.
+Ars spell potency scales with Iron's spell power attributes. Elemental spell power is applied when the first glyph indicates an element.
 
-### Resonance (Iron's only)
+### Resonance
 
-Optional resonance tracks current mana percentage and boosts Iron's spell damage. It is computed server-side and synced to clients.
+Optional resonance tracks mana percentage and boosts Iron's spell damage when mana is above a configurable threshold (default 95%).
 
 ### Cooldowns
 
-A unified cooldown system prevents cross-mod spell spam. Spells are grouped into categories and lock out similar spells across mods.
+A unified cooldown system groups spells into categories and locks out similar spells across mods. Disabled by default.
 
 ### Progression and affinity
 
-- Ars spell casts can grant Iron's school attribute progression.
-- Affinity tracks spell school usage and syncs to client.
+Ars spell casts can grant Iron's school progression and vice versa. Affinity tracks spell school usage over time, with optional decay.
 
 ### Cross-mod spell casting (experimental)
 
-Items can store cross-mod spell NBT and cast the stored spell on right-click. The list tag is `arsnspells:cross_spells`.
+Items can store cross-mod spell NBT (`arsnspells:cross_spells`) and cast the stored spell on right-click. Sneak-right-click cycles entries. Mana costs respect the active mode and conversion rates.
 
-Per-entry NBT:
-- `spell_type`: `IRONS_SPELLBOOKS` or `ARS_NOUVEAU`
-- Iron spell: `spell_id` (e.g., `irons_spellbooks:fireball`), `spell_level` (int), optional `cast_source`
-- Ars spell: `ars_spell` (CompoundTag from `Spell.serialize()`)
+---
 
-Sneak-right-click cycles the selected entry. The selected index is stored in `arsnspells:cross_spell_index`.
+## Covenant of the Seven integration
 
-Mana costs respect the active mode and conversion rates:
-- `iss_primary` / `hybrid`: Ars costs are paid from Iron with `conversion_rate_ars_to_iron`.
-- `ars_primary`: Iron costs are paid from Ars with `conversion_rate_iron_to_ars`.
-- `separate`: costs split by `dual_cost_*`; the off-pool portion uses the relevant conversion rate.
+When Covenant of the Seven (Sanctified Legacy) is installed, two ring systems become available.
+
+### Ring of Seven Curses (LP costs)
+
+Wearing the Cursed Ring converts mana costs to **Life Points**. LP can be sourced from Blood Magic's Soul Network or player health.
+
+- **LP source modes** (`lp_source_mode`):
+  - `BLOOD_MAGIC_PRIORITY` (default) -- Try Blood Magic first, fall back to health.
+  - `BLOOD_MAGIC_ONLY` -- Blood Magic only; fails if BM is not installed.
+  - `HEALTH_ONLY` -- Always use health (100 LP = 5 hearts).
+- **Insufficient LP behavior** (`death_on_insufficient_lp`):
+  - `false` (default) -- Spell is cancelled with 1 heart of damage.
+  - `true` -- Spell casts but the player dies.
+- LP costs scale with configurable base and tier multipliers, with a minimum cost floor.
+
+### Ring of Seven Virtues (aura costs)
+
+Wearing the Virtue Ring converts mana costs to **aura**, a custom resource that regenerates over time.
+
+- **Aura pool**: Configurable max (default 1000) and regen rate (default 0.5/tick = 10/sec).
+- **Cost formula**: `aura = max(minimum, manaCost * baseMultiplier * tierMultiplier)`
+- Aura persists across death and dimension changes.
+- Insufficient aura cancels the spell with an action bar message.
+
+### Blasphemy curios (school discounts)
+
+Thirteen Blasphemy curios provide a base 15% mana discount, plus an extra 10% when the spell school matches the curio's element. Discounts stack multiplicatively with ring costs when enabled.
+
+---
+
+## Scroll cost enforcement
+
+Iron's Spellbooks scrolls now respect resource costs. The `scroll_cost_mode` config controls behavior:
+
+| Mode | Behavior |
+| --- | --- |
+| `full` (default) | Scrolls consume mana and LP/aura like normal casting. |
+| `lp_only` | Scrolls are mana-free but LP is still consumed for Cursed Ring wearers. |
+| `free` | No resource cost for scrolls (LP from Cursed Ring still applies). |
+
+---
 
 ## Configuration
 
 Config file: `config/ars_n_spells-common.toml`
 
-Common options:
+### Master toggles
 
-| Option | Default | Notes |
+| Option | Default | Description |
 | --- | --- | --- |
-| `enable_mana_unification` | `true` | Enables all mana bridging logic; when `false`, each mod uses its native mana only. |
-| `mana_unification_mode` | `iss_primary` | Chooses which mana pool is authoritative and how pools sync or split. |
-| `conversion_rate_ars_to_iron` | `1.0` | Multiplier applied when Ars costs are paid from Iron's pool (higher = more expensive Ars casts). |
-| `conversion_rate_iron_to_ars` | `1.0` | Multiplier applied when Iron's costs/bonuses are paid from Ars pool (higher = more expensive Iron's casts). |
-| `dual_cost_ars_percentage` | `0.5` | In `separate`, percent of cost taken from Ars pool when cross-casting. |
-| `dual_cost_iss_percentage` | `0.5` | In `separate`, percent of cost taken from Iron's pool when cross-casting. |
-| `respect_armor_bonuses` | `true` | When enabled, applies mana-related armor perks to the active mana source. |
-| `respect_enchantments` | `true` | When enabled, mana-related enchantments add mana/regen bonuses. |
-| `enable_resonance_system` | `true` | Enables full-mana resonance bonuses (Iron's only). |
-| `enable_cooldown_system` | `true` | Enables unified cooldown categories across both mods. |
-| `enable_progression_system` | `true` | Enables Ars casts to grant Iron's school progression bonuses. |
-| `enable_affinity_system` | `true` | Enables affinity/attunement tracking for spell schools. |
-| `debug_mode` | `false` | Enables verbose debug logging for troubleshooting. |
+| `enable_mana_unification` | `true` | Enables all mana bridging logic. |
+| `mana_unification_mode` | `iss_primary` | Which mana pool is authoritative. |
+| `enable_resonance_system` | `true` | Full-mana resonance bonuses (Iron's). |
+| `enable_cooldown_system` | `false` | Unified cooldown categories. |
+| `enable_progression_system` | `true` | Cross-mod progression XP. |
+| `enable_affinity_system` | `true` | Spell school affinity tracking. |
+| `debug_mode` | `false` | Verbose logging. |
 
-Changes are safest with a client/server restart.
+### Mana conversion
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `conversion_rate_ars_to_iron` | `1.0` | Multiplier for Ars costs paid from Iron's pool. |
+| `conversion_rate_iron_to_ars` | `1.0` | Multiplier for Iron's costs paid from Ars pool. |
+| `dual_cost_ars_percentage` | `0.5` | In `separate`, fraction taken from Ars pool. |
+| `dual_cost_iss_percentage` | `0.5` | In `separate`, fraction taken from Iron's pool. |
+| `hybrid_mana_bar` | `irons` | Which HUD bar to show in `hybrid` mode (`ars` or `irons`). |
+
+### LP system (Cursed Ring)
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `lp_source_mode` | `BLOOD_MAGIC_PRIORITY` | LP source fallback order. |
+| `death_on_insufficient_lp` | `false` | Kill player instead of cancelling spell. |
+| `show_lp_cost_messages` | `true` | Action bar LP notifications. |
+| `ars_lp_base_multiplier` | `1.0` | Base LP multiplier for Ars spells. |
+| `irons_lp_base_multiplier` | `0.5` | Base LP multiplier for Iron's spells. |
+| `ars_lp_minimum_cost` | `10` | Minimum LP per Ars cast. |
+| `irons_lp_minimum_cost` | `10` | Minimum LP per Iron's cast. |
+
+### Aura system (Virtue Ring)
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `aura_max_default` | `1000` | Starting max aura. |
+| `aura_regen_rate` | `0.5` | Aura regenerated per tick (10/sec at 20 TPS). |
+| `aura_base_multiplier` | `1.0` | Base aura cost multiplier. |
+| `aura_tier1_multiplier` | `1.0` | Tier 1 spell aura multiplier. |
+| `aura_tier2_multiplier` | `1.5` | Tier 2 spell aura multiplier. |
+| `aura_tier3_multiplier` | `2.0` | Tier 3 spell aura multiplier. |
+| `aura_minimum_cost` | `5` | Minimum aura per cast. |
+| `show_aura_messages` | `true` | Action bar aura notifications. |
+
+### Scroll costs
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `scroll_cost_mode` | `full` | Scroll resource cost mode (`full`/`lp_only`/`free`). |
+
+### Curio discounts
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `enable_curio_discounts` | `true` | Enable Blasphemy curio discounts. |
+| `blasphemy_discount` | `0.15` | Base Blasphemy discount (15%). |
+| `blasphemy_matching_school_bonus` | `0.10` | Extra discount for matching school (+10%). |
+| `allow_discount_stacking` | `true` | Allow discounts to stack with ring costs. |
+
+### Other
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `respect_armor_bonuses` | `true` | Route armor mana perks to active source. |
+| `respect_enchantments` | `true` | Include mana enchantment bonuses. |
+
+---
 
 ## Mana bars
 
 The mod hides redundant mana bars based on mode:
 
-- `iss_primary`: hides Ars mana bar
-- `ars_primary` / `hybrid`: hides Iron's mana bar
-- `separate` / `disabled`: both bars may show
+- **iss_primary**: Hides Ars mana bar.
+- **ars_primary**: Hides Iron's mana bar.
+- **hybrid**: Shows the bar selected by `hybrid_mana_bar`.
+- **separate / disabled**: Both bars may show.
 
 ## Troubleshooting
 
-- Ars mana not changing in `iss_primary`:
-  - Ensure Iron's is installed and compatible (3.15.x).
-  - Check logs for mixin failures or missing attributes.
-
-- Gear perks not affecting mana:
-  - Confirm `respect_armor_bonuses=true` and the correct mode.
-  - In `separate`, perks are not cross-applied by design.
-
-- Double mana bars:
-  - Verify your mode and look for overlay conflicts from other UI mods.
+- **Ars mana not changing in iss_primary**: Ensure Iron's is installed (3.15.x). Check logs for mixin failures.
+- **Gear perks not affecting mana**: Confirm `respect_armor_bonuses=true` and the correct mode. In `separate`, perks are not cross-applied.
+- **Double mana bars**: Verify your mode and check for overlay conflicts from other UI mods.
+- **"Insufficient LP" despite enough hearts**: Ensure `lp_source_mode` is not `BLOOD_MAGIC_ONLY` without Blood Magic installed. Default is `BLOOD_MAGIC_PRIORITY`.
+- **Scrolls casting for free**: Verify `scroll_cost_mode` is set to `full` (default).
 
 ## Building from source
 
@@ -125,10 +206,10 @@ The mod hides redundant mana bars based on mode:
 3. Run:
 
 ```powershell
-.\\gradlew.bat build
+.\gradlew.bat build
 ```
 
-Output jar: `build/libs/ars_n_spells-<version>.jar`
+Output jar: `build/libs/ars_n_spells-1.5.0.jar`
 
 ## License
 
