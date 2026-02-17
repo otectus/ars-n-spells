@@ -1,0 +1,12 @@
+.blackboxcli/
+.gradle/
+.vscode/
+build/
+logs/
+dependencies/
+mods/
+io/
+gradle-8.4/
+gradle-8.4-bin.zip
+*.jar
+$null
