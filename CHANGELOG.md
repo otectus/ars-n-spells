@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-03-16
+
+### Fixed - Critical Mana Reset Bug
+- **Fixed mana being permanently stuck at 1/100 with no regeneration** in ISS_PRIMARY mode
+  - Root cause: ManaCap write intercepts (`setMana`, `addMana`, `removeMana`) were forwarding Ars-internal stale values (typically 0) to Iron's MagicData, overwriting Iron's actual mana every tick
+  - Fix: Changed write intercepts to read-only shadow sync — ManaCap now reads Iron's current value without writing back to it; spell consumption still works via the separate `expendMana` path through `BridgeManager`
+- **Fixed StackOverflowError crash in ARS_PRIMARY mode**
+  - Root cause: `getCurrentMana()` mixin called `ArsNativeBridge.getMana()` which called `cap.getCurrentMana()`, re-entering the mixin in an infinite loop
+  - Fix: Added `ThreadLocal` recursion guard and explicit ARS_PRIMARY early-exit (Ars is source of truth in that mode, no bridge needed)
+- **Fixed mana potions and armor buffs snapping back immediately**
+  - Caused by the same write redirect bug — potion/armor effects set correct mana, then the next Ars-internal `setMana(0)` overwrote it
+- **Fixed "both bars empty" when disabling mana unification**
+  - Root cause 1: `MixinSpellResolverPreCast` unconditionally overrode Ars's native `canCast()` even in DISABLED mode
+  - Root cause 2: `MixinArsManaRegen` only checked mode (cached from startup), not `isUnificationEnabled()`
+  - Fix: Added `isUnificationEnabled()` guard to both mixins; native Ars behavior now fully restored when unification is off
+- **Fixed config mode changes requiring a full restart**
+  - `BridgeManager.getCurrentMode()` now reads directly from config instead of returning a stale cached value
+- **Fixed client-side mana display artifacts**
+  - ManaCap read intercepts now only run on server side; client uses native values synced by each mod independently
+
+### Changed
+- `MixinManaCapability`: Rewrote all 6 method intercepts with proper guards and read-only semantics
+- `MixinArsManaRegen`: Added `isUnificationEnabled()` check before suppressing Ars regen
+- `MixinSpellResolverPreCast`: Added early return when unification disabled and no Sanctified rings active
+- `BridgeManager.getCurrentMode()`: Now always reads from `AnsConfig.getManaMode()` for runtime config responsiveness
+
+### Technical Details
+- ManaCap `setMana`/`addMana`/`removeMana` no longer write to Iron's MagicData in any mode
+- Spell mana consumption path is unaffected: `MixinSpellResolverMana` → `BridgeManager.consumeManaForMode()` → `IronsBridge.consumeMana()` (bypasses ManaCap entirely)
+- `ThreadLocal<Boolean>` recursion guard prevents re-entrant bridge calls in all modes
+- All mixin intercepts now check `player.level().isClientSide()` and skip client-side execution
+
+---
+
 ## [1.2.0] - 2026-02-02
 
 ### Added - Covenant of the Seven Integration
@@ -231,4 +265,4 @@ GNU GPLv3
 
 ---
 
-*Last Updated: February 2, 2026*
+*Last Updated: March 16, 2026*

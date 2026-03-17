@@ -7,6 +7,7 @@ import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
 import com.hollingsworth.arsnouveau.api.spell.SpellValidationError;
 import com.hollingsworth.arsnouveau.common.util.PortUtil;
 import com.otectus.arsnspells.aura.AuraManager;
+import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.casting.CastingAuthority;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
@@ -68,6 +69,18 @@ public abstract class MixinSpellResolverPreCast {
 
         if (player.level().isClientSide()) {
             return;
+        }
+
+        // FIX: When mana unification is disabled AND no Sanctified rings are active,
+        // let Ars Nouveau handle canCast() natively. This prevents the mod from
+        // interfering with vanilla Ars mana validation when unification is off.
+        if (!BridgeManager.isUnificationEnabled()) {
+            boolean hasSanctifiedRing = SanctifiedLegacyCompat.isAvailable()
+                && (SanctifiedLegacyCompat.isWearingCursedRing(player)
+                    || SanctifiedLegacyCompat.isWearingVirtueRing(player));
+            if (!hasSanctifiedRing) {
+                return; // Let native Ars canCast() run
+            }
         }
 
         // Replicate native spell recipe validation since we bypass the rest of canCast().

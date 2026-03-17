@@ -125,10 +125,14 @@ public class BridgeManager {
     }
 
     /**
-     * Get the current mana unification mode
+     * Get the current mana unification mode.
+     *
+     * FIX: Always reads from config so runtime config changes take effect
+     * without requiring a restart. The bridges themselves are still initialized
+     * once (they're stateless readers), but the MODE governs behavior.
      */
     public static ManaUnificationMode getCurrentMode() {
-        return currentMode != null ? currentMode : AnsConfig.getManaMode();
+        return AnsConfig.getManaMode();
     }
 
     /**
