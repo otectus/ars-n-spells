@@ -5,7 +5,7 @@ import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -33,9 +33,9 @@ public abstract class MixinSanctifiedAbstractSpell {
         cancellable = true,
         require = 0
     )
-    private void arsnspells$checkLPWithConfig(LivingEntity entity, CallbackInfoReturnable<Boolean> cir) {
-        // Only intercept for players wearing Cursed Ring
-        if (!(entity instanceof ServerPlayer player)) {
+    private void arsnspells$checkLPWithConfig(Player player, CallbackInfoReturnable<Boolean> cir) {
+        // Only intercept for server-side players wearing Cursed Ring
+        if (!(player instanceof ServerPlayer)) {
             return;
         }
         
