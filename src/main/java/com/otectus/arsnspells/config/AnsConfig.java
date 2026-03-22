@@ -27,6 +27,7 @@ public class AnsConfig {
     public static final ForgeConfigSpec.BooleanValue ALLOW_MANA_OVERFLOW;
     public static final ForgeConfigSpec.DoubleValue DUAL_COST_ARS_PERCENTAGE;
     public static final ForgeConfigSpec.DoubleValue DUAL_COST_ISS_PERCENTAGE;
+    public static final ForgeConfigSpec.DoubleValue DEFAULT_MAX_MANA;
     public static final ForgeConfigSpec.BooleanValue respectArmorBonuses;
     public static final ForgeConfigSpec.BooleanValue respectEnchantments;
 
@@ -105,6 +106,7 @@ public class AnsConfig {
     // ========================================
     // CURSED RING LP SYSTEM
     // ========================================
+    public static final ForgeConfigSpec.BooleanValue ENABLE_LP_SYSTEM;
     public static final ForgeConfigSpec.ConfigValue<String> LP_SOURCE_MODE;
     public static final ForgeConfigSpec.BooleanValue DEATH_ON_INSUFFICIENT_LP;
     public static final ForgeConfigSpec.BooleanValue SHOW_LP_COST_MESSAGES;
@@ -241,6 +243,12 @@ public class AnsConfig {
             .comment("Percentage of ISS mana cost in SEPARATE mode (0.5 = 50%)")
             .defineInRange("dual_cost_iss_percentage", 0.5, 0.0, 1.0);
         
+        DEFAULT_MAX_MANA = BUILDER
+            .comment("Default maximum mana fallback when the native system returns no value.",
+                     "Can be changed at runtime with /arsnspells mana setdefault <value>",
+                     "Applies to both Ars Nouveau and Iron's Spellbooks bridge fallbacks.")
+            .defineInRange("default_max_mana", 100.0, 1.0, 100000.0);
+
         respectArmorBonuses = BUILDER
             .comment("Include armor bonuses in unified mana calculations")
             .define("respect_armor_bonuses", true);
@@ -507,6 +515,11 @@ public class AnsConfig {
             "Applies to both Ars Nouveau and Iron's Spellbooks spells."
         );
 
+        ENABLE_LP_SYSTEM = BUILDER
+            .comment("Master toggle for the Cursed Ring LP system.",
+                     "When disabled, spells use normal mana even with Cursed Ring equipped.")
+            .define("enable_lp_system", true);
+
         LP_SOURCE_MODE = BUILDER
             .comment(
                 "Where to consume LP from when wearing the Cursed Ring:",
@@ -730,6 +743,7 @@ public class AnsConfig {
             case "cooldown": return ENABLE_COOLDOWN_SYSTEM.get();
             case "progression": return ENABLE_PROGRESSION_SYSTEM.get();
             case "affinity": return ENABLE_AFFINITY_SYSTEM.get();
+            case "lp": return ENABLE_LP_SYSTEM.get();
             default: return false;
         }
     }

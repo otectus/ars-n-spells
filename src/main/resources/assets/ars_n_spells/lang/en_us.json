@@ -3,5 +3,7 @@
   "ritual.ars_n_spells.mana_well": "Ritual of the Mana Well",
   "ritual.ars_n_spells.mana_infusion": "Ritual of Mana Infusion",
   "ritual.ars_n_spells.spell_transcription": "Ritual of Spell Transcription",
-  "config.ars_n_spells.title": "Ars 'n' Spells Configuration"
+  "config.ars_n_spells.title": "Ars 'n' Spells Configuration",
+  "commands.ans.mana.setdefault.success": "Default max mana set to %s",
+  "commands.ans.mana.getdefault": "Current default max mana: %s"
 }

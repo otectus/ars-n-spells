@@ -79,6 +79,10 @@ public class MixinScrollItem {
         if (SanctifiedLegacyCompat.isAvailable() && SanctifiedLegacyCompat.isWearingCursedRing(player)) {
             if (manaCost > 0) {
                 SpellRarity rarity = spell.getRarity(spellLevel);
+                if (rarity == null) {
+                    LOGGER.warn("Null rarity for scroll spell {} level {} - skipping LP cost", spell.getSpellId(), spellLevel);
+                    return;
+                }
                 int lpCost = SanctifiedLegacyCompat.calculateIronsLPCost(manaCost, spellLevel, rarity.name());
 
                 LOGGER.debug("Scroll LP validation: spell={}, level={}, lpCost={}",
@@ -108,9 +112,6 @@ public class MixinScrollItem {
 
                 // Mark spell cast for death prevention system
                 LPDeathPrevention.markSpellCast(player);
-
-                // Store pending LP cost for consumption after scroll cast
-                IronsLPHandler.storePendingScrollLP(player, lpCost, manaCost);
 
                 if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
                     player.displayClientMessage(

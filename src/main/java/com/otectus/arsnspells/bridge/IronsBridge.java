@@ -3,6 +3,7 @@ package com.otectus.arsnspells.bridge;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.world.entity.player.Player;
+import com.otectus.arsnspells.config.AnsConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -28,7 +29,9 @@ public class IronsBridge implements IManaBridge {
     public void setMana(Player player, float amount) {
         if (player.level().isClientSide()) return;
         try {
-            MagicData.getPlayerMagicData(player).setMana(amount);
+            MagicData data = MagicData.getPlayerMagicData(player);
+            if (data == null) return;
+            data.setMana(amount);
         } catch (Throwable e) {
             logCriticalError("setMana", e);
         }
@@ -57,18 +60,18 @@ public class IronsBridge implements IManaBridge {
     public float getMaxMana(Player player) {
         try {
             if (player == null) {
-                return 100.0f;
+                return AnsConfig.DEFAULT_MAX_MANA.get().floatValue();
             }
             return (float) player.getAttributeValue(AttributeRegistry.MAX_MANA.get());
         } catch (Throwable e) {
             logCriticalError("getMaxMana", e);
-            return 100.0f;
+            return AnsConfig.DEFAULT_MAX_MANA.get().floatValue();
         }
     }
 
     private void logCriticalError(String op, Throwable e) {
         if (!errorLogged) {
-            LOGGER.error("Ars 'n' Spells: Iron's Spells API failure during {}. integration may be unstable.", op);
+            LOGGER.error("Ars 'n' Spells: Iron's Spells API failure during {} - integration may be unstable.", op);
             errorLogged = true;
         }
     }

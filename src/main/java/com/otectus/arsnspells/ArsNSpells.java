@@ -1,5 +1,6 @@
 package com.otectus.arsnspells;
 
+import com.otectus.arsnspells.commands.ArsNSpellsCommands;
 import com.otectus.arsnspells.aura.AuraCapabilityProvider;
 import com.otectus.arsnspells.aura.IAuraCapability;
 import com.otectus.arsnspells.bridge.BridgeManager;
@@ -57,6 +58,7 @@ public class ArsNSpells {
         MinecraftForge.EVENT_BUS.register(VirtueRingHandler.class);
         MinecraftForge.EVENT_BUS.register(LPDeathPrevention.class);
         MinecraftForge.EVENT_BUS.register(AuraCapabilityProvider.class);
+        MinecraftForge.EVENT_BUS.register(ArsNSpellsCommands.class);
 
         if (ModList.get().isLoaded("irons_spellbooks")) {
             MinecraftForge.EVENT_BUS.register(new IronsCooldownHandler());

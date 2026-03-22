@@ -9,6 +9,7 @@ import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import io.redspace.ironsspellbooks.api.spells.SpellRarity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -46,6 +47,10 @@ public class IronsLPHandler {
             return;
         }
 
+        if (!AnsConfig.ENABLE_LP_SYSTEM.get()) {
+            return;
+        }
+
         if (!SanctifiedLegacyCompat.isWearingCursedRing(player)) {
             return;
         }
@@ -67,6 +72,10 @@ public class IronsLPHandler {
         }
 
         SpellRarity rarity = spell.getRarity(spellLevel);
+        if (rarity == null) {
+            LOGGER.warn("Null rarity for spell {} level {} - skipping LP cost", event.getSpellId(), spellLevel);
+            return;
+        }
         int lpCost = SanctifiedLegacyCompat.calculateIronsLPCost(manaCost, spellLevel, rarity.name());
 
         LOGGER.debug("Cursed Ring active for Iron's spell on {}", player.getName().getString());
@@ -82,11 +91,13 @@ public class IronsLPHandler {
                 return;
             }
 
+            // Safe mode: Set immune flag to block residual damage from native Cursed Ring
+            LPDeathPrevention.setLPImmune(player);
             LOGGER.warn("Insufficient LP - cancelling spell");
             event.setCanceled(true);
             pendingCosts.remove(player.getUUID());
 
-            // Apply minor health penalty silently (1 heart)
+            // Apply minor health penalty silently (bypasses damage events entirely)
             SanctifiedLegacyCompat.applySilentHealthLoss(player, 2.0f);
 
             if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
@@ -94,6 +105,11 @@ public class IronsLPHandler {
                     Component.literal(ChatFormatting.RED + "Insufficient LP - Spell Cancelled"),
                     true
                 );
+            }
+
+            // Clear immune flag next tick
+            if (player instanceof ServerPlayer sp && sp.getServer() != null) {
+                sp.getServer().execute(() -> LPDeathPrevention.clearLPImmune(player));
             }
             return;
         }
@@ -113,6 +129,10 @@ public class IronsLPHandler {
         }
 
         if (!SanctifiedLegacyCompat.isAvailable()) {
+            return;
+        }
+
+        if (!AnsConfig.ENABLE_LP_SYSTEM.get()) {
             return;
         }
 
@@ -152,7 +172,8 @@ public class IronsLPHandler {
                 return;
             }
 
-            // Safe mode: cancel if possible and apply silent penalty
+            // Safe mode: Set immune flag to block residual damage from native Cursed Ring
+            LPDeathPrevention.setLPImmune(player);
             event.setCanceled(true);
             SanctifiedLegacyCompat.applySilentHealthLoss(player, 2.0f);
             if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
@@ -160,6 +181,11 @@ public class IronsLPHandler {
                     Component.literal(ChatFormatting.RED + "Insufficient LP - Spell Cancelled"),
                     true
                 );
+            }
+
+            // Clear immune flag next tick
+            if (player instanceof ServerPlayer sp && sp.getServer() != null) {
+                sp.getServer().execute(() -> LPDeathPrevention.clearLPImmune(player));
             }
             return;
         }

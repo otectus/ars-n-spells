@@ -1,6 +1,7 @@
 package com.otectus.arsnspells.bridge;
 
 import com.hollingsworth.arsnouveau.api.mana.IManaCap;
+import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.util.ManaUtil;
 import net.minecraft.world.entity.player.Player;
 
@@ -31,7 +32,8 @@ public class ArsNativeBridge implements IManaBridge {
 
     @Override
     public float getMaxMana(Player player) {
-        return ManaUtil.getNativeMana(player).map(cap -> (float)cap.getMaxMana()).orElse(100.0f);
+        return ManaUtil.getNativeMana(player).map(cap -> (float)cap.getMaxMana())
+            .orElse(AnsConfig.DEFAULT_MAX_MANA.get().floatValue());
     }
 
     @Override

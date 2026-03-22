@@ -31,7 +31,7 @@ public abstract class MixinSpellResolverMana {
             LivingEntity caster = spellContext.getUnwrappedCaster();
             if (caster instanceof Player player) {
                 if (SanctifiedLegacyCompat.isAvailable()) {
-                    if (SanctifiedLegacyCompat.isWearingCursedRing(player)) {
+                    if (AnsConfig.ENABLE_LP_SYSTEM.get() && SanctifiedLegacyCompat.isWearingCursedRing(player)) {
                         ci.cancel();
                         return;
                     }

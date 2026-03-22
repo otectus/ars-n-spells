@@ -107,6 +107,14 @@ public class BridgeManager {
             LOGGER.info("Secondary Bridge: {}", secondaryBridge.getBridgeType());
         }
         LOGGER.info("Mana Unification Enabled: {}", AnsConfig.ENABLE_MANA_UNIFICATION.get());
+        if (currentMode == ManaUnificationMode.SEPARATE) {
+            double arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get();
+            double issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get();
+            double total = arsPercent + issPercent;
+            if (Math.abs(total - 1.0) > 0.01) {
+                LOGGER.warn("Dual-cost percentages sum to {} (Ars: {}, ISS: {}) - expected 1.0", total, arsPercent, issPercent);
+            }
+        }
         LOGGER.info("========================================");
     }
 
@@ -174,8 +182,11 @@ public class BridgeManager {
      */
     public static float getManaForMode(net.minecraft.world.entity.player.Player player, boolean fromArs) {
         if (!isUnificationEnabled()) {
-            return fromArs ? new ArsNativeBridge().getMana(player) : 
-                   (isIronsLoaded ? new IronsBridge().getMana(player) : 0);
+            if (fromArs) {
+                return activeBridge != null ? activeBridge.getMana(player) : 0;
+            }
+            return secondaryBridge != null ? secondaryBridge.getMana(player) :
+                   (activeBridge != null ? activeBridge.getMana(player) : 0);
         }
 
         ManaUnificationMode mode = getCurrentMode();
@@ -201,11 +212,10 @@ public class BridgeManager {
     public static boolean consumeManaForMode(net.minecraft.world.entity.player.Player player, float amount, boolean fromArs) {
         if (!isUnificationEnabled()) {
             if (fromArs) {
-                return new ArsNativeBridge().consumeMana(player, amount);
-            } else if (isIronsLoaded) {
-                return new IronsBridge().consumeMana(player, amount);
+                return activeBridge != null && activeBridge.consumeMana(player, amount);
             }
-            return false;
+            return secondaryBridge != null ? secondaryBridge.consumeMana(player, amount) :
+                   (activeBridge != null && activeBridge.consumeMana(player, amount));
         }
 
         ManaUnificationMode mode = getCurrentMode();

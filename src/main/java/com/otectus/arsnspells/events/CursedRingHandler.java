@@ -40,6 +40,10 @@ public class CursedRingHandler {
             return;
         }
 
+        if (!AnsConfig.ENABLE_LP_SYSTEM.get()) {
+            return;
+        }
+
         LivingEntity caster = event.context != null ? event.context.getUnwrappedCaster() : null;
         if (!(caster instanceof Player player)) {
             return;
@@ -137,6 +141,10 @@ public class CursedRingHandler {
             return;
         }
 
+        if (!AnsConfig.ENABLE_LP_SYSTEM.get()) {
+            return;
+        }
+
         if (event.context == null) {
             return;
         }
@@ -189,17 +197,23 @@ public class CursedRingHandler {
                 
                 // Don't cancel - let spell execute
             } else {
-                // Safe mode: Cancel spell and apply minor damage
-                LOGGER.warn("   🛡️ Safe mode - cancelling spell, applying minor damage");
+                // Safe mode: Set immune flag BEFORE any damage can propagate,
+                // then cancel spell and apply silent health loss (bypasses damage events).
+                // This prevents Corpse mod from seeing a death event and moving inventory.
+                LPDeathPrevention.setLPImmune(player);
+                LOGGER.warn("   Safe mode - cancelling spell, applying minor damage");
                 event.setCanceled(true);
                 pendingCosts.remove(player.getUUID());
-                
-                // Apply minor health penalty silently (1 heart)
+
+                // Apply minor health penalty silently (bypasses damage events entirely)
                 SanctifiedLegacyCompat.applySilentHealthLoss(player, 2.0f);
-                
+
                 if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
                     player.displayClientMessage(Component.literal("§cInsufficient LP - Spell Cancelled"), true);
                 }
+
+                // Clear immune flag next tick after all event processing is complete
+                player.getServer().execute(() -> LPDeathPrevention.clearLPImmune(player));
             }
         } else {
             LOGGER.debug("LP consumed successfully - spell will execute");

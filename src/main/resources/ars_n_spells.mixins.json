@@ -15,7 +15,8 @@
     "ars.MixinArsPotionEffects",
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana",
-    "irons.MixinScrollItem"
+    "irons.MixinScrollItem",
+    "sanctified.MixinSanctifiedAbstractSpell"
   ],
   "client": [
     "ars.MixinArsManaHud",
