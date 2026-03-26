@@ -38,7 +38,7 @@ The mod automatically hides the redundant mana bar so your HUD stays clean.
 ## Gear & Spell Integration
 
 - **Gear perks cross over** — Ars armor bonuses apply to Iron's mana pool (and vice versa), depending on your active mode.
-- **Spell scaling** — Ars spell potency scales with Iron's spell power attributes. Elemental bonuses are applied based on your first glyph.
+- **Spell scaling** — Ars spell potency scales with Iron's spell power attributes using additive stacking (not multiplicative). Elemental bonuses are applied based on your first glyph. A configurable `spell_power_cap` (default 3.0) prevents extreme values.
 - **Enchantments** — Mana-related enchantments from both mods are respected regardless of which pool is active.
 
 ---
@@ -46,6 +46,12 @@ The mod automatically hides the redundant mana bar so your HUD stays clean.
 ## Resonance
 
 When your mana is nearly full (above 95% by default), you gain a **Resonance bonus** that boosts Iron's spell damage. A reward for mana-efficient play.
+
+---
+
+## Source Jar Synergy
+
+Standing near Ars Nouveau Source Jars passively boosts Iron's mana regeneration. The bonus is configurable via `source_jar_synergy_multiplier` (default 5.0). The scan is position-cached for performance — it only re-scans when you move.
 
 ---
 
@@ -75,14 +81,16 @@ Wearing the Cursed Ring converts all mana costs into **Life Points (LP)**.
 - **Health Only** — Always costs health (100 LP = 5 hearts).
 
 If you run out of LP:
-- **Safe Mode** *(default)* — Spell is cancelled, you take 1 heart of damage.
+- **Safe Mode** *(default)* — Spell is cancelled, you take minor damage (you will never die from this).
 - **Death Mode** — The spell casts... but it kills you.
 
-LP costs scale with configurable base multipliers and per-tier scaling.
+LP costs scale with configurable base multipliers and per-tier scaling. Blasphemy LP discounts are independently configurable via `blasphemy_lp_discount` (default 85%).
 
 ### Ring of Seven Virtues — Aura Casting
 
-Wearing the Virtue Ring converts mana costs into **Aura**, a custom resource that regenerates over time (default: 10/sec, 1000 max pool). Aura persists through death and dimension changes. If you run dry, the spell simply fails.
+Wearing the Virtue Ring converts mana costs into **Aura**, a custom resource that regenerates over time (default: 10/sec, 1000 max pool). Aura persists through death and dimension changes. If you run dry, the spell simply fails. Blasphemy aura discounts are independently configurable via `blasphemy_aura_discount` (default 85%).
+
+**Ring Conflict:** Wearing both rings at the same time cancels both effects — you'll use normal mana instead, and receive a warning notification.
 
 ### Blasphemy Curios — School Discounts
 
@@ -116,7 +124,12 @@ Everything is configurable via `config/ars_n_spells-common.toml`. Major options 
 - **LP system** — source mode, death penalty, base/tier multipliers, minimum costs
 - **Aura system** — max pool, regen rate, tier multipliers
 - **Curio discounts** — base discount, matching bonus, stacking behavior
+- **Blasphemy ring discounts** — separate LP and aura discount rates
+- **Spell scaling** — power cap for Iron's attribute stacking
+- **Source Jar synergy** — proximity regen multiplier
+- **Rituals** — configurable Mana Infusion amount
 - **Scroll cost mode**
+- **Performance** — Source Jar cache move threshold
 - **Debug mode** for troubleshooting
 
 All options ship with balanced defaults — install and play, or fine-tune to your liking.
