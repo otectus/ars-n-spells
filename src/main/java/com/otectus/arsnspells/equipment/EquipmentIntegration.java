@@ -169,9 +169,9 @@ public class EquipmentIntegration {
             player.getName().getString(), arsMaxBonus, arsRegenBonus);
         logDebug("Calculated Iron bonuses for {}: max={}, regen={}",
             player.getName().getString(), ironMaxBonus, ironRegenBonus);
-        logDebug("Calculated curio discounts for {}: virtue={}, blasphemy={}, total={:.1f}%",
-            player.getName().getString(), curioDiscounts.hasVirtueRing, 
-            curioDiscounts.hasBlasphemy, curioDiscounts.totalDiscount * 100);
+        logDebug("Calculated curio discounts for {}: virtue={}, blasphemy={}, total={}%",
+            player.getName().getString(), curioDiscounts.hasVirtueRing,
+            curioDiscounts.hasBlasphemy, String.format("%.1f", curioDiscounts.totalDiscount * 100));
 
         return computed;
     }

@@ -2,6 +2,66 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-03-26
+
+### Critical Fixes
+- **Fixed SEPARATE mode dual-cost losing mana on partial failure** -- If Iron's consumption fails after Ars succeeds, Ars mana is now rolled back to its pre-consumption value instead of being silently lost
+- **Fixed `applySilentHealthLoss` killing the player in safe mode** -- Health floor changed from 0.0 to 1.0, preventing unintended death when LP is insufficient and death penalty is disabled
+- **Fixed hardcoded Blasphemy LP minimum ignoring config** -- Blasphemy-discounted LP costs now respect the `ars_lp_minimum_cost` config instead of a hardcoded 100
+
+### High-Priority Fixes
+- **Removed `Thread.sleep(100)` from mod loading thread** -- Ritual and compat initialization now deferred to `ModConfigEvent.Loading` instead of blocking the FML work queue
+- **Switched pending cost TTL to game ticks** -- VirtueRingHandler and CursedRingHandler no longer use wall-clock time; costs expire after 100 game ticks (5 seconds at 20 TPS) instead of 5000ms, preventing free casts under server lag
+- **Fixed double event firing** -- Removed 8 redundant explicit `.register()` calls for handlers already auto-registered via `@Mod.EventBusSubscriber`
+
+### Bug Fixes
+- **Fixed MixinManaCapability.setMana API contract violation** -- `setMana()` now returns the requested `amount` instead of Iron's internal mana value
+- **Fixed ResonanceManager memory leak** -- Cache now cleans up offline players every 60 seconds and clears all entries on server stop
+- **Fixed potion effect detection using fragile string matching** -- Ars potion effects are now detected by registry `ResourceLocation` instead of matching substrings in description keys
+- **Fixed SLF4J format string bug** -- `{:.1f}` (Python-style) replaced with proper `String.format("%.1f", value)` in EquipmentIntegration
+- **Fixed aura regen float precision drift** -- Accumulator now uses modulo instead of subtraction to prevent IEEE 754 errors over long sessions
+- **Fixed cooldown namespace keys being constructed but never used** -- Removed dead `namespacedKey` variable assignments from UnifiedCooldownManager
+- **Fixed AffinityData lost on death** -- Added `PlayerEvent.Clone` handler to persist affinity levels across death/respawn
+- **Fixed CrossCastContext entries never cleaned up on disconnect** -- Added logout handler to clear stale entries
+
+### Balance Changes
+- **Spell scaling changed from multiplicative to additive** -- Iron's base spell power and elemental spell power bonuses are now added instead of multiplied, preventing exponential stacking. New configurable `spell_power_cap` (default 3.0) provides a hard limit
+- **Blasphemy discounts now independently configurable per resource type** -- New `blasphemy_lp_discount` and `blasphemy_aura_discount` configs (default 0.85) replace the old hardcoded 85% reduction, separate from the mana discount
+- **Source Jar regen synergy buffed** -- New `source_jar_synergy_multiplier` (default 5.0) makes the proximity bonus meaningful (5 mana/sec instead of 1)
+- **Ritual of Mana Infusion now configurable** -- New `ritual_mana_infusion_amount` config (default 500) replaces the hardcoded value
+
+### New Features
+- **Ring conflict notification** -- Players wearing both Cursed Ring and Virtue Ring now receive a one-time action bar warning that the rings cancel each other
+- **New commands:**
+  - `/ans debug` -- Toggle debug mode at runtime (op 2)
+  - `/ans info <player>` -- Display player's mana, aura, resonance, and ring status (op 2)
+  - `/ans mode` -- Show the current mana unification mode
+
+### UX Improvements
+- **Expanded language file** from 8 to 28 translation entries
+- **Replaced hardcoded formatting codes** -- LP and aura messages now use `Component.translatable()` with `ChatFormatting` constants instead of raw `\u00a7` section signs, enabling proper i18n support
+
+### Code Quality
+- **Standardized logging** -- All files now use SLF4J; removed mixed Log4j usage
+- **Removed emoji from log messages** -- Replaced with text equivalents for cross-platform console compatibility
+- **Removed 11 dead code files** -- AffinityTracker, CooldownManager facade, BridgeHealthCheck, ConfigCache, ModLogger, FeatureManager, 4 unused addon compat classes, and duplicate ProgressionData stub
+
+### Performance
+- **Source Jar block scan now cached by position** -- Scans only when player moves >4 blocks from last scan position; stationary players skip all 324-block scans
+- **`hasAnyBlasphemy` reduced from 13 inventory scans to 1** -- Single curio slot iteration with `HashSet.contains()` lookup instead of 13 separate `hasCurio()` calls
+
+### New Config Options
+| Option | Default | Description |
+|--------|---------|-------------|
+| `spell_power_cap` | `3.0` | Maximum total spell power multiplier |
+| `blasphemy_lp_discount` | `0.85` | LP cost discount from matching Blasphemy |
+| `blasphemy_aura_discount` | `0.85` | Aura cost discount from matching Blasphemy |
+| `source_jar_synergy_multiplier` | `5.0` | Source Jar proximity regen multiplier |
+| `ritual_mana_infusion_amount` | `500.0` | Mana added by Ritual of Mana Infusion |
+| `source_jar_cache_move_threshold` | `4.0` | Distance before re-scanning for Source Jars |
+
+---
+
 ## [1.6.0] - 2026-03-16
 
 ### Fixed - Critical Mana Reset Bug

@@ -5,9 +5,13 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ICapabilitySerializable;
 import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+@Mod.EventBusSubscriber(modid = "ars_n_spells")
 public class ModCapabilityProvider implements ICapabilitySerializable<CompoundTag> {
     private final AffinityData affinityData = new AffinityData();
     private final CooldownData cooldownData = new CooldownData();
@@ -34,5 +38,22 @@ public class ModCapabilityProvider implements ICapabilitySerializable<CompoundTa
     public void deserializeNBT(CompoundTag nbt) {
         affinityData.loadFromNBT(nbt);
         cooldownData.load(nbt);
+    }
+
+    /**
+     * Persist affinity data across death/dimension change.
+     * Cooldown data intentionally NOT persisted (resets on death).
+     */
+    @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        event.getOriginal().reviveCaps();
+        event.getOriginal().getCapability(AffinityData.AFFINITY_DATA).ifPresent(oldData -> {
+            event.getEntity().getCapability(AffinityData.AFFINITY_DATA).ifPresent(newData -> {
+                CompoundTag tag = new CompoundTag();
+                oldData.saveToNBT(tag);
+                newData.loadFromNBT(tag);
+            });
+        });
+        event.getOriginal().invalidateCaps();
     }
 }

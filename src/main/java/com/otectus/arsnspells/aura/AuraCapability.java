@@ -64,7 +64,7 @@ public class AuraCapability implements IAuraCapability {
         if (this.regenAccumulator >= 1.0f) {
             int regen = (int) this.regenAccumulator;
             this.aura = Math.min(this.maxAura, this.aura + regen);
-            this.regenAccumulator -= regen;
+            this.regenAccumulator = this.regenAccumulator % 1.0f; // Prevent float precision drift
         }
     }
 

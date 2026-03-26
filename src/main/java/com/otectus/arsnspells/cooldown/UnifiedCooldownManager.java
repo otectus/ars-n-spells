@@ -42,9 +42,6 @@ public class UnifiedCooldownManager {
             return false;
         }
 
-        // Create namespaced category key
-        String namespacedKey = modNamespace + ":" + category.name();
-
         if (player.level().isClientSide()) {
             long currentTime = player.level().getGameTime();
             return CLIENT_TRACKER.isOnCooldown(category, currentTime);
@@ -120,9 +117,6 @@ public class UnifiedCooldownManager {
         long currentTime = player.level().getGameTime();
         long cooldownEnd = currentTime + duration;
 
-        // Create namespaced category key
-        String namespacedKey = modNamespace + ":" + category.name();
-
         if (player.level().isClientSide()) {
             CLIENT_TRACKER.setLastCastTime(category, cooldownEnd);
         } else {
@@ -154,9 +148,6 @@ public class UnifiedCooldownManager {
         long duration = (long) (baseDuration * multiplier);
         long currentTime = player.level().getGameTime();
         long cooldownEnd = currentTime + duration;
-
-        // Create namespaced category key
-        String namespacedKey = modNamespace + ":" + category.name();
 
         if (player.level().isClientSide()) {
             CLIENT_TRACKER.setLastCastTime(category, cooldownEnd);

@@ -2,10 +2,15 @@ package com.otectus.arsnspells.compat;
 
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.util.CuriosUtil;
+import com.otectus.arsnspells.config.AnsConfig;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.registries.ForgeRegistries;
+
+import java.util.HashSet;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +31,20 @@ public class SanctifiedLegacyCompat {
     private static boolean isEnigmaticLegacyLoaded = false;
     private static boolean isBloodMagicLoaded = false;
     private static boolean initialized = false;
+
+    // Pre-built set of all Blasphemy curio IDs for single-scan optimization
+    private static final Set<ResourceLocation> BLASPHEMY_IDS = new HashSet<>();
+    static {
+        String[] types = {
+            "fire_blasphemy", "ice_blasphemy", "lightning_blasphemy", "holy_blasphemy",
+            "ender_blasphemy", "blood_blasphemy", "evocation_blasphemy", "nature_blasphemy",
+            "eldritch_blasphemy", "aqua_blasphemy", "geo_blasphemy", "wind_blasphemy",
+            "dormant_blasphemy"
+        };
+        for (String type : types) {
+            BLASPHEMY_IDS.add(new ResourceLocation(MOD_ID, type));
+        }
+    }
 
     // Blood Magic reflection cache
     private static Class<?> bloodMagicNetworkClass = null;
@@ -96,15 +115,15 @@ public class SanctifiedLegacyCompat {
             getCurrentEssenceMethod = soulNetworkClass.getMethod("getCurrentEssence");
             syphonMethod = soulNetworkClass.getMethod("syphon", int.class);
 
-            LOGGER.info("  ✅ Blood Magic Soul Network API initialized via reflection");
+            LOGGER.info("  [OK] Blood Magic Soul Network API initialized via reflection");
         } catch (ClassNotFoundException e) {
-            LOGGER.warn("  ⚠️ Blood Magic classes not found - will use health fallback");
+            LOGGER.warn("  [WARN] Blood Magic classes not found - will use health fallback");
             isBloodMagicLoaded = false;
         } catch (NoSuchMethodException e) {
-            LOGGER.warn("  ⚠️ Blood Magic API methods not found - will use health fallback");
+            LOGGER.warn("  [WARN] Blood Magic API methods not found - will use health fallback");
             isBloodMagicLoaded = false;
         } catch (Exception e) {
-            LOGGER.error("  ❌ Failed to initialize Blood Magic reflection", e);
+            LOGGER.error("  [FAIL] Failed to initialize Blood Magic reflection", e);
             isBloodMagicLoaded = false;
         }
     }
@@ -168,8 +187,21 @@ public class SanctifiedLegacyCompat {
     }
     
     /**
+     * Check if the player has both the Cursed Ring and Virtue Ring equipped (conflict state).
+     */
+    public static boolean hasBothRings(Player player) {
+        if (!isLoaded || !isEnigmaticLegacyLoaded) return false;
+        try {
+            return hasCurio(player, "enigmaticlegacy:cursed_ring")
+                && hasCurio(player, "covenant_of_the_seven:virtue_ring");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * Check if a player has a specific curio equipped using Ars Nouveau's CuriosUtil.
-     * 
+     *
      * @param player The player
      * @param curioId The curio item ID (e.g., "enigmaticlegacy:cursed_ring")
      * @return true if the curio is equipped
@@ -432,7 +464,7 @@ public class SanctifiedLegacyCompat {
         if (healthLoss <= 0.0f) {
             return;
         }
-        float newHealth = Math.max(0.0f, player.getHealth() - healthLoss);
+        float newHealth = Math.max(1.0f, player.getHealth() - healthLoss);
         player.setHealth(newHealth);
     }
 
@@ -507,8 +539,27 @@ public class SanctifiedLegacyCompat {
      * @param schoolType The spell school
      * @return 0.15 if has matching Blasphemy (85% discount), 1.0 otherwise
      */
+    @Deprecated
     public static double getBlasphemyMultiplier(Player player, String schoolType) {
         return hasMatchingBlasphemy(player, schoolType) ? 0.15 : 1.0;
+    }
+
+    /**
+     * Get the LP-specific Blasphemy multiplier using the configurable discount.
+     * @return (1.0 - discount) if matching Blasphemy equipped, 1.0 otherwise
+     */
+    public static double getBlasphemyLPMultiplier(Player player, String schoolType) {
+        return hasMatchingBlasphemy(player, schoolType)
+            ? (1.0 - AnsConfig.BLASPHEMY_LP_DISCOUNT.get()) : 1.0;
+    }
+
+    /**
+     * Get the Aura-specific Blasphemy multiplier using the configurable discount.
+     * @return (1.0 - discount) if matching Blasphemy equipped, 1.0 otherwise
+     */
+    public static double getBlasphemyAuraMultiplier(Player player, String schoolType) {
+        return hasMatchingBlasphemy(player, schoolType)
+            ? (1.0 - AnsConfig.BLASPHEMY_AURA_DISCOUNT.get()) : 1.0;
     }
     
     // ========================================
@@ -540,22 +591,25 @@ public class SanctifiedLegacyCompat {
         if (!isAvailable()) {
             return false;
         }
-        
-        // Check all 13 Blasphemy variants
-        String[] blasphemyTypes = {
-            "fire_blasphemy", "ice_blasphemy", "lightning_blasphemy", "holy_blasphemy",
-            "ender_blasphemy", "blood_blasphemy", "evocation_blasphemy", "nature_blasphemy",
-            "eldritch_blasphemy", "aqua_blasphemy", "geo_blasphemy", "wind_blasphemy",
-            "dormant_blasphemy"
-        };
-        
-        for (String type : blasphemyTypes) {
-            if (hasBlasphemyType(player, type)) {
-                return true;
-            }
+
+        // Single curio inventory scan checking all 13 variants at once
+        try {
+            return CuriosUtil.getAllWornItems(player).map(handler -> {
+                for (int i = 0; i < handler.getSlots(); i++) {
+                    ItemStack stack = handler.getStackInSlot(i);
+                    if (!stack.isEmpty()) {
+                        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+                        if (id != null && BLASPHEMY_IDS.contains(id)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }).orElse(false);
+        } catch (Exception e) {
+            LOGGER.error("Failed to scan for Blasphemy curios", e);
+            return false;
         }
-        
-        return false;
     }
     
     /**

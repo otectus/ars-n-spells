@@ -5,6 +5,7 @@ import com.hollingsworth.arsnouveau.api.event.SpellResolveEvent;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -29,6 +30,7 @@ public class CursedRingHandler {
     
     // Track which spells have had LP consumed (to prevent double-consumption)
     private static final Map<UUID, PendingLPCost> pendingCosts = new HashMap<>();
+    private static final java.util.Set<UUID> ringConflictNotified = java.util.concurrent.ConcurrentHashMap.newKeySet();
     
     /**
      * Calculate and validate LP cost when Cursed Ring is equipped.
@@ -80,17 +82,17 @@ public class CursedRingHandler {
         
         // Apply Blasphemy multiplier
         String spellSchool = SanctifiedLegacyCompat.determineSpellSchool(spellPart);
-        double blasphemyMultiplier = SanctifiedLegacyCompat.getBlasphemyMultiplier(player, spellSchool);
+        double blasphemyMultiplier = SanctifiedLegacyCompat.getBlasphemyLPMultiplier(player, spellSchool);
         if (blasphemyMultiplier < 1.0) {
             int originalCost = lpCost;
-            lpCost = (int) Math.max(100, Math.round(lpCost * blasphemyMultiplier));
+            lpCost = (int) Math.max(AnsConfig.ARS_LP_MINIMUM_COST.get(), Math.round(lpCost * blasphemyMultiplier));
             LOGGER.debug("Blasphemy discount applied: {} LP -> {} LP", originalCost, lpCost);
         }
         
         LOGGER.debug("Spell will cost {} LP (base mana: {})", lpCost, manaCost);
         
         // Store the LP cost for consumption in the resolve event
-        pendingCosts.put(player.getUUID(), new PendingLPCost(lpCost, System.currentTimeMillis()));
+        pendingCosts.put(player.getUUID(), new PendingLPCost(lpCost, player.tickCount));
         
         // Set mana cost to 0 so Ars Nouveau doesn't consume mana
         event.currentCost = 0;
@@ -112,7 +114,7 @@ public class CursedRingHandler {
             return -1;
         }
 
-        if (System.currentTimeMillis() - pending.timestamp > 5000) {
+        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
             pendingCosts.remove(player.getUUID());
             return -1;
         }
@@ -160,8 +162,8 @@ public class CursedRingHandler {
             return; // No LP cost pending (not wearing Cursed Ring)
         }
         
-        // Check if the pending cost is still valid (within 5 seconds)
-        if (System.currentTimeMillis() - pending.timestamp > 5000) {
+        // Check if the pending cost is still valid (within 100 game ticks)
+        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
             LOGGER.warn("   Pending LP cost expired for {}", player.getName().getString());
             pendingCosts.remove(player.getUUID());
             return;
@@ -179,20 +181,20 @@ public class CursedRingHandler {
         
         if (!success) {
             // LP consumption failed
-            LOGGER.warn("   ❌ LP consumption failed");
+            LOGGER.warn("   [FAIL] LP consumption failed");
             
             boolean deathPenalty = AnsConfig.DEATH_ON_INSUFFICIENT_LP.get();
             
             if (deathPenalty) {
                 // Death penalty mode: Allow spell to cast but kill the player
-                LOGGER.warn("   💀 Death penalty enabled - player will die but spell will cast");
+                LOGGER.warn("   [DEATH] Death penalty enabled - player will die but spell will cast");
                 pending.consumed = true;
                 
                 // Kill the player
                 player.hurt(player.damageSources().magic(), Float.MAX_VALUE);
                 
                 if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
-                    player.displayClientMessage(Component.literal("§4§lDEATH: Insufficient LP (" + pending.lpCost + " LP required)"), true);
+                    player.displayClientMessage(Component.translatable("message.ars_n_spells.lp.death", pending.lpCost).withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD), true);
                 }
                 
                 // Don't cancel - let spell execute
@@ -209,7 +211,7 @@ public class CursedRingHandler {
                 SanctifiedLegacyCompat.applySilentHealthLoss(player, 2.0f);
 
                 if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
-                    player.displayClientMessage(Component.literal("§cInsufficient LP - Spell Cancelled"), true);
+                    player.displayClientMessage(Component.translatable("message.ars_n_spells.lp.insufficient").withStyle(ChatFormatting.RED), true);
                 }
 
                 // Clear immune flag next tick after all event processing is complete
@@ -220,7 +222,7 @@ public class CursedRingHandler {
             pending.consumed = true;
             
             if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
-                player.displayClientMessage(Component.literal("§6Consumed " + pending.lpCost + " LP"), true);
+                player.displayClientMessage(Component.translatable("message.ars_n_spells.lp.consumed", pending.lpCost).withStyle(ChatFormatting.GOLD), true);
             }
             // Don't remove from map yet - let it expire naturally to prevent double-consumption
         }
@@ -236,22 +238,39 @@ public class CursedRingHandler {
         }
         
         if (event.player.tickCount % 100 == 0) { // Every 5 seconds
-            long now = System.currentTimeMillis();
-            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().timestamp > 5000);
+            int now = event.player.tickCount;
+            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().tickStamp > PENDING_COST_TTL_TICKS);
+
+            // Ring conflict notification
+            if (SanctifiedLegacyCompat.isAvailable() && !event.player.level().isClientSide()) {
+                if (SanctifiedLegacyCompat.hasBothRings(event.player)) {
+                    if (ringConflictNotified.add(event.player.getUUID())) {
+                        event.player.displayClientMessage(
+                            Component.translatable("message.ars_n_spells.ring_conflict")
+                                .withStyle(ChatFormatting.YELLOW),
+                            true
+                        );
+                    }
+                } else {
+                    ringConflictNotified.remove(event.player.getUUID());
+                }
+            }
         }
     }
     
+    private static final int PENDING_COST_TTL_TICKS = 100; // 5 seconds at 20 TPS
+
     /**
      * Container for pending LP costs.
      */
     private static class PendingLPCost {
         final int lpCost;
-        final long timestamp;
+        final int tickStamp;
         boolean consumed = false;
-        
-        PendingLPCost(int lpCost, long timestamp) {
+
+        PendingLPCost(int lpCost, int tickStamp) {
             this.lpCost = lpCost;
-            this.timestamp = timestamp;
+            this.tickStamp = tickStamp;
         }
     }
 }

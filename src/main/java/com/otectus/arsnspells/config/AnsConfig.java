@@ -148,8 +148,30 @@ public class AnsConfig {
     public static final ForgeConfigSpec.ConfigValue<String> SCROLL_COST_MODE;
 
     // ========================================
+    // SPELL SCALING
+    // ========================================
+    public static final ForgeConfigSpec.DoubleValue SPELL_POWER_CAP;
+
+    // ========================================
+    // BLASPHEMY RING DISCOUNTS
+    // ========================================
+    public static final ForgeConfigSpec.DoubleValue BLASPHEMY_LP_DISCOUNT;
+    public static final ForgeConfigSpec.DoubleValue BLASPHEMY_AURA_DISCOUNT;
+
+    // ========================================
+    // SOURCE JAR SYNERGY
+    // ========================================
+    public static final ForgeConfigSpec.DoubleValue SOURCE_JAR_SYNERGY_MULTIPLIER;
+
+    // ========================================
+    // RITUALS
+    // ========================================
+    public static final ForgeConfigSpec.DoubleValue RITUAL_MANA_INFUSION_AMOUNT;
+
+    // ========================================
     // PERFORMANCE TUNING
     // ========================================
+    public static final ForgeConfigSpec.DoubleValue SOURCE_JAR_CACHE_MOVE_THRESHOLD;
     public static final ForgeConfigSpec.IntValue MANA_SYNC_INTERVAL;
     public static final ForgeConfigSpec.BooleanValue ENABLE_CACHING;
     public static final ForgeConfigSpec.IntValue CACHE_DURATION;
@@ -697,10 +719,73 @@ public class AnsConfig {
         BUILDER.pop();
 
         // ========================================
+        // SPELL SCALING
+        // ========================================
+        BUILDER.push("Spell Scaling");
+        BUILDER.comment("Controls how spell power from Iron's attributes scales Ars spells.");
+
+        SPELL_POWER_CAP = BUILDER
+            .comment("Maximum total spell power multiplier from Iron's attributes.",
+                     "Prevents stacking from exceeding this value. Set higher to allow more scaling.")
+            .defineInRange("spell_power_cap", 3.0, 1.0, 10.0);
+
+        BUILDER.pop();
+
+        // ========================================
+        // BLASPHEMY RING DISCOUNTS
+        // ========================================
+        BUILDER.push("Blasphemy Ring Discounts");
+        BUILDER.comment(
+            "Independent discount rates for LP and Aura costs when Blasphemy curios are equipped.",
+            "These are separate from the mana discount (configured in Curio Discount System)."
+        );
+
+        BLASPHEMY_LP_DISCOUNT = BUILDER
+            .comment("LP cost discount when matching Blasphemy is equipped (0.85 = 85% discount, pay only 15%)")
+            .defineInRange("blasphemy_lp_discount", 0.85, 0.0, 1.0);
+
+        BLASPHEMY_AURA_DISCOUNT = BUILDER
+            .comment("Aura cost discount when matching Blasphemy is equipped (0.85 = 85% discount, pay only 15%)")
+            .defineInRange("blasphemy_aura_discount", 0.85, 0.0, 1.0);
+
+        BUILDER.pop();
+
+        // ========================================
+        // SOURCE JAR SYNERGY
+        // ========================================
+        BUILDER.push("Source Jar Synergy");
+        BUILDER.comment("Controls the passive mana regen bonus when near Ars Nouveau Source Jars.");
+
+        SOURCE_JAR_SYNERGY_MULTIPLIER = BUILDER
+            .comment("Multiplier for Source Jar proximity regen bonus.",
+                     "Higher values = stronger regen when standing near Source Jars.",
+                     "Final bonus = CONVERSION_RATE_ARS_TO_IRON * this value per second.")
+            .defineInRange("source_jar_synergy_multiplier", 5.0, 0.1, 100.0);
+
+        BUILDER.pop();
+
+        // ========================================
+        // RITUALS
+        // ========================================
+        BUILDER.push("Rituals");
+        BUILDER.comment("Configuration for Ars 'n' Spells custom rituals.");
+
+        RITUAL_MANA_INFUSION_AMOUNT = BUILDER
+            .comment("Amount of mana added by the Ritual of Mana Infusion")
+            .defineInRange("ritual_mana_infusion_amount", 500.0, 1.0, 100000.0);
+
+        BUILDER.pop();
+
+        // ========================================
         // PERFORMANCE TUNING
         // ========================================
         BUILDER.push("Performance");
         BUILDER.comment("Performance optimization settings");
+
+        SOURCE_JAR_CACHE_MOVE_THRESHOLD = BUILDER
+            .comment("Distance in blocks a player must move before re-scanning for Source Jars.",
+                     "Higher values = less scanning but slower detection of jar changes.")
+            .defineInRange("source_jar_cache_move_threshold", 4.0, 1.0, 32.0);
         
         MANA_SYNC_INTERVAL = BUILDER
             .comment("Mana synchronization interval (ticks, lower = more responsive but higher CPU)")
@@ -758,23 +843,23 @@ public class AnsConfig {
         for (int i = 0; i < maxRetries; i++) {
             try {
                 SPEC.save();
-                org.apache.logging.log4j.LogManager.getLogger().info("OK Config saved successfully");
+                org.slf4j.LoggerFactory.getLogger(AnsConfig.class).info("OK Config saved successfully");
                 return true;
             } catch (Exception e) {
-                org.apache.logging.log4j.LogManager.getLogger().warn(
+                org.slf4j.LoggerFactory.getLogger(AnsConfig.class).warn(
                     "Config save attempt {} of {} failed: {}", i + 1, maxRetries, e.getMessage());
-                
+
                 if (i < maxRetries - 1) {
                     try {
                         Thread.sleep(retryDelay);
                         retryDelay *= 2; // Exponential backoff
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        org.apache.logging.log4j.LogManager.getLogger().error("Config save retry interrupted");
+                        org.slf4j.LoggerFactory.getLogger(AnsConfig.class).error("Config save retry interrupted");
                         return false;
                     }
                 } else {
-                    org.apache.logging.log4j.LogManager.getLogger().error(
+                    org.slf4j.LoggerFactory.getLogger(AnsConfig.class).error(
                         "FAILED to save config after {} attempts", maxRetries, e);
                 }
             }

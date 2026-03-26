@@ -212,9 +212,6 @@ public class ConfigScreenFactory {
             // Use safe save method with retry logic
             boolean success = AnsConfig.safeSave();
             
-            // Invalidate config cache to force reload
-            ConfigCache.invalidateAll();
-            
             // Show message to player
             if (minecraft != null && minecraft.player != null) {
                 if (success) {

@@ -7,10 +7,13 @@ import com.otectus.arsnspells.network.ResonanceSyncPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 
 public class ResonanceEvents {
+    private int cleanupCounter = 0;
+
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
         if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !ModList.get().isLoaded("irons_spellbooks")) {
@@ -22,6 +25,13 @@ public class ResonanceEvents {
             && event.player instanceof ServerPlayer player) {
             ResonanceManager.computeResonance(player);
             PacketHandler.sendToClient(new ResonanceSyncPacket((float) ResonanceManager.getResonance(player)), player);
+
+            // Periodic cleanup: every 1200 ticks (60 seconds)
+            cleanupCounter++;
+            if (cleanupCounter >= 30) { // 30 * 40 ticks = 1200 ticks
+                cleanupCounter = 0;
+                ResonanceManager.cleanupOfflinePlayers(player.getServer());
+            }
         }
     }
 
@@ -40,5 +50,10 @@ public class ResonanceEvents {
     @SubscribeEvent
     public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         ResonanceManager.clear(event.getEntity());
+    }
+
+    @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        ResonanceManager.clearAll();
     }
 }

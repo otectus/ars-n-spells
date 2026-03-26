@@ -5,11 +5,13 @@ import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.TickEvent.PlayerTickEvent;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -126,16 +128,23 @@ public abstract class MixinArsPotionEffects {
         }
     }
 
+    @Unique
+    private static final ResourceLocation ARS_MANA_REGEN_EFFECT = new ResourceLocation("ars_nouveau", "mana_regen");
+    @Unique
+    private static final ResourceLocation ARS_MANA_BOOST_EFFECT = new ResourceLocation("ars_nouveau", "mana_boost");
+
     /**
      * Calculate total mana regen bonus from Ars potion effects.
+     * Uses registry-based detection instead of string matching on description keys.
      */
     @Unique
     private static double arsnspells$calculateArsRegenBonus(Player player) {
         double bonus = 0.0;
 
         for (MobEffectInstance effect : player.getActiveEffects()) {
-            String effectName = effect.getEffect().getDescriptionId().toLowerCase();
-            if (effectName.contains("mana_regen") || effectName.contains("mana_boost")) {
+            ResourceLocation effectId = ForgeRegistries.MOB_EFFECTS.getKey(effect.getEffect());
+            if (effectId == null) continue;
+            if (effectId.equals(ARS_MANA_REGEN_EFFECT) || effectId.equals(ARS_MANA_BOOST_EFFECT)) {
                 bonus += (effect.getAmplifier() + 1) * 0.5;
             }
         }
@@ -145,14 +154,16 @@ public abstract class MixinArsPotionEffects {
 
     /**
      * Calculate total max mana bonus from Ars potion effects.
+     * Uses registry-based detection instead of string matching on description keys.
      */
     @Unique
     private static double arsnspells$calculateArsMaxManaBonus(Player player) {
         double bonus = 0.0;
 
         for (MobEffectInstance effect : player.getActiveEffects()) {
-            String effectName = effect.getEffect().getDescriptionId().toLowerCase();
-            if (effectName.contains("max_mana") || effectName.contains("mana_boost")) {
+            ResourceLocation effectId = ForgeRegistries.MOB_EFFECTS.getKey(effect.getEffect());
+            if (effectId == null) continue;
+            if (effectId.equals(ARS_MANA_BOOST_EFFECT)) {
                 bonus += (effect.getAmplifier() + 1) * 10.0;
             }
         }

@@ -133,8 +133,8 @@ public abstract class MixinManaCapability {
         try {
             arsnspells$inBridgeCall.set(true);
             double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
-            this.mana = ironsCurrentMana;
-            cir.setReturnValue(ironsCurrentMana);
+            this.mana = ironsCurrentMana;  // Sync shadow field from Iron's for consistency
+            cir.setReturnValue(amount);     // Return requested value to satisfy API contract
         } finally {
             arsnspells$inBridgeCall.set(false);
         }

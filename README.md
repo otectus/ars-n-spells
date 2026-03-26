@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v1.5.2)
+# Ars 'n' Spells (v1.7.0)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -173,6 +173,16 @@ Config file: `config/ars_n_spells-common.toml`
 | `blasphemy_matching_school_bonus` | `0.10` | Extra discount for matching school (+10%). |
 | `allow_discount_stacking` | `true` | Allow discounts to stack with ring costs. |
 
+### Spell scaling
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `spell_power_cap` | `3.0` | Maximum total spell power multiplier from Iron's attributes. |
+| `blasphemy_lp_discount` | `0.85` | LP cost discount from matching Blasphemy curio (0.85 = 85%). |
+| `blasphemy_aura_discount` | `0.85` | Aura cost discount from matching Blasphemy curio (0.85 = 85%). |
+| `source_jar_synergy_multiplier` | `5.0` | Multiplier for Source Jar proximity regen bonus. |
+| `ritual_mana_infusion_amount` | `500.0` | Mana added by Ritual of Mana Infusion. |
+
 ### Other
 
 | Option | Default | Description |
@@ -192,6 +202,9 @@ The mod hides redundant mana bars based on mode:
 - **separate / disabled**: Both bars may show.
 
 ## Changelog
+
+### v1.7.0
+- Major quality and stability release: fixed SEPARATE mode mana loss, safe mode killing players, pending cost TTL under server lag, double event firing, and more. Added additive spell scaling with configurable cap, ring conflict notifications, new `/ans` commands, expanded translations, and performance optimizations. See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ### v1.5.2
 - Fixed crash on world join caused by MixinArsManaRegen targeting non-existent `tick` method in ManaCap. Mixin now correctly targets `ManaCapEvents.playerOnTick` to suppress native Ars mana regeneration in ISS_PRIMARY mode.
@@ -214,7 +227,7 @@ The mod hides redundant mana bars based on mode:
 .\gradlew.bat build
 ```
 
-Output jar: `build/libs/ars_n_spells-1.5.2.jar`
+Output jar: `build/libs/ars_n_spells-1.7.0.jar`
 
 ## License
 

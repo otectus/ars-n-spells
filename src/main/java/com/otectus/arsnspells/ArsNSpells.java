@@ -26,15 +26,16 @@ import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Mod(ArsNSpells.MODID)
 public class ArsNSpells {
     public static final String MODID = "ars_n_spells";
-    public static final Logger LOGGER = LogManager.getLogger();
+    public static final Logger LOGGER = LoggerFactory.getLogger(ArsNSpells.class);
 
     public ArsNSpells() {
         // Validate environment before initialization
@@ -45,28 +46,28 @@ public class ArsNSpells {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerCaps);
+        modEventBus.addListener(this::onConfigLoading);
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AnsConfig.SPEC, "ars_n_spells-common.toml");
 
         MinecraftForge.EVENT_BUS.addGenericListener(Entity.class, this::onAttachCapabilities);
+        // Instance-registered handlers (no @Mod.EventBusSubscriber, use instance @SubscribeEvent methods)
         MinecraftForge.EVENT_BUS.register(new CooldownHandler());
         MinecraftForge.EVENT_BUS.register(new AffinityHandler());
-        MinecraftForge.EVENT_BUS.register(CrossCastingHandler.class);
-        MinecraftForge.EVENT_BUS.register(EquipmentHandler.class);
-        MinecraftForge.EVENT_BUS.register(CurioDiscountHandler.class);
-        MinecraftForge.EVENT_BUS.register(CursedRingHandler.class);
-        MinecraftForge.EVENT_BUS.register(VirtueRingHandler.class);
-        MinecraftForge.EVENT_BUS.register(LPDeathPrevention.class);
-        MinecraftForge.EVENT_BUS.register(AuraCapabilityProvider.class);
+        // ArsNSpellsCommands has no @Mod.EventBusSubscriber, needs explicit registration
         MinecraftForge.EVENT_BUS.register(ArsNSpellsCommands.class);
+        // Note: CrossCastingHandler, EquipmentHandler, CurioDiscountHandler, CursedRingHandler,
+        // VirtueRingHandler, LPDeathPrevention, AuraCapabilityProvider are auto-registered
+        // via @Mod.EventBusSubscriber — do NOT register them here to avoid double-firing.
 
         if (ModList.get().isLoaded("irons_spellbooks")) {
+            // Instance-registered handlers (no @Mod.EventBusSubscriber)
             MinecraftForge.EVENT_BUS.register(new IronsCooldownHandler());
             MinecraftForge.EVENT_BUS.register(new ProgressionHandler());
             MinecraftForge.EVENT_BUS.register(new ResonanceEvents());
             MinecraftForge.EVENT_BUS.register(new RegenSynergyHandler());
             MinecraftForge.EVENT_BUS.register(new CrossCastIronsHandler());
-            MinecraftForge.EVENT_BUS.register(IronsLPHandler.class);
+            // Note: IronsLPHandler is auto-registered via @Mod.EventBusSubscriber
         }
 
         MinecraftForge.EVENT_BUS.register(this);
@@ -88,45 +89,12 @@ public class ArsNSpells {
         try {
             BridgeManager.init(event);
             event.enqueueWork(() -> {
-                // Add delay to prevent config race conditions with other mods
-                try {
-                    Thread.sleep(100); // 100ms delay
-                    LOGGER.debug("Config loading delay complete");
-                } catch (InterruptedException e) {
-                    LOGGER.warn("Config loading delay interrupted", e);
-                    Thread.currentThread().interrupt();
-                }
-                
-                // Initialize features with error handling
                 try {
                     PacketHandler.register();
                     LOGGER.info("OK Packet handler registered");
                 } catch (Exception e) {
                     LOGGER.error("FAILED to register packet handler", e);
                 }
-                
-                try {
-                    RitualRegistryHandler.registerRituals();
-                    LOGGER.info("OK Rituals registered");
-                } catch (Exception e) {
-                    LOGGER.error("FAILED to register rituals", e);
-                }
-                
-                // Initialize Sanctified Legacy compatibility
-                try {
-                    SanctifiedLegacyCompat.init();
-                    if (SanctifiedLegacyCompat.isAvailable()) {
-                        LOGGER.info("OK Sanctified Legacy compatibility enabled");
-                        LOGGER.info("   - Cursed Ring support for Ars Nouveau spells");
-                        LOGGER.info("   - Virtue Ring support for Ars Nouveau spells");
-                    }
-                } catch (Exception e) {
-                    LOGGER.error("FAILED to initialize Sanctified Legacy compatibility", e);
-                }
-                
-                LOGGER.info("========================================");
-                LOGGER.info("OK Ars 'n' Spells initialization complete");
-                LOGGER.info("========================================");
             });
         } catch (Exception e) {
             LOGGER.error("========================================");
@@ -134,5 +102,33 @@ public class ArsNSpells {
             LOGGER.error("Mod will run in safe mode (features disabled)");
             LOGGER.error("========================================", e);
         }
+    }
+
+    private void onConfigLoading(final ModConfigEvent.Loading event) {
+        if (!event.getConfig().getModId().equals(MODID)) {
+            return;
+        }
+
+        try {
+            RitualRegistryHandler.registerRituals();
+            LOGGER.info("OK Rituals registered");
+        } catch (Exception e) {
+            LOGGER.error("FAILED to register rituals", e);
+        }
+
+        try {
+            SanctifiedLegacyCompat.init();
+            if (SanctifiedLegacyCompat.isAvailable()) {
+                LOGGER.info("OK Sanctified Legacy compatibility enabled");
+                LOGGER.info("   - Cursed Ring support for Ars Nouveau spells");
+                LOGGER.info("   - Virtue Ring support for Ars Nouveau spells");
+            }
+        } catch (Exception e) {
+            LOGGER.error("FAILED to initialize Sanctified Legacy compatibility", e);
+        }
+
+        LOGGER.info("========================================");
+        LOGGER.info("OK Ars 'n' Spells initialization complete");
+        LOGGER.info("========================================");
     }
 }

@@ -1,6 +1,7 @@
 package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
+import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.resources.ResourceLocation;
@@ -15,7 +16,7 @@ public class ManaInfusionRitual extends AbstractRitual {
         }
         MagicData data = MagicData.getPlayerMagicData(player);
         if (data != null) {
-            data.addMana(500f);
+            data.addMana(AnsConfig.RITUAL_MANA_INFUSION_AMOUNT.get().floatValue());
         }
     }
 

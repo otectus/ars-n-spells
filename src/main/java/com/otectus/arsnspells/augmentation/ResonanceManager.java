@@ -3,12 +3,15 @@ package com.otectus.arsnspells.augmentation;
 import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.fml.ModList;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 public class ResonanceManager {
     // Fixed: Use UUID instead of Player to prevent garbage collection issues
@@ -57,5 +60,25 @@ public class ResonanceManager {
         if (player != null) {
             resonanceCache.remove(player.getUUID());
         }
+    }
+
+    /**
+     * Remove cache entries for players not currently online.
+     * Call periodically to prevent memory leaks from disconnected players.
+     */
+    public static void cleanupOfflinePlayers(MinecraftServer server) {
+        if (server == null) return;
+        Set<UUID> onlineUUIDs = server.getPlayerList().getPlayers().stream()
+            .map(p -> p.getUUID())
+            .collect(Collectors.toSet());
+        resonanceCache.keySet().removeIf(uuid -> !onlineUUIDs.contains(uuid));
+    }
+
+    /**
+     * Clear all cached resonance values. Call on server stop.
+     */
+    public static void clearAll() {
+        resonanceCache.clear();
+        clientResonance = 1.0;
     }
 }

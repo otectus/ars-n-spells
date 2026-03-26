@@ -4,8 +4,8 @@ import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * BridgeManager - Central hub for mana system integration
@@ -14,7 +14,7 @@ import org.apache.logging.log4j.Logger;
  * Supports 5 different mana unification modes.
  */
 public class BridgeManager {
-    private static final Logger LOGGER = LogManager.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(BridgeManager.class);
     private static IManaBridge activeBridge;
     private static IManaBridge secondaryBridge; // For hybrid/separate modes
     private static ManaUnificationMode currentMode;
@@ -243,10 +243,21 @@ public class BridgeManager {
                     return false;
                 }
 
+                // Atomic dual-cost: capture state for rollback if second consumption fails
+                float arsManaBefore = arsBridge.getMana(player);
                 boolean arsSuccess = arsBridge.consumeMana(player, arsCost);
-                boolean issSuccess = issBridge.consumeMana(player, issCost);
+                if (!arsSuccess) {
+                    return false;
+                }
 
-                return arsSuccess && issSuccess;
+                boolean issSuccess = issBridge.consumeMana(player, issCost);
+                if (!issSuccess) {
+                    // Rollback: restore Ars mana to pre-consumption value
+                    arsBridge.setMana(player, arsManaBefore);
+                    return false;
+                }
+
+                return true;
                 
             default:
                 return activeBridge.consumeMana(player, amount);

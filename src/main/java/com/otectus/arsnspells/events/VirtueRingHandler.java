@@ -7,6 +7,7 @@ import com.otectus.arsnspells.aura.AuraManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.util.CasterContext;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -74,7 +75,7 @@ public class VirtueRingHandler {
 
         // Apply Blasphemy discount to aura cost
         String spellSchool = SanctifiedLegacyCompat.determineSpellSchool(spellPart);
-        double blasphemyMultiplier = SanctifiedLegacyCompat.getBlasphemyMultiplier(player, spellSchool);
+        double blasphemyMultiplier = SanctifiedLegacyCompat.getBlasphemyAuraMultiplier(player, spellSchool);
         if (blasphemyMultiplier < 1.0) {
             int originalCost = auraCost;
             auraCost = (int) Math.max(AnsConfig.AURA_MINIMUM_COST.get(),
@@ -85,7 +86,7 @@ public class VirtueRingHandler {
         LOGGER.debug("Spell will cost {} aura (base mana: {})", auraCost, manaCost);
 
         // Store the aura cost for consumption on spell resolve
-        pendingCosts.put(player.getUUID(), new PendingAuraCost(auraCost, System.currentTimeMillis()));
+        pendingCosts.put(player.getUUID(), new PendingAuraCost(auraCost, player.tickCount));
 
         // Set mana cost to 0 so Ars Nouveau doesn't consume mana
         event.currentCost = 0;
@@ -102,7 +103,7 @@ public class VirtueRingHandler {
         if (pending == null) {
             return -1;
         }
-        if (System.currentTimeMillis() - pending.timestamp > 5000) {
+        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
             pendingCosts.remove(player.getUUID());
             return -1;
         }
@@ -141,7 +142,7 @@ public class VirtueRingHandler {
             return;
         }
 
-        if (System.currentTimeMillis() - pending.timestamp > 5000) {
+        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
             LOGGER.warn("Pending aura cost expired for {}", player.getName().getString());
             pendingCosts.remove(player.getUUID());
             return;
@@ -163,8 +164,8 @@ public class VirtueRingHandler {
             if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
                 int currentAura = AuraManager.getAura(player);
                 player.displayClientMessage(
-                    Component.literal("\u00a7bInsufficient Aura: Need " + pending.auraCost
-                        + ", have " + currentAura),
+                    Component.translatable("message.ars_n_spells.aura.insufficient", pending.auraCost, currentAura)
+                        .withStyle(ChatFormatting.AQUA),
                     true
                 );
             }
@@ -174,7 +175,8 @@ public class VirtueRingHandler {
             if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
                 int remaining = AuraManager.getAura(player);
                 player.displayClientMessage(
-                    Component.literal("\u00a7bConsumed " + pending.auraCost + " Aura (" + remaining + " remaining)"),
+                    Component.translatable("message.ars_n_spells.aura.consumed", pending.auraCost, remaining)
+                        .withStyle(ChatFormatting.AQUA),
                     true
                 );
             }
@@ -190,19 +192,21 @@ public class VirtueRingHandler {
             return;
         }
         if (event.player.tickCount % 100 == 0) {
-            long now = System.currentTimeMillis();
-            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().timestamp > 5000);
+            int now = event.player.tickCount;
+            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().tickStamp > PENDING_COST_TTL_TICKS);
         }
     }
 
+    private static final int PENDING_COST_TTL_TICKS = 100; // 5 seconds at 20 TPS
+
     private static class PendingAuraCost {
         final int auraCost;
-        final long timestamp;
+        final int tickStamp;
         boolean consumed = false;
 
-        PendingAuraCost(int auraCost, long timestamp) {
+        PendingAuraCost(int auraCost, int tickStamp) {
             this.auraCost = auraCost;
-            this.timestamp = timestamp;
+            this.tickStamp = tickStamp;
         }
     }
 }
