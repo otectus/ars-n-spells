@@ -17,8 +17,12 @@ public class AffinityData {
         return levels.getOrDefault(type, 0);
     }
 
+    public void setLevel(AffinityType type, int level) {
+        levels.put(type, Math.max(0, Math.min(100, level)));
+    }
+
     public void addLevel(AffinityType type, int amount) {
-        levels.put(type, Math.min(100, getLevel(type) + amount));
+        setLevel(type, getLevel(type) + amount);
     }
 
     public void saveToNBT(CompoundTag nbt) {

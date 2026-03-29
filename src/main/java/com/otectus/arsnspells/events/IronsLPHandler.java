@@ -107,10 +107,7 @@ public class IronsLPHandler {
                 );
             }
 
-            // Clear immune flag next tick
-            if (player instanceof ServerPlayer sp && sp.getServer() != null) {
-                sp.getServer().execute(() -> LPDeathPrevention.clearLPImmune(player));
-            }
+            LPDeathPrevention.clearLPImmune(player);
             return;
         }
 
@@ -184,9 +181,7 @@ public class IronsLPHandler {
             }
 
             // Clear immune flag next tick
-            if (player instanceof ServerPlayer sp && sp.getServer() != null) {
-                sp.getServer().execute(() -> LPDeathPrevention.clearLPImmune(player));
-            }
+            LPDeathPrevention.clearLPImmune(player);
             return;
         }
 

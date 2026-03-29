@@ -3,8 +3,8 @@ package com.otectus.arsnspells.events;
 import com.hollingsworth.arsnouveau.api.event.SpellCastEvent;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.cooldown.CooldownCategory;
-import com.otectus.arsnspells.cooldown.SpellCategorizer;
 import com.otectus.arsnspells.cooldown.UnifiedCooldownManager;
+import com.otectus.arsnspells.util.SpellAnalysis;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.network.CooldownSyncPacket;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,10 +18,7 @@ public class CooldownHandler {
         }
         if (event.getEntity() instanceof ServerPlayer player) {
             // Use standard Ars Nouveau 4.12.7 field: spell
-            if (event.spell == null || event.spell.recipe == null || event.spell.recipe.isEmpty()) {
-                return;
-            }
-            CooldownCategory category = SpellCategorizer.categorizeArsGlyph(event.spell.recipe.get(0));
+            CooldownCategory category = SpellAnalysis.analyze(event.spell).category();
             
             // CRITICAL FIX: Only check ARS-namespaced cooldowns
             if (UnifiedCooldownManager.isOnCooldown(player, category, "ars")) {

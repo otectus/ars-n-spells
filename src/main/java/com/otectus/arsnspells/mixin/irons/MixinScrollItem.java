@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * - "lp_only": Scrolls are mana-free but LP is still consumed for Cursed Ring
  * - "free": No resource cost, but LP from Cursed Ring still applies
  */
-@Mixin(targets = "io.redspace.ironsspellbooks.item.Scroll", remap = false)
+@Mixin(value = io.redspace.ironsspellbooks.item.Scroll.class, remap = false)
 public class MixinScrollItem {
     private static final Logger LOGGER = LoggerFactory.getLogger(MixinScrollItem.class);
 

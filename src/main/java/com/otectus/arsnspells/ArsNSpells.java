@@ -9,6 +9,7 @@ import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.data.AffinityData;
 import com.otectus.arsnspells.data.ModCapabilityProvider;
 import com.otectus.arsnspells.data.CooldownData;
+import com.otectus.arsnspells.data.ProgressionData;
 import com.otectus.arsnspells.events.*;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.rituals.RitualRegistryHandler;
@@ -77,6 +78,7 @@ public class ArsNSpells {
         event.register(AffinityData.class);
         event.register(CooldownData.class);
         event.register(IAuraCapability.class);
+        event.register(ProgressionData.class);
     }
 
     private void onAttachCapabilities(AttachCapabilitiesEvent<Entity> event) {
@@ -95,6 +97,12 @@ public class ArsNSpells {
                 } catch (Exception e) {
                     LOGGER.error("FAILED to register packet handler", e);
                 }
+                try {
+                    RitualRegistryHandler.registerRituals();
+                    LOGGER.info("OK Rituals registered");
+                } catch (Exception e) {
+                    LOGGER.error("FAILED to register rituals", e);
+                }
             });
         } catch (Exception e) {
             LOGGER.error("========================================");
@@ -107,13 +115,6 @@ public class ArsNSpells {
     private void onConfigLoading(final ModConfigEvent.Loading event) {
         if (!event.getConfig().getModId().equals(MODID)) {
             return;
-        }
-
-        try {
-            RitualRegistryHandler.registerRituals();
-            LOGGER.info("OK Rituals registered");
-        } catch (Exception e) {
-            LOGGER.error("FAILED to register rituals", e);
         }
 
         try {

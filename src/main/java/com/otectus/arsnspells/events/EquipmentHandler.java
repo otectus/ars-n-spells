@@ -106,7 +106,7 @@ public class EquipmentHandler {
                 return;
             }
 
-            if (mode.isIssPrimary() || mode.isHybrid()) {
+            if (mode.isIssPrimary() || mode.isHybrid() || mode.isArsPrimary()) {
                 double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
                 EquipmentIntegration.applyArsBonusesToIrons(player, conversionRate);
                 EquipmentIntegration.ManaBonus arsBonus = EquipmentIntegration.getArsManaBonuses(player);

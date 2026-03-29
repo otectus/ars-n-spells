@@ -29,18 +29,22 @@ public class StartupValidator {
         LOGGER.info("========================================");
         
         boolean allChecks = true;
-        
-        // Check 1: Config directory writable
-        allChecks &= checkConfigWritable();
-        
-        // Check 2: No file locks on our config
-        allChecks &= checkFileLocks();
-        
-        // Check 3: Required mods present
+
+        // Check 1: Required mods present (always run — cheap and essential)
         allChecks &= checkRequiredMods();
-        
-        // Check 4: Java version
+
+        // Check 2: Java version (always run — cheap and essential)
         allChecks &= checkJavaVersion();
+
+        // Checks 3-4: File I/O checks (debug only — invasive and unnecessary on most setups)
+        boolean debugMode = false;
+        try {
+            debugMode = com.otectus.arsnspells.config.AnsConfig.DEBUG_MODE.get();
+        } catch (Exception ignored) {}
+        if (debugMode) {
+            allChecks &= checkConfigWritable();
+            allChecks &= checkFileLocks();
+        }
         
         LOGGER.info("========================================");
         if (allChecks) {

@@ -10,8 +10,6 @@
     "ars.MixinSpellResolverMana",
     "ars.MixinSpellResolverPreCast",
     "ars.MixinSpellResolverContext",
-    "ars.MixinSpellStatsPotency",
-    "ars.MixinArsManaRegen",
     "ars.MixinArsPotionEffects",
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana",
@@ -19,7 +17,6 @@
     "sanctified.MixinSanctifiedAbstractSpell"
   ],
   "client": [
-    "ars.MixinArsManaHud",
     "irons.MixinIronsManaBarOverlay"
   ],
   "injectors": {

@@ -109,14 +109,9 @@ public class CurioDiscountHandler {
      * @return The spell school identifier
      */
     private static String determineSpellSchool(SpellCostCalcEvent event) {
-        // Try to get spell from CasterContext (set by MixinSpellResolverContext)
-        return CasterContext.getSpell().map(spell -> {
-            if (spell.recipe != null && !spell.recipe.isEmpty()) {
-                AbstractSpellPart firstPart = spell.recipe.get(0);
-                return SanctifiedLegacyCompat.determineSpellSchool(firstPart);
-            }
-            return "generic";
-        }).orElse("generic");
+        return CasterContext.getSpell()
+            .map(spell -> com.otectus.arsnspells.util.SpellAnalysis.analyze(spell).dominantSchool())
+            .orElse("generic");
     }
     
     /**

@@ -95,21 +95,18 @@ public class CastingAuthority {
         LOGGER.debug("validateCursedRingCost called for player: {}, mana cost: {}",
             player.getName().getString(), manaCost);
 
-        // Get the first spell part for tier/rarity info
-        AbstractSpellPart spellPart = null;
-        if (resolver.spell != null && resolver.spell.recipe != null && !resolver.spell.recipe.isEmpty()) {
-            spellPart = resolver.spell.recipe.get(0);
-            LOGGER.debug("Spell part: {}", spellPart.getRegistryName());
-        } else {
-            LOGGER.debug("No spell part found in resolver");
-        }
+        // Get first effect glyph for tier/rarity info
+        com.otectus.arsnspells.util.SpellAnalysis.Result analysis =
+            com.otectus.arsnspells.util.SpellAnalysis.analyze(resolver.spell);
+        AbstractSpellPart spellPart = analysis.firstEffect();
+        LOGGER.debug("Spell part: {}", spellPart != null ? spellPart.getRegistryName() : "none");
 
         // Calculate LP cost
         int lpCost = SanctifiedLegacyCompat.calculateLPCost(manaCost, spellPart);
         LOGGER.debug("Calculated LP cost: {} (base mana: {})", lpCost, manaCost);
 
         // Determine spell school for Blasphemy multiplier
-        String spellSchool = SanctifiedLegacyCompat.determineSpellSchool(spellPart);
+        String spellSchool = analysis.dominantSchool();
         LOGGER.debug("Detected spell school: {}", spellSchool);
 
         // Apply Blasphemy multiplier if applicable

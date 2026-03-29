@@ -71,17 +71,17 @@ public class CursedRingHandler {
             return;
         }
 
-        // Get spell part for tier calculation from CasterContext
-        AbstractSpellPart spellPart = com.otectus.arsnspells.util.CasterContext.getSpell()
-            .filter(spell -> spell.recipe != null && !spell.recipe.isEmpty())
-            .map(spell -> spell.recipe.get(0))
+        // Get first effect glyph for tier calculation from CasterContext
+        com.otectus.arsnspells.util.SpellAnalysis.Result analysis = com.otectus.arsnspells.util.CasterContext.getSpell()
+            .map(com.otectus.arsnspells.util.SpellAnalysis::analyze)
             .orElse(null);
-        
+        AbstractSpellPart spellPart = analysis != null ? analysis.firstEffect() : null;
+
         // Calculate LP cost
         int lpCost = SanctifiedLegacyCompat.calculateLPCost(manaCost, spellPart);
-        
+
         // Apply Blasphemy multiplier
-        String spellSchool = SanctifiedLegacyCompat.determineSpellSchool(spellPart);
+        String spellSchool = analysis != null ? analysis.dominantSchool() : "generic";
         double blasphemyMultiplier = SanctifiedLegacyCompat.getBlasphemyLPMultiplier(player, spellSchool);
         if (blasphemyMultiplier < 1.0) {
             int originalCost = lpCost;
@@ -215,7 +215,7 @@ public class CursedRingHandler {
                 }
 
                 // Clear immune flag next tick after all event processing is complete
-                player.getServer().execute(() -> LPDeathPrevention.clearLPImmune(player));
+                LPDeathPrevention.clearLPImmune(player);
             }
         } else {
             LOGGER.debug("LP consumed successfully - spell will execute");

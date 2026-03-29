@@ -30,7 +30,7 @@ side="BOTH"
 [[dependencies.ars_n_spells]]
 modId="ars_nouveau"
 mandatory=true
-versionRange="[4.12.7]"
+versionRange="[4.12.7,4.13)"
 ordering="AFTER"
 side="BOTH"
 

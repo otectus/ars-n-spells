@@ -64,17 +64,17 @@ public class VirtueRingHandler {
         LOGGER.debug("Virtue Ring detected on {} - Spell will use Aura instead of mana",
             player.getName().getString());
 
-        // Get spell part for tier calculation
-        AbstractSpellPart spellPart = CasterContext.getSpell()
-            .filter(spell -> spell.recipe != null && !spell.recipe.isEmpty())
-            .map(spell -> spell.recipe.get(0))
+        // Get first effect glyph for tier calculation
+        com.otectus.arsnspells.util.SpellAnalysis.Result analysis = CasterContext.getSpell()
+            .map(com.otectus.arsnspells.util.SpellAnalysis::analyze)
             .orElse(null);
+        AbstractSpellPart spellPart = analysis != null ? analysis.firstEffect() : null;
 
         // Calculate aura cost
         int auraCost = AuraManager.calculateAuraCost(manaCost, spellPart);
 
         // Apply Blasphemy discount to aura cost
-        String spellSchool = SanctifiedLegacyCompat.determineSpellSchool(spellPart);
+        String spellSchool = analysis != null ? analysis.dominantSchool() : "generic";
         double blasphemyMultiplier = SanctifiedLegacyCompat.getBlasphemyAuraMultiplier(player, spellSchool);
         if (blasphemyMultiplier < 1.0) {
             int originalCost = auraCost;

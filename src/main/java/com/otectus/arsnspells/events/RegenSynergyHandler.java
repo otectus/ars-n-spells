@@ -56,12 +56,13 @@ public class RegenSynergyHandler {
                 try {
                     float boost = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get().floatValue()
                         * AnsConfig.SOURCE_JAR_SYNERGY_MULTIPLIER.get().floatValue();
-                    MagicData data = MagicData.getPlayerMagicData(player);
-                    if (data != null) {
-                        data.addMana(boost);
-                    }
+                    com.otectus.arsnspells.bridge.IManaBridge bridge =
+                        com.otectus.arsnspells.bridge.BridgeManager.getBridge();
+                    float current = bridge.getMana(player);
+                    float max = bridge.getMaxMana(player);
+                    bridge.setMana(player, Math.min(current + boost, max));
                 } catch (Exception e) {
-                    // Silently fail if Iron's API is unavailable
+                    // Silently fail if bridge API is unavailable
                 }
             }
         }

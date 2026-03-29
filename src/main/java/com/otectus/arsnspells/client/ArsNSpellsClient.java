@@ -29,10 +29,7 @@ public class ArsNSpellsClient {
         
         // Register config screen
         registerConfigScreen();
-        
-        // Initialize overlay manager
-        OverlayManager.initialize(event);
-        
+
         // Enable overlay diagnostics if debug mode is on
         if (AnsConfig.DEBUG_MODE.get()) {
             LOGGER.info("Debug mode enabled - activating overlay diagnostics");

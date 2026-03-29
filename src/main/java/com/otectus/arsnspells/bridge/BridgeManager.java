@@ -107,6 +107,7 @@ public class BridgeManager {
             LOGGER.info("Secondary Bridge: {}", secondaryBridge.getBridgeType());
         }
         LOGGER.info("Mana Unification Enabled: {}", AnsConfig.ENABLE_MANA_UNIFICATION.get());
+        LOGGER.info("NOTE: Changing mana_unification_mode requires a game restart.");
         if (currentMode == ManaUnificationMode.SEPARATE) {
             double arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get();
             double issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get();
@@ -134,13 +135,10 @@ public class BridgeManager {
 
     /**
      * Get the current mana unification mode.
-     *
-     * FIX: Always reads from config so runtime config changes take effect
-     * without requiring a restart. The bridges themselves are still initialized
-     * once (they're stateless readers), but the MODE governs behavior.
+     * Cached at init time — changing mana_unification_mode requires a restart.
      */
     public static ManaUnificationMode getCurrentMode() {
-        return AnsConfig.getManaMode();
+        return currentMode;
     }
 
     /**

@@ -2,6 +2,73 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.1] - 2026-03-29
+
+### Bug Fix
+- **Fixed Ars Nouveau armor mana bonuses not applying in ARS_PRIMARY mode** -- Iron's internal regen was clamping the shared mana pool to Iron's base max because Ars armor bonuses were cleared from `AttributeRegistry.MAX_MANA` in ARS_PRIMARY. The equipment handler now keeps Iron's max mana attribute aligned with Ars's max in all shared-pool modes (ISS_PRIMARY, HYBRID, and ARS_PRIMARY)
+
+---
+
+## [1.8.0] - 2026-03-27
+
+### Upstream Compatibility Overhaul
+This release brings full compatibility with **Ars Nouveau 4.12.7** and **Iron's Spellbooks 3.15.5.1**.
+
+### Build System
+- **Replaced local jar dependencies with CurseMaven** -- Clean checkouts now compile without manual jar placement; dependencies resolve automatically from CurseForge
+- **Updated Iron's Spellbooks dependency** from 3.15.2 to 3.15.5.1
+- **Widened Ars Nouveau version range** from exact `[4.12.7]` to `[4.12.7,4.13)` to accept compatible patch releases
+
+### Critical Fixes
+- **Fixed fundamentally wrong spell classification across the entire mod** -- All systems (cooldowns, progression, affinity, LP costing, scaling, discounts) were reading `recipe.get(0)` which returns the cast method (projectile/touch/self), not the actual effect glyph. New central `SpellAnalysis` utility correctly walks recipes, skips cast methods and augments, and identifies the first effect glyph
+- **Removed two broken Ars mixins** -- `MixinArsManaHud` (targeted removed `render` method) and `MixinSpellStatsPotency` (targeted removed `getPotency` method) were silently dead against Ars 4.12.7
+- **Removed `MixinArsManaRegen`** that cancelled the entire `ManaCapEvents.playerOnTick` handler -- This broke capability state maintenance and sync. Regen suppression in ISS_PRIMARY/HYBRID mode is already handled by `MixinManaCapability.addMana`
+- **Fixed all three rituals doing nothing on completion** -- `onFinishing(Player)` and `onRitualFinished(Player)` were dead methods that nothing called; migrated to the current Ars 4.12.7 `onEnd()` lifecycle hook
+- **Fixed ritual double-registration on config reload** -- Added guard and moved registration to `commonSetup`
+
+### LP Death Prevention Rework
+- **Replaced broad temporary magic immunity with scoped cast transactions** -- Previously, `setLPImmune` blocked ALL magic/sacrifice damage for up to 3 seconds, creating an invulnerability exploit. Now only blocks damage in the same tick as the LP cast
+- **Immunity cleared immediately** instead of deferred to next tick
+- **Safety timeout reduced** from 3 seconds to 1 second
+
+### Mana Bridge Fixes
+- **Fixed BridgeManager stale state** -- `getCurrentMode()` was reading config live but bridges were built once at init, creating impossible mixed states. Mode is now cached at init; changing `mana_unification_mode` requires a restart
+- **Fixed RegenSynergyHandler ignoring mana mode** -- Source Jar synergy was always writing to Iron's `MagicData` regardless of mode. Now routes through `BridgeManager` to write to the correct pool
+- **Consolidated overlay handling** -- Removed redundant `OverlayRegistrationHandler` and dead `OverlayManager`; `ManaBarController` is now the sole overlay controller
+- **Fixed MixinScrollItem mixin warning** -- Switched from `targets` to `value` for the public `Scroll` class
+
+### Spell Scaling Improvements
+- **Added `nature` and `eldritch` schools** to `SpellScalingUtil` element map (were missing from Iron's 3.15.x)
+- **Wired affinity bonuses into spell scaling** -- High affinity in a school now provides a spell power bonus (0.5% per level, up to 50%)
+- **Wired resonance multiplier into spell scaling** -- `ResonanceManager` values now actually affect spell power
+
+### Progression System Overhaul
+- **Progression is now a real persistent capability** -- Per-school cast counts stored in `ProgressionData` via NBT, persisted across death and dimension changes
+- **Attribute bonuses are now transient** instead of permanent -- Recalculated from stored data on login; no more permanent stat drift
+- **Created working `ProgressionSyncPacket`** -- Replaces the old no-op stub that did nothing
+
+### Affinity System Fixes
+- **Added `setLevel()` with `[0,100]` clamping** -- Previously only `addLevel` existed with upper-only clamping, allowing desync to negative values
+- **Switched to full-state sync** -- Client now receives the absolute level instead of a delta, preventing desync
+
+### ManaWell Ritual Config
+- **Added dedicated `mana_well_range`** (default 8) -- Previously hijacked `cooldown_category_duration` divided by 10
+- **Added `mana_well_regen_rate`** (default 2.0) -- Previously hardcoded to 2.0f
+
+### Cleanup
+- **Gated StartupValidator file I/O behind debug mode** -- Write tests and lock probes only run when `debug_mode` is enabled; mod-presence and Java-version checks remain always-on
+- **Deprecated `XpConverter.mapGlyphToSchool()`** -- Use `SpellAnalysis.analyze(spell).dominantSchool()` instead
+- **Deprecated `SpellCategorizer.categorizeArsGlyph()`** -- Use `SpellAnalysis.analyze(spell).category()` instead
+- **Removed 8 dead code files** -- MixinArsManaHud, MixinSpellStatsPotency, MixinArsManaRegen, OverlayManager, OverlayRegistrationHandler, old ProgressionSyncPacket, ArsSpellCastHandler, IronsSpellCastHandler
+
+### New Config Options
+| Option | Default | Description |
+|--------|---------|-------------|
+| `mana_well_range` | `8` | Radius in blocks for Mana Well ritual effect |
+| `mana_well_regen_rate` | `2.0` | Mana per tick granted within Mana Well range |
+
+---
+
 ## [1.7.0] - 2026-03-26
 
 ### Critical Fixes

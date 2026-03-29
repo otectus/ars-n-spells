@@ -167,6 +167,8 @@ public class AnsConfig {
     // RITUALS
     // ========================================
     public static final ForgeConfigSpec.DoubleValue RITUAL_MANA_INFUSION_AMOUNT;
+    public static final ForgeConfigSpec.IntValue MANA_WELL_RANGE;
+    public static final ForgeConfigSpec.DoubleValue MANA_WELL_REGEN_RATE;
 
     // ========================================
     // PERFORMANCE TUNING
@@ -193,7 +195,8 @@ public class AnsConfig {
                 "  ars_primary - Ars Nouveau mana is the single source",
                 "  hybrid - Both systems share a unified mana pool",
                 "  separate - Separate pools with dual-cost mechanics",
-                "  disabled - No mana integration at all"
+                "  disabled - No mana integration at all",
+                "NOTE: Changing this value requires a game restart to take effect."
             )
             .define("mana_unification_mode", "iss_primary");
         
@@ -773,6 +776,14 @@ public class AnsConfig {
         RITUAL_MANA_INFUSION_AMOUNT = BUILDER
             .comment("Amount of mana added by the Ritual of Mana Infusion")
             .defineInRange("ritual_mana_infusion_amount", 500.0, 1.0, 100000.0);
+
+        MANA_WELL_RANGE = BUILDER
+            .comment("Radius in blocks for Mana Well ritual effect")
+            .defineInRange("mana_well_range", 8, 1, 64);
+
+        MANA_WELL_REGEN_RATE = BUILDER
+            .comment("Mana per tick granted to players within Mana Well range")
+            .defineInRange("mana_well_regen_rate", 2.0, 0.1, 100.0);
 
         BUILDER.pop();
 

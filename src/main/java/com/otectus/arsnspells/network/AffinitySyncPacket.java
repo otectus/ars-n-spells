@@ -39,9 +39,7 @@ public class AffinitySyncPacket {
             mc.player.getCapability(AffinityData.AFFINITY_DATA).ifPresent(data -> {
                 try {
                     AffinityType type = AffinityType.valueOf(typeName);
-                    // Operational Logic: Sets the client specialty level to the mirrored server value.
-                    int boost = level - data.getLevel(type);
-                    data.addLevel(type, boost);
+                    data.setLevel(type, level);
                 } catch (Exception ignored) {}
             });
         });

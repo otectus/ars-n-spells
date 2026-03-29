@@ -152,8 +152,9 @@ public abstract class MixinManaCapability {
             return;
         }
         // Read-only sync: do NOT add to Iron's mana here.
-        // Ars regen is cancelled in ISS_PRIMARY (MixinArsManaRegen), and in HYBRID
-        // mode Iron's handles its own regen. Any addMana calls from Ars internal code
+        // In ISS_PRIMARY/HYBRID, this intercept suppresses Ars regen by making addMana
+        // a no-op. playerOnTick still runs for cap state maintenance and sync, but the
+        // actual mana addition is discarded. Any addMana calls from Ars internal code
         // (e.g. potion effects restoring Ars mana) should not affect Iron's pool.
         try {
             arsnspells$inBridgeCall.set(true);
