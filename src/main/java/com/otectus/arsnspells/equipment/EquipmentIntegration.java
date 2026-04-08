@@ -90,6 +90,23 @@ public class EquipmentIntegration {
     }
 
     /**
+     * Sync Iron's MAX_MANA attribute to match Ars's actual max mana.
+     * Used in ARS_PRIMARY mode to prevent Iron's tick from clamping Ars mana.
+     */
+    public static void syncIronsMaxToArs(Player player, float arsMax) {
+        if (player == null || player.level().isClientSide()) {
+            return;
+        }
+        if (!ModList.get().isLoaded("irons_spellbooks")) {
+            return;
+        }
+        double ironsBase = player.getAttributeBaseValue(AttributeRegistry.MAX_MANA.get());
+        double needed = Math.max(0, arsMax - ironsBase);
+        applyAttributeModifier(player, AttributeRegistry.MAX_MANA.get(), ARS_TO_IRON_MAX_MANA_ID,
+            "Ars Max Mana Sync", needed);
+    }
+
+    /**
      * Remove Ars-derived mana bonuses from Iron's attributes.
      */
     public static void clearArsBonusesFromIrons(Player player) {

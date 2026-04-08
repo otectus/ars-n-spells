@@ -106,7 +106,13 @@ public class EquipmentHandler {
                 return;
             }
 
-            if (mode.isIssPrimary() || mode.isHybrid() || mode.isArsPrimary()) {
+            if (mode.isArsPrimary()) {
+                // Sync Iron's MAX_MANA to Ars's actual max to prevent Iron's tick from clamping
+                float arsMax = BridgeManager.getBridge().getMaxMana(player);
+                EquipmentIntegration.syncIronsMaxToArs(player, arsMax);
+                logDebug("Synced Iron's max mana to Ars max for {}: arsMax={}",
+                    player.getName().getString(), arsMax);
+            } else if (mode.isIssPrimary() || mode.isHybrid()) {
                 double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
                 EquipmentIntegration.applyArsBonusesToIrons(player, conversionRate);
                 EquipmentIntegration.ManaBonus arsBonus = EquipmentIntegration.getArsManaBonuses(player);

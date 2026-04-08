@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.2] - 2026-04-08
+
+### Bug Fix
+- **Fixed Ars armor still not increasing mana in ARS_PRIMARY mode** -- The v1.8.1 fix only applied item-level armor bonuses to Iron's MAX_MANA attribute, but Ars 4.12.7 applies bonuses via the perk system (player attributes, not item modifiers), so the scanned bonus was often zero. Iron's mana tick then clamped Ars mana to Iron's base max (~200). Now syncs Iron's MAX_MANA to Ars's actual calculated max mana instead of scanning items, with a secondary sync on every `MaxManaCalcEvent` to catch level-ups, perk changes, and glyph learning
+
+---
+
 ## [1.8.1] - 2026-03-29
 
 ### Bug Fix
