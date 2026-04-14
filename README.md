@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v1.7.0)
+# Ars 'n' Spells (v1.8.3)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -57,9 +57,17 @@ A unified cooldown system groups spells into categories and locks out similar sp
 
 Ars spell casts can grant Iron's school progression and vice versa. Affinity tracks spell school usage over time, with optional decay.
 
-### Cross-mod spell casting (experimental)
+### Cross-mod spell casting
 
-Items can store cross-mod spell NBT (`arsnspells:cross_spells`) and cast the stored spell on right-click. Sneak-right-click cycles entries. Mana costs respect the active mode and conversion rates.
+Cross-casting lets any item store a spell from the *other* mod and cast it on right-click. The inscription is applied in survival via the **Spell Transcription** ritual:
+
+1. Build the Spell Transcription ritual (`ars_n_spells:spell_transcription`).
+2. Drop a **source** within ~3 blocks of the brazier: a filled Ars Nouveau spell parchment, spellbook, or focus, **or** an Iron's Spellbooks scroll.
+3. Drop a **target** item in the same area -- any item can receive the inscription.
+4. Activate the ritual. On completion, the source is consumed and the target gains the `arsnspells:cross_spells` NBT tag.
+5. **Right-click** the target to cast the inscribed spell. **Sneak-right-click** cycles if you stack multiple inscriptions.
+
+Mana costs flow through `BridgeManager` and respect the active unification mode. In `separate` mode, the dual-cost split (`dual_cost_ars_percentage` / `dual_cost_iss_percentage`) and conversion rates determine how much each pool pays per cast.
 
 ---
 
@@ -203,11 +211,14 @@ The mod hides redundant mana bars based on mode:
 
 ## Changelog
 
+### v1.8.3
+- **Spell Transcription ritual is now functional** -- The previously no-op ritual now actually inscribes a cross-mod spell onto a target item, exposing the cross-casting runtime to survival play. Removed the dead `ProgressionSyncPacket` and deprecated `XpConverter`, and added a defensive guard in `AuraCapability` for early capability attach. See [CHANGELOG.md](CHANGELOG.md) for details.
+
+### v1.8.0 -- v1.8.2
+- Upstream compatibility overhaul for Ars Nouveau 4.12.7 and Iron's Spellbooks 3.15.5.1: central `SpellAnalysis` utility corrects glyph classification across all systems, rituals migrated to the current `onEnd()` lifecycle, LP death prevention rewritten as scoped cast transactions, overlay controllers consolidated, and Ars armor mana bonuses fixed in `ARS_PRIMARY` mode. See [CHANGELOG.md](CHANGELOG.md) for the full list.
+
 ### v1.7.0
 - Major quality and stability release: fixed SEPARATE mode mana loss, safe mode killing players, pending cost TTL under server lag, double event firing, and more. Added additive spell scaling with configurable cap, ring conflict notifications, new `/ans` commands, expanded translations, and performance optimizations. See [CHANGELOG.md](CHANGELOG.md) for full details.
-
-### v1.5.2
-- Fixed crash on world join caused by MixinArsManaRegen targeting non-existent `tick` method in ManaCap. Mixin now correctly targets `ManaCapEvents.playerOnTick` to suppress native Ars mana regeneration in ISS_PRIMARY mode.
 
 ## Troubleshooting
 
@@ -220,14 +231,15 @@ The mod hides redundant mana bars based on mode:
 ## Building from source
 
 1. Install JDK 17.
-2. Place dependency jars in the repo root (as configured in `build.gradle`).
-3. Run:
+2. Run:
 
-```powershell
-.\gradlew.bat build
+```bash
+./gradlew build
 ```
 
-Output jar: `build/libs/ars_n_spells-1.7.0.jar`
+Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven; no manual jar placement required.
+
+Output jar: `build/libs/ars_n_spells-1.8.3.jar`
 
 ## License
 

@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.3] - 2026-04-14
+
+### New Feature
+- **Spell Transcription ritual is now functional** -- Previously a no-op that dropped a blank scroll. The ritual now inscribes a cross-mod spell onto a target item, exposing the previously API-only cross-casting runtime to survival play. Drop a source (filled Ars spell parchment/focus/spellbook, or an Iron's scroll) and a target item near the brazier, activate the ritual, and the target gains the `arsnspells:cross_spells` NBT tag. Right-click the target to cast the inscribed spell; sneak-right-click cycles through multiple inscriptions. Mana costs flow through `BridgeManager` and respect the active unification mode, including `SEPARATE`-mode dual-cost splitting.
+
+### Cleanup
+- **Removed dead `ProgressionSyncPacket`** -- The packet was registered on the network channel but never constructed or sent anywhere. Its packet-id slot is freed.
+- **Removed deprecated `XpConverter`** -- `@Deprecated` stub that redirected to `SpellAnalysis`; had no remaining callers.
+
+### Bug Fixes
+- **`AuraCapability` now tolerates early capability attach** -- Constructor and `loadNBTData` wrap `AnsConfig.AURA_MAX_DEFAULT.get()` in try/catch, defaulting to 100 if the config spec isn't loaded yet (defensive; pre-existing crash had not been observed in practice).
+
+### Documentation
+- **Fixed `CLAUDE.md` Ars Nouveau version range drift** -- Now shows `[4.12.7, 4.13)` matching `mods.toml` instead of a misleading `4.12.7+`.
+
+---
+
 ## [1.8.2] - 2026-04-08
 
 ### Bug Fix
@@ -399,4 +416,4 @@ GNU GPLv3
 
 ---
 
-*Last Updated: March 16, 2026*
+*Last Updated: April 14, 2026*

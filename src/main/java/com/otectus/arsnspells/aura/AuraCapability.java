@@ -14,7 +14,13 @@ public class AuraCapability implements IAuraCapability {
     private float regenAccumulator = 0f;
 
     public AuraCapability() {
-        this.maxAura = AnsConfig.AURA_MAX_DEFAULT.get();
+        int defaultMax;
+        try {
+            defaultMax = AnsConfig.AURA_MAX_DEFAULT.get();
+        } catch (IllegalStateException e) {
+            defaultMax = 100;
+        }
+        this.maxAura = defaultMax;
         this.aura = this.maxAura;
     }
 
@@ -79,7 +85,11 @@ public class AuraCapability implements IAuraCapability {
         this.aura = tag.getInt("aura");
         this.maxAura = tag.getInt("maxAura");
         if (this.maxAura <= 0) {
-            this.maxAura = AnsConfig.AURA_MAX_DEFAULT.get();
+            try {
+                this.maxAura = AnsConfig.AURA_MAX_DEFAULT.get();
+            } catch (IllegalStateException e) {
+                this.maxAura = 100;
+            }
         }
         if (this.aura > this.maxAura) {
             this.aura = this.maxAura;

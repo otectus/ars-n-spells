@@ -62,6 +62,20 @@ Standing near Ars Nouveau Source Jars passively boosts Iron's mana regeneration.
 
 ---
 
+## Spell Transcription Ritual
+
+Cast spells from *either* mod using items from the *other* mod. The **Spell Transcription** ritual inscribes a cross-mod spell onto any item:
+
+1. Build the Spell Transcription ritual.
+2. Drop a **source** near the brazier: a filled Ars Nouveau spell parchment, spellbook, or focus, or an Iron's Spellbooks scroll.
+3. Drop a **target** item — any item can receive the inscription.
+4. Activate the ritual. The source is consumed, and the target is now a cross-mod caster.
+5. **Right-click** the target to cast the inscribed spell. **Sneak-right-click** to cycle between multiple inscriptions on the same item.
+
+Mana costs flow through the active unification mode and respect your configured conversion rates. In **Separate** mode, costs split between both pools according to your dual-cost percentages.
+
+---
+
 ## Unified Cooldowns
 
 An optional system that groups similar spells across both mods into shared cooldown categories. Prevents spell spam by locking out related spells when one is cast. Disabled by default.

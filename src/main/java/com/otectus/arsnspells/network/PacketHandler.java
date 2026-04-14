@@ -24,7 +24,6 @@ public class PacketHandler {
         }
         INSTANCE.registerMessage(id++, AffinitySyncPacket.class, AffinitySyncPacket::toBytes, AffinitySyncPacket::new, AffinitySyncPacket::handle);
         INSTANCE.registerMessage(id++, CooldownSyncPacket.class, CooldownSyncPacket::toBytes, CooldownSyncPacket::new, CooldownSyncPacket::handle);
-        INSTANCE.registerMessage(id++, ProgressionSyncPacket.class, ProgressionSyncPacket::toBytes, ProgressionSyncPacket::new, ProgressionSyncPacket::handle);
     }
 
     public static void sendToClient(Object msg, ServerPlayer player) {

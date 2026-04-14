@@ -117,7 +117,7 @@ public final class SpellAnalysis {
     /**
      * Derive the spell school from the first effect glyph using keyword analysis
      * of the registry path. Consolidates logic formerly duplicated in
-     * XpConverter, SanctifiedLegacyCompat.determineSpellSchool, and SpellScalingUtil.
+     * SanctifiedLegacyCompat.determineSpellSchool and SpellScalingUtil.
      */
     public static String deriveSchool(@Nullable AbstractSpellPart effect) {
         if (effect == null || effect.getRegistryName() == null) {
