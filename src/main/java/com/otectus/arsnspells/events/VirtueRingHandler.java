@@ -18,9 +18,9 @@ import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Handles Virtue Ring aura consumption for Ars Nouveau spells.
@@ -31,7 +31,8 @@ import java.util.UUID;
 public class VirtueRingHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(VirtueRingHandler.class);
 
-    private static final Map<UUID, PendingAuraCost> pendingCosts = new HashMap<>();
+    // ConcurrentHashMap because event handlers can fire from network/tick threads.
+    private static final Map<UUID, PendingAuraCost> pendingCosts = new ConcurrentHashMap<>();
 
     /**
      * Calculate aura cost and replace mana cost when Virtue Ring is equipped.
@@ -195,6 +196,14 @@ public class VirtueRingHandler {
             int now = event.player.tickCount;
             pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().tickStamp > PENDING_COST_TTL_TICKS);
         }
+    }
+
+    /**
+     * Evict per-player state on disconnect.
+     */
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        pendingCosts.remove(event.getEntity().getUUID());
     }
 
     private static final int PENDING_COST_TTL_TICKS = 100; // 5 seconds at 20 TPS

@@ -2,8 +2,11 @@ package com.otectus.arsnspells.client;
 
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
@@ -29,16 +32,34 @@ public class ManaBarController {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRenderOverlay(RenderGuiOverlayEvent.Pre event) {
         try {
+            // Get the overlay being rendered
+            String overlayId = event.getOverlay().id().toString();
+
+            // Hide mana bars when the Cursed/Virtue Ring is equipped — spells consume
+            // LP or Aura in that state, so showing a mana bar is misleading. This runs
+            // independently of mana unification so it still applies when unification is off.
+            if (isManaOverlay(overlayId)
+                && AnsConfig.HIDE_MANA_BAR_WITH_RING.get()
+                && SanctifiedLegacyCompat.isAvailable()) {
+                LocalPlayer localPlayer = Minecraft.getInstance().player;
+                if (localPlayer != null) {
+                    boolean cursed = AnsConfig.ENABLE_LP_SYSTEM.get()
+                        && SanctifiedLegacyCompat.isWearingCursedRing(localPlayer);
+                    boolean virtue = SanctifiedLegacyCompat.isWearingVirtueRing(localPlayer);
+                    if (cursed || virtue) {
+                        event.setCanceled(true);
+                        return;
+                    }
+                }
+            }
+
             // Only process if mana unification is enabled
             if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
                 return;
             }
-            
+
             // Get current mana mode
             ManaUnificationMode mode = BridgeManager.getCurrentMode();
-            
-            // Get the overlay being rendered
-            String overlayId = event.getOverlay().id().toString();
             
             // Log once for debugging
             if (!loggedOnce && AnsConfig.DEBUG_MODE.get()) {
@@ -77,5 +98,12 @@ public class ManaBarController {
                 LOGGER.error("[ManaBarController] Error in overlay handler", e);
             }
         }
+    }
+
+    private static boolean isManaOverlay(String overlayId) {
+        if (!overlayId.contains("mana")) {
+            return false;
+        }
+        return overlayId.contains("irons_spellbooks") || overlayId.contains("ars_nouveau");
     }
 }

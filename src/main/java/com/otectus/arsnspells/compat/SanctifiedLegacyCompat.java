@@ -9,8 +9,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +48,48 @@ public class SanctifiedLegacyCompat {
             BLASPHEMY_IDS.add(new ResourceLocation(MOD_ID, type));
         }
     }
+
+    // Cached ring resource locations — avoid allocating per check.
+    // Sets so both Enigmatic Legacy and Covenant of the Seven namespaces resolve to
+    // the same ring type when present (they ship equivalent items in some packs).
+    private static final Set<ResourceLocation> CURSED_RING_IDS = Set.of(
+        new ResourceLocation(ENIGMATIC_LEGACY_MOD_ID, "cursed_ring"),
+        new ResourceLocation(MOD_ID, "cursed_ring")
+    );
+    private static final Set<ResourceLocation> VIRTUE_RING_IDS = Set.of(
+        new ResourceLocation(MOD_ID, "virtue_ring")
+    );
+
+    // ------------------------------------------------------------------
+    // Curio-state cache
+    //
+    // Scanning the entire curio inventory runs once per spell cast per player
+    // for ring/blasphemy detection. We scan once, cache the result for a short
+    // TTL, and serve subsequent queries from cache. Entries are evicted on
+    // player logout (see clearCacheFor / CursedRingHandler listener).
+    // ------------------------------------------------------------------
+    private static final int CURIO_CACHE_TTL_TICKS = 20; // 1 second at 20 TPS
+    private static final ConcurrentHashMap<UUID, CurioState> CURIO_STATE_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * Snapshot of the Covenant-of-the-Seven / Enigmatic Legacy curio state for
+     * a single player. Populated by {@link #scanCurios(Player, int)}.
+     */
+    private static final class CurioState {
+        final boolean cursedRing;
+        final boolean virtueRing;
+        final Set<ResourceLocation> blasphemies; // immutable
+        final int cachedAtTick;
+
+        CurioState(boolean cursedRing, boolean virtueRing, Set<ResourceLocation> blasphemies, int cachedAtTick) {
+            this.cursedRing = cursedRing;
+            this.virtueRing = virtueRing;
+            this.blasphemies = blasphemies;
+            this.cachedAtTick = cachedAtTick;
+        }
+    }
+
+    private static final CurioState EMPTY_STATE = new CurioState(false, false, Collections.emptySet(), Integer.MIN_VALUE);
 
     // Blood Magic reflection cache
     private static Class<?> bloodMagicNetworkClass = null;
@@ -152,17 +197,9 @@ public class SanctifiedLegacyCompat {
         if (!isEnigmaticLegacyLoaded && !isLoaded) {
             return false;
         }
-
-        try {
-            boolean hasCursed = hasCurio(player, "enigmaticlegacy:cursed_ring");
-            boolean hasVirtue = isLoaded && hasCurio(player, "covenant_of_the_seven:virtue_ring");
-
-            // Cursed Ring only active if wearing it WITHOUT Virtue Ring
-            return hasCursed && !hasVirtue;
-        } catch (Exception e) {
-            LOGGER.error("Failed to check for Cursed Ring", e);
-            return false;
-        }
+        CurioState state = getState(player);
+        // Cursed Ring only active if wearing it WITHOUT Virtue Ring
+        return state.cursedRing && !state.virtueRing;
     }
 
     /**
@@ -173,61 +210,83 @@ public class SanctifiedLegacyCompat {
         if (!isLoaded) {
             return false;
         }
-
-        try {
-            boolean hasCursed = isEnigmaticLegacyLoaded && hasCurio(player, "enigmaticlegacy:cursed_ring");
-            boolean hasVirtue = hasCurio(player, "covenant_of_the_seven:virtue_ring");
-
-            // Virtue Ring only active if wearing it WITHOUT Cursed Ring
-            return hasVirtue && !hasCursed;
-        } catch (Exception e) {
-            LOGGER.error("Failed to check for Virtue Ring", e);
-            return false;
-        }
+        CurioState state = getState(player);
+        // Virtue Ring only active if wearing it WITHOUT Cursed Ring
+        return state.virtueRing && !state.cursedRing;
     }
-    
+
     /**
      * Check if the player has both the Cursed Ring and Virtue Ring equipped (conflict state).
      */
     public static boolean hasBothRings(Player player) {
         if (!isLoaded || !isEnigmaticLegacyLoaded) return false;
-        try {
-            return hasCurio(player, "enigmaticlegacy:cursed_ring")
-                && hasCurio(player, "covenant_of_the_seven:virtue_ring");
-        } catch (Exception e) {
-            return false;
-        }
+        CurioState state = getState(player);
+        return state.cursedRing && state.virtueRing;
     }
 
     /**
-     * Check if a player has a specific curio equipped using Ars Nouveau's CuriosUtil.
-     *
-     * @param player The player
-     * @param curioId The curio item ID (e.g., "enigmaticlegacy:cursed_ring")
-     * @return true if the curio is equipped
+     * Scan curio inventory once and cache ring/blasphemy presence for {@value #CURIO_CACHE_TTL_TICKS}
+     * ticks. Called by all ring/blasphemy checks; scans are deduplicated within the TTL window.
      */
-    private static boolean hasCurio(Player player, String curioId) {
-        try {
-            ResourceLocation itemId = new ResourceLocation(curioId);
+    private static CurioState getState(Player player) {
+        if (player == null) {
+            return EMPTY_STATE;
+        }
+        UUID id = player.getUUID();
+        int now = player.tickCount;
+        CurioState cached = CURIO_STATE_CACHE.get(id);
+        if (cached != null && now - cached.cachedAtTick < CURIO_CACHE_TTL_TICKS && now >= cached.cachedAtTick) {
+            return cached;
+        }
+        CurioState fresh = scanCurios(player, now);
+        CURIO_STATE_CACHE.put(id, fresh);
+        return fresh;
+    }
 
-            return CuriosUtil.getAllWornItems(player).map(handler -> {
+    /**
+     * Single-pass scan of the player's curio inventory. Populates ring presence and
+     * collects every equipped Blasphemy curio ID in one traversal.
+     */
+    private static CurioState scanCurios(Player player, int tick) {
+        boolean[] cursed = {false};
+        boolean[] virtue = {false};
+        @SuppressWarnings("unchecked")
+        Set<ResourceLocation>[] blasphemiesRef = new Set[]{null};
+        try {
+            CuriosUtil.getAllWornItems(player).ifPresent(handler -> {
                 for (int i = 0; i < handler.getSlots(); i++) {
                     ItemStack stack = handler.getStackInSlot(i);
-                    if (!stack.isEmpty()) {
-                        ResourceLocation stackId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(stack.getItem());
-                        if (stackId != null && stackId.equals(itemId)) {
-                            return true;
-                        }
+                    if (stack.isEmpty()) continue;
+                    ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+                    if (itemId == null) continue;
+                    if (CURSED_RING_IDS.contains(itemId)) {
+                        cursed[0] = true;
+                    } else if (VIRTUE_RING_IDS.contains(itemId)) {
+                        virtue[0] = true;
+                    } else if (BLASPHEMY_IDS.contains(itemId)) {
+                        if (blasphemiesRef[0] == null) blasphemiesRef[0] = new HashSet<>(2);
+                        blasphemiesRef[0].add(itemId);
                     }
                 }
-                return false;
-            }).orElse(false);
+            });
         } catch (Exception e) {
-            LOGGER.error("Failed to check for curio {}: {}", curioId, e.getMessage(), e);
-            return false;
+            LOGGER.error("Failed to scan curios for {}", player.getName().getString(), e);
+        }
+        Set<ResourceLocation> blasphemies = blasphemiesRef[0];
+        return new CurioState(cursed[0], virtue[0],
+            blasphemies == null ? Collections.emptySet() : Collections.unmodifiableSet(blasphemies),
+            tick);
+    }
+
+    /**
+     * Evict cached curio state for a player (call on logout).
+     */
+    public static void clearCacheFor(UUID playerId) {
+        if (playerId != null) {
+            CURIO_STATE_CACHE.remove(playerId);
         }
     }
-    
+
     /**
      * Calculate LP cost for an Ars Nouveau spell using configurable formula.
      * 
@@ -352,6 +411,11 @@ public class SanctifiedLegacyCompat {
         if (player == null) {
             return false;
         }
+        if (lpCost <= 0) {
+            // Non-positive costs would bypass health/LP checks — treat as unavailable
+            // so callers don't silently "succeed" with a free cast.
+            return false;
+        }
 
         LPSourceMode mode = getLPSourceMode();
 
@@ -390,6 +454,10 @@ public class SanctifiedLegacyCompat {
     public static boolean consumeLP(Player player, int lpCost) {
         if (player == null) {
             LOGGER.warn("Cannot consume LP: player is null");
+            return false;
+        }
+        if (lpCost <= 0) {
+            LOGGER.warn("Refusing to consume non-positive LP cost: {}", lpCost);
             return false;
         }
 
@@ -438,7 +506,8 @@ public class SanctifiedLegacyCompat {
             return false;
         }
 
-        float newHealth = currentHealth - healthCost;
+        // Clamp to preserve the 1 HP buffer even under floating-point drift.
+        float newHealth = Math.max(1.0f, currentHealth - healthCost);
         player.setHealth(newHealth);
 
         LOGGER.debug("Successfully consumed {} LP ({} health) - new health: {}",
@@ -478,11 +547,13 @@ public class SanctifiedLegacyCompat {
 
         try {
             Object soulNetwork = getSoulNetworkMethod.invoke(null, player.getUUID());
-            if (soulNetwork != null) {
-                Object essence = getCurrentEssenceMethod.invoke(soulNetwork);
-                if (essence instanceof Number) {
-                    return ((Number) essence).intValue();
-                }
+            if (soulNetwork == null) {
+                LOGGER.debug("Blood Magic Soul Network is null for {}", player.getName().getString());
+                return 0;
+            }
+            Object essence = getCurrentEssenceMethod.invoke(soulNetwork);
+            if (essence instanceof Number) {
+                return ((Number) essence).intValue();
             }
         } catch (Exception e) {
             LOGGER.error("Failed to get Blood Magic LP", e);
@@ -494,19 +565,21 @@ public class SanctifiedLegacyCompat {
      * Consume LP from Blood Magic Soul Network.
      */
     public static boolean consumeBloodMagicLP(Player player, int amount) {
-        if (!isBloodMagicAvailable() || player == null) {
+        if (!isBloodMagicAvailable() || player == null || amount <= 0) {
             return false;
         }
 
         try {
             Object soulNetwork = getSoulNetworkMethod.invoke(null, player.getUUID());
-            if (soulNetwork != null) {
-                // The syphon method returns the amount actually syphoned
-                Object result = syphonMethod.invoke(soulNetwork, amount);
-                if (result instanceof Number) {
-                    int syphoned = ((Number) result).intValue();
-                    return syphoned >= amount;
-                }
+            if (soulNetwork == null) {
+                LOGGER.debug("Blood Magic Soul Network is null for {}", player.getName().getString());
+                return false;
+            }
+            // The syphon method returns the amount actually syphoned
+            Object result = syphonMethod.invoke(soulNetwork, amount);
+            if (result instanceof Number) {
+                int syphoned = ((Number) result).intValue();
+                return syphoned >= amount;
             }
         } catch (Exception e) {
             LOGGER.error("Failed to consume Blood Magic LP", e);
@@ -517,19 +590,17 @@ public class SanctifiedLegacyCompat {
     /**
      * Check if the player has a Blasphemy curio that matches the spell school.
      * Blasphemy curios reduce LP costs by 85% for matching schools.
-     * 
+     *
      * @param player The player
      * @param schoolType The spell school (e.g., "fire", "ice", "lightning")
      * @return true if player has matching Blasphemy curio
      */
     public static boolean hasMatchingBlasphemy(Player player, String schoolType) {
-        if (!ModList.get().isLoaded(MOD_ID) || schoolType == null) {
+        if (!isLoaded || schoolType == null) {
             return false;
         }
-        
-        // Check for Blasphemy curio matching the school type
-        String blasphemyId = "covenant_of_the_seven:" + schoolType.toLowerCase() + "_blasphemy";
-        return hasCurio(player, blasphemyId);
+        ResourceLocation id = new ResourceLocation(MOD_ID, schoolType.toLowerCase() + "_blasphemy");
+        return getState(player).blasphemies.contains(id);
     }
     
     /**
@@ -569,21 +640,20 @@ public class SanctifiedLegacyCompat {
     /**
      * Check if the player is wearing the Ring of the Seven Virtues.
      * This is the standalone check (doesn't care about Cursed Ring).
-     * 
+     *
      * @param player The player
      * @return true if wearing Ring of Virtue
      */
     public static boolean hasVirtueRing(Player player) {
-        if (!ModList.get().isLoaded(MOD_ID)) {
+        if (!isLoaded) {
             return false;
         }
-        
-        return hasCurio(player, "covenant_of_the_seven:virtue_ring");
+        return getState(player).virtueRing;
     }
     
     /**
      * Check if the player has any Blasphemy curio equipped.
-     * 
+     *
      * @param player The player
      * @return true if wearing any Blasphemy curio
      */
@@ -591,41 +661,21 @@ public class SanctifiedLegacyCompat {
         if (!isAvailable()) {
             return false;
         }
-
-        // Single curio inventory scan checking all 13 variants at once
-        try {
-            return CuriosUtil.getAllWornItems(player).map(handler -> {
-                for (int i = 0; i < handler.getSlots(); i++) {
-                    ItemStack stack = handler.getStackInSlot(i);
-                    if (!stack.isEmpty()) {
-                        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
-                        if (id != null && BLASPHEMY_IDS.contains(id)) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }).orElse(false);
-        } catch (Exception e) {
-            LOGGER.error("Failed to scan for Blasphemy curios", e);
-            return false;
-        }
+        return !getState(player).blasphemies.isEmpty();
     }
-    
+
     /**
      * Check if the player has a specific Blasphemy curio type.
-     * 
+     *
      * @param player The player
      * @param blasphemyType The Blasphemy type (e.g., "fire_blasphemy")
      * @return true if wearing that specific Blasphemy
      */
     public static boolean hasBlasphemyType(Player player, String blasphemyType) {
-        if (!ModList.get().isLoaded(MOD_ID)) {
+        if (!isLoaded || blasphemyType == null) {
             return false;
         }
-        
-        String curioId = "covenant_of_the_seven:" + blasphemyType;
-        return hasCurio(player, curioId);
+        return getState(player).blasphemies.contains(new ResourceLocation(MOD_ID, blasphemyType));
     }
     
     /**

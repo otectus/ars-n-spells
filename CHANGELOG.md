@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.6] - 2026-04-24
+
+### Bug Fixes
+- **Ring of Seven Curses / Virtues now hides the mana bar** -- While either ring is equipped, spells consume LP or Aura instead of mana, so the Iron's Spellbooks and Ars Nouveau mana bars are now hidden on the HUD. New config `hide_mana_bar_with_ring` (default `true`) gates the behavior, and the check runs independently of mana unification so it applies in every mode.
+- **Cursed Ring now recognized from both namespaces** -- Detection matches `enigmaticlegacy:cursed_ring` and `covenant_of_the_seven:cursed_ring`; previously only the Enigmatic Legacy variant was honored. Virtue Ring detection uses an equivalent set for defensive future-proofing.
+- **Thread-safety fix for LP/Aura pending-cost tracking** -- `CursedRingHandler`, `IronsLPHandler`, and `VirtueRingHandler` now store pending-cost state in `ConcurrentHashMap` instead of `HashMap`. Prevents rare `ConcurrentModificationException` or lost entries when spell events fire on different threads than the tick sweep.
+- **Per-player state now evicted on logout** -- Added `PlayerLoggedOutEvent` handlers to all three ring/LP handlers so stale UUID entries are removed immediately instead of waiting for the 5-second TTL sweep. The Cursed handler also clears the curio-state cache on logout.
+- **Defensive guards on LP accounting** -- `hasEnoughLP` and `consumeLP` now refuse non-positive costs instead of silently "succeeding" with a free cast. `consumeLP` also clamps post-cast health at 1 HP so floating-point drift cannot violate the reserved buffer.
+- **Null-guard on Blood Magic Soul Network lookup** -- `getBloodMagicLP` and `consumeBloodMagicLP` now check for a null Soul Network return value and log a debug message instead of relying on a catch-all `Exception` to mask a potential NPE across Blood Magic version drift.
+
+### Performance
+- **Curio scan cached per player** -- Ring and Blasphemy detection (`isWearingCursedRing`, `isWearingVirtueRing`, `hasBothRings`, `hasAnyBlasphemy`, `hasMatchingBlasphemy`, `hasBlasphemyType`, `hasVirtueRing`) previously iterated every curio slot on every spell cast — up to 5–6 scans per Ars cast between the Cursed Ring, Virtue Ring, and Blasphemy-discount paths. A new 20-tick (~1-second) TTL `CurioState` cache in `SanctifiedLegacyCompat` collapses all checks onto a single inventory scan per player per second.
+- **Pre-computed ring ResourceLocations** -- Removed per-call `new ResourceLocation(...)` allocations; ring IDs are now static final `Set<ResourceLocation>` fields built once.
+
+### Cleanup
+- **Removed dead `hasCurio` helper** -- All call sites moved to the cached state lookup; the generic helper had no remaining callers.
+
+---
+
 ## [1.8.3] - 2026-04-14
 
 ### New Feature

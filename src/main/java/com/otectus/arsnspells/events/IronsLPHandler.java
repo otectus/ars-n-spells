@@ -17,9 +17,9 @@ import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Handles Cursed Ring LP consumption for Iron's Spellbooks spells.
@@ -29,8 +29,9 @@ import java.util.UUID;
 public class IronsLPHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(IronsLPHandler.class);
 
-    // Track LP costs for message display and post-cast consumption
-    private static final Map<UUID, PendingIronsLP> pendingCosts = new HashMap<>();
+    // Track LP costs for message display and post-cast consumption.
+    // ConcurrentHashMap because event handlers can fire from network/tick threads.
+    private static final Map<UUID, PendingIronsLP> pendingCosts = new ConcurrentHashMap<>();
 
     /**
      * Validate LP cost for Iron's spells.
@@ -207,6 +208,14 @@ public class IronsLPHandler {
             long now = System.currentTimeMillis();
             pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().timestamp > 5000);
         }
+    }
+
+    /**
+     * Evict per-player state on disconnect.
+     */
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        pendingCosts.remove(event.getEntity().getUUID());
     }
 
     /**

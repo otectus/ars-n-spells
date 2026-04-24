@@ -24,6 +24,7 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue CONVERSION_RATE_IRON_TO_ARS;
     public static final ForgeConfigSpec.DoubleValue HYBRID_SYNC_RATE;
     public static final ForgeConfigSpec.ConfigValue<String> HYBRID_MANA_BAR;
+    public static final ForgeConfigSpec.BooleanValue HIDE_MANA_BAR_WITH_RING;
     public static final ForgeConfigSpec.BooleanValue ALLOW_MANA_OVERFLOW;
     public static final ForgeConfigSpec.DoubleValue DUAL_COST_ARS_PERCENTAGE;
     public static final ForgeConfigSpec.DoubleValue DUAL_COST_ISS_PERCENTAGE;
@@ -255,6 +256,15 @@ public class AnsConfig {
                 "Only applies when mana_unification_mode is set to 'hybrid'"
             )
             .define("hybrid_mana_bar", "irons");
+
+        HIDE_MANA_BAR_WITH_RING = BUILDER
+            .comment(
+                "Hide the Ars Nouveau and Iron's Spellbooks mana bars while wearing the",
+                "Ring of the Seven Curses (LP) or Ring of the Seven Virtues (Aura).",
+                "Spells consume LP/Aura instead of mana when these rings are equipped,",
+                "so displaying a mana bar is misleading."
+            )
+            .define("hide_mana_bar_with_ring", true);
 
         ALLOW_MANA_OVERFLOW = BUILDER
             .comment("Allow mana to overflow max capacity during conversion")

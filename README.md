@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v1.8.3)
+# Ars 'n' Spells (v1.8.6)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -211,6 +211,9 @@ The mod hides redundant mana bars based on mode:
 
 ## Changelog
 
+### v1.8.6
+- **Cursed/Virtue Ring polish and LP hardening** -- Mana bar is now hidden while either ring is equipped (new `hide_mana_bar_with_ring` config, default on). Cursed Ring detection now recognizes both `enigmaticlegacy:cursed_ring` and `covenant_of_the_seven:cursed_ring`. Ring and Blasphemy curio detection is cached per-player so a single spell cast no longer triggers 5+ curio-inventory scans. LP pending-cost maps upgraded to `ConcurrentHashMap` with `PlayerLoggedOutEvent` eviction in all three handlers. Added defensive guards against non-positive LP costs, null Blood Magic Soul Networks, and floating-point health drift below the 1-HP buffer. See [CHANGELOG.md](CHANGELOG.md) for details.
+
 ### v1.8.3
 - **Spell Transcription ritual is now functional** -- The previously no-op ritual now actually inscribes a cross-mod spell onto a target item, exposing the cross-casting runtime to survival play. Removed the dead `ProgressionSyncPacket` and deprecated `XpConverter`, and added a defensive guard in `AuraCapability` for early capability attach. See [CHANGELOG.md](CHANGELOG.md) for details.
 
@@ -239,7 +242,7 @@ The mod hides redundant mana bars based on mode:
 
 Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven; no manual jar placement required.
 
-Output jar: `build/libs/ars_n_spells-1.8.3.jar`
+Output jar: `build/libs/ars_n_spells-1.8.6.jar`
 
 ## License
 

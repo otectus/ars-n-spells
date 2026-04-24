@@ -16,9 +16,9 @@ import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Handles Cursed Ring LP consumption for Ars Nouveau spells.
@@ -28,9 +28,10 @@ import java.util.UUID;
 public class CursedRingHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CursedRingHandler.class);
     
-    // Track which spells have had LP consumed (to prevent double-consumption)
-    private static final Map<UUID, PendingLPCost> pendingCosts = new HashMap<>();
-    private static final java.util.Set<UUID> ringConflictNotified = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    // Track which spells have had LP consumed (to prevent double-consumption).
+    // ConcurrentHashMap because event handlers can fire from network/tick threads.
+    private static final Map<UUID, PendingLPCost> pendingCosts = new ConcurrentHashMap<>();
+    private static final java.util.Set<UUID> ringConflictNotified = ConcurrentHashMap.newKeySet();
     
     /**
      * Calculate and validate LP cost when Cursed Ring is equipped.
@@ -258,6 +259,18 @@ public class CursedRingHandler {
         }
     }
     
+    /**
+     * Evict per-player state on disconnect so stale UUIDs don't linger until TTL sweep.
+     * Also clears the shared curio-state cache so logins under the same UUID re-scan.
+     */
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        UUID id = event.getEntity().getUUID();
+        pendingCosts.remove(id);
+        ringConflictNotified.remove(id);
+        SanctifiedLegacyCompat.clearCacheFor(id);
+    }
+
     private static final int PENDING_COST_TTL_TICKS = 100; // 5 seconds at 20 TPS
 
     /**
