@@ -194,9 +194,14 @@ public class CrossCastingHandler {
         io.redspace.ironsspellbooks.api.spells.CastSource source =
             parseCastSource(spellData, io.redspace.ironsspellbooks.api.spells.CastSource.SPELLBOOK);
 
+        float multiplier = (float) Math.max(0.0, AnsConfig.CROSS_CAST_COST_MULTIPLIER.get());
         ManaUnificationMode mode = BridgeManager.getCurrentMode();
         if (BridgeManager.isUnificationEnabled() && mode == ManaUnificationMode.SEPARATE) {
-            float totalCost = spell.getManaCost(castLevel);
+            float baseCost = spell.getManaCost(castLevel);
+            // Apply the cross-cast multiplier once, on the base cost, before the
+            // SEPARATE-mode dual-cost split. The handler in CrossCastIronsHandler
+            // reads entry.issCost as-is to avoid a second application at event time.
+            float totalCost = baseCost * multiplier;
             float arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
             float issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
             float arsCost = (float) (totalCost * arsPercent * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
@@ -210,6 +215,9 @@ public class CrossCastingHandler {
                 }
             }
 
+            logDebug("Iron's cross-cast (SEPARATE) {}: base={} multiplier={} total={} ars={} iss={}",
+                spellId, baseCost, multiplier, totalCost, arsCost, issCost);
+
             CrossCastContext.begin(player, CrossSpellType.IRONS_SPELLBOOKS,
                 player.level().getGameTime(), arsCost, issCost, spell.getSpellId());
 
@@ -221,7 +229,16 @@ public class CrossCastingHandler {
             return success;
         }
 
-        return spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT);
+        // Non-SEPARATE: Iron's owns the cost calculation. Mark the cast so
+        // CrossCastIronsHandler can apply the multiplier exactly once when
+        // SpellOnCastEvent fires, then commit the cast.
+        CrossCastContext.begin(player, CrossSpellType.IRONS_SPELLBOOKS,
+            player.level().getGameTime(), 0.0f, 0.0f, spell.getSpellId());
+        boolean success = spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT);
+        if (!success) {
+            CrossCastContext.clear(player);
+        }
+        return success;
     }
 
     private static io.redspace.ironsspellbooks.api.spells.CastSource parseCastSource(
