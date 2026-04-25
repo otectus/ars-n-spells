@@ -41,6 +41,13 @@ dependencies {
     implementation fg.deobf("curse.maven:${ars_nouveau_project}:${ars_nouveau_file}")
     compileOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${irons_spellbooks_file}")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 processResources {

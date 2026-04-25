@@ -37,14 +37,16 @@ import org.slf4j.LoggerFactory;
 public class CrossCastingHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrossCastingHandler.class);
 
-    // NBT tags for cross-mod spell storage
-    private static final String TAG_CROSS_MOD_SPELLS = "arsnspells:cross_spells";
-    private static final String TAG_SPELL_ID = "spell_id";
-    private static final String TAG_SPELL_LEVEL = "spell_level";
-    private static final String TAG_SPELL_TYPE = "spell_type";
-    private static final String TAG_SPELL_INDEX = "arsnspells:cross_spell_index";
-    private static final String TAG_ARS_SPELL = "ars_spell";
-    private static final String TAG_CAST_SOURCE = "cast_source";
+    // NBT tag keys live in CrossCastNbt so the inscribe/uninscribe round-trip
+    // is testable without bootstrapping Minecraft. Local aliases keep call
+    // sites in this file unchanged.
+    private static final String TAG_CROSS_MOD_SPELLS = CrossCastNbt.TAG_CROSS_MOD_SPELLS;
+    private static final String TAG_SPELL_ID = CrossCastNbt.TAG_SPELL_ID;
+    private static final String TAG_SPELL_LEVEL = CrossCastNbt.TAG_SPELL_LEVEL;
+    private static final String TAG_SPELL_TYPE = CrossCastNbt.TAG_SPELL_TYPE;
+    private static final String TAG_SPELL_INDEX = CrossCastNbt.TAG_SPELL_INDEX;
+    private static final String TAG_ARS_SPELL = CrossCastNbt.TAG_ARS_SPELL;
+    private static final String TAG_CAST_SOURCE = CrossCastNbt.TAG_CAST_SOURCE;
     private static final String CROSS_CAST_SLOT = "arsnspells:cross_cast";
 
     /**
@@ -361,42 +363,21 @@ public class CrossCastingHandler {
     }
 
     /**
-     * Add a cross-mod spell to an item with optional Ars spell tag
+     * Add a cross-mod spell to an item with optional Ars spell tag.
+     * Delegates to {@link CrossCastNbt} so the on-disk shape stays in sync
+     * with the uninscribe path and the round-trip test.
      */
     public static void addCrossModSpell(ItemStack stack, ResourceLocation spellId, int spellLevel,
         CrossSpellType type, CompoundTag arsSpellTag) {
-
-        CompoundTag tag = stack.getOrCreateTag();
-
-        ListTag spellList;
-        if (tag.contains(TAG_CROSS_MOD_SPELLS)) {
-            spellList = tag.getList(TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
-        } else {
-            spellList = new ListTag();
-        }
-
-        CompoundTag spellData = new CompoundTag();
-        if (spellId != null) {
-            spellData.putString(TAG_SPELL_ID, spellId.toString());
-        }
-        spellData.putInt(TAG_SPELL_LEVEL, spellLevel);
-        if (type != null) {
-            spellData.putString(TAG_SPELL_TYPE, type.name());
-        }
-        if (arsSpellTag != null) {
-            spellData.put(TAG_ARS_SPELL, arsSpellTag);
-        }
-
-        spellList.add(spellData);
-        tag.put(TAG_CROSS_MOD_SPELLS, spellList);
+        CrossCastNbt.addCrossModSpellToTag(stack.getOrCreateTag(), spellId, spellLevel, type, arsSpellTag);
     }
 
     /**
-     * Remove all cross-mod spells from an item
+     * Strip every cross-mod inscription artifact from an item, including the
+     * cycle index. The result is bit-identical to a never-inscribed stack.
      */
     public static void clearCrossModSpells(ItemStack stack) {
-        CompoundTag tag = stack.getOrCreateTag();
-        tag.remove(TAG_CROSS_MOD_SPELLS);
+        CrossCastNbt.clearCrossModSpells(stack);
     }
 
     /**

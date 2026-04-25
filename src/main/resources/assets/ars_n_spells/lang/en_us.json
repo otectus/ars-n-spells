@@ -17,6 +17,16 @@
   "ritual.ars_n_spells.spell_transcription.success": "Spell inscribed: %1$s",
   "ritual.ars_n_spells.spell_transcription.source.ars": "Ars Nouveau spell",
   "ritual.ars_n_spells.spell_transcription.source.irons": "%1$s (level %2$s)",
+
+  "item.ars_n_spells.spell_uninscription": "Spell Uninscription",
+  "ars_n_spells.ritual_desc.spell_uninscription": "Strips the cross-cast inscription from a single inscribed item, leaving it bit-identical to a fresh blank target. Drop exactly one inscribed item within three blocks of the brazier; sources or other blank items in range will cause the ritual to refuse rather than risk stripping the wrong stack.",
+  "ritual.ars_n_spells.spell_uninscription": "Ritual of Spell Uninscription",
+  "ritual.ars_n_spells.spell_uninscription.error.empty_range": "Spell Uninscription: drop the inscribed item to clear within three blocks of the brazier.",
+  "ritual.ars_n_spells.spell_uninscription.error.unexpected_source": "Spell Uninscription: spell-bearing item(s) in range (%1$s). This ritual operates only on already-inscribed items — remove the source(s), or use Spell Transcription instead.",
+  "ritual.ars_n_spells.spell_uninscription.error.unexpected_blank": "Spell Uninscription: blank item(s) in range (%1$s). Drop only the inscribed item; remove anything else.",
+  "ritual.ars_n_spells.spell_uninscription.error.no_inscribed": "Spell Uninscription: no inscribed item found. Drop one item carrying a cross-cast inscription.",
+  "ritual.ars_n_spells.spell_uninscription.error.multiple_inscribed": "Spell Uninscription found %1$s inscribed items (%2$s). Place exactly one inscribed item.",
+  "ritual.ars_n_spells.spell_uninscription.success": "Spell uninscribed: %1$s",
   "config.ars_n_spells.title": "Ars 'n' Spells Configuration",
 
   "commands.ans.mana.setdefault.success": "Default max mana set to %s",

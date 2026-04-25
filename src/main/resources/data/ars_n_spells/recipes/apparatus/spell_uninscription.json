@@ -1,0 +1,24 @@
+{
+  "type": "ars_nouveau:enchanting_apparatus",
+  "keepNbtOfReagent": false,
+  "output": {
+    "item": "ars_n_spells:spell_uninscription"
+  },
+  "reagent": [
+    {
+      "item": "ars_nouveau:blank_parchment"
+    }
+  ],
+  "pedestalItems": [
+    {
+      "item": "minecraft:water_bucket"
+    },
+    {
+      "item": "ars_nouveau:source_gem"
+    },
+    {
+      "tag": "forge:logs/archwood"
+    }
+  ],
+  "sourceCost": 500
+}

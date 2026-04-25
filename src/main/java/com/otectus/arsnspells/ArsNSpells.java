@@ -50,9 +50,13 @@ public class ArsNSpells {
         modEventBus.addListener(this::registerCaps);
         modEventBus.addListener(this::onConfigLoading);
 
-        // Register cross-mod ritual tablet only when Iron's Spellbooks is loaded.
-        // Must happen before ITEMS.register(modEventBus) so the DeferredRegister
-        // carries the entry when the item RegisterEvent fires.
+        // Common items (uninscribe tablet) are registered unconditionally so
+        // they remain available for cleanup if Iron's Spellbooks is later
+        // uninstalled. Iron's-dependent items (transcribe tablet) only when
+        // Iron's is present. Both must be registered before
+        // ITEMS.register(modEventBus) so the DeferredRegister carries the
+        // entries when the item RegisterEvent fires.
+        ModItemsRegistry.registerCommonItems();
         if (ModList.get().isLoaded("irons_spellbooks")) {
             ModItemsRegistry.registerIronsDependentItems();
         }
