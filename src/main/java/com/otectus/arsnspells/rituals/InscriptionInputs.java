@@ -2,11 +2,11 @@ package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.hollingsworth.arsnouveau.api.spell.SpellCaster;
+import com.otectus.arsnspells.spell.CrossCastNbt;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
 import io.redspace.ironsspellbooks.api.spells.SpellData;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -28,8 +28,6 @@ import java.util.List;
  * own count-based validation rules on top of the buckets.
  */
 public final class InscriptionInputs {
-    public static final String CROSS_SPELLS_TAG = "arsnspells:cross_spells";
-
     public final List<ItemEntity> sources;
     public final List<ItemEntity> inscribed;
     public final List<ItemEntity> blankTargets;
@@ -61,10 +59,16 @@ public final class InscriptionInputs {
     }
 
     public static boolean isInscribed(ItemStack stack) {
-        if (!stack.hasTag()) return false;
-        CompoundTag tag = stack.getTag();
-        if (tag == null || !tag.contains(CROSS_SPELLS_TAG, Tag.TAG_LIST)) return false;
-        return !tag.getList(CROSS_SPELLS_TAG, Tag.TAG_COMPOUND).isEmpty();
+        return stack.hasTag() && CrossCastNbt.hasCrossModSpells(stack.getTag());
+    }
+
+    /**
+     * CompoundTag-only companion to {@link #isInscribed(ItemStack)} so the
+     * disambiguation contract is unit-testable without bootstrapping the
+     * vanilla item registry.
+     */
+    public static boolean isInscribed(CompoundTag stackTag) {
+        return CrossCastNbt.hasCrossModSpells(stackTag);
     }
 
     /**

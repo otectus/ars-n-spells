@@ -2,22 +2,17 @@ package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
 import com.otectus.arsnspells.spell.CrossCastNbt;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
-import javax.annotation.Nullable;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -42,7 +37,6 @@ public class SpellUninscriptionRitual extends AbstractRitual {
     public static final String REGISTRY_PATH = "spell_uninscription";
     private static final String LANG_PREFIX = "ritual.ars_n_spells.spell_uninscription.";
     private static final int SEARCH_RADIUS = 3;
-    private static final int FEEDBACK_RADIUS = 8;
 
     @Override
     protected void tick() {}
@@ -60,7 +54,7 @@ public class SpellUninscriptionRitual extends AbstractRitual {
             e -> e.isAlive() && !e.getItem().isEmpty());
 
         if (entities.isEmpty()) {
-            error(level, pos, LANG_PREFIX + "error.empty_range");
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.empty_range");
             return;
         }
 
@@ -70,22 +64,22 @@ public class SpellUninscriptionRitual extends AbstractRitual {
         // refuse early so we never accidentally strip an item the player
         // intended to keep inscribed.
         if (!inputs.sources.isEmpty()) {
-            error(level, pos, LANG_PREFIX + "error.unexpected_source",
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.unexpected_source",
                 InscriptionInputs.joinNames(inputs.sources));
             return;
         }
         if (!inputs.blankTargets.isEmpty()) {
-            error(level, pos, LANG_PREFIX + "error.unexpected_blank",
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.unexpected_blank",
                 InscriptionInputs.joinNames(inputs.blankTargets));
             return;
         }
 
         if (inputs.inscribed.isEmpty()) {
-            error(level, pos, LANG_PREFIX + "error.no_inscribed");
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_inscribed");
             return;
         }
         if (inputs.inscribed.size() > 1) {
-            error(level, pos, LANG_PREFIX + "error.multiple_inscribed",
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_inscribed",
                 inputs.inscribed.size(), InscriptionInputs.joinNames(inputs.inscribed));
             return;
         }
@@ -101,7 +95,7 @@ public class SpellUninscriptionRitual extends AbstractRitual {
         inscribedEntity.setItem(stack);
 
         playUninscribeEffects(level, pos);
-        success(level, pos, LANG_PREFIX + "success", displayName);
+        RitualFeedback.success(level, pos, LANG_PREFIX + "success", displayName);
     }
 
     private void playUninscribeEffects(Level level, BlockPos pos) {
@@ -115,31 +109,6 @@ public class SpellUninscriptionRitual extends AbstractRitual {
         }
         level.playSound(null, pos, SoundEvents.FIRE_EXTINGUISH,
             SoundSource.BLOCKS, 0.7f, 0.85f);
-    }
-
-    @Nullable
-    private Player findNearestPlayer(Level level, BlockPos pos) {
-        AABB area = new AABB(pos).inflate(FEEDBACK_RADIUS);
-        return level.getEntitiesOfClass(Player.class, area).stream()
-            .min(Comparator.comparingDouble(p -> p.distanceToSqr(
-                pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)))
-            .orElse(null);
-    }
-
-    private void error(Level level, BlockPos pos, String key, Object... args) {
-        Player player = findNearestPlayer(level, pos);
-        if (player != null) {
-            player.displayClientMessage(
-                Component.translatable(key, args).withStyle(ChatFormatting.RED), false);
-        }
-    }
-
-    private void success(Level level, BlockPos pos, String key, Object... args) {
-        Player player = findNearestPlayer(level, pos);
-        if (player != null) {
-            player.displayClientMessage(
-                Component.translatable(key, args).withStyle(ChatFormatting.GREEN), false);
-        }
     }
 
     @Override

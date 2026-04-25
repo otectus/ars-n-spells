@@ -3,7 +3,6 @@ package com.otectus.arsnspells.rituals;
 import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.CrossSpellType;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
@@ -12,13 +11,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
-import javax.annotation.Nullable;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -41,7 +37,6 @@ public class SpellTranscriptionRitual extends AbstractRitual {
     public static final String REGISTRY_PATH = "spell_transcription";
     private static final String LANG_PREFIX = "ritual.ars_n_spells.spell_transcription.";
     private static final int SEARCH_RADIUS = 3;
-    private static final int FEEDBACK_RADIUS = 8;
 
     @Override
     protected void tick() {}
@@ -59,7 +54,7 @@ public class SpellTranscriptionRitual extends AbstractRitual {
             e -> e.isAlive() && !e.getItem().isEmpty());
 
         if (entities.isEmpty()) {
-            error(level, pos, LANG_PREFIX + "error.empty_range");
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.empty_range");
             return;
         }
 
@@ -68,27 +63,27 @@ public class SpellTranscriptionRitual extends AbstractRitual {
         // Already-inscribed items in range are a distinct error from
         // too-many-targets: the fix is "uninscribe first", not "remove".
         if (!inputs.inscribed.isEmpty()) {
-            error(level, pos, LANG_PREFIX + "error.inscribed_items",
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.inscribed_items",
                 InscriptionInputs.joinNames(inputs.inscribed));
             return;
         }
 
         if (inputs.sources.isEmpty()) {
-            error(level, pos, LANG_PREFIX + "error.no_source");
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_source");
             return;
         }
         if (inputs.sources.size() > 1) {
-            error(level, pos, LANG_PREFIX + "error.multiple_sources",
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_sources",
                 inputs.sources.size(), InscriptionInputs.joinNames(inputs.sources));
             return;
         }
 
         if (inputs.blankTargets.isEmpty()) {
-            error(level, pos, LANG_PREFIX + "error.no_target");
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_target");
             return;
         }
         if (inputs.blankTargets.size() > 1) {
-            error(level, pos, LANG_PREFIX + "error.multiple_targets",
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_targets",
                 inputs.blankTargets.size(), InscriptionInputs.joinNames(inputs.blankTargets));
             return;
         }
@@ -103,7 +98,7 @@ public class SpellTranscriptionRitual extends AbstractRitual {
         // root that the source parser didn't recognize as filled but would
         // still let Ars's own right-click handler shadow the cross-cast.
         if (InscriptionInputs.hasArsSpellAtRoot(targetStack)) {
-            error(level, pos, LANG_PREFIX + "error.target_ars_rooted",
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.target_ars_rooted",
                 targetStack.getHoverName().getString());
             return;
         }
@@ -112,7 +107,7 @@ public class SpellTranscriptionRitual extends AbstractRitual {
         if (source == null) {
             // Classify said this was a source but a second read failed -- a
             // genuinely transient parse problem, not a validation error.
-            error(level, pos, LANG_PREFIX + "error.source_parse_failed",
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.source_parse_failed",
                 sourceStack.getHoverName().getString());
             return;
         }
@@ -131,7 +126,7 @@ public class SpellTranscriptionRitual extends AbstractRitual {
         sourceEntity.discard();
 
         playInscribeEffects(level, pos);
-        success(level, pos, LANG_PREFIX + "success", sourceLabel(source));
+        RitualFeedback.success(level, pos, LANG_PREFIX + "success", sourceLabel(source));
     }
 
     private void playInscribeEffects(Level level, BlockPos pos) {
@@ -154,31 +149,6 @@ public class SpellTranscriptionRitual extends AbstractRitual {
         String id = source.spellId == null ? "" : source.spellId.toString();
         return Component.translatable(LANG_PREFIX + "source.irons", id, source.spellLevel)
             .getString();
-    }
-
-    @Nullable
-    private Player findNearestPlayer(Level level, BlockPos pos) {
-        AABB area = new AABB(pos).inflate(FEEDBACK_RADIUS);
-        return level.getEntitiesOfClass(Player.class, area).stream()
-            .min(Comparator.comparingDouble(p -> p.distanceToSqr(
-                pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)))
-            .orElse(null);
-    }
-
-    private void error(Level level, BlockPos pos, String key, Object... args) {
-        Player player = findNearestPlayer(level, pos);
-        if (player != null) {
-            player.displayClientMessage(
-                Component.translatable(key, args).withStyle(ChatFormatting.RED), false);
-        }
-    }
-
-    private void success(Level level, BlockPos pos, String key, Object... args) {
-        Player player = findNearestPlayer(level, pos);
-        if (player != null) {
-            player.displayClientMessage(
-                Component.translatable(key, args).withStyle(ChatFormatting.GREEN), false);
-        }
     }
 
     @Override

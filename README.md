@@ -59,15 +59,27 @@ Ars spell casts can grant Iron's school progression and vice versa. Affinity tra
 
 ### Cross-mod spell casting
 
-Cross-casting lets any item store a spell from the *other* mod and cast it on right-click. The inscription is applied in survival via the **Spell Transcription** ritual:
+Cross-casting lets any item store a spell from the *other* mod and cast it on right-click. Inscription is a two-tablet ritual flow inscribe/uninscribe pair backed by datapack recipes, so pack authors can retune ingredients without touching code.
 
-1. Build the Spell Transcription ritual (`ars_n_spells:spell_transcription`).
-2. Drop a **source** within ~3 blocks of the brazier: a filled Ars Nouveau spell parchment, spellbook, or focus, **or** an Iron's Spellbooks scroll.
-3. Drop a **target** item in the same area -- any item can receive the inscription.
-4. Activate the ritual. On completion, the source is consumed and the target gains the `arsnspells:cross_spells` NBT tag.
-5. **Right-click** the target to cast the inscribed spell. **Sneak-right-click** cycles if you stack multiple inscriptions.
+**1. Craft the Spell Transcription tablet.**
+Combine a novice Ars spellbook (reagent) with an Iron's spellbook, an archwood log, and a source gem block on the Enchanting Apparatus. Costs 2000 source. Recipe lives at [data/ars_n_spells/recipes/apparatus/spell_transcription.json](src/main/resources/data/ars_n_spells/recipes/apparatus/spell_transcription.json).
 
-Mana costs flow through `BridgeManager` and respect the active unification mode. In `separate` mode, the dual-cost split (`dual_cost_ars_percentage` / `dual_cost_iss_percentage`) and conversion rates determine how much each pool pays per cast.
+**2. Run the Spell Transcription ritual.**
+Place the tablet on a Ritual Brazier, then drop two items within three blocks:
+- exactly one **source** -- a filled Ars Nouveau spell parchment, focus, or spellbook, or an Iron's Spellbooks scroll
+- exactly one blank **target** item
+
+Strict disambiguation: more than one of either category fails the ritual with a chat message naming what it saw. Items already carrying an Ars Nouveau spell at NBT root are rejected as targets (they would let Ars's own right-click handler shadow the cross-cast). Items already carrying a cross-cast inscription are rejected too -- uninscribe first.
+
+Activate the ritual; on completion the source is consumed and the target gains the `arsnspells:cross_spells` NBT list. Enchantment-glyph particles and the enchantment-table sound mark the inscribe.
+
+**3. Cast the inscribed spell.**
+Right-click the target. Sneak-right-click cycles between multiple inscriptions on the same item. Mana costs flow through `BridgeManager` and respect the active unification mode; in SEPARATE mode the dual-cost split (`dual_cost_ars_percentage` / `dual_cost_iss_percentage`) and conversion rates determine how much each pool pays per cast.
+
+Cross-cast spells pay an overhead set by `cross_cast_cost_multiplier` (default `1.25`, range `0.5`-`5.0`). The multiplier applies to both Iron's spells cast from non-Iron's items and Ars spells cast from non-Ars items, once per cast, before mana deduction.
+
+**4. Strip an inscription.**
+Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank parchment (reagent), a water bucket, a source gem, and an archwood log -- 500 source. Drop one inscribed item within three blocks of the brazier with no other items in range. Ash and smoke particles plus a fire-extinguish sound mark the strip; the result is bit-identical to a fresh blank target so the same item can be re-inscribed cleanly. The uninscribe ritual is Iron's-independent and remains useful for cleanup even if Iron's Spellbooks is later removed.
 
 ---
 
