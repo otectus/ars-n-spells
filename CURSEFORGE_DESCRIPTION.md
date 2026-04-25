@@ -62,17 +62,30 @@ Standing near Ars Nouveau Source Jars passively boosts Iron's mana regeneration.
 
 ---
 
-## Spell Transcription Ritual
+## Cross-Spell Inscription
 
-Cast spells from *either* mod using items from the *other* mod. The **Spell Transcription** ritual inscribes a cross-mod spell onto any item:
+Cast spells from *either* mod using items from the *other* mod through a tablet-driven inscribe / uninscribe ritual flow. Both ritual tablets are crafted at the **Enchanting Apparatus** and are fully datapack-defined, so pack authors can retune ingredients without code.
 
-1. Build the Spell Transcription ritual.
-2. Drop a **source** near the brazier: a filled Ars Nouveau spell parchment, spellbook, or focus, or an Iron's Spellbooks scroll.
-3. Drop a **target** item — any item can receive the inscription.
-4. Activate the ritual. The source is consumed, and the target is now a cross-mod caster.
-5. **Right-click** the target to cast the inscribed spell. **Sneak-right-click** to cycle between multiple inscriptions on the same item.
+### Spell Transcription — bind a foreign spell onto an item
 
-Mana costs flow through the active unification mode and respect your configured conversion rates. In **Separate** mode, costs split between both pools according to your dual-cost percentages.
+1. **Craft the Spell Transcription tablet.** Reagent: a novice Ars Nouveau spellbook. Pedestals: an Iron's Spellbooks spellbook, an archwood log, and a source gem block. Costs 2000 source.
+2. **Set up the brazier.** Place the tablet on a Ritual Brazier and drop two items within ~3 blocks:
+   - exactly one **source** — a filled Ars Nouveau spell parchment, focus, or spellbook, or an Iron's Spellbooks scroll
+   - exactly one blank **target** item to receive the inscription
+3. **Activate.** Strict disambiguation: more than one of either category, or any already-inscribed item in range, fails the ritual with a chat message that names the items it saw and the rule. Items that already carry an Ars Nouveau spell at root NBT are rejected as targets so right-click resolution stays unambiguous. On success the source is consumed, the target gains the cross-cast inscription, and a binding theme of enchantment-glyph particles + the enchantment-table sound marks the inscribe.
+4. **Cast.** Right-click the target. Sneak-right-click cycles between multiple inscriptions on the same item.
+
+Mana costs flow through the active unification mode and respect your configured conversion rates. In **Separate** mode, costs split between both pools according to your dual-cost percentages. Cross-cast spells pay an overhead set by `cross_cast_cost_multiplier` (default 1.25 = 25% extra) — applied symmetrically to both directions, once per cast, before mana deduction.
+
+### Spell Uninscription — strip an inscription cleanly
+
+If you change your mind, the **Spell Uninscription** ritual returns an inscribed item to a bit-identical fresh-blank state so it can be re-inscribed cleanly.
+
+1. **Craft the Spell Uninscription tablet.** Reagent: a blank parchment. Pedestals: a water bucket, a source gem, and an archwood log. 500 source.
+2. **Activate** with exactly one inscribed item in range and nothing else — sources or stray blanks fail the ritual rather than risk stripping the wrong stack.
+3. The cross-cast NBT is removed cleanly (spells list, cycle index, and any empty residual tag), with an ash + smoke dissolution theme.
+
+The uninscribe ritual works without Iron's Spellbooks loaded, so legacy inscribed items can still be cleaned up after Iron's is removed.
 
 ---
 

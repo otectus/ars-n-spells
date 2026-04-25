@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.9] - 2026-04-25
+
+### New Features
+- **Cross-Spell Inscription is now reachable in survival.** The Spell Transcription ritual has been functional in code since v1.8.3, but the ritual tablet that activates it had no acquisition path: Ars Nouveau iterates `RitualRegistry.getRitualMap()` during its own item `RegisterEvent` and produces a `RitualTablet` per ritual, but that loop runs before Ars 'n' Spells's common-setup registration so our ritual was never picked up. The mod now owns its tablet items: a new `ModItemsRegistry.ITEMS` (`DeferredRegister<Item>`) registers the Spell Transcription tablet (when Iron's Spellbooks is loaded) and the new Spell Uninscription tablet (always), and `RitualRegistryHandler` splices them into Ars's `ritualItemMap` at common setup so brazier and JEI lookups by `ResourceLocation` resolve.
+- **Apparatus recipe gates the Spell Transcription tablet.** Datapack recipe at [data/ars_n_spells/recipes/apparatus/spell_transcription.json](src/main/resources/data/ars_n_spells/recipes/apparatus/spell_transcription.json): novice Ars spellbook reagent + Iron's spellbook + archwood log + source gem block on pedestals, 2000 source. The recipe loader silently drops the recipe when Iron's isn't installed, matching the tablet-registration gate.
+- **Spell Transcription rewritten with strict disambiguation.** Validation now runs to completion before any item mutation. The new `InscriptionInputs` classifier sorts dropped items in the three-block work area into three disjoint buckets (sources, inscribed, blank-target candidates); each violation produces a lang-keyed message naming the offending items and the rule. Distinct paths for empty range, no source, multiple sources (counted and listed), no target, multiple targets (counted and listed), already-inscribed items in range ("uninscribe first"), Ars-rooted target (decision 5 defensive guard against right-click handler shadowing), and source re-parse failure.
+- **Spell-to-spell direct copy is intentionally not auto-resolved** -- the user must uninscribe first. Predictable beats clever; a "smart" fallback that picked one direction would silently corrupt the wrong item.
+- **New Spell Uninscription ritual.** Mirrors the transcribe flow with stricter intake (no sources or blanks in range, exactly one inscribed item). Strips both the cross-spell list and the cycle index and collapses an empty residual root tag to null, so the result is bit-identical to a fresh blank target and the same item can be re-inscribed cleanly. Iron's-independent: the tablet and ritual register without Iron's loaded so a player can still clean up legacy inscribed items after Iron's is removed. Apparatus recipe at [data/ars_n_spells/recipes/apparatus/spell_uninscription.json](src/main/resources/data/ars_n_spells/recipes/apparatus/spell_uninscription.json): blank parchment reagent + water bucket + source gem + archwood log, 500 source. Cheaper than transcribe by design -- uninscribing is a fix, not a feat.
+- **Cross-cast cost multiplier.** New `cross_cast_cost_multiplier` config (default `1.25`, range `0.5`-`5.0`) charges a flat overhead on cross-cast spells. Applies symmetrically to Iron's spells cast from non-Iron's items and Ars spells cast from non-Ars items, exactly once per cast, after base cost calculation and before mana deduction. Routed through `BridgeManager` so it composes with the active mana mode and the SEPARATE-mode dual-cost split. Iron's-side: SEPARATE-mode multiplies the base before splitting; non-SEPARATE multiplies `event.getManaCost()` in the handler and clears the entry. Ars-side: a new `Entry.multiplierApplied` one-shot guard prevents double-application across multiple `SpellCostCalcEvent` fires per resolve. Direct casts (no cross-cast context entry) are never touched.
+- **Theming.** Inscribe plays enchantment-glyph particles (`ParticleTypes.ENCHANT`) + the enchantment-table sound; uninscribe plays ash + smoke + a fire-extinguish sound.
+
+### Configuration
+- **New: `cross_cast_cost_multiplier`** (default `1.25`, range `0.5`-`5.0`) -- multiplier on cross-cast spell base mana cost.
+- **New: `enable_per_cast_reagent`** (default `false`) -- reserved hook for a future per-cast reagent system. No-op today; documented so future work can be gated without re-shuffling config keys.
+
+### Internal
+- **`CrossCastNbt`** -- new pure helper extracted from `CrossCastingHandler`. NBT-key constants and the inscribe/clear/has-cross-spells operations live here, with no dependency on Minecraft `Bootstrap`. `CrossCastingHandler` delegates its add and clear methods to the helper; the on-disk shape is unchanged.
+- **`InscriptionInputs` / `InscriptionSource` / `RitualFeedback`** -- new files in the rituals package. `InscriptionInputs.classify(...)` is the shared classifier consumed by both transcribe and uninscribe rituals; `RitualFeedback.error/success` centralizes the chat-message styling and nearest-player lookup so the two rituals stay in lockstep.
+- **JUnit 5 test harness.** `testImplementation` JUnit 5.10.2 in [build.gradle](build.gradle); `useJUnitPlatform()`. Two test classes:
+  - `CrossCastNbtRoundTripTest` (5 cases) -- empty-baseline round-trip, unrelated-NBT preservation, inscribe→uninscribe→inscribe identity, cycle-index strip, multi-inscription bulk clear.
+  - `InscriptionInputsPredicateTest` (7 cases) -- empty tag, null tag, empty list shape, inscribed tag, unrelated root NBT, conflicting non-root NBT (must pass per spec), wrong tag type at the cross-spells key.
+  - All 12 tests green under `./gradlew test`.
+
+### Documentation
+- README's "Cross-mod spell casting" section rewritten end-to-end to walk through the new survival flow: tablet crafting, strict source/target rules, cost multiplier, and the uninscribe ritual.
+
+---
+
 ## [1.8.8] - 2026-04-24
 
 ### Bug Fixes

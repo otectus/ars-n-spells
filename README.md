@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v1.8.8)
+# Ars 'n' Spells (v1.8.9)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -223,6 +223,14 @@ The mod hides redundant mana bars based on mode:
 
 ## Changelog
 
+### v1.8.9
+- **Cross-Spell Inscription is now reachable in survival** -- the Spell Transcription ritual has been wired to the world for the first time. An Enchanting Apparatus recipe (Ars novice spellbook + Iron's spellbook + archwood log + source gem block, 2000 source) crafts the ritual tablet that activates a brazier; previously the tablet existed only via `/give` because Ars Nouveau builds tablet items during its own item RegisterEvent and never saw our common-setup ritual. The mod now owns the tablet through a dedicated `DeferredRegister<Item>` and splices it into Ars's `ritualItemMap` at startup. Same flow for the new Spell Uninscription tablet.
+- **Spell Transcription rewritten with strict disambiguation** -- exactly one source and exactly one blank target in the brazier's three-block radius. More than one of either category fails with a chat message naming what was found. Items already carrying an Ars Nouveau spell at NBT root are rejected as targets to keep right-click resolution unambiguous; already-inscribed items in range are rejected with a "uninscribe first" hint. Every failure produces a lang-keyed, item-named message; no silent failures.
+- **New Spell Uninscription ritual** -- mirrors the inscribe flow with strict intake (exactly one inscribed item, no other items in range). The strip removes both the cross-spell list and the cycle index, and collapses an empty residual root tag to null so the result is bit-identical to a fresh blank target. Iron's-independent: the tablet and ritual register without Iron's loaded so legacy inscribed items can still be cleaned up after Iron's is removed. Apparatus recipe: blank parchment + water bucket + source gem + archwood log, 500 source.
+- **Cross-cast cost multiplier** -- new `cross_cast_cost_multiplier` config (default `1.25`, range `0.5`-`5.0`) charges a flat overhead on spells cast from inscribed items. Applies to both Iron's spells from non-Iron's items and Ars spells from non-Ars items, exactly once per cast, before mana deduction. Routed through `BridgeManager` so it composes cleanly with the active mana mode and the SEPARATE-mode dual-cost split. New `enable_per_cast_reagent` config reserved as a future hook (default `false`, no-op today).
+- **Theming** -- inscribe plays enchantment-glyph particles + the enchantment-table sound; uninscribe plays ash + smoke + the fire-extinguish sound.
+- **Test harness** -- JUnit 5 lands with two test classes: a CompoundTag-level inscribe/uninscribe round-trip (5 cases) and a disambiguation-predicate suite (7 cases). Twelve tests total, all green under `./gradlew test`. The cross-cast NBT manipulation is extracted into a Bootstrap-free `CrossCastNbt` helper so the contract is testable without booting Minecraft. See [CHANGELOG.md](CHANGELOG.md) for details.
+
 ### v1.8.8
 - **Cross-system mana regen unit mismatch fixed** -- Iron's `MANA_REGEN` is a percentage-of-pool multiplier; Ars regen is absolute mana/sec. Three callsites previously wrote a value from one system directly into the other without converting units, so an Ars Mana Regen III enchantment on wizard armor could compound into hundreds of mana/sec. All cross-system regen translations now route through a new `ManaRegenBridge` that converts via the wearer's current max pool. Three new config knobs (`cross_system_regen_conversion`, `cross_system_regen_multiplier`, `cross_system_regen_reference_pool`) control the conversion strategy. Also tightened the enchantment-detection heuristic in `EquipmentIntegration` from a broad `description.contains("mana")` string match to specific Ars enchantment IDs, eliminating spurious +50 max-mana grants from unrelated enchantments. See [CHANGELOG.md](CHANGELOG.md) for details.
 
@@ -257,7 +265,7 @@ The mod hides redundant mana bars based on mode:
 
 Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven; no manual jar placement required.
 
-Output jar: `build/libs/ars_n_spells-1.8.8.jar`
+Output jar: `build/libs/ars_n_spells-1.8.9.jar`
 
 ## License
 
