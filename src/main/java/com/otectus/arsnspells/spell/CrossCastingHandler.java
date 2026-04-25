@@ -156,15 +156,14 @@ public class CrossCastingHandler {
         Spell spell = Spell.fromTag(arsSpellTag);
         ISpellCaster caster = new SpellCaster(item);
 
-        boolean separate = BridgeManager.isUnificationEnabled()
-            && BridgeManager.getCurrentMode() == ManaUnificationMode.SEPARATE;
-        if (separate) {
-            CrossCastContext.begin(player, CrossSpellType.ARS_NOUVEAU, player.level().getGameTime());
-        }
+        // Always mark the cast so onArsSpellCost can apply the cross-cast cost
+        // multiplier (and, in SEPARATE mode, the dual-cost split). Without an
+        // entry the handler cannot tell a cross-cast apart from a direct Ars cast.
+        CrossCastContext.begin(player, CrossSpellType.ARS_NOUVEAU, player.level().getGameTime());
 
         InteractionResultHolder<ItemStack> result = caster.castSpell(player.level(), player, hand, null, spell);
         boolean success = result.getResult().consumesAction();
-        if (separate && !success) {
+        if (!success) {
             CrossCastContext.clear(player);
         }
         return success;
@@ -262,11 +261,6 @@ public class CrossCastingHandler {
             return;
         }
 
-        ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        if (mode != ManaUnificationMode.SEPARATE) {
-            return;
-        }
-
         LivingEntity caster = event.context != null ? event.context.getUnwrappedCaster() : null;
         if (!(caster instanceof Player player)) {
             return;
@@ -277,29 +271,58 @@ public class CrossCastingHandler {
             return;
         }
 
-        int totalCost = Math.max(0, event.currentCost);
-        float arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
-        float issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
-        float arsCost = totalCost * arsPercent;
-        float issCost = (float) (totalCost * issPercent * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
-
-        entry.arsCost = arsCost;
-        entry.issCost = issCost;
-        entry.costsReady = true;
-
-        if (!player.isCreative() && issCost > 0.0f) {
-            IManaBridge issBridge = BridgeManager.getSecondaryBridge();
-            float issMana = issBridge != null ? issBridge.getMana(player) : 0.0f;
-            if (issMana < issCost) {
-                entry.blocked = true;
-                event.currentCost = Integer.MAX_VALUE;
-                CrossCastContext.clear(player);
-                logDebug("Insufficient Iron mana for cross-cast: need {}, have {}", issCost, issMana);
-                return;
-            }
+        // One-shot: a single cast can produce more than one cost-calc fire
+        // (preview vs. resolve). Apply our adjustments on the first only.
+        if (entry.multiplierApplied) {
+            return;
         }
 
-        event.currentCost = Math.max(0, Math.round(arsCost));
+        ManaUnificationMode mode = BridgeManager.getCurrentMode();
+        float multiplier = (float) Math.max(0.0, AnsConfig.CROSS_CAST_COST_MULTIPLIER.get());
+        int baseEventCost = Math.max(0, event.currentCost);
+        // Apply the cross-cast multiplier to the Ars-computed base cost first;
+        // the SEPARATE-mode dual-cost split (below) then operates on the
+        // already-multiplied total, matching the Iron's-side accounting where
+        // the multiplier is applied before the split.
+        int totalCost = Math.max(0, Math.round(baseEventCost * multiplier));
+
+        if (mode == ManaUnificationMode.SEPARATE) {
+            float arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
+            float issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
+            float arsCost = totalCost * arsPercent;
+            float issCost = (float) (totalCost * issPercent * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+
+            entry.arsCost = arsCost;
+            entry.issCost = issCost;
+            entry.costsReady = true;
+            entry.multiplierApplied = true;
+
+            if (!player.isCreative() && issCost > 0.0f) {
+                IManaBridge issBridge = BridgeManager.getSecondaryBridge();
+                float issMana = issBridge != null ? issBridge.getMana(player) : 0.0f;
+                if (issMana < issCost) {
+                    entry.blocked = true;
+                    event.currentCost = Integer.MAX_VALUE;
+                    CrossCastContext.clear(player);
+                    logDebug("Insufficient Iron mana for cross-cast: need {}, have {}", issCost, issMana);
+                    return;
+                }
+            }
+
+            event.currentCost = Math.max(0, Math.round(arsCost));
+            logDebug("Ars cross-cast (SEPARATE): base={} multiplier={} total={} ars={} iss={}",
+                baseEventCost, multiplier, totalCost, arsCost, issCost);
+            return;
+        }
+
+        // Non-SEPARATE: Ars deducts the full cost from its own pool. The
+        // multiplier is the only adjustment we make. Mark the entry as
+        // applied; it will TTL-expire harmlessly since no downstream consumer
+        // (no MixinSpellResolverMana TAIL hook outside SEPARATE) reads it.
+        entry.multiplierApplied = true;
+        event.currentCost = totalCost;
+        logDebug("Ars cross-cast ({}): base={} multiplier={} total={}",
+            mode, baseEventCost, multiplier, totalCost);
     }
 
     @SubscribeEvent
