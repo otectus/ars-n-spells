@@ -4,8 +4,10 @@ import com.google.common.collect.Multimap;
 import com.hollingsworth.arsnouveau.api.mana.IManaEquipment;
 import com.hollingsworth.arsnouveau.api.perk.PerkAttributes;
 import com.hollingsworth.arsnouveau.api.util.CuriosUtil;
+import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -17,6 +19,7 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,13 +83,19 @@ public class EquipmentIntegration {
         }
 
         ManaBonus arsBonus = getArsManaBonuses(player);
-        double maxMana = arsBonus.maxMana * conversionRate;
-        double regen = arsBonus.manaRegen * conversionRate;
+        double maxManaBonus = arsBonus.maxMana * conversionRate;
 
+        // Apply max mana first so the regen conversion sees the post-bonus pool size.
+        // Otherwise EQUAL_EFFECT would underestimate the regen attribute delta needed.
         applyAttributeModifier(player, AttributeRegistry.MAX_MANA.get(), ARS_TO_IRON_MAX_MANA_ID,
-            "Ars Gear Max Mana", maxMana);
+            "Ars Gear Max Mana", maxManaBonus);
+
+        // Ars regen is absolute mana/sec; Iron's MANA_REGEN is a percentage-of-pool
+        // multiplier. Direct assignment is a unit-mismatch bug — go through the bridge.
+        double absRegenPerSec = arsBonus.manaRegen * conversionRate;
+        double regenAttr = ManaRegenBridge.convertArsToIrons(absRegenPerSec, player);
         applyAttributeModifier(player, AttributeRegistry.MANA_REGEN.get(), ARS_TO_IRON_REGEN_ID,
-            "Ars Gear Mana Regen", regen);
+            "Ars Gear Mana Regen", regenAttr);
     }
 
     /**
@@ -281,37 +290,59 @@ public class EquipmentIntegration {
         return 0.0;
     }
     
+    private static final ResourceLocation ARS_MANA_REGEN_ENCHANT_ID =
+        new ResourceLocation("ars_nouveau", "mana_regen");
+    private static final ResourceLocation ARS_MANA_BOOST_ENCHANT_ID =
+        new ResourceLocation("ars_nouveau", "mana_boost");
+
     /**
-     * Get mana bonus from enchantments
+     * Get mana bonus from Ars Nouveau enchantments equipped on an item.
+     *
+     * <p>Returns Ars-side units: {@code maxMana} in absolute mana, {@code manaRegen}
+     * in absolute mana/sec. The cross-system bridge converts these to Iron's
+     * percentage-of-pool units when applied via {@link #applyArsBonusesToIrons}.
+     *
+     * <p>This path is load-bearing in {@code ISS_PRIMARY} / {@code HYBRID} mode where
+     * {@code MixinManaCapability.addMana} suppresses Ars's native regen tick — the
+     * enchantment's intended effect would otherwise be lost on the Iron's pool.
+     * In {@code ARS_PRIMARY} mode Ars handles its own enchantments natively, so the
+     * value populated here is unused (the Ars-primary regen handler reads only the
+     * Iron's-side bonus container).
+     *
+     * <p>Detection is anchored to specific Ars enchantment IDs to avoid false
+     * positives from the previous broad string match (which granted +50 max per
+     * level to any enchantment whose description contained "mana" or "source",
+     * including unrelated ones like {@code mana_steal} or {@code source_friendly}).
      */
     private static ManaBonus getEnchantmentManaBonus(ItemStack armor) {
         if (!AnsConfig.respectEnchantments.get()) {
             return ManaBonus.ZERO;
         }
-        
+
         double maxBonus = 0.0;
         double regenBonus = 0.0;
-        
+
         try {
             Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(armor);
-            
+
             for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
                 Enchantment enchantment = entry.getKey();
                 int level = entry.getValue();
-                
-                // Check for mana-related enchantments
-                String enchantName = enchantment.getDescriptionId().toLowerCase();
-                
-                if (enchantName.contains("mana_regen") || enchantName.contains("mana_regeneration")) {
+                ResourceLocation id = ForgeRegistries.ENCHANTMENTS.getKey(enchantment);
+                if (id == null) {
+                    continue;
+                }
+
+                if (ARS_MANA_REGEN_ENCHANT_ID.equals(id)) {
                     regenBonus += level;
-                } else if (enchantName.contains("mana") || enchantName.contains("source")) {
+                } else if (ARS_MANA_BOOST_ENCHANT_ID.equals(id)) {
                     maxBonus += level * 50;
                 }
             }
         } catch (Exception e) {
             LOGGER.error("Failed to get enchantment mana bonus", e);
         }
-        
+
         return new ManaBonus(maxBonus, regenBonus);
     }
     

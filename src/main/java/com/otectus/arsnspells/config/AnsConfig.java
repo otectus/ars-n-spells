@@ -31,6 +31,9 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue DEFAULT_MAX_MANA;
     public static final ForgeConfigSpec.BooleanValue respectArmorBonuses;
     public static final ForgeConfigSpec.BooleanValue respectEnchantments;
+    public static final ForgeConfigSpec.ConfigValue<String> CROSS_SYSTEM_REGEN_CONVERSION;
+    public static final ForgeConfigSpec.DoubleValue CROSS_SYSTEM_REGEN_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue CROSS_SYSTEM_REGEN_REFERENCE_POOL;
 
     // ========================================
     // ARS GLYPH BONUSES
@@ -291,7 +294,37 @@ public class AnsConfig {
         respectEnchantments = BUILDER
             .comment("Include enchantment bonuses in unified mana calculations")
             .define("respect_enchantments", true);
-        
+
+        CROSS_SYSTEM_REGEN_CONVERSION = BUILDER
+            .comment(
+                "How mana regen values are translated when crossing the Ars / Iron's boundary.",
+                "Iron's regen is a percentage-of-pool multiplier; Ars regen is absolute mana/sec.",
+                "Without conversion, an Ars enchantment like Mana Regen III applied to Iron's regen",
+                "will produce hundreds of mana/sec because the absolute value is misread as a percentage.",
+                "  EQUAL_EFFECT  - Convert by the target system's current max pool (DEFAULT, recommended).",
+                "                  Preserves equivalent mana/sec on both sides at any pool size.",
+                "  REFERENCE_POOL - Convert using a fixed reference pool (see cross_system_regen_reference_pool).",
+                "                   Predictable but ignores the wearer's actual pool size.",
+                "  DISABLED      - Do not translate cross-system regen at all. Mana Regen enchantments",
+                "                  on Ars only affect Ars; Iron's gear regen only affects Iron's."
+            )
+            .define("cross_system_regen_conversion", "EQUAL_EFFECT");
+
+        CROSS_SYSTEM_REGEN_MULTIPLIER = BUILDER
+            .comment(
+                "Global dampener applied to every cross-system regen translation.",
+                "Use to tone down or boost the strength of cross-mod regen bonuses without",
+                "disabling them entirely. 1.0 = full strength, 0.5 = half, 2.0 = double."
+            )
+            .defineInRange("cross_system_regen_multiplier", 1.0, 0.0, 100.0);
+
+        CROSS_SYSTEM_REGEN_REFERENCE_POOL = BUILDER
+            .comment(
+                "Reference pool size used by REFERENCE_POOL conversion mode.",
+                "Has no effect when cross_system_regen_conversion is EQUAL_EFFECT or DISABLED."
+            )
+            .defineInRange("cross_system_regen_reference_pool", 100.0, 1.0, 100000.0);
+
         BUILDER.pop();
 
         // ========================================

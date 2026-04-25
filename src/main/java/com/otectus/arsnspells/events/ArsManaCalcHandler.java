@@ -3,6 +3,7 @@ package com.otectus.arsnspells.events;
 import com.hollingsworth.arsnouveau.api.event.ManaRegenCalcEvent;
 import com.hollingsworth.arsnouveau.api.event.MaxManaCalcEvent;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.equipment.EquipmentIntegration;
@@ -105,8 +106,13 @@ public class ArsManaCalcHandler {
             return;
         }
 
+        // Iron's MANA_REGEN attribute is a percentage-of-pool multiplier; the Ars regen
+        // event expects an absolute mana/sec delta. Going through ManaRegenBridge is
+        // mandatory — adding ironBonus.manaRegen directly is a unit-mismatch bug that
+        // can produce hundreds of mana/sec on geared wizards.
+        double absRegenPerSec = ManaRegenBridge.convertIronsToArs(ironBonus.manaRegen, player);
         double conversionRate = AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get();
-        double updatedRegen = Math.max(0.0, event.getRegen() + ironBonus.manaRegen * conversionRate);
+        double updatedRegen = Math.max(0.0, event.getRegen() + absRegenPerSec * conversionRate);
         event.setRegen(updatedRegen);
     }
 }

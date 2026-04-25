@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.8] - 2026-04-24
+
+### Bug Fixes
+- **Cross-system mana regen unit mismatch fixed** -- Iron's `MANA_REGEN` is a percentage-of-pool multiplier (`max × regen × 0.01` mana/sec); Ars Nouveau regen is absolute mana/sec. Three callsites previously wrote a value from one system directly into the other without converting units, so an Ars enchantment like Mana Regen III on wizard armor compounded into hundreds of mana/sec instead of the intended single-digit boost. All cross-system regen translations now route through a new `ManaRegenBridge` that converts via the wearer's current max pool.
+  - `ArsManaCalcHandler.onManaRegenCalc` (ARS_PRIMARY mode) -- Iron's gear regen attribute is now converted to mana/sec before being added to the Ars regen event.
+  - `EquipmentIntegration.applyArsBonusesToIrons` (ISS_PRIMARY/HYBRID mode) -- Ars-side regen bonuses are now converted to the equivalent Iron's `MANA_REGEN` attribute delta. Max mana modifier is applied first so the regen conversion sees the post-bonus pool.
+  - `MixinArsPotionEffects.arsnspells$redirectManaRegenPotions` -- Ars `mana_regen` / `mana_boost` potion effects redirected to Iron's `MANA_REGEN` now go through the bridge.
+
+### Configuration
+- **New: `cross_system_regen_conversion`** (default `EQUAL_EFFECT`) -- Conversion strategy. `EQUAL_EFFECT` preserves equivalent mana/sec on both sides at any pool size; `REFERENCE_POOL` uses a fixed pool for predictable conversions; `DISABLED` blocks cross-system regen translation entirely (Mana Regen enchantments only affect their own system).
+- **New: `cross_system_regen_multiplier`** (default `1.0`) -- Global dampener for every cross-system regen translation.
+- **New: `cross_system_regen_reference_pool`** (default `100.0`) -- Reference pool size for `REFERENCE_POOL` mode.
+
+### Cleanup
+- **Tightened enchantment mana detection** -- `EquipmentIntegration.getEnchantmentManaBonus` previously string-matched any enchantment whose description ID contained `"mana"` or `"source"` and granted +50 max mana per level, which silently caught unrelated enchantments (e.g. anything named `mana_steal`, `source_friendly`). Detection is now anchored to the specific Ars Nouveau enchantment IDs `ars_nouveau:mana_regen` and `ars_nouveau:mana_boost` via `ForgeRegistries`. The heuristic remains load-bearing in `ISS_PRIMARY`/`HYBRID` mode where `MixinManaCapability` suppresses Ars's native regen tick, so this is the only path that surfaces those enchantments to the Iron's pool.
+
+---
+
 ## [1.8.6] - 2026-04-24
 
 ### Bug Fixes

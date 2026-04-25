@@ -2,6 +2,7 @@ package com.otectus.arsnspells.mixin.ars;
 
 import com.hollingsworth.arsnouveau.common.event.ManaCapEvents;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
@@ -76,9 +77,12 @@ public abstract class MixinArsPotionEffects {
                 // Remove old modifier
                 regenAttr.removeModifier(POTION_MANA_REGEN_ID);
 
-                // Apply new modifier with conversion
+                // arsRegenBonus is absolute mana/sec; Iron's MANA_REGEN is a percentage-of-pool
+                // multiplier. Going through ManaRegenBridge converts units; the pool conversion
+                // rate is then layered on top.
                 double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
-                double ironRegenBonus = arsRegenBonus * conversionRate;
+                double absRegenPerSec = arsRegenBonus * conversionRate;
+                double ironRegenBonus = ManaRegenBridge.convertArsToIrons(absRegenPerSec, player);
 
                 AttributeModifier modifier = new AttributeModifier(
                     POTION_MANA_REGEN_ID,
