@@ -1,5 +1,7 @@
 {
   "item.ars_n_spells.affinity_shard": "Affinity Shard",
+  "item.ars_n_spells.spell_transcription": "Spell Transcription",
+  "ars_n_spells.ritual_desc.spell_transcription": "Inscribes a cross-mod spell onto a blank target item. Drop a filled Ars Nouveau spell parchment, focus, or spellbook (or an Iron's Spellbooks scroll) as the source, and a blank target item within three blocks of the brazier. Right-click the inscribed item to cast the spell; sneak-right-click cycles between multiple inscriptions.",
   "ritual.ars_n_spells.mana_well": "Ritual of the Mana Well",
   "ritual.ars_n_spells.mana_infusion": "Ritual of Mana Infusion",
   "ritual.ars_n_spells.spell_transcription": "Ritual of Spell Transcription",

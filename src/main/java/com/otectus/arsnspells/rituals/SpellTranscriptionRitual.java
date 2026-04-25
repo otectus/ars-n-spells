@@ -36,6 +36,7 @@ import java.util.List;
  *    arsnspells:cross_spells NBT tag.
  */
 public class SpellTranscriptionRitual extends AbstractRitual {
+    public static final String REGISTRY_PATH = "spell_transcription";
     private static final int SEARCH_RADIUS = 3;
 
     @Override
@@ -162,7 +163,7 @@ public class SpellTranscriptionRitual extends AbstractRitual {
 
     @Override
     public ResourceLocation getRegistryName() {
-        return new ResourceLocation("ars_n_spells", "spell_transcription");
+        return new ResourceLocation("ars_n_spells", REGISTRY_PATH);
     }
 
     private static final class Source {

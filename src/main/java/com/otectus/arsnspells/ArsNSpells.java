@@ -12,6 +12,7 @@ import com.otectus.arsnspells.data.CooldownData;
 import com.otectus.arsnspells.data.ProgressionData;
 import com.otectus.arsnspells.events.*;
 import com.otectus.arsnspells.network.PacketHandler;
+import com.otectus.arsnspells.registry.ModItemsRegistry;
 import com.otectus.arsnspells.rituals.RitualRegistryHandler;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.CrossCastIronsHandler;
@@ -48,6 +49,14 @@ public class ArsNSpells {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerCaps);
         modEventBus.addListener(this::onConfigLoading);
+
+        // Register cross-mod ritual tablet only when Iron's Spellbooks is loaded.
+        // Must happen before ITEMS.register(modEventBus) so the DeferredRegister
+        // carries the entry when the item RegisterEvent fires.
+        if (ModList.get().isLoaded("irons_spellbooks")) {
+            ModItemsRegistry.registerIronsDependentItems();
+        }
+        ModItemsRegistry.register(modEventBus);
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AnsConfig.SPEC, "ars_n_spells-common.toml");
 

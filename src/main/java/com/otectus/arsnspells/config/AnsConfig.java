@@ -175,6 +175,12 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue MANA_WELL_REGEN_RATE;
 
     // ========================================
+    // CROSS-CAST INSCRIPTION
+    // ========================================
+    public static final ForgeConfigSpec.DoubleValue CROSS_CAST_COST_MULTIPLIER;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_PER_CAST_REAGENT;
+
+    // ========================================
     // PERFORMANCE TUNING
     // ========================================
     public static final ForgeConfigSpec.DoubleValue SOURCE_JAR_CACHE_MOVE_THRESHOLD;
@@ -827,6 +833,38 @@ public class AnsConfig {
         MANA_WELL_REGEN_RATE = BUILDER
             .comment("Mana per tick granted to players within Mana Well range")
             .defineInRange("mana_well_regen_rate", 2.0, 0.1, 100.0);
+
+        BUILDER.pop();
+
+        // ========================================
+        // CROSS-CAST INSCRIPTION
+        // ========================================
+        BUILDER.push("Cross-Cast Inscription");
+        BUILDER.comment(
+            "Controls spells cast from items inscribed via the Spell Transcription ritual.",
+            "The inscription mechanic itself lives in the datapack recipe under",
+            "data/ars_n_spells/recipes/apparatus/ -- pack authors can swap ingredients there."
+        );
+
+        CROSS_CAST_COST_MULTIPLIER = BUILDER
+            .comment(
+                "Multiplier applied to the base mana cost of a spell cast from an inscribed item.",
+                "Represents the overhead of casting through a foreign mod's form. 1.0 = no overhead,",
+                "1.25 = 25% extra cost (default). Applied once, after base cost calculation and",
+                "before mana deduction. Routed through BridgeManager, so it composes with the",
+                "active mana unification mode and SEPARATE-mode dual-cost splitting."
+            )
+            .defineInRange("cross_cast_cost_multiplier", 1.25, 0.5, 5.0);
+
+        ENABLE_PER_CAST_REAGENT = BUILDER
+            .comment(
+                "Reserved hook for a future per-cast reagent system. When enabled, inscribed",
+                "items would consume a physical reagent per cast in addition to mana. The",
+                "reagent itself, item, and consumption hook are not implemented yet -- this",
+                "flag exists only so future work can be gated without re-shuffling config",
+                "keys. Leave at the default (false)."
+            )
+            .define("enable_per_cast_reagent", false);
 
         BUILDER.pop();
 
