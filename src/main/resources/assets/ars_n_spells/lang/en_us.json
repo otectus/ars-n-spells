@@ -5,6 +5,18 @@
   "ritual.ars_n_spells.mana_well": "Ritual of the Mana Well",
   "ritual.ars_n_spells.mana_infusion": "Ritual of Mana Infusion",
   "ritual.ars_n_spells.spell_transcription": "Ritual of Spell Transcription",
+
+  "ritual.ars_n_spells.spell_transcription.error.empty_range": "Spell Transcription: drop a source and a blank target item within three blocks of the brazier.",
+  "ritual.ars_n_spells.spell_transcription.error.inscribed_items": "Spell Transcription: already-inscribed item(s) in range (%1$s). Uninscribe first, or remove them before re-running the ritual.",
+  "ritual.ars_n_spells.spell_transcription.error.no_source": "Spell Transcription: no spell source found. Drop a filled Ars Nouveau spell parchment, focus, or spellbook, or an Iron's Spellbooks scroll.",
+  "ritual.ars_n_spells.spell_transcription.error.multiple_sources": "Spell Transcription found %1$s spell-bearing items (%2$s). Place exactly one source and one blank target.",
+  "ritual.ars_n_spells.spell_transcription.error.no_target": "Spell Transcription: no blank target item found. Drop exactly one blank item to receive the inscription.",
+  "ritual.ars_n_spells.spell_transcription.error.multiple_targets": "Spell Transcription found %1$s non-spell items (%2$s). Place exactly one source and one blank target.",
+  "ritual.ars_n_spells.spell_transcription.error.target_ars_rooted": "Spell Transcription: %1$s already carries an Ars Nouveau spell at root. Use a blank parchment, or uninscribe first.",
+  "ritual.ars_n_spells.spell_transcription.error.source_parse_failed": "Spell Transcription: source %1$s could not be re-parsed during inscription. Remove and re-drop the source, then re-run the ritual.",
+  "ritual.ars_n_spells.spell_transcription.success": "Spell inscribed: %1$s",
+  "ritual.ars_n_spells.spell_transcription.source.ars": "Ars Nouveau spell",
+  "ritual.ars_n_spells.spell_transcription.source.irons": "%1$s (level %2$s)",
   "config.ars_n_spells.title": "Ars 'n' Spells Configuration",
 
   "commands.ans.mana.setdefault.success": "Default max mana set to %s",
