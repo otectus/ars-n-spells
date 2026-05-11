@@ -1,7 +1,7 @@
 package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
-import com.otectus.arsnspells.spell.CrossCastNbt;
+import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
@@ -91,7 +91,7 @@ public class SpellUninscriptionRitual extends AbstractRitual {
         // Strip cleanly. CrossCastNbt drops both the spells list and the
         // cycle index, then collapses an empty residual root tag to null so
         // the result matches a never-inscribed item bit-for-bit.
-        CrossCastNbt.clearCrossModSpells(stack);
+        CrossModSpellComponents.clear(stack);
         inscribedEntity.setItem(stack);
 
         playUninscribeEffects(level, pos);
@@ -113,6 +113,6 @@ public class SpellUninscriptionRitual extends AbstractRitual {
 
     @Override
     public ResourceLocation getRegistryName() {
-        return new ResourceLocation("ars_n_spells", REGISTRY_PATH);
+        return ResourceLocation.fromNamespaceAndPath("ars_n_spells", REGISTRY_PATH);
     }
 }

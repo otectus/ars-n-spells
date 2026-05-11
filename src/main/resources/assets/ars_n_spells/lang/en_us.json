@@ -34,22 +34,8 @@
   "commands.ans.debug.disabled": "Debug mode disabled",
   "commands.ans.info.header": "--- Ars 'n' Spells Info for %s ---",
   "commands.ans.info.mana": "Mana: %s / %s",
-  "commands.ans.info.aura": "Aura: %s / %s",
   "commands.ans.info.resonance": "Resonance: %s",
-  "commands.ans.info.cursed_ring": "Cursed Ring: %s",
-  "commands.ans.info.virtue_ring": "Virtue Ring: %s",
   "commands.ans.mode.current": "Current mana unification mode: %s",
 
-  "message.ars_n_spells.lp.consumed": "Consumed %s LP",
-  "message.ars_n_spells.lp.insufficient": "Insufficient LP - Spell Cancelled",
-  "message.ars_n_spells.lp.death": "DEATH: Insufficient LP (%s LP required)",
-  "message.ars_n_spells.lp.scroll_cancelled": "Insufficient LP - Scroll Cancelled",
-
-  "message.ars_n_spells.aura.consumed": "Consumed %s Aura (%s remaining)",
-  "message.ars_n_spells.aura.insufficient": "Insufficient Aura: Need %s, have %s",
-
-  "message.ars_n_spells.mana.insufficient": "Not Enough Mana: Need %s, have %s",
-  "message.ars_n_spells.lp.insufficient_need": "Insufficient Life Points: Need %s LP",
-
-  "message.ars_n_spells.ring_conflict": "Ring conflict: Cursed Ring and Virtue Ring cancel each other - using normal mana"
+  "message.ars_n_spells.mana.insufficient": "Not Enough Mana: Need %s, have %s"
 }

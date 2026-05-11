@@ -1,19 +1,25 @@
 package com.otectus.arsnspells.data;
 
-import net.minecraft.nbt.CompoundTag;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.CapabilityManager;
-import net.minecraftforge.common.capabilities.CapabilityToken;
+import com.mojang.serialization.Codec;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Stores per-school cast counts for the cross-mod progression system.
- * Cast counts are persistent and derive transient attribute bonuses.
+ * Per-player school cast counts driving the cross-mod progression bonuses.
+ * Persists via {@link #CODEC}; copies on death (long-term progression
+ * survives respawn).
  */
 public class ProgressionData {
-    public static final Capability<ProgressionData> PROGRESSION_DATA = CapabilityManager.get(new CapabilityToken<>() {});
+    public static final Codec<ProgressionData> CODEC = Codec.unboundedMap(Codec.STRING, Codec.INT)
+        .xmap(
+            raw -> {
+                ProgressionData d = new ProgressionData();
+                d.schoolCastCounts.putAll(raw);
+                return d;
+            },
+            d -> new HashMap<>(d.schoolCastCounts)
+        );
 
     private final Map<String, Integer> schoolCastCounts = new HashMap<>();
 
@@ -36,21 +42,5 @@ public class ProgressionData {
 
     public Map<String, Integer> getAllCastCounts() {
         return new HashMap<>(schoolCastCounts);
-    }
-
-    public void saveToNBT(CompoundTag nbt) {
-        CompoundTag tag = new CompoundTag();
-        schoolCastCounts.forEach(tag::putInt);
-        nbt.put("ProgressionCounts", tag);
-    }
-
-    public void loadFromNBT(CompoundTag nbt) {
-        schoolCastCounts.clear();
-        if (nbt.contains("ProgressionCounts")) {
-            CompoundTag tag = nbt.getCompound("ProgressionCounts");
-            for (String key : tag.getAllKeys()) {
-                schoolCastCounts.put(key, tag.getInt(key));
-            }
-        }
     }
 }

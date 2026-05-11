@@ -1,12 +1,13 @@
 package com.otectus.arsnspells.events;
 
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.data.AttachmentTypes;
 import com.otectus.arsnspells.data.ProgressionData;
 import com.otectus.arsnspells.progression.ProgressionAttributes;
 import io.redspace.ironsspellbooks.api.events.SpellOnCastEvent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 
 import java.util.Locale;
 
@@ -20,8 +21,7 @@ import java.util.Locale;
  * both handlers index into the same map and the {@code <school>_spell_power}
  * attribute applied by either side targets the same Iron's attribute.
  *
- * <p>Iron's-only: must only be registered when Iron's is loaded
- * (see {@link com.otectus.arsnspells.ArsNSpells} constructor).
+ * <p>Iron's-only: must only be registered when Iron's is loaded.
  */
 public class IronsProgressionHandler {
 
@@ -44,9 +44,8 @@ public class IronsProgressionHandler {
         if (school.isEmpty()) {
             return;
         }
-        player.getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(data -> {
-            data.incrementCastCount(school);
-            ProgressionAttributes.applyTransientBonus(player, school, data.getBonusForSchool(school));
-        });
+        ProgressionData data = player.getData(AttachmentTypes.PROGRESSION.get());
+        data.incrementCastCount(school);
+        ProgressionAttributes.applyTransientBonus(player, school, data.getBonusForSchool(school));
     }
 }

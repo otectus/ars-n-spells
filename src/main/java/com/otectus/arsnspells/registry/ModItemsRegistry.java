@@ -4,11 +4,11 @@ import com.hollingsworth.arsnouveau.common.items.RitualTablet;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.rituals.SpellTranscriptionRitual;
 import com.otectus.arsnspells.rituals.SpellUninscriptionRitual;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * Item registrar for Ars 'n' Spells. The mod does not ship gameplay items of
@@ -24,16 +24,16 @@ import net.minecraftforge.registries.RegistryObject;
  * {@code RitualRegistry.getRitualItemMap()} manually from the ritual setup
  * path.
  *
- * The tablet is only registered when Iron's Spellbooks is loaded, to avoid
- * linking {@link SpellTranscriptionRitual} (and its Iron's imports) on
- * installs that don't have Iron's available.
+ * The transcription tablet is only registered when Iron's Spellbooks is
+ * loaded; the uninscription tablet is always registered so players can
+ * clean up legacy inscribed items after removing Iron's.
  */
 public final class ModItemsRegistry {
     public static final DeferredRegister<Item> ITEMS =
-        DeferredRegister.create(ForgeRegistries.ITEMS, ArsNSpells.MODID);
+        DeferredRegister.create(BuiltInRegistries.ITEM, ArsNSpells.MODID);
 
-    private static RegistryObject<RitualTablet> spellTranscriptionTablet;
-    private static RegistryObject<RitualTablet> spellUninscriptionTablet;
+    private static DeferredHolder<Item, RitualTablet> spellTranscriptionTablet;
+    private static DeferredHolder<Item, RitualTablet> spellUninscriptionTablet;
 
     private ModItemsRegistry() {}
 
@@ -53,9 +53,8 @@ public final class ModItemsRegistry {
     }
 
     /**
-     * Registers items that work even without Iron's Spellbooks loaded. The
-     * uninscribe tablet is here so players can clean up legacy inscribed
-     * items after removing Iron's. Must be called from the mod constructor.
+     * Registers items that work even without Iron's Spellbooks loaded.
+     * Must be called from the mod constructor.
      */
     public static void registerCommonItems() {
         if (spellUninscriptionTablet != null) {
@@ -71,11 +70,11 @@ public final class ModItemsRegistry {
         ITEMS.register(modBus);
     }
 
-    public static RegistryObject<RitualTablet> spellTranscriptionTablet() {
+    public static DeferredHolder<Item, RitualTablet> spellTranscriptionTablet() {
         return spellTranscriptionTablet;
     }
 
-    public static RegistryObject<RitualTablet> spellUninscriptionTablet() {
+    public static DeferredHolder<Item, RitualTablet> spellUninscriptionTablet() {
         return spellUninscriptionTablet;
     }
 }

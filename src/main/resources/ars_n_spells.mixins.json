@@ -3,8 +3,7 @@
   "minVersion": "0.8",
   "package": "com.otectus.arsnspells.mixin",
   "plugin": "com.otectus.arsnspells.mixin.ArsNSpellsMixinPlugin",
-  "compatibilityLevel": "JAVA_17",
-  "refmap": "ars_n_spells.refmap.json",
+  "compatibilityLevel": "JAVA_21",
   "mixins": [
     "ars.MixinManaCapability",
     "ars.MixinSpellResolverMana",
@@ -13,8 +12,7 @@
     "ars.MixinArsPotionEffects",
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana",
-    "irons.MixinScrollItem",
-    "sanctified.MixinSanctifiedAbstractSpell"
+    "irons.MixinScrollItem"
   ],
   "client": [
     "irons.MixinIronsManaBarOverlay"

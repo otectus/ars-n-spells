@@ -1,32 +1,42 @@
 package com.otectus.arsnspells.network;
 
 import com.otectus.arsnspells.ArsNSpells;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkDirection;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.simple.SimpleChannel;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
-public class PacketHandler {
-    private static final String PROTOCOL_VERSION = "1";
-    public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(ArsNSpells.MODID, "main"),
-            () -> PROTOCOL_VERSION,
-            PROTOCOL_VERSION::equals,
-            PROTOCOL_VERSION::equals
-    );
+/**
+ * NeoForge 1.21.1 payload handler — replaces the Forge SimpleChannel rig
+ * from 1.20.1. Registration runs on the mod bus
+ * ({@link RegisterPayloadHandlersEvent}); broadcast helpers wrap
+ * {@link PacketDistributor}.
+ */
+public final class PacketHandler {
+    /** Bumped on protocol-breaking changes. "1" for the first NeoForge line. */
+    public static final String PROTOCOL_VERSION = "1";
 
-    public static void register() {
-        int id = 0;
+    private PacketHandler() {}
+
+    public static void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar reg = event.registrar(PROTOCOL_VERSION);
+
+        reg.playToClient(AffinitySyncPayload.TYPE, AffinitySyncPayload.STREAM_CODEC,
+            AffinitySyncPayload::handleOnClient);
+        reg.playToClient(CooldownSyncPayload.TYPE, CooldownSyncPayload.STREAM_CODEC,
+            CooldownSyncPayload::handleOnClient);
+
         if (ModList.get().isLoaded("irons_spellbooks")) {
-            INSTANCE.registerMessage(id++, ResonanceSyncPacket.class, ResonanceSyncPacket::toBytes, ResonanceSyncPacket::new, ResonanceSyncPacket::handle);
+            reg.playToClient(ResonanceSyncPayload.TYPE, ResonanceSyncPayload.STREAM_CODEC,
+                ResonanceSyncPayload::handleOnClient);
         }
-        INSTANCE.registerMessage(id++, AffinitySyncPacket.class, AffinitySyncPacket::toBytes, AffinitySyncPacket::new, AffinitySyncPacket::handle);
-        INSTANCE.registerMessage(id++, CooldownSyncPacket.class, CooldownSyncPacket::toBytes, CooldownSyncPacket::new, CooldownSyncPacket::handle);
+
+        ArsNSpells.LOGGER.info("Registered payload handlers (protocol={})", PROTOCOL_VERSION);
     }
 
-    public static void sendToClient(Object msg, ServerPlayer player) {
-        INSTANCE.sendTo(msg, player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+    public static <T extends CustomPacketPayload> void sendToClient(T payload, ServerPlayer player) {
+        PacketDistributor.sendToPlayer(player, payload);
     }
 }

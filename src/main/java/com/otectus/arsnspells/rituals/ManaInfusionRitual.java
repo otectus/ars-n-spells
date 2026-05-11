@@ -41,6 +41,6 @@ public class ManaInfusionRitual extends AbstractRitual {
 
     @Override
     public ResourceLocation getRegistryName() {
-        return new ResourceLocation("ars_n_spells", "mana_infusion");
+        return ResourceLocation.fromNamespaceAndPath("ars_n_spells", "mana_infusion");
     }
 }

@@ -153,6 +153,6 @@ public class SpellTranscriptionRitual extends AbstractRitual {
 
     @Override
     public ResourceLocation getRegistryName() {
-        return new ResourceLocation("ars_n_spells", REGISTRY_PATH);
+        return ResourceLocation.fromNamespaceAndPath("ars_n_spells", REGISTRY_PATH);
     }
 }

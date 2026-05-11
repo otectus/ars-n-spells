@@ -1,13 +1,12 @@
 package com.otectus.arsnspells.progression;
 
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraftforge.registries.ForgeRegistries;
-
-import java.util.UUID;
 
 /**
  * Shared helper for the cross-mod progression system. Looks up the Iron's
@@ -16,16 +15,15 @@ import java.util.UUID;
  *
  * Used by both Ars-side {@link com.otectus.arsnspells.events.ProgressionHandler}
  * and Iron's-side {@link com.otectus.arsnspells.events.IronsProgressionHandler}
- * so both directions share the exact same modifier UUID and naming.
+ * so both directions share the exact same modifier id.
  *
- * <p>Iron's-only: this helper imports nothing from Iron's APIs directly, but
- * the attribute it looks up only exists when Iron's is loaded. Callers must
- * be gated on {@link com.otectus.arsnspells.compat.IronsCompat#isLoaded()}.
+ * <p>Iron's-only at runtime: the attribute it looks up only exists when Iron's
+ * is loaded. Callers must be gated on {@link com.otectus.arsnspells.compat.IronsCompat#isLoaded()}.
  */
 public final class ProgressionAttributes {
-    public static final UUID ELEMENT_XP_ID = UUID.fromString("b0ba11ad-dead-beef-cafe-f00d20245678");
     private static final String IRONS_NAMESPACE = "irons_spellbooks";
-    private static final String MODIFIER_NAME = "Cross-Mod School Progression";
+    public static final ResourceLocation MODIFIER_ID =
+        ResourceLocation.fromNamespaceAndPath("ars_n_spells", "cross_mod_school_progression");
 
     private ProgressionAttributes() {}
 
@@ -33,8 +31,11 @@ public final class ProgressionAttributes {
         if (player == null || school == null || school.isEmpty()) {
             return;
         }
-        Attribute attribute = ForgeRegistries.ATTRIBUTES.getValue(
-            new ResourceLocation(IRONS_NAMESPACE, school + "_spell_power"));
+        ResourceLocation attrId = ResourceLocation.fromNamespaceAndPath(
+            IRONS_NAMESPACE, school + "_spell_power");
+        Holder<Attribute> attribute = BuiltInRegistries.ATTRIBUTE
+            .getHolder(attrId)
+            .orElse(null);
         if (attribute == null) {
             return;
         }
@@ -42,10 +43,10 @@ public final class ProgressionAttributes {
         if (instance == null) {
             return;
         }
-        instance.removeModifier(ELEMENT_XP_ID);
+        instance.removeModifier(MODIFIER_ID);
         if (bonus > 0) {
             instance.addTransientModifier(new AttributeModifier(
-                ELEMENT_XP_ID, MODIFIER_NAME, bonus, AttributeModifier.Operation.ADDITION));
+                MODIFIER_ID, bonus, AttributeModifier.Operation.ADD_VALUE));
         }
     }
 }

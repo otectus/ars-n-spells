@@ -1,33 +1,39 @@
 package com.otectus.arsnspells.data;
 
+import com.mojang.serialization.Codec;
 import com.otectus.arsnspells.cooldown.CooldownCategory;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.CapabilityManager;
-import net.minecraftforge.common.capabilities.CapabilityToken;
+
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+/**
+ * Per-player cooldown end-tick timestamps keyed by category. Attachment
+ * intentionally does NOT copy on death (cooldowns reset on respawn).
+ */
 public class CooldownData {
-    public static final Capability<CooldownData> COOLDOWN_CAP = CapabilityManager.get(new CapabilityToken<>() {});
-    // Stores cooldown end tick per category
+    public static final Codec<CooldownData> CODEC = Codec.unboundedMap(Codec.STRING, Codec.LONG)
+        .xmap(
+            raw -> {
+                CooldownData d = new CooldownData();
+                raw.forEach((k, v) -> {
+                    try {
+                        d.cooldowns.put(CooldownCategory.valueOf(k), v);
+                    } catch (IllegalArgumentException ignored) {}
+                });
+                return d;
+            },
+            d -> d.cooldowns.entrySet().stream()
+                .collect(Collectors.toMap(e -> e.getKey().name(), Map.Entry::getValue))
+        );
+
     private final Map<CooldownCategory, Long> cooldowns = new HashMap<>();
 
-    public long getLastCast(CooldownCategory cat) { return cooldowns.getOrDefault(cat, 0L); }
-    public void setLastCast(CooldownCategory cat, long time) { cooldowns.put(cat, time); }
-
-    public void save(CompoundTag nbt) {
-        CompoundTag tag = new CompoundTag();
-        cooldowns.forEach((cat, time) -> tag.putLong(cat.name(), time));
-        nbt.put("BridgeCooldowns", tag);
+    public long getLastCast(CooldownCategory cat) {
+        return cooldowns.getOrDefault(cat, 0L);
     }
 
-    public void load(CompoundTag nbt) {
-        if (nbt.contains("BridgeCooldowns")) {
-            CompoundTag tag = nbt.getCompound("BridgeCooldowns");
-            for (CooldownCategory cat : CooldownCategory.values()) {
-                if (tag.contains(cat.name())) cooldowns.put(cat, tag.getLong(cat.name()));
-            }
-        }
+    public void setLastCast(CooldownCategory cat, long time) {
+        cooldowns.put(cat, time);
     }
 }

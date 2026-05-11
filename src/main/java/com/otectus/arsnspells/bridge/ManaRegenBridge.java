@@ -3,7 +3,7 @@ package com.otectus.arsnspells.bridge;
 import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 /**
  * Single point of truth for converting mana regen values between Ars Nouveau
@@ -130,7 +130,7 @@ public final class ManaRegenBridge {
             return 0.0;
         }
         try {
-            return player.getAttributeValue(AttributeRegistry.MAX_MANA.get());
+            return player.getAttributeValue(AttributeRegistry.MAX_MANA);
         } catch (Throwable t) {
             return 0.0;
         }

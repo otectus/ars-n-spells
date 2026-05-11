@@ -2,43 +2,32 @@ package com.otectus.arsnspells.bridge;
 
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * BridgeManager - Central hub for mana system integration
- * 
- * Manages the active mana bridge based on configuration and available mods.
- * Supports 5 different mana unification modes.
+ * BridgeManager - central hub for mana system integration. Resolves the
+ * active bridge based on configuration and the presence of Iron's
+ * Spellbooks at common-setup time.
  */
 public class BridgeManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(BridgeManager.class);
     private static IManaBridge activeBridge;
-    private static IManaBridge secondaryBridge; // For hybrid/separate modes
+    private static IManaBridge secondaryBridge;
     private static ManaUnificationMode currentMode;
     private static boolean isIronsLoaded = false;
 
     public static void init(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
-            // Check if Iron's Spellbooks is loaded
             isIronsLoaded = ModList.get().isLoaded("irons_spellbooks");
-            
-            // Get configured mode
             currentMode = AnsConfig.getManaMode();
-            
-            // Initialize bridges based on mode
             initializeBridges();
-            
-            // Log initialization
             logInitialization();
         });
     }
 
-    /**
-     * Initialize mana bridges based on configuration mode
-     */
     private static void initializeBridges() {
         switch (currentMode) {
             case ISS_PRIMARY:
@@ -51,25 +40,25 @@ public class BridgeManager {
                     currentMode = ManaUnificationMode.ARS_PRIMARY;
                 }
                 break;
-                
+
             case ARS_PRIMARY:
                 activeBridge = new ArsNativeBridge();
                 if (isIronsLoaded) {
                     secondaryBridge = new IronsBridge();
                 }
                 break;
-                
+
             case HYBRID:
                 if (isIronsLoaded) {
-                    activeBridge = new IronsBridge(); // Primary for reads
-                    secondaryBridge = new ArsNativeBridge(); // Secondary for sync
+                    activeBridge = new IronsBridge();
+                    secondaryBridge = new ArsNativeBridge();
                 } else {
                     LOGGER.warn("HYBRID mode selected but Iron's Spellbooks not found. Falling back to ARS_PRIMARY.");
                     activeBridge = new ArsNativeBridge();
                     currentMode = ManaUnificationMode.ARS_PRIMARY;
                 }
                 break;
-                
+
             case SEPARATE:
                 activeBridge = new ArsNativeBridge();
                 if (isIronsLoaded) {
@@ -79,12 +68,12 @@ public class BridgeManager {
                     currentMode = ManaUnificationMode.ARS_PRIMARY;
                 }
                 break;
-                
+
             case DISABLED:
-                activeBridge = new ArsNativeBridge(); // Fallback to native
+                activeBridge = new ArsNativeBridge();
                 secondaryBridge = null;
                 break;
-                
+
             default:
                 LOGGER.error("Unknown mana mode: {}. Defaulting to ISS_PRIMARY.", currentMode);
                 activeBridge = isIronsLoaded ? new IronsBridge() : new ArsNativeBridge();
@@ -92,9 +81,6 @@ public class BridgeManager {
         }
     }
 
-    /**
-     * Log initialization details
-     */
     private static void logInitialization() {
         LOGGER.info("========================================");
         LOGGER.info("Ars 'n' Spells - Mana Bridge Initialization");
@@ -119,38 +105,22 @@ public class BridgeManager {
         LOGGER.info("========================================");
     }
 
-    /**
-     * Get the active mana bridge
-     */
     public static IManaBridge getBridge() {
         return activeBridge != null ? activeBridge : new ArsNativeBridge();
     }
 
-    /**
-     * Get the secondary mana bridge (for hybrid/separate modes)
-     */
     public static IManaBridge getSecondaryBridge() {
         return secondaryBridge;
     }
 
-    /**
-     * Get the current mana unification mode.
-     * Cached at init time — changing mana_unification_mode requires a restart.
-     */
     public static ManaUnificationMode getCurrentMode() {
         return currentMode;
     }
 
-    /**
-     * Check if Iron's Spellbooks is loaded
-     */
     public static boolean isIronsSpellbooksLoaded() {
         return isIronsLoaded;
     }
 
-    /**
-     * Check if mana unification is enabled
-     */
     public static boolean isUnificationEnabled() {
         if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
             return false;
@@ -159,25 +129,16 @@ public class BridgeManager {
         return mode != null && mode.isUnificationEnabled();
     }
 
-    /**
-     * Check if we're using a shared mana pool
-     */
     public static boolean usesSharedPool() {
         ManaUnificationMode mode = getCurrentMode();
         return isUnificationEnabled() && mode != null && mode.usesSharedPool();
     }
 
-    /**
-     * Check if we're using dual-cost mechanics
-     */
     public static boolean usesDualCost() {
         ManaUnificationMode mode = getCurrentMode();
         return isUnificationEnabled() && mode != null && mode.requiresDualCost();
     }
 
-    /**
-     * Get mana from the appropriate bridge based on mode
-     */
     public static float getManaForMode(net.minecraft.world.entity.player.Player player, boolean fromArs) {
         if (!isUnificationEnabled()) {
             if (fromArs) {
@@ -193,20 +154,17 @@ public class BridgeManager {
             case ARS_PRIMARY:
             case HYBRID:
                 return activeBridge.getMana(player);
-                
+
             case SEPARATE:
                 return fromArs ?
                     activeBridge.getMana(player) :
                     (secondaryBridge != null ? secondaryBridge.getMana(player) : activeBridge.getMana(player));
-                
+
             default:
                 return activeBridge.getMana(player);
         }
     }
 
-    /**
-     * Consume mana based on current mode
-     */
     public static boolean consumeManaForMode(net.minecraft.world.entity.player.Player player, float amount, boolean fromArs) {
         if (!isUnificationEnabled()) {
             if (fromArs) {
@@ -221,11 +179,9 @@ public class BridgeManager {
             case ISS_PRIMARY:
             case ARS_PRIMARY:
             case HYBRID:
-                // Shared pool - consume from primary bridge
                 return activeBridge.consumeMana(player, amount);
-                
+
             case SEPARATE:
-                // Dual-cost mode - consume from both pools
                 float arsCost = amount * AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
                 float issCost = amount * AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
                 IManaBridge arsBridge = activeBridge;
@@ -241,7 +197,6 @@ public class BridgeManager {
                     return false;
                 }
 
-                // Atomic dual-cost: capture state for rollback if second consumption fails
                 float arsManaBefore = arsBridge.getMana(player);
                 boolean arsSuccess = arsBridge.consumeMana(player, arsCost);
                 if (!arsSuccess) {
@@ -250,13 +205,12 @@ public class BridgeManager {
 
                 boolean issSuccess = issBridge.consumeMana(player, issCost);
                 if (!issSuccess) {
-                    // Rollback: restore Ars mana to pre-consumption value
                     arsBridge.setMana(player, arsManaBefore);
                     return false;
                 }
 
                 return true;
-                
+
             default:
                 return activeBridge.consumeMana(player, amount);
         }

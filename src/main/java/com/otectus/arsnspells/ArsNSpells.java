@@ -1,36 +1,34 @@
 package com.otectus.arsnspells;
 
-import com.otectus.arsnspells.commands.ArsNSpellsCommands;
-import com.otectus.arsnspells.aura.AuraCapabilityProvider;
-import com.otectus.arsnspells.aura.IAuraCapability;
 import com.otectus.arsnspells.bridge.BridgeManager;
-import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
+import com.otectus.arsnspells.commands.ArsNSpellsCommands;
 import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.data.AffinityData;
-import com.otectus.arsnspells.data.ModCapabilityProvider;
-import com.otectus.arsnspells.data.CooldownData;
-import com.otectus.arsnspells.data.ProgressionData;
-import com.otectus.arsnspells.events.*;
+import com.otectus.arsnspells.data.AttachmentTypes;
+import com.otectus.arsnspells.events.AffinityDecayHandler;
+import com.otectus.arsnspells.events.AffinityHandler;
+import com.otectus.arsnspells.events.AffinitySyncOnLoginHandler;
+import com.otectus.arsnspells.events.ArsSpellScalingHandler;
+import com.otectus.arsnspells.events.CooldownHandler;
+import com.otectus.arsnspells.events.IronsAffinityHandler;
+import com.otectus.arsnspells.events.IronsCooldownHandler;
+import com.otectus.arsnspells.events.IronsProgressionHandler;
+import com.otectus.arsnspells.events.ProgressionHandler;
+import com.otectus.arsnspells.events.RegenSynergyHandler;
+import com.otectus.arsnspells.events.ResonanceEvents;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
 import com.otectus.arsnspells.rituals.RitualRegistryHandler;
-import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.CrossCastIronsHandler;
+import com.otectus.arsnspells.spell.ModDataComponents;
 import com.otectus.arsnspells.util.StartupValidator;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent;
-import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,85 +37,63 @@ public class ArsNSpells {
     public static final String MODID = "ars_n_spells";
     public static final Logger LOGGER = LoggerFactory.getLogger(ArsNSpells.class);
 
-    public ArsNSpells() {
-        // Validate environment before initialization
+    public ArsNSpells(IEventBus modBus, ModContainer container) {
         if (!StartupValidator.validate()) {
             LOGGER.warn("Startup validation failed - some features may not work correctly");
         }
-        
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
-        modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(this::registerCaps);
-        modEventBus.addListener(this::onConfigLoading);
 
-        // Common items (uninscribe tablet) are registered unconditionally so
-        // they remain available for cleanup if Iron's Spellbooks is later
-        // uninstalled. Iron's-dependent items (transcribe tablet) only when
-        // Iron's is present. Both must be registered before
-        // ITEMS.register(modEventBus) so the DeferredRegister carries the
-        // entries when the item RegisterEvent fires.
+        // ---- DeferredRegisters on the mod bus ----
+        // Common items (uninscribe tablet) register unconditionally so they
+        // remain available for cleanup if Iron's Spellbooks is later removed.
+        // Iron's-dependent items (transcribe tablet) only when Iron's is
+        // present. Both must be registered before ITEMS.register(modBus) so
+        // the DeferredRegister carries the entries when the item RegisterEvent
+        // fires.
         ModItemsRegistry.registerCommonItems();
         if (ModList.get().isLoaded("irons_spellbooks")) {
             ModItemsRegistry.registerIronsDependentItems();
         }
-        ModItemsRegistry.register(modEventBus);
+        ModItemsRegistry.register(modBus);
+        AttachmentTypes.register(modBus);
+        ModDataComponents.register(modBus);
 
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AnsConfig.SPEC, "ars_n_spells-common.toml");
+        // ---- Mod-bus listeners ----
+        modBus.addListener(this::commonSetup);
+        modBus.addListener(this::onConfigLoading);
+        modBus.addListener(PacketHandler::onRegisterPayloadHandlers);
 
-        MinecraftForge.EVENT_BUS.addGenericListener(Entity.class, this::onAttachCapabilities);
-        // Instance-registered handlers (no @Mod.EventBusSubscriber, use instance @SubscribeEvent methods)
-        MinecraftForge.EVENT_BUS.register(new CooldownHandler());
-        MinecraftForge.EVENT_BUS.register(new AffinityHandler());
-        MinecraftForge.EVENT_BUS.register(new AffinityDecayHandler());
-        MinecraftForge.EVENT_BUS.register(new AffinitySyncOnLoginHandler());
-        // ArsNSpellsCommands has no @Mod.EventBusSubscriber, needs explicit registration
-        MinecraftForge.EVENT_BUS.register(ArsNSpellsCommands.class);
-        // Note: CrossCastingHandler, EquipmentHandler, CurioDiscountHandler, CursedRingHandler,
-        // VirtueRingHandler, LPDeathPrevention, AuraCapabilityProvider are auto-registered
-        // via @Mod.EventBusSubscriber — do NOT register them here to avoid double-firing.
+        // ---- Config registration via ModContainer ----
+        container.registerConfig(ModConfig.Type.COMMON, AnsConfig.SPEC, "ars_n_spells-common.toml");
+
+        // ---- Game-bus instance handlers (NeoForge.EVENT_BUS) ----
+        // These have NO @EventBusSubscriber and must be registered explicitly.
+        // CrossCastingHandler, EquipmentHandler, CurioDiscountHandler are
+        // auto-registered via @EventBusSubscriber — do NOT register them
+        // here to avoid double-firing.
+        NeoForge.EVENT_BUS.register(new CooldownHandler());
+        NeoForge.EVENT_BUS.register(new AffinityHandler());
+        NeoForge.EVENT_BUS.register(new AffinityDecayHandler());
+        NeoForge.EVENT_BUS.register(new AffinitySyncOnLoginHandler());
+        NeoForge.EVENT_BUS.register(ArsNSpellsCommands.class);
 
         if (ModList.get().isLoaded("irons_spellbooks")) {
-            // Instance-registered handlers (no @Mod.EventBusSubscriber).
-            // IronsLPHandler used to auto-subscribe but its Iron's-API imports
-            // would crash an Iron's-less server at classload, so it is now
-            // gated and instance-registered here too.
-            MinecraftForge.EVENT_BUS.register(new IronsCooldownHandler());
-            MinecraftForge.EVENT_BUS.register(new ProgressionHandler());
-            MinecraftForge.EVENT_BUS.register(new IronsProgressionHandler());
-            MinecraftForge.EVENT_BUS.register(new IronsAffinityHandler());
-            MinecraftForge.EVENT_BUS.register(new ArsSpellScalingHandler());
-            MinecraftForge.EVENT_BUS.register(new ResonanceEvents());
-            MinecraftForge.EVENT_BUS.register(new RegenSynergyHandler());
-            MinecraftForge.EVENT_BUS.register(new CrossCastIronsHandler());
-            MinecraftForge.EVENT_BUS.register(new IronsLPHandler());
+            NeoForge.EVENT_BUS.register(new IronsCooldownHandler());
+            NeoForge.EVENT_BUS.register(new ProgressionHandler());
+            NeoForge.EVENT_BUS.register(new IronsProgressionHandler());
+            NeoForge.EVENT_BUS.register(new IronsAffinityHandler());
+            NeoForge.EVENT_BUS.register(new ArsSpellScalingHandler());
+            NeoForge.EVENT_BUS.register(new ResonanceEvents());
+            NeoForge.EVENT_BUS.register(new RegenSynergyHandler());
+            NeoForge.EVENT_BUS.register(new CrossCastIronsHandler());
         }
 
-        MinecraftForge.EVENT_BUS.register(this);
-    }
-
-    private void registerCaps(RegisterCapabilitiesEvent event) {
-        event.register(AffinityData.class);
-        event.register(CooldownData.class);
-        event.register(IAuraCapability.class);
-        event.register(ProgressionData.class);
-    }
-
-    private void onAttachCapabilities(AttachCapabilitiesEvent<Entity> event) {
-        if (event.getObject() instanceof Player) {
-            event.addCapability(new ResourceLocation(MODID, "bridge_data"), new ModCapabilityProvider());
-        }
+        NeoForge.EVENT_BUS.register(this);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         try {
             BridgeManager.init(event);
             event.enqueueWork(() -> {
-                try {
-                    PacketHandler.register();
-                    LOGGER.info("OK Packet handler registered");
-                } catch (Exception e) {
-                    LOGGER.error("FAILED to register packet handler", e);
-                }
                 try {
                     RitualRegistryHandler.registerRituals();
                     LOGGER.info("OK Rituals registered");
@@ -136,17 +112,6 @@ public class ArsNSpells {
     private void onConfigLoading(final ModConfigEvent.Loading event) {
         if (!event.getConfig().getModId().equals(MODID)) {
             return;
-        }
-
-        try {
-            SanctifiedLegacyCompat.init();
-            if (SanctifiedLegacyCompat.isAvailable()) {
-                LOGGER.info("OK Sanctified Legacy compatibility enabled");
-                LOGGER.info("   - Cursed Ring support for Ars Nouveau spells");
-                LOGGER.info("   - Virtue Ring support for Ars Nouveau spells");
-            }
-        } catch (Exception e) {
-            LOGGER.error("FAILED to initialize Sanctified Legacy compatibility", e);
         }
 
         LOGGER.info("========================================");

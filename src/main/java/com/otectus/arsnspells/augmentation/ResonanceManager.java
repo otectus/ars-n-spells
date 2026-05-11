@@ -5,7 +5,7 @@ import io.redspace.ironsspellbooks.api.magic.MagicData;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 import java.util.Map;
 import java.util.Set;
@@ -44,7 +44,7 @@ public class ResonanceManager {
             if (data == null) {
                 return;
             }
-            double maxMana = player.getAttributeValue(AttributeRegistry.MAX_MANA.get());
+            double maxMana = player.getAttributeValue(AttributeRegistry.MAX_MANA);
             double manaPercent = data.getMana() / Math.max(1.0, maxMana);
             double strength = AnsConfig.RESONANCE_STRENGTH.get();
             

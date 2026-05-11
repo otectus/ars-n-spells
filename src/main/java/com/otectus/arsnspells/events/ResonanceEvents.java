@@ -1,55 +1,28 @@
 package com.otectus.arsnspells.events;
 
 import com.otectus.arsnspells.augmentation.ResonanceManager;
-import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.network.PacketHandler;
-import com.otectus.arsnspells.network.ResonanceSyncPacket;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
+/**
+ * Ticks the resonance computation per player at 1Hz. The math itself
+ * ({@link ResonanceManager#computeResonance}) reads from Iron's
+ * {@code MagicData}, which is alive in 1.21.1-3.15.6, so resonance from
+ * Iron's mana works today. AN-side resonance still needs Phase 11 work
+ * once the Ars mana bridge is restored.
+ */
 public class ResonanceEvents {
-    private int cleanupCounter = 0;
 
     @SubscribeEvent
-    public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !ModList.get().isLoaded("irons_spellbooks")) {
+    public void onPlayerTickPost(PlayerTickEvent.Post event) {
+        if (event.getEntity() == null || event.getEntity().level().isClientSide()) {
             return;
         }
-        if (event.phase == TickEvent.Phase.END
-            && !event.player.level().isClientSide()
-            && event.player.tickCount % 40 == 0
-            && event.player instanceof ServerPlayer player) {
-            ResonanceManager.computeResonance(player);
-            PacketHandler.sendToClient(new ResonanceSyncPacket((float) ResonanceManager.getResonance(player)), player);
-
-            // Periodic cleanup: every 1200 ticks (60 seconds)
-            cleanupCounter++;
-            if (cleanupCounter >= 30) { // 30 * 40 ticks = 1200 ticks
-                cleanupCounter = 0;
-                ResonanceManager.cleanupOfflinePlayers(player.getServer());
-            }
-        }
-    }
-
-    @SubscribeEvent
-    public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !ModList.get().isLoaded("irons_spellbooks")) {
+        if (event.getEntity().tickCount % 20 != 0) {
             return;
         }
-        if (event.getEntity() instanceof ServerPlayer player) {
-            // Logic: Immediate sync on login ensures no 'Zero-State' HUD artifacts
-            ResonanceManager.computeResonance(player);
-            PacketHandler.sendToClient(new ResonanceSyncPacket((float) ResonanceManager.getResonance(player)), player);
-        }
-    }
-
-    @SubscribeEvent
-    public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        ResonanceManager.clear(event.getEntity());
+        ResonanceManager.computeResonance(event.getEntity());
     }
 
     @SubscribeEvent

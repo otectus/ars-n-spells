@@ -1,7 +1,7 @@
 package com.otectus.arsnspells.util;
 
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.loading.FMLPaths;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,30 +13,24 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 /**
- * Validates the environment before mod initialization.
- * Checks for common issues that could cause crashes or failures.
+ * Validates the environment before mod initialization. The Java-version and
+ * required-mods checks always run; the file-I/O checks (config writable,
+ * file lock probe) only run in DEBUG_MODE since they're invasive and rarely
+ * useful in production.
  */
 public class StartupValidator {
     private static final Logger LOGGER = LoggerFactory.getLogger(StartupValidator.class);
-    
-    /**
-     * Run all validation checks
-     * @return true if all checks pass, false if any fail
-     */
+
     public static boolean validate() {
         LOGGER.info("========================================");
         LOGGER.info("Ars 'n' Spells - Startup Validation");
         LOGGER.info("========================================");
-        
+
         boolean allChecks = true;
 
-        // Check 1: Required mods present (always run — cheap and essential)
         allChecks &= checkRequiredMods();
-
-        // Check 2: Java version (always run — cheap and essential)
         allChecks &= checkJavaVersion();
 
-        // Checks 3-4: File I/O checks (debug only — invasive and unnecessary on most setups)
         boolean debugMode = false;
         try {
             debugMode = com.otectus.arsnspells.config.AnsConfig.DEBUG_MODE.get();
@@ -45,7 +39,7 @@ public class StartupValidator {
             allChecks &= checkConfigWritable();
             allChecks &= checkFileLocks();
         }
-        
+
         LOGGER.info("========================================");
         if (allChecks) {
             LOGGER.info("OK Startup Validation: PASSED");
@@ -54,44 +48,31 @@ public class StartupValidator {
             LOGGER.warn("Mod may not function correctly");
         }
         LOGGER.info("========================================");
-        
+
         return allChecks;
     }
-    
-    /**
-     * Check if config directory is writable
-     */
+
     private static boolean checkConfigWritable() {
         try {
             Path configDir = FMLPaths.CONFIGDIR.get();
             Path testFile = configDir.resolve(".arsnspells_write_test");
-            
-            // Try to write a test file
             Files.write(testFile, "test".getBytes());
             Files.delete(testFile);
-            
             LOGGER.info("OK Config directory writable");
             return true;
         } catch (IOException e) {
             LOGGER.error("FAILED Config directory not writable: {}", e.getMessage());
-            LOGGER.error("  This will cause config save failures!");
             return false;
         }
     }
-    
-    /**
-     * Check for file locks on our config file
-     */
+
     private static boolean checkFileLocks() {
         try {
             Path configPath = FMLPaths.CONFIGDIR.get().resolve("ars_n_spells-common.toml");
-            
             if (!Files.exists(configPath)) {
                 LOGGER.info("OK Config file doesn't exist yet (will be created)");
                 return true;
             }
-            
-            // Try to acquire a lock
             try (FileChannel channel = FileChannel.open(configPath, StandardOpenOption.WRITE)) {
                 FileLock lock = channel.tryLock();
                 if (lock != null) {
@@ -100,65 +81,51 @@ public class StartupValidator {
                     return true;
                 } else {
                     LOGGER.warn("FAILED Config file is locked by another process");
-                    LOGGER.warn("  This may cause save failures!");
                     return false;
                 }
             }
         } catch (IOException e) {
             LOGGER.warn("WARN Could not check file locks: {}", e.getMessage());
-            // Don't fail validation for this
             return true;
         }
     }
-    
-    /**
-     * Check if required mods are present
-     */
+
     private static boolean checkRequiredMods() {
         boolean arsNouveau = ModList.get().isLoaded("ars_nouveau");
         boolean ironsSpellbooks = ModList.get().isLoaded("irons_spellbooks");
-        
+
         if (arsNouveau) {
             LOGGER.info("OK Ars Nouveau detected");
         } else {
             LOGGER.error("FAILED Ars Nouveau not found (REQUIRED)");
-            LOGGER.error("  Ars 'n' Spells requires Ars Nouveau to function!");
             return false;
         }
-        
+
         if (ironsSpellbooks) {
             LOGGER.info("OK Iron's Spellbooks detected (optional)");
         } else {
             LOGGER.warn("WARN Iron's Spellbooks not found (optional but recommended)");
-            LOGGER.warn("  Some features will be unavailable");
         }
-        
-        return arsNouveau; // Only Ars Nouveau is required
+
+        return arsNouveau;
     }
-    
-    /**
-     * Check Java version
-     */
+
     private static boolean checkJavaVersion() {
         String javaVersion = System.getProperty("java.version");
         int majorVersion = getMajorJavaVersion();
-        
-        if (majorVersion >= 17) {
+
+        if (majorVersion >= 21) {
             LOGGER.info("OK Java version: {} (compatible)", javaVersion);
             return true;
         } else {
             LOGGER.error("FAILED Java version: {} (incompatible)", javaVersion);
-            LOGGER.error("  Minecraft 1.20.1 requires Java 17 or higher!");
+            LOGGER.error("  Minecraft 1.21.1 / NeoForge requires Java 21 or higher!");
             return false;
         }
     }
-    
-    /**
-     * Get major Java version number
-     */
+
     private static int getMajorJavaVersion() {
         String version = System.getProperty("java.version");
-        
         if (version.startsWith("1.")) {
             version = version.substring(2, 3);
         } else {
@@ -167,7 +134,6 @@ public class StartupValidator {
                 version = version.substring(0, dot);
             }
         }
-        
         try {
             return Integer.parseInt(version);
         } catch (NumberFormatException e) {

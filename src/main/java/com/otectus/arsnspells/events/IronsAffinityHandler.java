@@ -3,12 +3,13 @@ package com.otectus.arsnspells.events;
 import com.otectus.arsnspells.affinity.AffinityType;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.data.AffinityData;
-import com.otectus.arsnspells.network.AffinitySyncPacket;
+import com.otectus.arsnspells.data.AttachmentTypes;
+import com.otectus.arsnspells.network.AffinitySyncPayload;
 import com.otectus.arsnspells.network.PacketHandler;
 import io.redspace.ironsspellbooks.api.events.SpellOnCastEvent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 
 import java.util.Locale;
 
@@ -51,9 +52,8 @@ public class IronsAffinityHandler {
         } catch (IllegalArgumentException ignored) {
             return;
         }
-        player.getCapability(AffinityData.AFFINITY_DATA).ifPresent(data -> {
-            data.addLevel(type, 1);
-            PacketHandler.sendToClient(new AffinitySyncPacket(type, data.getLevel(type)), player);
-        });
+        AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
+        data.addLevel(type, 1);
+        PacketHandler.sendToClient(new AffinitySyncPayload(type, data.getLevel(type)), player);
     }
 }

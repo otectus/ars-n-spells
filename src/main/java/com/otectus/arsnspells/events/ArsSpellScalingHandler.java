@@ -6,9 +6,9 @@ import com.otectus.arsnspells.util.SpellScalingUtil;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 
 import java.util.Map;
 import java.util.UUID;
@@ -23,20 +23,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * untrue. This handler is the missing connector:
  *
  * <ol>
- *   <li>On Ars {@code SpellCastEvent}, compute the scaling multiplier with
- *       {@link SpellScalingUtil#getMultiplierForCaster} and stage it for the
- *       casting player with a short tick window.</li>
- *   <li>On {@link LivingHurtEvent} from a magic-flavored damage source whose
- *       attacker is the marked player, multiply the damage amount by the
- *       staged multiplier.</li>
+ *   <li>On Ars {@code SpellCastEvent}, compute the scaling multiplier and
+ *       stage it for the casting player with a short tick window.</li>
+ *   <li>On {@link LivingDamageEvent.Pre} from a magic-flavored damage source
+ *       whose attacker is the marked player, multiply the damage amount by
+ *       the staged multiplier.</li>
  * </ol>
  *
- * <p>The tick window covers spell projectile travel and delayed AOE ticks.
- * The damage-source filter avoids scaling unrelated melee or environmental
- * damage from the same player during the window.
- *
- * <p>Iron's-only: must only be registered when Iron's is loaded
- * (see {@link com.otectus.arsnspells.ArsNSpells}).
+ * <p>Iron's-only: must only be registered when Iron's is loaded.
  */
 public class ArsSpellScalingHandler {
 
@@ -62,7 +56,7 @@ public class ArsSpellScalingHandler {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public void onHurt(LivingHurtEvent event) {
+    public void onHurt(LivingDamageEvent.Pre event) {
         DamageSource src = event.getSource();
         if (src == null) {
             return;
@@ -83,9 +77,9 @@ public class ArsSpellScalingHandler {
             return;
         }
         float scaled = (float) Math.min(
-            event.getAmount() * entry.multiplier,
-            event.getAmount() * AnsConfig.SPELL_POWER_CAP.get());
-        event.setAmount(scaled);
+            event.getNewDamage() * entry.multiplier,
+            event.getNewDamage() * AnsConfig.SPELL_POWER_CAP.get());
+        event.setNewDamage(scaled);
     }
 
     /**

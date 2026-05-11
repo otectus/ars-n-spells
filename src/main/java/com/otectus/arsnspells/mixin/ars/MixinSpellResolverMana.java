@@ -4,7 +4,6 @@ import com.hollingsworth.arsnouveau.api.spell.SpellContext;
 import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.bridge.IManaBridge;
-import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.spell.CrossCastContext;
@@ -24,25 +23,6 @@ public abstract class MixinSpellResolverMana {
 
     @Inject(method = "expendMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$expendMana(CallbackInfo ci) {
-        // SANCTIFIED LEGACY INTEGRATION: Skip mana consumption for Cursed Ring and Virtue Ring
-        // - Cursed Ring: LP was consumed in CursedRingHandler.onSpellResolve
-        // - Virtue Ring: Aura was consumed in VirtueRingHandler.onSpellResolve
-        if (spellContext != null) {
-            LivingEntity caster = spellContext.getUnwrappedCaster();
-            if (caster instanceof Player player) {
-                if (SanctifiedLegacyCompat.isAvailable()) {
-                    if (AnsConfig.ENABLE_LP_SYSTEM.get() && SanctifiedLegacyCompat.isWearingCursedRing(player)) {
-                        ci.cancel();
-                        return;
-                    }
-                    if (SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
-                        // Aura was already consumed by VirtueRingHandler
-                        ci.cancel();
-                        return;
-                    }
-                }
-            }
-        }
         if (!BridgeManager.isUnificationEnabled()) {
             return;
         }

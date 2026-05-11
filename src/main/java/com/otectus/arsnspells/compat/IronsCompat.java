@@ -1,11 +1,11 @@
 package com.otectus.arsnspells.compat;
 
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 /**
  * Single source of truth for whether Iron's Spellbooks is loaded.
- * Result is cached after the first invocation post-FMLLoad to keep the
- * check on the cast hot-path cheap.
+ * Result is cached after the first invocation to keep the check on the
+ * cast hot-path cheap.
  *
  * Any common-side reference to Iron's APIs MUST be guarded by
  * {@link #isLoaded()} or run only inside a class that this guard reaches.

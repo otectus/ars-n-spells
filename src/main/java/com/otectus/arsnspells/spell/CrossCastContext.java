@@ -124,12 +124,6 @@ public final class CrossCastContext {
         public boolean costsReady;
         public boolean blocked;
         public String spellId;
-        /**
-         * One-shot guard for the cross-cast cost multiplier on the Ars side.
-         * The Ars cost-calc event can fire more than once during a resolve
-         * (preview vs. actual deduction). The multiplier applies on the first
-         * fire only; subsequent fires see this true and pass through.
-         */
         public boolean multiplierApplied;
 
         private Entry(CrossSpellType type, long expiresAt) {

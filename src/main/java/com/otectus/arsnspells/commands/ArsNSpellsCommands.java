@@ -4,9 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
-import com.otectus.arsnspells.aura.AuraManager;
 import com.otectus.arsnspells.bridge.BridgeManager;
-import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import net.minecraft.ChatFormatting;
@@ -15,8 +13,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,32 +114,10 @@ public class ArsNSpellsCommands {
             false
         );
 
-        // Aura info
-        int aura = AuraManager.getAura(target);
-        int maxAura = AuraManager.getMaxAura(target);
-        context.getSource().sendSuccess(
-            () -> Component.translatable("commands.ans.info.aura", aura, maxAura),
-            false
-        );
-
         // Resonance
         double resonance = ResonanceManager.getResonance(target);
         context.getSource().sendSuccess(
             () -> Component.translatable("commands.ans.info.resonance", String.format("%.3f", resonance)),
-            false
-        );
-
-        // Ring status
-        boolean cursed = SanctifiedLegacyCompat.isAvailable() && SanctifiedLegacyCompat.isWearingCursedRing(target);
-        boolean virtue = SanctifiedLegacyCompat.isAvailable() && SanctifiedLegacyCompat.isWearingVirtueRing(target);
-        context.getSource().sendSuccess(
-            () -> Component.translatable("commands.ans.info.cursed_ring", cursed ? "Active" : "Inactive")
-                .withStyle(cursed ? ChatFormatting.RED : ChatFormatting.GRAY),
-            false
-        );
-        context.getSource().sendSuccess(
-            () -> Component.translatable("commands.ans.info.virtue_ring", virtue ? "Active" : "Inactive")
-                .withStyle(virtue ? ChatFormatting.AQUA : ChatFormatting.GRAY),
             false
         );
 

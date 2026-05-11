@@ -1,423 +1,58 @@
 package com.otectus.arsnspells.spell;
 
-import com.hollingsworth.arsnouveau.api.event.SpellCostCalcEvent;
-import com.hollingsworth.arsnouveau.api.spell.ISpellCaster;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
-import com.hollingsworth.arsnouveau.api.spell.SpellCaster;
-import com.otectus.arsnspells.bridge.BridgeManager;
-import com.otectus.arsnspells.bridge.IManaBridge;
-import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.config.ManaUnificationMode;
-import net.minecraft.network.chat.Component;
+import com.otectus.arsnspells.ArsNSpells;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles cross-mod spell casting - allows spells from one mod to be cast using items from another.
- * Examples:
- * - Cast Iron's Spellbooks spells from Ars Nouveau spellbooks
- * - Cast Ars Nouveau glyphs from Iron's Spellbooks items
+ * Stripped-down cross-cast handler. The 1.20.1 implementation hosted the
+ * right-click intercept, the cross-cast cost-event hook into AN's
+ * {@code SpellCostCalcEvent}, and the player-tick context cleanup. The
+ * data-component side of the inscription pipeline is fully ported (see
+ * {@link CrossModSpellComponents}, {@link CrossModSpellList},
+ * {@link ModDataComponents}); the AN-side cast invocation needs Phase 11
+ * work because {@code Spell.fromTag}, {@code SpellCaster.castSpell}, and
+ * the public field accesses on {@code SpellCostCalcEvent} all changed
+ * shape between 4.12 and 5.x.
+ *
+ * Public {@link #addCrossModSpell} entry points stay live so the rituals
+ * (transcription / uninscription) keep their current contract.
  */
-@Mod.EventBusSubscriber(modid = "ars_n_spells")
+@EventBusSubscriber(modid = ArsNSpells.MODID)
 public class CrossCastingHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrossCastingHandler.class);
 
-    // NBT tag keys live in CrossCastNbt so the inscribe/uninscribe round-trip
-    // is testable without bootstrapping Minecraft. Local aliases keep call
-    // sites in this file unchanged.
-    private static final String TAG_CROSS_MOD_SPELLS = CrossCastNbt.TAG_CROSS_MOD_SPELLS;
-    private static final String TAG_SPELL_ID = CrossCastNbt.TAG_SPELL_ID;
-    private static final String TAG_SPELL_LEVEL = CrossCastNbt.TAG_SPELL_LEVEL;
-    private static final String TAG_SPELL_TYPE = CrossCastNbt.TAG_SPELL_TYPE;
-    private static final String TAG_SPELL_INDEX = CrossCastNbt.TAG_SPELL_INDEX;
-    private static final String TAG_ARS_SPELL = CrossCastNbt.TAG_ARS_SPELL;
-    private static final String TAG_CAST_SOURCE = CrossCastNbt.TAG_CAST_SOURCE;
-    private static final String CROSS_CAST_SLOT = "arsnspells:cross_cast";
-
-    /**
-     * Handle right-click events to intercept spell casting
-     */
-    @SubscribeEvent
-    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
-        Player player = event.getEntity();
-        ItemStack stack = event.getItemStack();
-        InteractionHand hand = event.getHand();
-
-        // Only process main hand to avoid double-casting
-        if (hand != InteractionHand.MAIN_HAND) {
-            return;
-        }
-
-        // Check if cross-mod casting is enabled
-        if (!BridgeManager.isUnificationEnabled()) {
-            return;
-        }
-
-        // Handle cross-mod spell casting
-        if (handleCrossCast(player, stack, hand)) {
-            event.setCanceled(true);
-        }
+    /** Inscribe an Ars Nouveau spell onto a stack. */
+    public static void addCrossModSpell(ItemStack stack, Spell spell) {
+        if (spell == null) return;
+        // TODO(Phase 11): serialise via AN 5.x Spell.CODEC instead of the deprecated fromTag/serialize pair.
+        CrossModSpellComponents.addCrossModSpell(
+            stack,
+            ResourceLocation.fromNamespaceAndPath("ars_nouveau", "spell"),
+            1,
+            CrossSpellType.ARS_NOUVEAU,
+            null
+        );
     }
 
-    /**
-     * Handle cross-mod spell casting
-     */
-    private static boolean handleCrossCast(Player player, ItemStack item, InteractionHand hand) {
-        CompoundTag tag = item.getOrCreateTag();
-
-        if (!tag.contains(TAG_CROSS_MOD_SPELLS)) {
-            return false; // No cross-mod spells inscribed
-        }
-
-        ListTag spellList = tag.getList(TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
-
-        if (spellList.isEmpty()) {
-            return false;
-        }
-
-        int index = getSelectedIndex(tag, spellList.size());
-
-        if (player.isCrouching()) {
-            int nextIndex = (index + 1) % spellList.size();
-            setSelectedIndex(tag, nextIndex);
-            if (!player.level().isClientSide()) {
-                Component msg = Component.literal("Cross spell selected: " + (nextIndex + 1)
-                    + "/" + spellList.size());
-                player.displayClientMessage(msg, true);
-            }
-            return true;
-        }
-
-        CompoundTag spellData = spellList.getCompound(index);
-        CrossSpellType type = parseSpellType(spellData);
-        if (type == null) {
-            return false;
-        }
-
-        if (player.level().isClientSide()) {
-            return true;
-        }
-
-        switch (type) {
-            case ARS_NOUVEAU:
-                return castArsSpell(player, item, hand, spellData);
-            case IRONS_SPELLBOOKS:
-                return castIronsSpell(player, item, spellData);
-            default:
-                return false;
-        }
-    }
-
-    private static CrossSpellType parseSpellType(CompoundTag spellData) {
-        String typeName = spellData.getString(TAG_SPELL_TYPE);
-        if (!typeName.isEmpty()) {
-            try {
-                return CrossSpellType.valueOf(typeName);
-            } catch (IllegalArgumentException ignored) {
-                // Fall back to namespace detection
-            }
-        }
-
-        ResourceLocation spellId = ResourceLocation.tryParse(spellData.getString(TAG_SPELL_ID));
-        if (spellId != null) {
-            String namespace = spellId.getNamespace();
-            if ("ars_nouveau".equals(namespace)) {
-                return CrossSpellType.ARS_NOUVEAU;
-            }
-            if ("irons_spellbooks".equals(namespace)) {
-                return CrossSpellType.IRONS_SPELLBOOKS;
-            }
-        }
-
-        LOGGER.warn("Cross-mod spell missing or invalid type: {}", spellData);
-        return null;
-    }
-
-    private static boolean castArsSpell(Player player, ItemStack item, InteractionHand hand, CompoundTag spellData) {
-        CompoundTag arsSpellTag = spellData.getCompound(TAG_ARS_SPELL);
-        if (arsSpellTag.isEmpty()) {
-            LOGGER.warn("Cross-mod Ars spell missing ars_spell tag: {}", spellData);
-            return false;
-        }
-
-        Spell spell = Spell.fromTag(arsSpellTag);
-        ISpellCaster caster = new SpellCaster(item);
-
-        // Always mark the cast so onArsSpellCost can apply the cross-cast cost
-        // multiplier (and, in SEPARATE mode, the dual-cost split). Without an
-        // entry the handler cannot tell a cross-cast apart from a direct Ars cast.
-        CrossCastContext.begin(player, CrossSpellType.ARS_NOUVEAU, player.level().getGameTime());
-
-        InteractionResultHolder<ItemStack> result = caster.castSpell(player.level(), player, hand, null, spell);
-        boolean success = result.getResult().consumesAction();
-        if (!success) {
-            CrossCastContext.clear(player);
-        }
-        return success;
-    }
-
-    private static boolean castIronsSpell(Player player, ItemStack item, CompoundTag spellData) {
-        if (!ModList.get().isLoaded("irons_spellbooks")) {
-            return false;
-        }
-
-        ResourceLocation spellId = ResourceLocation.tryParse(spellData.getString(TAG_SPELL_ID));
-        if (spellId == null) {
-            LOGGER.warn("Cross-mod Iron spell missing spell_id: {}", spellData);
-            return false;
-        }
-
-        io.redspace.ironsspellbooks.api.spells.AbstractSpell spell =
-            io.redspace.ironsspellbooks.api.registry.SpellRegistry.getSpell(spellId);
-
-        if (spell == null) {
-            LOGGER.warn("Cross-mod Iron spell not found: {}", spellId);
-            return false;
-        }
-
-        int spellLevel = Math.max(1, spellData.getInt(TAG_SPELL_LEVEL));
-        int castLevel = spell.getLevelFor(spellLevel, player);
-        io.redspace.ironsspellbooks.api.spells.CastSource source =
-            parseCastSource(spellData, io.redspace.ironsspellbooks.api.spells.CastSource.SPELLBOOK);
-
-        float multiplier = (float) Math.max(0.0, AnsConfig.CROSS_CAST_COST_MULTIPLIER.get());
-        ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        if (BridgeManager.isUnificationEnabled() && mode == ManaUnificationMode.SEPARATE) {
-            float baseCost = spell.getManaCost(castLevel);
-            // Apply the cross-cast multiplier once, on the base cost, before the
-            // SEPARATE-mode dual-cost split. The handler in CrossCastIronsHandler
-            // reads entry.issCost as-is to avoid a second application at event time.
-            float totalCost = baseCost * multiplier;
-            float arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
-            float issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
-            float arsCost = (float) (totalCost * arsPercent * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
-            float issCost = totalCost * issPercent;
-
-            if (!player.isCreative() && arsCost > 0.0f) {
-                float arsMana = BridgeManager.getBridge().getMana(player);
-                if (arsMana < arsCost) {
-                    logDebug("Insufficient Ars mana for cross-cast: need {}, have {}", arsCost, arsMana);
-                    return false;
-                }
-            }
-
-            logDebug("Iron's cross-cast (SEPARATE) {}: base={} multiplier={} total={} ars={} iss={}",
-                spellId, baseCost, multiplier, totalCost, arsCost, issCost);
-
-            CrossCastContext.begin(player, CrossSpellType.IRONS_SPELLBOOKS,
-                player.level().getGameTime(), arsCost, issCost, spell.getSpellId());
-
-            boolean success = CrossCastContext.withManaCheckOverride(player, issPercent,
-                () -> spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT));
-            if (!success) {
-                CrossCastContext.clear(player);
-            }
-            return success;
-        }
-
-        // Non-SEPARATE: Iron's owns the cost calculation. Mark the cast so
-        // CrossCastIronsHandler can apply the multiplier exactly once when
-        // SpellOnCastEvent fires, then commit the cast.
-        CrossCastContext.begin(player, CrossSpellType.IRONS_SPELLBOOKS,
-            player.level().getGameTime(), 0.0f, 0.0f, spell.getSpellId());
-        boolean success = spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT);
-        if (!success) {
-            CrossCastContext.clear(player);
-        }
-        return success;
-    }
-
-    private static io.redspace.ironsspellbooks.api.spells.CastSource parseCastSource(
-        CompoundTag spellData,
-        io.redspace.ironsspellbooks.api.spells.CastSource fallback) {
-
-        String sourceName = spellData.getString(TAG_CAST_SOURCE);
-        if (sourceName.isEmpty()) {
-            return fallback;
-        }
-        try {
-            return io.redspace.ironsspellbooks.api.spells.CastSource.valueOf(sourceName);
-        } catch (IllegalArgumentException ignored) {
-            return fallback;
-        }
-    }
-
-    @SubscribeEvent
-    public static void onArsSpellCost(SpellCostCalcEvent event) {
-        if (!BridgeManager.isUnificationEnabled()) {
-            return;
-        }
-
-        LivingEntity caster = event.context != null ? event.context.getUnwrappedCaster() : null;
-        if (!(caster instanceof Player player)) {
-            return;
-        }
-
-        CrossCastContext.Entry entry = CrossCastContext.peek(player);
-        if (entry == null || entry.type != CrossSpellType.ARS_NOUVEAU) {
-            return;
-        }
-
-        // One-shot: a single cast can produce more than one cost-calc fire
-        // (preview vs. resolve). Apply our adjustments on the first only.
-        if (entry.multiplierApplied) {
-            return;
-        }
-
-        ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        float multiplier = (float) Math.max(0.0, AnsConfig.CROSS_CAST_COST_MULTIPLIER.get());
-        int baseEventCost = Math.max(0, event.currentCost);
-        // Apply the cross-cast multiplier to the Ars-computed base cost first;
-        // the SEPARATE-mode dual-cost split (below) then operates on the
-        // already-multiplied total, matching the Iron's-side accounting where
-        // the multiplier is applied before the split.
-        int totalCost = Math.max(0, Math.round(baseEventCost * multiplier));
-
-        if (mode == ManaUnificationMode.SEPARATE) {
-            float arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
-            float issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
-            float arsCost = totalCost * arsPercent;
-            float issCost = (float) (totalCost * issPercent * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
-
-            entry.arsCost = arsCost;
-            entry.issCost = issCost;
-            entry.costsReady = true;
-            entry.multiplierApplied = true;
-
-            if (!player.isCreative() && issCost > 0.0f) {
-                IManaBridge issBridge = BridgeManager.getSecondaryBridge();
-                float issMana = issBridge != null ? issBridge.getMana(player) : 0.0f;
-                if (issMana < issCost) {
-                    entry.blocked = true;
-                    event.currentCost = Integer.MAX_VALUE;
-                    CrossCastContext.clear(player);
-                    logDebug("Insufficient Iron mana for cross-cast: need {}, have {}", issCost, issMana);
-                    return;
-                }
-            }
-
-            event.currentCost = Math.max(0, Math.round(arsCost));
-            logDebug("Ars cross-cast (SEPARATE): base={} multiplier={} total={} ars={} iss={}",
-                baseEventCost, multiplier, totalCost, arsCost, issCost);
-            return;
-        }
-
-        // Non-SEPARATE: Ars deducts the full cost from its own pool. The
-        // multiplier is the only adjustment we make. Mark the entry as
-        // applied; it will TTL-expire harmlessly since no downstream consumer
-        // (no MixinSpellResolverMana TAIL hook outside SEPARATE) reads it.
-        entry.multiplierApplied = true;
-        event.currentCost = totalCost;
-        logDebug("Ars cross-cast ({}): base={} multiplier={} total={}",
-            mode, baseEventCost, multiplier, totalCost);
-    }
-
-    @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
-        if (event.player == null || event.player.level().isClientSide()) {
-            return;
-        }
-        CrossCastContext.cleanupExpired(event.player, event.player.level().getGameTime());
-    }
-
-    @SubscribeEvent
-    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        CrossCastContext.clear(event.getEntity());
-    }
-
-    /**
-     * Add a cross-mod spell to an item
-     */
+    /** Inscribe a foreign-mod spell by id + level + type. */
     public static void addCrossModSpell(ItemStack stack, ResourceLocation spellId, int spellLevel,
-        CrossSpellType type) {
+                                        CrossSpellType type) {
         addCrossModSpell(stack, spellId, spellLevel, type, null);
     }
 
-    /**
-     * Add a cross-mod Ars spell to an item using serialized spell NBT
-     */
-    public static void addCrossModSpell(ItemStack stack, Spell spell) {
-        if (spell == null) {
-            return;
-        }
-        addCrossModSpell(stack, new ResourceLocation("ars_nouveau", "spell"), 1,
-            CrossSpellType.ARS_NOUVEAU, spell.serialize());
-    }
-
-    /**
-     * Add a cross-mod spell to an item with optional Ars spell tag.
-     * Delegates to {@link CrossCastNbt} so the on-disk shape stays in sync
-     * with the uninscribe path and the round-trip test.
-     */
     public static void addCrossModSpell(ItemStack stack, ResourceLocation spellId, int spellLevel,
-        CrossSpellType type, CompoundTag arsSpellTag) {
-        CrossCastNbt.addCrossModSpellToTag(stack.getOrCreateTag(), spellId, spellLevel, type, arsSpellTag);
+                                        CrossSpellType type, CompoundTag arsSpellTag) {
+        CrossModSpellComponents.addCrossModSpell(stack, spellId, spellLevel, type, arsSpellTag);
     }
 
-    /**
-     * Strip every cross-mod inscription artifact from an item, including the
-     * cycle index. The result is bit-identical to a never-inscribed stack.
-     */
+    /** Strip every inscription artifact from a stack. */
     public static void clearCrossModSpells(ItemStack stack) {
-        CrossCastNbt.clearCrossModSpells(stack);
-    }
-
-    /**
-     * Get all cross-mod spells on an item
-     */
-    public static ListTag getCrossModSpells(ItemStack stack) {
-        CompoundTag tag = stack.getOrCreateTag();
-
-        if (tag.contains(TAG_CROSS_MOD_SPELLS)) {
-            return tag.getList(TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
-        }
-
-        return new ListTag();
-    }
-
-    private static int getSelectedIndex(CompoundTag tag, int size) {
-        if (size <= 0) {
-            return 0;
-        }
-        int index = tag.getInt(TAG_SPELL_INDEX);
-        if (index < 0 || index >= size) {
-            index = 0;
-            tag.putInt(TAG_SPELL_INDEX, index);
-        }
-        return index;
-    }
-
-    private static void setSelectedIndex(CompoundTag tag, int index) {
-        if (index < 0) {
-            index = 0;
-        }
-        tag.putInt(TAG_SPELL_INDEX, index);
-    }
-
-    /**
-     * Log debug message if debug mode is enabled
-     */
-    private static void logDebug(String message, Object... args) {
-        if (AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get()) {
-            LOGGER.info("[CrossCasting] [DEBUG] " + message, args);
-        }
+        CrossModSpellComponents.clear(stack);
     }
 }

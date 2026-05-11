@@ -5,8 +5,8 @@ import com.hollingsworth.arsnouveau.common.items.RitualTablet;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 public class RitualRegistryHandler {
     private static boolean registered = false;
@@ -17,7 +17,7 @@ public class RitualRegistryHandler {
         }
 
         // Iron's-independent rituals are registered unconditionally. The
-        // uninscribe ritual touches only known root NBT keys and remains
+        // uninscribe ritual touches only known root component keys and remains
         // useful even after Iron's Spellbooks has been uninstalled, when a
         // player might still hold legacy inscribed items.
         RitualRegistry.registerRitual(new SpellUninscriptionRitual());
@@ -45,12 +45,12 @@ public class RitualRegistryHandler {
      * iterates {@code ritualMap} during item RegisterEvent and cannot see
      * rituals added at common setup, so we splice manually.
      */
-    private static void spliceTablet(String path, RegistryObject<RitualTablet> tabletRef) {
-        if (tabletRef == null || !tabletRef.isPresent()) {
+    private static void spliceTablet(String path, DeferredHolder<net.minecraft.world.item.Item, RitualTablet> tabletRef) {
+        if (tabletRef == null || !tabletRef.isBound()) {
             return;
         }
         RitualRegistry.getRitualItemMap().put(
-            new ResourceLocation(ArsNSpells.MODID, path),
+            ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, path),
             tabletRef.get()
         );
     }

@@ -4,11 +4,11 @@ import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.cooldown.CooldownCategory;
 import com.otectus.arsnspells.cooldown.SpellCategorizer;
 import com.otectus.arsnspells.cooldown.UnifiedCooldownManager;
-import com.otectus.arsnspells.network.CooldownSyncPacket;
+import com.otectus.arsnspells.network.CooldownSyncPayload;
 import com.otectus.arsnspells.network.PacketHandler;
 import io.redspace.ironsspellbooks.api.events.SpellPreCastEvent;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 
 public class IronsCooldownHandler {
     @SubscribeEvent
@@ -32,15 +32,14 @@ public class IronsCooldownHandler {
         }
         
         CooldownCategory category = SpellCategorizer.categorizeIronsSpell(event.getSchoolType().getId());
-
-        // Cooldowns are global per category — an Iron's OFFENSIVE cast collides with an
-        // Ars OFFENSIVE cast and vice versa. This is the documented behavior in 1.9.0+.
-        if (UnifiedCooldownManager.isOnCooldown(player, category)) {
+        
+        // CRITICAL FIX: Only check IRONS-namespaced cooldowns
+        if (UnifiedCooldownManager.isOnCooldown(player, category, "irons")) {
             event.setCanceled(true);
         } else {
-            long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);
+            long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false, "irons");
             if (!player.level().isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-                PacketHandler.sendToClient(new CooldownSyncPacket(category, cooldownEnd), serverPlayer);
+                PacketHandler.sendToClient(new CooldownSyncPayload(category, cooldownEnd), serverPlayer);
             }
         }
     }

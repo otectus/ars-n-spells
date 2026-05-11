@@ -1,41 +1,47 @@
 package com.otectus.arsnspells.bridge;
 
-import com.hollingsworth.arsnouveau.api.mana.IManaCap;
 import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.util.ManaUtil;
 import net.minecraft.world.entity.player.Player;
 
+/**
+ * STUB — the 1.20.1 implementation read AN's mana via {@code IManaCap}, a
+ * Forge capability that no longer exists in NeoForge 1.21.1 (AN 5.x moved
+ * to data attachments). Wiring this back up requires identifying AN 5.x's
+ * mana attachment / public API and reimplementing the four bridge methods.
+ *
+ * Until Phase 11: returns {@link AnsConfig#DEFAULT_MAX_MANA} as max,
+ * 0 as current, and refuses consumption. Practical effect: ARS_PRIMARY,
+ * HYBRID, and SEPARATE mana modes effectively no-op the Ars side. Use
+ * ISS_PRIMARY (Iron's-only) until the bridge is restored.
+ */
 public class ArsNativeBridge implements IManaBridge {
     @Override
     public float getMana(Player player) {
-        // Unifying to float as per IManaBridge signature
-        return ManaUtil.getNativeMana(player).map(cap -> (float)cap.getCurrentMana()).orElse(0.0f);
+        return 0.0f;
     }
 
     @Override
     public void setMana(Player player, float amount) {
-        if (player.level().isClientSide()) return;
-        ManaUtil.getNativeMana(player).ifPresent(cap -> cap.setMana((double)amount));
+        // TODO(Phase 11): write to AN 5.x mana attachment
     }
 
     @Override
     public boolean consumeMana(Player player, float amount) {
-        if (player.level().isClientSide()) return false;
-        return ManaUtil.getNativeMana(player).map(cap -> {
-            if (cap.getCurrentMana() >= (double)amount) {
-                cap.removeMana((double)amount);
-                return true;
-            }
-            return false;
-        }).orElse(false);
+        // TODO(Phase 11): consume from AN 5.x mana attachment
+        return false;
     }
 
     @Override
     public float getMaxMana(Player player) {
-        return ManaUtil.getNativeMana(player).map(cap -> (float)cap.getMaxMana())
-            .orElse(AnsConfig.DEFAULT_MAX_MANA.get().floatValue());
+        try {
+            return AnsConfig.DEFAULT_MAX_MANA.get().floatValue();
+        } catch (Exception e) {
+            return 100.0f;
+        }
     }
 
     @Override
-    public String getBridgeType() { return "ARS_NATIVE"; }
+    public String getBridgeType() {
+        return "ARS_NATIVE_STUB";
+    }
 }

@@ -3,11 +3,12 @@ package com.otectus.arsnspells.events;
 import com.otectus.arsnspells.affinity.AffinityType;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.data.AffinityData;
-import com.otectus.arsnspells.network.AffinitySyncPacket;
+import com.otectus.arsnspells.data.AttachmentTypes;
+import com.otectus.arsnspells.network.AffinitySyncPayload;
 import com.otectus.arsnspells.network.PacketHandler;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * Periodically decays player affinity levels when no spells of that school
@@ -25,14 +26,11 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 public class AffinityDecayHandler {
 
     @SubscribeEvent
-    public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
-            return;
-        }
+    public void onPlayerTick(PlayerTickEvent.Post event) {
         if (!AnsConfig.ENABLE_AFFINITY_SYSTEM.get() || !AnsConfig.ENABLE_AFFINITY_DECAY.get()) {
             return;
         }
-        if (!(event.player instanceof ServerPlayer player)) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
         int interval = AnsConfig.AFFINITY_DECAY_INTERVAL_TICKS.get();
@@ -53,19 +51,18 @@ public class AffinityDecayHandler {
             return;
         }
 
-        player.getCapability(AffinityData.AFFINITY_DATA).ifPresent(data -> {
-            for (AffinityType type : AffinityType.values()) {
-                int level = data.getLevel(type);
-                if (level <= 0) {
-                    continue;
-                }
-                int decay = (int) Math.max(1, Math.floor(level * perInterval));
-                int newLevel = Math.max(0, level - decay);
-                if (newLevel != level) {
-                    data.setLevel(type, newLevel);
-                    PacketHandler.sendToClient(new AffinitySyncPacket(type, newLevel), player);
-                }
+        AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
+        for (AffinityType type : AffinityType.values()) {
+            int level = data.getLevel(type);
+            if (level <= 0) {
+                continue;
             }
-        });
+            int decay = (int) Math.max(1, Math.floor(level * perInterval));
+            int newLevel = Math.max(0, level - decay);
+            if (newLevel != level) {
+                data.setLevel(type, newLevel);
+                PacketHandler.sendToClient(new AffinitySyncPayload(type, newLevel), player);
+            }
+        }
     }
 }
