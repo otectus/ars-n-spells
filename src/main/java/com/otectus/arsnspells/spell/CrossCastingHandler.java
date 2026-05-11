@@ -1,11 +1,9 @@
 package com.otectus.arsnspells.spell;
 
 import com.hollingsworth.arsnouveau.api.spell.Spell;
-import com.otectus.arsnspells.ArsNSpells;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.fml.common.EventBusSubscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,15 +13,19 @@ import org.slf4j.LoggerFactory;
  * {@code SpellCostCalcEvent}, and the player-tick context cleanup. The
  * data-component side of the inscription pipeline is fully ported (see
  * {@link CrossModSpellComponents}, {@link CrossModSpellList},
- * {@link ModDataComponents}); the AN-side cast invocation needs Phase 11
+ * {@link ModDataComponents}); the AN-side cast invocation needs Phase 3
  * work because {@code Spell.fromTag}, {@code SpellCaster.castSpell}, and
  * the public field accesses on {@code SpellCostCalcEvent} all changed
  * shape between 4.12 and 5.x.
  *
  * Public {@link #addCrossModSpell} entry points stay live so the rituals
  * (transcription / uninscription) keep their current contract.
+ *
+ * Phase 3: restore {@code @EventBusSubscriber(modid = ArsNSpells.MODID)}
+ * once the right-click / SpellCostCalcEvent / player-tick handlers regain
+ * their @SubscribeEvent methods. NeoForge 1.21.1 rejects EventBus
+ * registration when a class has no @SubscribeEvent methods.
  */
-@EventBusSubscriber(modid = ArsNSpells.MODID)
 public class CrossCastingHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CrossCastingHandler.class);
 

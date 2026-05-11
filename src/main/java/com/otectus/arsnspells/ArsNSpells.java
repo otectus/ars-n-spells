@@ -13,7 +13,6 @@ import com.otectus.arsnspells.events.IronsAffinityHandler;
 import com.otectus.arsnspells.events.IronsCooldownHandler;
 import com.otectus.arsnspells.events.IronsProgressionHandler;
 import com.otectus.arsnspells.events.ProgressionHandler;
-import com.otectus.arsnspells.events.RegenSynergyHandler;
 import com.otectus.arsnspells.events.ResonanceEvents;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
@@ -66,10 +65,11 @@ public class ArsNSpells {
         container.registerConfig(ModConfig.Type.COMMON, AnsConfig.SPEC, "ars_n_spells-common.toml");
 
         // ---- Game-bus instance handlers (NeoForge.EVENT_BUS) ----
-        // These have NO @EventBusSubscriber and must be registered explicitly.
-        // CrossCastingHandler, EquipmentHandler, CurioDiscountHandler are
-        // auto-registered via @EventBusSubscriber — do NOT register them
-        // here to avoid double-firing.
+        // NeoForge 1.21.1 rejects EVENT_BUS.register(x) when x has zero
+        // @SubscribeEvent methods, so we only register classes that
+        // actually have at least one. Phase 3 will restore the stub
+        // handlers (RegenSynergyHandler, etc.) here as they gain real
+        // subscribed methods.
         NeoForge.EVENT_BUS.register(new CooldownHandler());
         NeoForge.EVENT_BUS.register(new AffinityHandler());
         NeoForge.EVENT_BUS.register(new AffinityDecayHandler());
@@ -83,11 +83,15 @@ public class ArsNSpells {
             NeoForge.EVENT_BUS.register(new IronsAffinityHandler());
             NeoForge.EVENT_BUS.register(new ArsSpellScalingHandler());
             NeoForge.EVENT_BUS.register(new ResonanceEvents());
-            NeoForge.EVENT_BUS.register(new RegenSynergyHandler());
             NeoForge.EVENT_BUS.register(new CrossCastIronsHandler());
+            // Phase 3: restore `NeoForge.EVENT_BUS.register(new RegenSynergyHandler());`
+            // once the cross-system regen handler regains a @SubscribeEvent method.
         }
 
-        NeoForge.EVENT_BUS.register(this);
+        // ArsNSpells's own lifecycle methods (commonSetup, onConfigLoading) are
+        // mod-bus listeners via modBus.addListener above — the class has no
+        // game-bus @SubscribeEvent methods, so we do NOT call
+        // NeoForge.EVENT_BUS.register(this) here.
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
