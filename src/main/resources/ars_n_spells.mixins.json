@@ -5,9 +5,13 @@
   "plugin": "com.otectus.arsnspells.mixin.ArsNSpellsMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "ars.MixinManaCapability",
+    "ars.MixinSpellResolverMana",
     "ars.MixinSpellResolverPreCast",
+    "ars.MixinSpellResolverContext",
     "ars.MixinArsPotionEffects",
     "irons.MixinIronsSpellDamage",
+    "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem"
   ],
   "client": [

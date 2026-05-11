@@ -17,18 +17,16 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * DISABLED in ars_n_spells.mixins.json pending Phase 2 verification against
- * Ars Nouveau 5.11.4. Re-enable in the config once `@Shadow public
- * SpellContext spellContext` and `@Shadow public abstract int
- * getResolveCost()` are confirmed against the current `SpellResolver`
- * class. The 1.21.1 hotfix on 2026-05-10 disabled this preemptively
- * alongside `MixinManaCapability`, since both belong to the same Ars
- * mana-bridge family that has drifted between 4.12 and 5.x.
+ * Routes Ars Nouveau's spell-mana consumption through {@link BridgeManager}.
+ * HEAD inject on {@code expendMana} cancels the native consumption when
+ * the active mode is ISS_PRIMARY / HYBRID (Iron's pays the cost via
+ * {@link com.otectus.arsnspells.bridge.IronsBridge#consumeMana}); TAIL
+ * inject handles SEPARATE mode's secondary-pool drain for cross-cast.
  *
- * Phase 2 work: verify `spellContext` field is still public on
- * SpellResolver; verify `expendMana()` method still exists; if either
- * has moved, replace with a `SpellCostCalcEvent` / `SpellCastEvent.Pre`
- * listener.
+ * Verified against Ars 5.11.4: {@code SpellResolver.spellContext} (public),
+ * {@code SpellResolver.getResolveCost()} (public, int), and
+ * {@code SpellResolver.expendMana()} (public, void) all match the
+ * shadows declared below.
  */
 @Mixin(value = SpellResolver.class, remap = false)
 public abstract class MixinSpellResolverMana {

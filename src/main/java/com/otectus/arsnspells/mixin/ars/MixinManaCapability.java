@@ -1,44 +1,36 @@
 package com.otectus.arsnspells.mixin.ars;
 
+import com.hollingsworth.arsnouveau.common.capability.ManaCap;
+import com.hollingsworth.arsnouveau.common.capability.ManaData;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.config.ManaUnificationMode;
-import com.hollingsworth.arsnouveau.common.capability.ManaCap;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * DISABLED in ars_n_spells.mixins.json pending Phase 2 verification against
- * Ars Nouveau 5.11.4. Re-enable in the config once the @Shadow fields below
- * are confirmed to exist on the current target class.
+ * Intercepts {@link ManaCap}'s public read/write surface to route mana
+ * through {@link BridgeManager} when the active mana-unification mode
+ * sends Ars's pool through Iron's MagicData. Updated for Ars Nouveau 5.x:
  *
- * The 1.21.1 hotfix on 2026-05-10 took this out of the rotation after
- * `@Shadow @Final private LivingEntity livingEntity` was rejected against
- * `ManaCap` at mixin-apply time (`InvalidMixinException: field not located`),
- * which aborted `RegisterCapabilitiesEvent` dispatch and crashed mod load.
- *
- * Phase 2 work: decompile the deobfuscated Ars 5.x jar and verify the
- * actual field names + types on `ManaCap`. The whole mixin may need to be
- * replaced with a NeoForge `ManaCalcEvent` listener (if upstream now
- * exposes one) rather than shadowing internals — that would be much more
- * robust to future Ars patch bumps.
- *
- * @see com.otectus.arsnspells.bridge.BridgeManager — the sole consumer of
- *      the methods this mixin used to intercept.
+ * <ul>
+ *   <li>Field rename {@code livingEntity} → {@code entity} (package-private).</li>
+ *   <li>Direct {@code mana}/{@code maxMana} fields were replaced with a
+ *       {@link ManaData} sub-object; field-sync writes go through
+ *       {@code manaData.setMana(…)} / {@code manaData.setMaxMana(…)}.</li>
+ * </ul>
  */
 @Mixin(value = ManaCap.class, remap = false)
 public abstract class MixinManaCapability {
 
-    @Shadow @Final private LivingEntity livingEntity;
-    @Shadow private double mana;
-    @Shadow private int maxMana;
+    @Shadow LivingEntity entity;
+    @Shadow private ManaData manaData;
 
     /**
      * Tracks the Ars Nouveau native max mana value in HYBRID mode.
@@ -61,7 +53,7 @@ public abstract class MixinManaCapability {
         if (arsnspells$inBridgeCall.get()) {
             return; // Recursion guard: let native method run
         }
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(this.entity instanceof Player player)) {
             return;
         }
         if (!BridgeManager.isUnificationEnabled()) {
@@ -81,7 +73,9 @@ public abstract class MixinManaCapability {
             arsnspells$inBridgeCall.set(true);
             double current = (double) BridgeManager.getBridge().getMana(player);
             if (mode != null && mode.isHybrid()) {
-                int cap = arsnspells$arsNativeMaxMana > 0 ? arsnspells$arsNativeMaxMana : this.maxMana;
+                int cap = arsnspells$arsNativeMaxMana > 0
+                    ? arsnspells$arsNativeMaxMana
+                    : this.manaData.getMaxMana();
                 current = Math.min(current, cap);
             }
             cir.setReturnValue(current);
@@ -95,7 +89,7 @@ public abstract class MixinManaCapability {
         if (arsnspells$inBridgeCall.get()) {
             return; // Recursion guard: let native method run
         }
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(this.entity instanceof Player player)) {
             return;
         }
         if (!BridgeManager.isUnificationEnabled()) {
@@ -131,13 +125,13 @@ public abstract class MixinManaCapability {
      * setMana() are Ars-internal (capability init, clone, NBT deserialization, max-mana
      * clamp) and must NOT overwrite Iron's mana with stale values.
      *
-     * Instead, we sync the shadow field from Iron's current value (read-only) so that
-     * any direct field reads in Ars see a consistent value, then cancel the original
-     * method to prevent Ars from clamping against its own stale maxMana.
+     * Instead, we sync the ManaData sub-object's value from Iron's current value
+     * (read-only) so any direct field reads in Ars see a consistent value, then cancel
+     * the original method to prevent Ars from clamping against its own stale state.
      */
     @Inject(method = "setMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$setMana(double amount, CallbackInfoReturnable<Double> cir) {
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(this.entity instanceof Player player)) {
             return;
         }
         if (!arsnspells$shouldIntercept()) {
@@ -146,14 +140,14 @@ public abstract class MixinManaCapability {
         if (player.level().isClientSide()) {
             return;
         }
-        // Read-only sync: update shadow field from Iron's actual value.
+        // Read-only sync: update ManaData from Iron's actual value.
         // Do NOT write 'amount' to Iron's — that would overwrite Iron's real mana
         // with stale Ars-internal values (typically 0).
         try {
             arsnspells$inBridgeCall.set(true);
             double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
-            this.mana = ironsCurrentMana;  // Sync shadow field from Iron's for consistency
-            cir.setReturnValue(amount);     // Return requested value to satisfy API contract
+            this.manaData.setMana(ironsCurrentMana);  // Sync sub-object for Ars internal consistency
+            cir.setReturnValue(amount);               // Return requested value to satisfy API contract
         } finally {
             arsnspells$inBridgeCall.set(false);
         }
@@ -161,7 +155,7 @@ public abstract class MixinManaCapability {
 
     @Inject(method = "addMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$addMana(double amount, CallbackInfoReturnable<Double> cir) {
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(this.entity instanceof Player player)) {
             return;
         }
         if (!arsnspells$shouldIntercept()) {
@@ -178,7 +172,7 @@ public abstract class MixinManaCapability {
         try {
             arsnspells$inBridgeCall.set(true);
             double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
-            this.mana = ironsCurrentMana;
+            this.manaData.setMana(ironsCurrentMana);
             cir.setReturnValue(ironsCurrentMana);
         } finally {
             arsnspells$inBridgeCall.set(false);
@@ -187,7 +181,7 @@ public abstract class MixinManaCapability {
 
     @Inject(method = "removeMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$removeMana(double amount, CallbackInfoReturnable<Double> cir) {
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(this.entity instanceof Player player)) {
             return;
         }
         if (!arsnspells$shouldIntercept()) {
@@ -203,7 +197,7 @@ public abstract class MixinManaCapability {
         try {
             arsnspells$inBridgeCall.set(true);
             double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
-            this.mana = ironsCurrentMana;
+            this.manaData.setMana(ironsCurrentMana);
             cir.setReturnValue(ironsCurrentMana);
         } finally {
             arsnspells$inBridgeCall.set(false);
@@ -212,7 +206,7 @@ public abstract class MixinManaCapability {
 
     @Inject(method = "setMaxMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$setMaxMana(int amount, CallbackInfo ci) {
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(this.entity instanceof Player player)) {
             return;
         }
         if (!BridgeManager.isUnificationEnabled()) {
@@ -233,7 +227,7 @@ public abstract class MixinManaCapability {
         }
         try {
             arsnspells$inBridgeCall.set(true);
-            this.maxMana = (int) BridgeManager.getBridge().getMaxMana(player);
+            this.manaData.setMaxMana((int) BridgeManager.getBridge().getMaxMana(player));
         } finally {
             arsnspells$inBridgeCall.set(false);
         }
