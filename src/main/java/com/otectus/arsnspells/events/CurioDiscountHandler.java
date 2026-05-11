@@ -96,30 +96,69 @@ public final class CurioDiscountHandler {
     }
 
     /**
-     * Indirection so the Curios API import lives in an inner class — the
-     * Java verifier only loads it when {@link #countDiscountCurios} actually
-     * dispatches, and {@code countDiscountCurios} is guarded by
-     * {@code ModList.isLoaded("curios")} above.
+     * Reflection-based Curios slot iteration. Curios is not pinned on the
+     * compile classpath (the user's instance ships the runtime jar, but
+     * `gradle.properties` does not include a CurseMaven file id for Curios
+     * — a follow-up can add one and switch this to direct API calls).
+     * Until then we reach Curios reflectively so the handler still
+     * functions at runtime when Curios is present. Methods are cached
+     * after first lookup to keep the SpellCostCalcEvent hot path cheap.
      */
     private static final class CuriosAccess {
+        private static volatile boolean initAttempted = false;
+        private static volatile Class<?> curiosApi;
+        private static volatile java.lang.reflect.Method mGetInventory;
+        private static volatile java.lang.reflect.Method mGetCurios;
+        private static volatile java.lang.reflect.Method mGetStacks;
+        private static volatile java.lang.reflect.Method mGetSlots;
+        private static volatile java.lang.reflect.Method mGetStackInSlot;
+
         static int countTagged(Player player, TagKey<net.minecraft.world.item.Item> tag) {
-            var optHandler = top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(player);
-            if (optHandler.isEmpty()) {
-                return 0;
-            }
-            int count = 0;
-            var slots = optHandler.get().getCurios();
-            for (var entry : slots.entrySet()) {
-                var stacksHandler = entry.getValue();
-                var inv = stacksHandler.getStacks();
-                for (int i = 0; i < inv.getSlots(); i++) {
-                    ItemStack stack = inv.getStackInSlot(i);
-                    if (!stack.isEmpty() && stack.is(tag)) {
-                        count++;
+            if (!resolve()) return 0;
+            try {
+                Object optional = mGetInventory.invoke(null, player);
+                if (!(optional instanceof java.util.Optional<?> opt) || opt.isEmpty()) {
+                    return 0;
+                }
+                Object handler = opt.get();
+                if (mGetCurios == null) mGetCurios = handler.getClass().getMethod("getCurios");
+                Object slots = mGetCurios.invoke(handler);
+                if (!(slots instanceof java.util.Map<?, ?> slotMap)) return 0;
+                int count = 0;
+                for (Object entry : slotMap.values()) {
+                    if (mGetStacks == null) mGetStacks = entry.getClass().getMethod("getStacks");
+                    Object inv = mGetStacks.invoke(entry);
+                    if (mGetSlots == null) mGetSlots = inv.getClass().getMethod("getSlots");
+                    int slotCount = (int) mGetSlots.invoke(inv);
+                    if (mGetStackInSlot == null) mGetStackInSlot =
+                        inv.getClass().getMethod("getStackInSlot", int.class);
+                    for (int i = 0; i < slotCount; i++) {
+                        Object obj = mGetStackInSlot.invoke(inv, i);
+                        if (obj instanceof ItemStack stack && !stack.isEmpty() && stack.is(tag)) {
+                            count++;
+                        }
                     }
                 }
+                return count;
+            } catch (Throwable t) {
+                return 0;
             }
-            return count;
+        }
+
+        private static boolean resolve() {
+            if (curiosApi != null) return true;
+            if (initAttempted) return false;
+            initAttempted = true;
+            try {
+                curiosApi = Class.forName("top.theillusivec4.curios.api.CuriosApi", false,
+                    CurioDiscountHandler.class.getClassLoader());
+                mGetInventory = curiosApi.getMethod("getCuriosInventory",
+                    net.minecraft.world.entity.LivingEntity.class);
+                return true;
+            } catch (Throwable t) {
+                curiosApi = null;
+                return false;
+            }
         }
     }
 }
