@@ -13,7 +13,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,8 +23,11 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Handles Cursed Ring LP consumption for Iron's Spellbooks spells.
  * Mirrors Ars Nouveau Cursed Ring behavior across all modes.
+ *
+ * NOT @Mod.EventBusSubscriber — would auto-load this class (which imports Iron's
+ * APIs) on Iron's-less servers and crash at classload. Registered as an instance
+ * by ArsNSpells behind ModList.isLoaded("irons_spellbooks").
  */
-@Mod.EventBusSubscriber(modid = "ars_n_spells")
 public class IronsLPHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(IronsLPHandler.class);
 
@@ -38,7 +40,7 @@ public class IronsLPHandler {
      * This runs BEFORE the spell actually casts.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onIronsSpellPreCast(SpellPreCastEvent event) {
+    public void onIronsSpellPreCast(SpellPreCastEvent event) {
         Player player = event.getEntity();
         if (player == null || player.level().isClientSide()) {
             return;
@@ -120,7 +122,7 @@ public class IronsLPHandler {
      * Consume LP when the spell actually casts.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onIronsSpellCast(SpellOnCastEvent event) {
+    public void onIronsSpellCast(SpellOnCastEvent event) {
         Player player = event.getEntity();
         if (player == null || player.level().isClientSide()) {
             return;
@@ -199,7 +201,7 @@ public class IronsLPHandler {
      * Clean up expired pending costs.
      */
     @SubscribeEvent
-    public static void onPlayerTick(net.minecraftforge.event.TickEvent.PlayerTickEvent event) {
+    public void onPlayerTick(net.minecraftforge.event.TickEvent.PlayerTickEvent event) {
         if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) {
             return;
         }
@@ -214,7 +216,7 @@ public class IronsLPHandler {
      * Evict per-player state on disconnect.
      */
     @SubscribeEvent
-    public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+    public void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
         pendingCosts.remove(event.getEntity().getUUID());
     }
 

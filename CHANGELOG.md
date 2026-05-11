@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2026-05-10
+
+### Bug Fixes (P0 stabilization pass)
+
+- **AffinitySyncPacket no longer crashes dedicated servers.** Pre-1.9.0, [AffinitySyncPacket](src/main/java/com/otectus/arsnspells/network/AffinitySyncPacket.java) imported `net.minecraft.client.Minecraft` directly and was registered unconditionally on the common bus, so the very first cast on a dedicated server attempted to load `Minecraft` server-side and risked a `NoClassDefFoundError`. Client logic moved to a new [`ClientAffinityPacketHandler`](src/main/java/com/otectus/arsnspells/client/ClientAffinityPacketHandler.java) and the packet now wraps the client-side capability mutation in `DistExecutor.unsafeRunWhenOn(Dist.CLIENT, …)` — the same pattern `ResonanceSyncPacket` was already using.
+- **Iron's Spellbooks is now actually optional.** [`IronsLPHandler`](src/main/java/com/otectus/arsnspells/events/IronsLPHandler.java) was an unconditional `@Mod.EventBusSubscriber` while importing `io.redspace.ironsspellbooks.api.*` at the file header — Iron's-less servers crashed at classload. The annotation is removed and the handler is now instance-registered behind the existing `ModList.get().isLoaded("irons_spellbooks")` block in [`ArsNSpells`](src/main/java/com/otectus/arsnspells/ArsNSpells.java). [`SpellScalingUtil`](src/main/java/com/otectus/arsnspells/util/SpellScalingUtil.java)'s static initializer (which referenced Iron's `AttributeRegistry.*_SPELL_POWER` slots) is converted to lazy double-checked init so the map only builds when an Iron's-aware caller actually invokes it. New [`IronsCompat`](src/main/java/com/otectus/arsnspells/compat/IronsCompat.java) exposes a cached `isLoaded()` for the cast hot-path.
+- **Scroll LP handling is now a real transaction.** [`MixinScrollItem`](src/main/java/com/otectus/arsnspells/mixin/irons/MixinScrollItem.java) used to consume LP at scroll-use time, ignore the consumption return value, and silently leak the death-on-insufficient-LP path because [`LPDeathPrevention`](src/main/java/com/otectus/arsnspells/events/LPDeathPrevention.java) early-returned when the death-mode config was on. The mixin is rewritten as **validate → cast → commit**: HEAD calls `hasEnoughLP`, stages a per-player pending entry via the new [`ScrollLPTracker`](src/main/java/com/otectus/arsnspells/compat/ScrollLPTracker.java) helper, and either cancels (safe mode) or lets the scroll proceed (death mode). RETURN reads the original `use` result and either consumes LP (success), kills the player explicitly (death mode), or no-ops (cast didn't actually consume the action). LP no longer disappears for failed casts, and the death-mode path now does its own enforcement instead of relying on a subsystem that exited early.
+- **Cooldown "namespacing" was a lie — now removed.** [`UnifiedCooldownManager`](src/main/java/com/otectus/arsnspells/cooldown/UnifiedCooldownManager.java) accepted a `String modNamespace` argument that suggested per-mod isolation, but the storage was always `Map<CooldownCategory, Long>` and the namespace only ever appeared in debug logs. The parameter is dropped from every public method, both callers ([`CooldownHandler`](src/main/java/com/otectus/arsnspells/events/CooldownHandler.java) and [`IronsCooldownHandler`](src/main/java/com/otectus/arsnspells/events/IronsCooldownHandler.java)) updated, and the README "Cooldowns" section now states clearly that the unified system is global per category — an Ars `OFFENSIVE` cast and an Iron's `OFFENSIVE` cast intentionally collide. NBT and packet wire formats are unchanged, so existing 1.8.9 saves load cleanly with no migration.
+
+### Finished half-wired systems
+
+The pre-1.9.0 README claimed cross-mod progression "and vice versa", "Ars spell potency scales with Iron's spell power attributes", and optional affinity decay. None of those were actually wired. They are now:
+
+- **Iron's-side progression hook.** New [`IronsProgressionHandler`](src/main/java/com/otectus/arsnspells/events/IronsProgressionHandler.java) listens to Iron's `SpellOnCastEvent`, derives the school from the path component of the school's resource location, and calls into the same `ProgressionData.incrementCastCount` + `<school>_spell_power` attribute application that the Ars-side handler uses. The shared logic lives in [`ProgressionAttributes`](src/main/java/com/otectus/arsnspells/progression/ProgressionAttributes.java) so both sides use the same modifier UUID and naming.
+- **Iron's-side affinity hook.** New [`IronsAffinityHandler`](src/main/java/com/otectus/arsnspells/events/IronsAffinityHandler.java) mirrors `AffinityHandler` for Iron's casts. The [`AffinityType`](src/main/java/com/otectus/arsnspells/affinity/AffinityType.java) enum gains `HOLY`, `ENDER`, `BLOOD`, `EVOCATION`, `ELDRITCH` so every Iron's stock school maps onto an entry. Adding enum values is forward and backward compatible — pre-1.9.0 NBT loads cleanly with the new entries defaulting to 0.
+- **Ars spell scaling actually wired.** New [`ArsSpellScalingHandler`](src/main/java/com/otectus/arsnspells/events/ArsSpellScalingHandler.java) computes `SpellScalingUtil.getMultiplierForCaster` on each Ars `SpellCastEvent`, stages it for the casting player with a 60-tick window, and applies it on `LivingHurtEvent` for spell-flavored damage from that player. Final amount is clamped against `spell_power_cap`. Filter rejects melee/environmental damage so the bonus only flows to actual spell hits.
+- **Affinity decay tick handler.** New [`AffinityDecayHandler`](src/main/java/com/otectus/arsnspells/events/AffinityDecayHandler.java) ticks each player every `affinity_decay_interval_ticks` (default 1200 = 60 s) and prorates the existing `affinity_decay_rate` from per-day to per-interval (24000 ticks per Minecraft day). Default for `enable_affinity_decay` is now `false` for new configs to avoid surprising existing players whose 1.8.9 config had it (no-op-ly) on; existing config files retain their previous setting.
+- **Login affinity sync.** New [`AffinitySyncOnLoginHandler`](src/main/java/com/otectus/arsnspells/events/AffinitySyncOnLoginHandler.java) fires one `AffinitySyncPacket` per non-zero school when the player joins, so HUD and tooltips reflect persisted state immediately instead of waiting for the next cast. Progression already auto-applies attribute modifiers on login so it doesn't need a packet sweep.
+- [`AffinityCalculator`](src/main/java/com/otectus/arsnspells/affinity/AffinityCalculator.java) and [`AffinityBonuses`](src/main/java/com/otectus/arsnspells/affinity/AffinityBonuses.java) — the per-level damage curve now lives in `AffinityCalculator.getDamageBonus` and is consumed by `AffinityBonuses.getAttributeMultiplier`. Same numbers as before; less duplication; no more dead code.
+
+### Configuration
+
+- **New: `affinity_decay_interval_ticks`** (default 1200, range 20–24000) — how often the new decay handler ticks each player.
+- **Changed default: `enable_affinity_decay`** is now `false` for fresh configs (was effectively a no-op `true` in 1.8.9). Existing configs preserve whatever value the user already had.
+
+### Internal
+
+- **Mixin-package isolation respected.** The transactional scroll-cost state ([`ScrollLPTracker`](src/main/java/com/otectus/arsnspells/compat/ScrollLPTracker.java)) lives in the `compat` package, not as an inner class of `MixinScrollItem`. Sponge Mixin treats every class inside a mixin package — including a mixin's own inner classes — as off-limits for direct reference, because the mixin class gets merged into its target at load time and stops existing as a standalone class. The first 1.9.0 build paid for that rule with an `IllegalClassLoadError` on `MixinScrollItem$PendingScrollLP`; extracting the holder fixed it without behavior change. Worth remembering for any future mixin that needs shared state.
+
+### Known follow-ups (deferred to 1.10.0+)
+
+- Aura HUD does not auto-update server-side regen — still updates only on next spell cast or login. Aura sync is queued for 1.10.0.
+- `SERVER` / `CLIENT` config split. All keys remain on the single `COMMON` config in 1.9.0.
+- Datapack registries for spell schools, cooldown categories, progression rules, cross-cast rules.
+- Cross-cast NBT re-validation at cast time (server-trust hardening).
+- Capability sync on dimension change / respawn (only login is in scope this round).
+
+### Backward compatibility
+
+Strict. AffinityData, ProgressionData, CooldownData, AuraCapability NBT shapes unchanged. Network protocol stays at "1". Inscribed cross-cast items unaffected. No removed config keys, no renamed config keys.
+
+---
+
 ## [1.8.9] - 2026-04-25
 
 ### New Features

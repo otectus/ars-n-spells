@@ -19,13 +19,12 @@ public class CooldownHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             // Use standard Ars Nouveau 4.12.7 field: spell
             CooldownCategory category = SpellAnalysis.analyze(event.spell).category();
-            
-            // CRITICAL FIX: Only check ARS-namespaced cooldowns
-            if (UnifiedCooldownManager.isOnCooldown(player, category, "ars")) {
+
+            if (UnifiedCooldownManager.isOnCooldown(player, category)) {
                 event.setCanceled(true);
             } else {
-                long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false, "ars");
-                // Logic: High-fidelity sync ensuring the client HUD mirrors the lockout
+                long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);
+                // High-fidelity sync ensures the client HUD mirrors the global-per-category lockout.
                 PacketHandler.sendToClient(new CooldownSyncPacket(category, cooldownEnd), player);
             }
         }

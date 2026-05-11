@@ -32,12 +32,13 @@ public class IronsCooldownHandler {
         }
         
         CooldownCategory category = SpellCategorizer.categorizeIronsSpell(event.getSchoolType().getId());
-        
-        // CRITICAL FIX: Only check IRONS-namespaced cooldowns
-        if (UnifiedCooldownManager.isOnCooldown(player, category, "irons")) {
+
+        // Cooldowns are global per category — an Iron's OFFENSIVE cast collides with an
+        // Ars OFFENSIVE cast and vice versa. This is the documented behavior in 1.9.0+.
+        if (UnifiedCooldownManager.isOnCooldown(player, category)) {
             event.setCanceled(true);
         } else {
-            long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false, "irons");
+            long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);
             if (!player.level().isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
                 PacketHandler.sendToClient(new CooldownSyncPacket(category, cooldownEnd), serverPlayer);
             }

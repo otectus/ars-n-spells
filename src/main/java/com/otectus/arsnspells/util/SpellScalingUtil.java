@@ -15,18 +15,38 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Iron's Spellbooks-aware spell scaling for Ars Nouveau spells. The {@code ELEMENT_MAP}
+ * resolves Iron's {@code AttributeRegistry} entries, so this class must never be loaded
+ * on a server that does not have Iron's installed. All callers are expected to gate
+ * on {@link com.otectus.arsnspells.compat.IronsCompat#isLoaded()} first; the map itself
+ * is lazily built so that even a stray accidental import will not trip a static initializer
+ * crash before the gate runs.
+ */
 public class SpellScalingUtil {
-    private static final Map<String, RegistryObject<Attribute>> ELEMENT_MAP = new HashMap<>();
-    static {
-        ELEMENT_MAP.put("fire", AttributeRegistry.FIRE_SPELL_POWER);
-        ELEMENT_MAP.put("ice", AttributeRegistry.ICE_SPELL_POWER);
-        ELEMENT_MAP.put("lightning", AttributeRegistry.LIGHTNING_SPELL_POWER);
-        ELEMENT_MAP.put("holy", AttributeRegistry.HOLY_SPELL_POWER);
-        ELEMENT_MAP.put("ender", AttributeRegistry.ENDER_SPELL_POWER);
-        ELEMENT_MAP.put("blood", AttributeRegistry.BLOOD_SPELL_POWER);
-        ELEMENT_MAP.put("evocation", AttributeRegistry.EVOCATION_SPELL_POWER);
-        ELEMENT_MAP.put("nature", AttributeRegistry.NATURE_SPELL_POWER);
-        ELEMENT_MAP.put("eldritch", AttributeRegistry.ELDRITCH_SPELL_POWER);
+    private static volatile Map<String, RegistryObject<Attribute>> ELEMENT_MAP;
+
+    private static Map<String, RegistryObject<Attribute>> elementMap() {
+        Map<String, RegistryObject<Attribute>> m = ELEMENT_MAP;
+        if (m == null) {
+            synchronized (SpellScalingUtil.class) {
+                m = ELEMENT_MAP;
+                if (m == null) {
+                    m = new HashMap<>();
+                    m.put("fire", AttributeRegistry.FIRE_SPELL_POWER);
+                    m.put("ice", AttributeRegistry.ICE_SPELL_POWER);
+                    m.put("lightning", AttributeRegistry.LIGHTNING_SPELL_POWER);
+                    m.put("holy", AttributeRegistry.HOLY_SPELL_POWER);
+                    m.put("ender", AttributeRegistry.ENDER_SPELL_POWER);
+                    m.put("blood", AttributeRegistry.BLOOD_SPELL_POWER);
+                    m.put("evocation", AttributeRegistry.EVOCATION_SPELL_POWER);
+                    m.put("nature", AttributeRegistry.NATURE_SPELL_POWER);
+                    m.put("eldritch", AttributeRegistry.ELDRITCH_SPELL_POWER);
+                    ELEMENT_MAP = m;
+                }
+            }
+        }
+        return m;
     }
 
     public static float getMultiplierForCaster(Player player, Spell spell) {
@@ -39,7 +59,7 @@ public class SpellScalingUtil {
         // Additive scaling: base power + (elemental bonus - 1.0) prevents exponential stacking
         if (effect != null && effect.getRegistryName() != null) {
             String path = effect.getRegistryName().getPath().toLowerCase(Locale.ROOT);
-            for (Map.Entry<String, RegistryObject<Attribute>> entry : ELEMENT_MAP.entrySet()) {
+            for (Map.Entry<String, RegistryObject<Attribute>> entry : elementMap().entrySet()) {
                 if (path.contains(entry.getKey())) {
                     float elementalPower = (float) player.getAttributeValue(entry.getValue().get());
                     multiplier = multiplier + (elementalPower - 1.0f);
@@ -51,7 +71,7 @@ public class SpellScalingUtil {
         // Apply affinity bonus: 0.5% per affinity level for matching school
         if (AnsConfig.ENABLE_AFFINITY_SYSTEM.get() && !"generic".equals(school)) {
             try {
-                AffinityType affinityType = AffinityType.valueOf(school.toUpperCase());
+                AffinityType affinityType = AffinityType.valueOf(school.toUpperCase(Locale.ROOT));
                 float affinityMultiplier = AffinityBonuses.getAttributeMultiplier(player, affinityType);
                 multiplier *= affinityMultiplier;
             } catch (IllegalArgumentException ignored) {

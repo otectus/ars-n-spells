@@ -97,6 +97,7 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue MAX_AFFINITY_BONUS;
     public static final ForgeConfigSpec.BooleanValue ENABLE_AFFINITY_DECAY;
     public static final ForgeConfigSpec.DoubleValue AFFINITY_DECAY_RATE;
+    public static final ForgeConfigSpec.IntValue AFFINITY_DECAY_INTERVAL_TICKS;
 
     // ========================================
     // CURIO DISCOUNT SYSTEM
@@ -540,13 +541,22 @@ public class AnsConfig {
             .defineInRange("max_affinity_bonus", 0.25, 0.0, 10.0);
         
         ENABLE_AFFINITY_DECAY = BUILDER
-            .comment("Enable affinity decay when not using a school")
-            .define("enable_affinity_decay", true);
-        
+            .comment("Enable affinity decay when not casting matching-school spells.",
+                     "Default changed to false in 1.9.0 — the previous true default was a no-op",
+                     "(decay was never implemented), so flipping it on by default would surprise",
+                     "existing players. Existing config files retain their previous value.")
+            .define("enable_affinity_decay", false);
+
         AFFINITY_DECAY_RATE = BUILDER
-            .comment("Rate of affinity decay per day (in-game)")
+            .comment("Fraction of current affinity to lose per Minecraft day (24000 ticks).",
+                     "0.01 = lose 1% of each school's affinity per in-game day; with the default",
+                     "interval (1200 ticks = 60s), each tick window decays roughly 0.05% of current.")
             .defineInRange("affinity_decay_rate", 0.01, 0.0, 1.0);
-        
+
+        AFFINITY_DECAY_INTERVAL_TICKS = BUILDER
+            .comment("How often (in ticks) the decay handler ticks each player. 1200 = once per minute.")
+            .defineInRange("affinity_decay_interval_ticks", 1200, 20, 24000);
+
         BUILDER.pop();
 
         // ========================================

@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v1.8.9)
+# Ars 'n' Spells (v1.9.0)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -43,7 +43,9 @@ Bonuses come from attribute modifiers, `IManaEquipment` implementations, mana-re
 
 ### Spell scaling
 
-Ars spell potency scales with Iron's spell power attributes. Elemental spell power is applied when the first glyph indicates an element.
+Ars spell potency scales with Iron's spell power attributes. The base `SPELL_POWER` attribute applies to every Ars cast; if the first glyph indicates an element (fire, ice, lightning, holy, ender, blood, evocation, nature, eldritch), the matching Iron's elemental spell-power attribute layers on additively. Affinity (per-school) and resonance (mana fullness) further shape the multiplier. The final scalar is clamped to `spell_power_cap` (default 3.0).
+
+Implementation: scaling activates on each Ars `SpellCastEvent` and is applied within a 60-tick window to spell-flavored damage from the casting player. Iron's must be installed for the scaling path to fire — without Iron's, Ars spells use their native damage values.
 
 ### Resonance
 
@@ -51,11 +53,13 @@ Optional resonance tracks mana percentage and boosts Iron's spell damage when ma
 
 ### Cooldowns
 
-A unified cooldown system groups spells into categories and locks out similar spells across mods. Disabled by default.
+A unified cooldown system groups spells into four categories (OFFENSIVE, DEFENSIVE, UTILITY, MOVEMENT) and locks out *all* spells in that category — across both mods — while a cooldown is active. **Cooldowns are global per category, by design**: an Ars OFFENSIVE cast and an Iron's OFFENSIVE cast intentionally collide on the same slot. Earlier versions exposed a `modNamespace` parameter that suggested per-mod isolation; it never actually affected the storage and was removed in 1.9.0. Disabled by default.
 
 ### Progression and affinity
 
-Ars spell casts can grant Iron's school progression and vice versa. Affinity tracks spell school usage over time, with optional decay.
+Casting builds **per-school progression** (cast counts persist) and **per-school affinity** (0–100 levels, recently used schools level up). Both systems work in **both directions** as of 1.9.0: Ars and Iron's casts each contribute to the same shared school maps, and progression-derived bonuses feed back into both Ars (via spell scaling) and Iron's (via the `<school>_spell_power` attribute) damage.
+
+**Affinity decay** is opt-in via `enable_affinity_decay` (default `false` in fresh configs; pre-existing configs keep their previous value). When enabled, each player ticks every `affinity_decay_interval_ticks` (default 1200 = 60 s) and loses a fraction of every non-zero affinity level prorated from `affinity_decay_rate` (default 0.01 per Minecraft day).
 
 ### Cross-mod spell casting
 
@@ -223,6 +227,22 @@ The mod hides redundant mana bars based on mode:
 
 ## Changelog
 
+### v1.9.0
+- **Stabilization pass: five P0 fixes for serious-modpack readiness.**
+  - **AffinitySyncPacket** no longer crashes dedicated servers — client logic moved to a new `ClientAffinityPacketHandler` and the packet wraps the capability mutation in `DistExecutor.unsafeRunWhenOn(Dist.CLIENT, …)`. Pre-1.9.0 the packet imported `net.minecraft.client.Minecraft` directly while being registered unconditionally on the common bus.
+  - **Iron's Spellbooks is actually optional now.** `IronsLPHandler` was an unconditional `@Mod.EventBusSubscriber` while importing Iron's APIs at the file header; the annotation is gone and the handler is instance-registered behind the existing `ModList.get().isLoaded("irons_spellbooks")` block. `SpellScalingUtil`'s static initializer (which referenced Iron's `AttributeRegistry.*_SPELL_POWER` slots) is converted to lazy double-checked init. New `IronsCompat` exposes a cached `isLoaded()` for hot paths.
+  - **Scroll LP handling is now a real transaction.** `MixinScrollItem` rewritten as **validate → cast → commit**: HEAD stages a per-player pending entry and either cancels (safe mode) or lets the scroll proceed (death mode); RETURN reads the original `use` result and either consumes LP (success), kills the player explicitly (death mode), or no-ops (cast didn't actually consume the action). LP no longer disappears for failed casts.
+  - **Cooldown "namespacing" was a lie — now removed.** The `String modNamespace` parameter on `UnifiedCooldownManager` was never part of the storage key; only the debug log saw it. Parameter dropped from every public method, both callers updated. Cooldowns are now documented as **global per category** by design — an Ars OFFENSIVE cast and an Iron's OFFENSIVE cast intentionally collide. NBT and packet wire formats unchanged.
+- **Half-wired systems finished.**
+  - **Iron's-side progression hook** (`IronsProgressionHandler`) listens to Iron's `SpellOnCastEvent` and feeds the same `ProgressionData` map + `<school>_spell_power` attribute application that Ars-side already does. The shared logic lives in a new `ProgressionAttributes` helper.
+  - **Iron's-side affinity hook** (`IronsAffinityHandler`) mirrors `AffinityHandler` for Iron's casts. `AffinityType` gains `HOLY`, `ENDER`, `BLOOD`, `EVOCATION`, `ELDRITCH` so every Iron's stock school maps onto an entry. Adding enum values is forward and backward compatible.
+  - **Ars spell scaling actually wired** — new `ArsSpellScalingHandler` computes `SpellScalingUtil.getMultiplierForCaster` on each Ars `SpellCastEvent`, stages it for the casting player with a 60-tick window, and applies it on `LivingHurtEvent` for spell-flavored damage from that player. Final amount is clamped against `spell_power_cap`. Filter rejects melee/environmental damage so the bonus only flows to actual spell hits.
+  - **Affinity decay tick handler** (`AffinityDecayHandler`) ticks each player every `affinity_decay_interval_ticks` (default 1200 = 60 s) and prorates `affinity_decay_rate` from per-day to per-interval. Default for `enable_affinity_decay` is now `false` for fresh configs to avoid surprising existing players whose 1.8.9 config had it (no-op-ly) on; existing config files retain their previous setting.
+  - **Login affinity sync** (`AffinitySyncOnLoginHandler`) fires one `AffinitySyncPacket` per non-zero school when the player joins, so HUD reflects persisted state immediately instead of waiting for the next cast.
+- **Configuration:** new `affinity_decay_interval_ticks` (default 1200, range 20–24000); changed default for `enable_affinity_decay` to `false` for fresh installs.
+- **Backward compatibility:** strict. AffinityData, ProgressionData, CooldownData, AuraCapability NBT shapes unchanged. Network protocol stays at "1". Inscribed cross-cast items unaffected. No removed config keys, no renamed config keys. Existing 1.8.9 saves load cleanly.
+- See [CHANGELOG.md](CHANGELOG.md) for the full list and follow-up notes.
+
 ### v1.8.9
 - **Cross-Spell Inscription is now reachable in survival** -- the Spell Transcription ritual has been wired to the world for the first time. An Enchanting Apparatus recipe (Ars novice spellbook + Iron's spellbook + archwood log + source gem block, 2000 source) crafts the ritual tablet that activates a brazier; previously the tablet existed only via `/give` because Ars Nouveau builds tablet items during its own item RegisterEvent and never saw our common-setup ritual. The mod now owns the tablet through a dedicated `DeferredRegister<Item>` and splices it into Ars's `ritualItemMap` at startup. Same flow for the new Spell Uninscription tablet.
 - **Spell Transcription rewritten with strict disambiguation** -- exactly one source and exactly one blank target in the brazier's three-block radius. More than one of either category fails with a chat message naming what was found. Items already carrying an Ars Nouveau spell at NBT root are rejected as targets to keep right-click resolution unambiguous; already-inscribed items in range are rejected with a "uninscribe first" hint. Every failure produces a lang-keyed, item-named message; no silent failures.
@@ -265,7 +285,7 @@ The mod hides redundant mana bars based on mode:
 
 Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven; no manual jar placement required.
 
-Output jar: `build/libs/ars_n_spells-1.8.9.jar`
+Output jar: `build/libs/ars_n_spells-1.9.0.jar`
 
 ## License
 

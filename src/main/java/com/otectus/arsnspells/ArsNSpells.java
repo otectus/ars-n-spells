@@ -68,6 +68,8 @@ public class ArsNSpells {
         // Instance-registered handlers (no @Mod.EventBusSubscriber, use instance @SubscribeEvent methods)
         MinecraftForge.EVENT_BUS.register(new CooldownHandler());
         MinecraftForge.EVENT_BUS.register(new AffinityHandler());
+        MinecraftForge.EVENT_BUS.register(new AffinityDecayHandler());
+        MinecraftForge.EVENT_BUS.register(new AffinitySyncOnLoginHandler());
         // ArsNSpellsCommands has no @Mod.EventBusSubscriber, needs explicit registration
         MinecraftForge.EVENT_BUS.register(ArsNSpellsCommands.class);
         // Note: CrossCastingHandler, EquipmentHandler, CurioDiscountHandler, CursedRingHandler,
@@ -75,13 +77,19 @@ public class ArsNSpells {
         // via @Mod.EventBusSubscriber — do NOT register them here to avoid double-firing.
 
         if (ModList.get().isLoaded("irons_spellbooks")) {
-            // Instance-registered handlers (no @Mod.EventBusSubscriber)
+            // Instance-registered handlers (no @Mod.EventBusSubscriber).
+            // IronsLPHandler used to auto-subscribe but its Iron's-API imports
+            // would crash an Iron's-less server at classload, so it is now
+            // gated and instance-registered here too.
             MinecraftForge.EVENT_BUS.register(new IronsCooldownHandler());
             MinecraftForge.EVENT_BUS.register(new ProgressionHandler());
+            MinecraftForge.EVENT_BUS.register(new IronsProgressionHandler());
+            MinecraftForge.EVENT_BUS.register(new IronsAffinityHandler());
+            MinecraftForge.EVENT_BUS.register(new ArsSpellScalingHandler());
             MinecraftForge.EVENT_BUS.register(new ResonanceEvents());
             MinecraftForge.EVENT_BUS.register(new RegenSynergyHandler());
             MinecraftForge.EVENT_BUS.register(new CrossCastIronsHandler());
-            // Note: IronsLPHandler is auto-registered via @Mod.EventBusSubscriber
+            MinecraftForge.EVENT_BUS.register(new IronsLPHandler());
         }
 
         MinecraftForge.EVENT_BUS.register(this);
