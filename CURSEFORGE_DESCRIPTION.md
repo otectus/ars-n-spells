@@ -2,7 +2,9 @@
 
 **Ars 'n' Spells** bridges [Ars Nouveau](https://www.curseforge.com/minecraft/mc-mods/ars-nouveau) and [Iron's Spells 'n Spellbooks](https://www.curseforge.com/minecraft/mc-mods/irons-spells-n-spellbooks) into one seamless magic experience. Unify your mana, share progression between spell systems, and scale your power across both mods — all fully configurable.
 
-Works with **Minecraft 1.20.1** on **Forge**.
+Works with **Minecraft 1.21.1** on **NeoForge**.
+
+> **Port note (1.9.0, NeoForge 1.21.1).** This release ports the Forge 1.20.1 1.9.0 codebase to NeoForge 1.21.1 — Java 21, vanilla payload networking, NeoForge entity attachments for player state, and a `DataComponent`-backed cross-cast inscription store. The previous **Covenant of the Seven** (Sanctified Legacy) integration — Ring of Seven Curses, Ring of Seven Virtues, Blasphemy curios, LP and aura systems — has been **removed** because Covenant of the Seven does not have a NeoForge 1.21.1 build. Several gameplay re-attach points against Ars Nouveau 5.11.1 / Iron's Spells 1.21.1-3.15.6 internals are still being worked through; expect the next 1.9.x release(s) to land cross-cast invocation, Iron's-side hooks, and a fresh Curios integration. The core mod (mana unification, attachments, networking, cross-cast inscription store, cooldowns, progression / affinity scaffolding) compiles and runs against NeoForge 1.21.1.
 
 ---
 
@@ -10,10 +12,12 @@ Works with **Minecraft 1.20.1** on **Forge**.
 
 | Mod | Required? |
 |-----|-----------|
-| **Ars Nouveau** (4.12.7+) | Yes |
-| **Iron's Spells 'n Spellbooks** (3.15.x) | No — falls back to native Ars behavior if absent |
-| **Covenant of the Seven** (Sanctified Legacy) | No — enables LP and aura ring systems |
-| **Blood Magic** | No — optional LP source for Ring of Seven Curses |
+| **Minecraft (NeoForge)** 1.21.1 / 21.1.84+ | Yes |
+| **Java 21** | Yes |
+| **Ars Nouveau** 5.11.1+ | Yes |
+| **Iron's Spells 'n Spellbooks** 1.21.1-3.15.6+ | No — falls back to native Ars behavior if absent |
+
+The mod will not load on Forge or on Minecraft versions other than 1.21.1.
 
 ---
 
@@ -31,7 +35,7 @@ The core of Ars 'n' Spells: **five configurable modes** that control how the two
 
 Conversion rates between the two mana systems are fully configurable.
 
-The mod automatically hides the redundant mana bar so your HUD stays clean.
+The mod hides the redundant mana bar so your HUD stays clean.
 
 ---
 
@@ -51,14 +55,16 @@ When your mana is nearly full (above 95% by default), you gain a **Resonance bon
 
 ## Source Jar Synergy
 
-Standing near Ars Nouveau Source Jars passively boosts Iron's mana regeneration. The bonus is configurable via `source_jar_synergy_multiplier` (default 5.0). The scan is position-cached for performance — it only re-scans when you move.
+Standing near Ars Nouveau Source Jars passively boosts Iron's mana regeneration. The bonus is configurable via `source_jar_synergy_multiplier` (default 5.0). The scan is position-cached for performance.
 
 ---
 
 ## Cross-Mod Progression & Affinity
 
 - **Progression sharing** — Casting Ars spells grants Iron's school progression, and vice versa.
-- **Affinity tracking** — The mod tracks your spell school usage over time, with optional decay for unused schools.
+- **Affinity tracking** — The mod tracks your spell school usage over time, with optional decay for unused schools (`affinity_decay_interval_ticks`, default 1200 ticks).
+
+Player state is stored in NeoForge entity attachments. Affinity and progression carry through death/respawn; cooldowns intentionally reset on respawn.
 
 ---
 
@@ -68,14 +74,16 @@ Cast spells from *either* mod using items from the *other* mod through a tablet-
 
 ### Spell Transcription — bind a foreign spell onto an item
 
-1. **Craft the Spell Transcription tablet.** Reagent: a novice Ars Nouveau spellbook. Pedestals: an Iron's Spellbooks spellbook, an archwood log, and a source gem block. Costs 2000 source.
+1. **Craft the Spell Transcription tablet.** Reagent: a novice Ars Nouveau spellbook. Pedestals: an Iron's Spellbooks spellbook, an archwood log, and a source gem block. Costs 2000 source. The recipe is gated on Iron's Spellbooks being installed.
 2. **Set up the brazier.** Place the tablet on a Ritual Brazier and drop two items within ~3 blocks:
    - exactly one **source** — a filled Ars Nouveau spell parchment, focus, or spellbook, or an Iron's Spellbooks scroll
    - exactly one blank **target** item to receive the inscription
-3. **Activate.** Strict disambiguation: more than one of either category, or any already-inscribed item in range, fails the ritual with a chat message that names the items it saw and the rule. Items that already carry an Ars Nouveau spell at root NBT are rejected as targets so right-click resolution stays unambiguous. On success the source is consumed, the target gains the cross-cast inscription, and a binding theme of enchantment-glyph particles + the enchantment-table sound marks the inscribe.
+3. **Activate.** Strict disambiguation: more than one of either category, or any already-inscribed item in range, fails the ritual with a chat message that names the items it saw and the rule.
 4. **Cast.** Right-click the target. Sneak-right-click cycles between multiple inscriptions on the same item.
 
 Mana costs flow through the active unification mode and respect your configured conversion rates. In **Separate** mode, costs split between both pools according to your dual-cost percentages. Cross-cast spells pay an overhead set by `cross_cast_cost_multiplier` (default 1.25 = 25% extra) — applied symmetrically to both directions, once per cast, before mana deduction.
+
+The inscription itself is stored as a vanilla **DataComponent** (`ars_n_spells:cross_spells`) on the item — moving forward on 1.21.1 we use the modern data model instead of root NBT.
 
 ### Spell Uninscription — strip an inscription cleanly
 
@@ -83,7 +91,7 @@ If you change your mind, the **Spell Uninscription** ritual returns an inscribed
 
 1. **Craft the Spell Uninscription tablet.** Reagent: a blank parchment. Pedestals: a water bucket, a source gem, and an archwood log. 500 source.
 2. **Activate** with exactly one inscribed item in range and nothing else — sources or stray blanks fail the ritual rather than risk stripping the wrong stack.
-3. The cross-cast NBT is removed cleanly (spells list, cycle index, and any empty residual tag), with an ash + smoke dissolution theme.
+3. The cross-cast component is removed cleanly, with an ash + smoke dissolution theme.
 
 The uninscribe ritual works without Iron's Spellbooks loaded, so legacy inscribed items can still be cleaned up after Iron's is removed.
 
@@ -91,54 +99,7 @@ The uninscribe ritual works without Iron's Spellbooks loaded, so legacy inscribe
 
 ## Unified Cooldowns
 
-An optional system that groups similar spells across both mods into shared cooldown categories. Prevents spell spam by locking out related spells when one is cast. Disabled by default.
-
----
-
-## Covenant of the Seven Integration
-
-When **Covenant of the Seven** (Sanctified Legacy) is installed, two powerful ring systems unlock.
-
-### Ring of Seven Curses — Life Point Casting
-
-Wearing the Cursed Ring converts all mana costs into **Life Points (LP)**.
-
-- **Blood Magic Priority** *(default)* — Draws LP from Blood Magic's Soul Network first, falls back to player health.
-- **Blood Magic Only** — Soul Network only.
-- **Health Only** — Always costs health (100 LP = 5 hearts).
-
-If you run out of LP:
-- **Safe Mode** *(default)* — Spell is cancelled, you take minor damage (you will never die from this).
-- **Death Mode** — The spell casts... but it kills you.
-
-LP costs scale with configurable base multipliers and per-tier scaling. Blasphemy LP discounts are independently configurable via `blasphemy_lp_discount` (default 85%).
-
-### Ring of Seven Virtues — Aura Casting
-
-Wearing the Virtue Ring converts mana costs into **Aura**, a custom resource that regenerates over time (default: 10/sec, 1000 max pool). Aura persists through death and dimension changes. If you run dry, the spell simply fails. Blasphemy aura discounts are independently configurable via `blasphemy_aura_discount` (default 85%).
-
-**Ring Conflict:** Wearing both rings at the same time cancels both effects — you'll use normal mana instead, and receive a warning notification.
-
-### Blasphemy Curios — School Discounts
-
-Thirteen Blasphemy curio variants (Fire, Ice, Lightning, Holy, Ender, Blood, Evocation, Nature, Eldritch, Aqua, Geo, Wind, Dormant) each provide:
-
-- **15% base mana discount** on all spells
-- **+10% bonus** when the spell's school matches the curio's element (25% total)
-
-Discounts stack multiplicatively with ring costs. A fully kitted setup can reach up to **40% off**.
-
----
-
-## Scroll Cost Enforcement
-
-Iron's Spellbooks scrolls now respect your resource costs:
-
-| Mode | Behavior |
-|------|----------|
-| **Full** *(default)* | Scrolls consume mana and LP/aura like normal casting. |
-| **LP Only** | Scrolls are mana-free, but LP is still consumed for Cursed Ring wearers. |
-| **Free** | No resource cost for scrolls (LP from Cursed Ring still applies). |
+An optional system that groups similar spells across both mods into shared cooldown categories (OFFENSIVE, DEFENSIVE, UTILITY, MOVEMENT). When enabled, cooldowns are **global per category by design** — an Ars OFFENSIVE cast and an Iron's OFFENSIVE cast intentionally collide on the same slot. Disabled by default.
 
 ---
 
@@ -148,15 +109,10 @@ Everything is configurable via `config/ars_n_spells-common.toml`. Major options 
 
 - **Master toggles** for mana unification, resonance, cooldowns, progression, and affinity
 - **Mana conversion rates** and dual-cost split percentages
-- **LP system** — source mode, death penalty, base/tier multipliers, minimum costs
-- **Aura system** — max pool, regen rate, tier multipliers
-- **Curio discounts** — base discount, matching bonus, stacking behavior
-- **Blasphemy ring discounts** — separate LP and aura discount rates
 - **Spell scaling** — power cap for Iron's attribute stacking
 - **Source Jar synergy** — proximity regen multiplier
-- **Rituals** — configurable Mana Infusion amount
-- **Scroll cost mode**
-- **Performance** — Source Jar cache move threshold
+- **Affinity decay** — opt-in tick handler with configurable interval
+- **Cross-cast** — overhead multiplier on cross-cast spell costs
 - **Debug mode** for troubleshooting
 
 All options ship with balanced defaults — install and play, or fine-tune to your liking.
@@ -168,26 +124,40 @@ All options ship with balanced defaults — install and play, or fine-tune to yo
 | Command | Permission | Description |
 |---------|------------|-------------|
 | `/ans mana setdefault <value>` | Op 2 | Set the default max mana |
-| `/ans mana getdefault` | -- | View the current default max mana |
+| `/ans mana getdefault` | — | View the current default max mana |
 | `/ans debug` | Op 2 | Toggle debug mode at runtime |
-| `/ans info <player>` | Op 2 | Show mana, aura, resonance, and ring status |
-| `/ans mode` | -- | Show current mana unification mode |
+| `/ans info <player>` | Op 2 | Show mana and resonance |
+| `/ans mode` | — | Show current mana unification mode |
+
+---
+
+## Features removed in the NeoForge 1.21.1 port
+
+Because **Covenant of the Seven** (Sanctified Legacy) does not have a NeoForge 1.21.1 distribution, the following addon-coupled features from Forge 1.20.1 are removed in this release:
+
+- **Ring of Seven Curses (LP costs).** LP-based casting from Blood Magic Soul Network or health.
+- **Ring of Seven Virtues (Aura costs).** Aura resource and regen system.
+- **Blasphemy curios.** School-matched mana discounts.
+- **Scroll cost mode** (`scroll_cost_mode`). LP-coupled scroll cost routing.
+- **The aura system itself.** Removed because Virtue Ring was the only consumer.
+
+If Covenant of the Seven ships a NeoForge 1.21.1 build, the integration can be revisited. A direct **Curios** integration is planned for an upcoming release to replace the curio-discount feature footprint.
 
 ---
 
 ## FAQ / Troubleshooting
 
 **Q: Ars mana isn't changing in ISS Primary mode.**
-A: Make sure Iron's Spells 'n Spellbooks (3.15.x) is installed. Check logs for mixin load failures.
+A: Make sure Iron's Spells 'n Spellbooks (1.21.1-3.15.6+) is installed. Check logs for mixin load failures.
 
 **Q: I see two mana bars.**
-A: Verify your mana mode is set correctly. Check for overlay conflicts from other UI mods.
+A: Verify your mana mode is set correctly. Check for overlay conflicts from other UI mods. (The mana-bar overlay re-targeting against NeoForge's `LayeredDraw` is on the work-in-progress list for the next 1.9.x release; until then both bars may show in some configurations.)
 
-**Q: "Insufficient LP" even though I have enough hearts.**
-A: Make sure `lp_source_mode` isn't set to `BLOOD_MAGIC_ONLY` without Blood Magic installed. The default (`BLOOD_MAGIC_PRIORITY`) falls back to health.
+**Q: Cross-casting an inscribed item does nothing.**
+A: Cross-cast invocation against Ars Nouveau 5.x is currently being re-attached as part of the port. Expect this to land in an upcoming 1.9.x release. Inscription itself works (you can inscribe and uninscribe), but the cast path is the open work.
 
-**Q: Scrolls are casting for free.**
-A: Check that `scroll_cost_mode` is set to `full` (the default).
+**Q: The mod requires Sanctified Legacy and I had a setup using LP.**
+A: The Sanctified Legacy integration is gone for this version because Sanctified Legacy itself hasn't shipped on NeoForge 1.21.1. Stay on the Forge 1.20.1 1.9.0 release if you need that feature.
 
 ---
 

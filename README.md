@@ -1,19 +1,19 @@
-# Ars 'n' Spells (v1.9.0)
+# Ars 'n' Spells (v1.9.0, NeoForge 1.21.1)
 
-Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
+Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.21.1 on **NeoForge**. It unifies mana, scaling, and progression while keeping each mod playable on its own.
+
+> **Port status (1.9.0 on NeoForge 1.21.1).** This release ports the Forge 1.20.1 1.9.0 codebase to NeoForge 1.21.1: loader rewrite, vanilla-payload networking, NeoForge attachments for player state, and a `DataComponent`-backed cross-cast inscription store. Several gameplay re-attach points against the new Ars Nouveau 5.11.1 / Iron's Spells 3.15.6 internals are still being worked through (see [`TODO(Phase 11)`](#known-work-in-progress) markers in the source). The previous **Covenant of the Seven / Sanctified Legacy** integration (Cursed Ring, Virtue Ring, Blasphemy curios, LP / aura systems) is **removed**: no NeoForge 1.21.1 distribution of that addon exists at the time of writing. A direct **Curios** integration is planned to replace its curio-feature footprint.
 
 ## Requirements
 
 | Mod | Version | Required |
 | --- | --- | --- |
-| Minecraft (Forge) | 1.20.1 / 47.2.0+ | Yes |
-| Ars Nouveau | 4.12.7 | Yes |
-| Iron's Spells 'n Spellbooks | 3.15.x | No |
-| Covenant of the Seven | Any | No |
-| Blood Magic | Any | No |
-| Curios API | Any | Included via Ars |
+| Minecraft (NeoForge) | 1.21.1 / 21.1.84+ | Yes |
+| Java | 21 | Yes |
+| Ars Nouveau | 5.11.1+ | Yes |
+| Iron's Spells 'n Spellbooks | 1.21.1-3.15.6+ | No |
 
-If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior.
+If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior. The mod will not load on Forge or on Minecraft versions other than 1.21.1.
 
 ## Features
 
@@ -35,11 +35,9 @@ Conversion rates (`conversion_rate_ars_to_iron`, `conversion_rate_iron_to_ars`) 
 
 Ars and Iron's gear bonuses are routed to the active mana source:
 
-- **iss_primary / hybrid** -- Ars gear perks apply to Iron's attributes.
-- **ars_primary** -- Iron's gear perks apply to Ars calculations.
-- **separate** -- Each mod's gear affects its own pool only.
-
-Bonuses come from attribute modifiers, `IManaEquipment` implementations, mana-related enchantments, and Curios items.
+- **iss_primary / hybrid** — Ars gear perks apply to Iron's attributes.
+- **ars_primary** — Iron's gear perks apply to Ars calculations.
+- **separate** — Each mod's gear affects its own pool only.
 
 ### Spell scaling
 
@@ -53,81 +51,45 @@ Optional resonance tracks mana percentage and boosts Iron's spell damage when ma
 
 ### Cooldowns
 
-A unified cooldown system groups spells into four categories (OFFENSIVE, DEFENSIVE, UTILITY, MOVEMENT) and locks out *all* spells in that category — across both mods — while a cooldown is active. **Cooldowns are global per category, by design**: an Ars OFFENSIVE cast and an Iron's OFFENSIVE cast intentionally collide on the same slot. Earlier versions exposed a `modNamespace` parameter that suggested per-mod isolation; it never actually affected the storage and was removed in 1.9.0. Disabled by default.
+A unified cooldown system groups spells into four categories (OFFENSIVE, DEFENSIVE, UTILITY, MOVEMENT) and locks out *all* spells in that category — across both mods — while a cooldown is active. **Cooldowns are global per category, by design**: an Ars OFFENSIVE cast and an Iron's OFFENSIVE cast intentionally collide on the same slot. Disabled by default.
 
 ### Progression and affinity
 
-Casting builds **per-school progression** (cast counts persist) and **per-school affinity** (0–100 levels, recently used schools level up). Both systems work in **both directions** as of 1.9.0: Ars and Iron's casts each contribute to the same shared school maps, and progression-derived bonuses feed back into both Ars (via spell scaling) and Iron's (via the `<school>_spell_power` attribute) damage.
+Casting builds **per-school progression** (cast counts persist) and **per-school affinity** (0–100 levels, recently used schools level up). Both systems work in **both directions**: Ars and Iron's casts each contribute to the same shared school maps, and progression-derived bonuses feed back into both Ars (via spell scaling) and Iron's (via the `<school>_spell_power` attribute) damage.
 
-**Affinity decay** is opt-in via `enable_affinity_decay` (default `false` in fresh configs; pre-existing configs keep their previous value). When enabled, each player ticks every `affinity_decay_interval_ticks` (default 1200 = 60 s) and loses a fraction of every non-zero affinity level prorated from `affinity_decay_rate` (default 0.01 per Minecraft day).
+**Affinity decay** is opt-in via `enable_affinity_decay` (default `false` in fresh configs). When enabled, each player ticks every `affinity_decay_interval_ticks` (default 1200 = 60 s) and loses a fraction of every non-zero affinity level prorated from `affinity_decay_rate` (default 0.01 per Minecraft day).
 
 ### Cross-mod spell casting
 
-Cross-casting lets any item store a spell from the *other* mod and cast it on right-click. Inscription is a two-tablet ritual flow inscribe/uninscribe pair backed by datapack recipes, so pack authors can retune ingredients without touching code.
+Cross-casting lets any item store a spell from the *other* mod and cast it on right-click. Inscription is a two-tablet ritual flow backed by datapack recipes, so pack authors can retune ingredients without touching code.
 
 **1. Craft the Spell Transcription tablet.**
-Combine a novice Ars spellbook (reagent) with an Iron's spellbook, an archwood log, and a source gem block on the Enchanting Apparatus. Costs 2000 source. Recipe lives at [data/ars_n_spells/recipes/apparatus/spell_transcription.json](src/main/resources/data/ars_n_spells/recipes/apparatus/spell_transcription.json).
+Combine a novice Ars spellbook (reagent) with an Iron's spellbook, an archwood log, and a source gem block on the Enchanting Apparatus. Costs 2000 source. Recipe lives at [`data/ars_n_spells/recipes/apparatus/spell_transcription.json`](src/main/resources/data/ars_n_spells/recipes/apparatus/spell_transcription.json). The recipe is gated with `neoforge:conditions` `mod_loaded irons_spellbooks`, so it only loads when Iron's Spells is installed.
 
 **2. Run the Spell Transcription ritual.**
 Place the tablet on a Ritual Brazier, then drop two items within three blocks:
-- exactly one **source** -- a filled Ars Nouveau spell parchment, focus, or spellbook, or an Iron's Spellbooks scroll
+- exactly one **source** — a filled Ars Nouveau spell parchment, focus, or spellbook, or an Iron's Spellbooks scroll
 - exactly one blank **target** item
 
-Strict disambiguation: more than one of either category fails the ritual with a chat message naming what it saw. Items already carrying an Ars Nouveau spell at NBT root are rejected as targets (they would let Ars's own right-click handler shadow the cross-cast). Items already carrying a cross-cast inscription are rejected too -- uninscribe first.
+Strict disambiguation: more than one of either category fails the ritual with a chat message naming what it saw. Items already carrying a cross-cast inscription are rejected too — uninscribe first.
 
-Activate the ritual; on completion the source is consumed and the target gains the `arsnspells:cross_spells` NBT list. Enchantment-glyph particles and the enchantment-table sound mark the inscribe.
+On completion the source is consumed and the target gains a `CrossModSpellList` data component. Enchantment-glyph particles and the enchantment-table sound mark the inscribe.
 
 **3. Cast the inscribed spell.**
 Right-click the target. Sneak-right-click cycles between multiple inscriptions on the same item. Mana costs flow through `BridgeManager` and respect the active unification mode; in SEPARATE mode the dual-cost split (`dual_cost_ars_percentage` / `dual_cost_iss_percentage`) and conversion rates determine how much each pool pays per cast.
 
-Cross-cast spells pay an overhead set by `cross_cast_cost_multiplier` (default `1.25`, range `0.5`-`5.0`). The multiplier applies to both Iron's spells cast from non-Iron's items and Ars spells cast from non-Ars items, once per cast, before mana deduction.
+Cross-cast spells pay an overhead set by `cross_cast_cost_multiplier` (default `1.25`, range `0.5`–`5.0`). The multiplier applies to both Iron's spells cast from non-Iron's items and Ars spells cast from non-Ars items, once per cast, before mana deduction.
 
 **4. Strip an inscription.**
-Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank parchment (reagent), a water bucket, a source gem, and an archwood log -- 500 source. Drop one inscribed item within three blocks of the brazier with no other items in range. Ash and smoke particles plus a fire-extinguish sound mark the strip; the result is bit-identical to a fresh blank target so the same item can be re-inscribed cleanly. The uninscribe ritual is Iron's-independent and remains useful for cleanup even if Iron's Spellbooks is later removed.
+Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank parchment (reagent), a water bucket, a source gem, and an archwood log — 500 source. Drop one inscribed item within three blocks of the brazier with no other items in range. Ash and smoke particles plus a fire-extinguish sound mark the strip; the result is bit-identical to a fresh blank target so the same item can be re-inscribed cleanly. The uninscribe ritual is Iron's-independent and remains useful for cleanup even if Iron's Spellbooks is later removed.
 
----
+### Cross-cast storage (1.21.1)
 
-## Covenant of the Seven integration
+On NeoForge 1.21.1 the cross-cast inscription is stored as a `DataComponentType<CrossModSpellList>` registered under `ars_n_spells:cross_spells` ([`ModDataComponents`](src/main/java/com/otectus/arsnspells/spell/ModDataComponents.java)). The component carries an immutable list of inscribed entries plus the currently-selected index for sneak-cycling, with both a JSON `Codec` and a `StreamCodec` for network sync. The Forge-era root-NBT keys (`arsnspells:cross_spells`, `arsnspells:cross_spell_index`) are gone; items inscribed under the previous Forge build will not migrate automatically.
 
-When Covenant of the Seven (Sanctified Legacy) is installed, two ring systems become available.
+### Player state (1.21.1)
 
-### Ring of Seven Curses (LP costs)
-
-Wearing the Cursed Ring converts mana costs to **Life Points**. LP can be sourced from Blood Magic's Soul Network or player health.
-
-- **LP source modes** (`lp_source_mode`):
-  - `BLOOD_MAGIC_PRIORITY` (default) -- Try Blood Magic first, fall back to health.
-  - `BLOOD_MAGIC_ONLY` -- Blood Magic only; fails if BM is not installed.
-  - `HEALTH_ONLY` -- Always use health (100 LP = 5 hearts).
-- **Insufficient LP behavior** (`death_on_insufficient_lp`):
-  - `false` (default) -- Spell is cancelled with 1 heart of damage.
-  - `true` -- Spell casts but the player dies.
-- LP costs scale with configurable base and tier multipliers, with a minimum cost floor.
-
-### Ring of Seven Virtues (aura costs)
-
-Wearing the Virtue Ring converts mana costs to **aura**, a custom resource that regenerates over time.
-
-- **Aura pool**: Configurable max (default 1000) and regen rate (default 0.5/tick = 10/sec).
-- **Cost formula**: `aura = max(minimum, manaCost * baseMultiplier * tierMultiplier)`
-- Aura persists across death and dimension changes.
-- Insufficient aura cancels the spell with an action bar message.
-
-### Blasphemy curios (school discounts)
-
-Thirteen Blasphemy curios provide a base 15% mana discount, plus an extra 10% when the spell school matches the curio's element. Discounts stack multiplicatively with ring costs when enabled.
-
----
-
-## Scroll cost enforcement
-
-Iron's Spellbooks scrolls now respect resource costs. The `scroll_cost_mode` config controls behavior:
-
-| Mode | Behavior |
-| --- | --- |
-| `full` (default) | Scrolls consume mana and LP/aura like normal casting. |
-| `lp_only` | Scrolls are mana-free but LP is still consumed for Cursed Ring wearers. |
-| `free` | No resource cost for scrolls (LP from Cursed Ring still applies). |
+Affinity, cooldown, and progression are stored as NeoForge entity attachments ([`AttachmentTypes`](src/main/java/com/otectus/arsnspells/data/AttachmentTypes.java)). Affinity and progression carry `copyOnDeath`; cooldown intentionally resets on respawn. The Forge capability provider that previously wrapped these has been removed.
 
 ---
 
@@ -145,6 +107,9 @@ Config file: `config/ars_n_spells-common.toml`
 | `enable_cooldown_system` | `false` | Unified cooldown categories. |
 | `enable_progression_system` | `true` | Cross-mod progression XP. |
 | `enable_affinity_system` | `true` | Spell school affinity tracking. |
+| `enable_affinity_decay` | `false` | Periodic affinity decay (opt-in). |
+| `affinity_decay_interval_ticks` | `1200` | Ticks between decay handler runs (range 20–24000). |
+| `affinity_decay_rate` | `0.01` | Fraction of each non-zero affinity lost per Minecraft day. |
 | `debug_mode` | `false` | Verbose logging. |
 
 ### Mana conversion
@@ -157,62 +122,24 @@ Config file: `config/ars_n_spells-common.toml`
 | `dual_cost_iss_percentage` | `0.5` | In `separate`, fraction taken from Iron's pool. |
 | `hybrid_mana_bar` | `irons` | Which HUD bar to show in `hybrid` mode (`ars` or `irons`). |
 
-### LP system (Cursed Ring)
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `lp_source_mode` | `BLOOD_MAGIC_PRIORITY` | LP source fallback order. |
-| `death_on_insufficient_lp` | `false` | Kill player instead of cancelling spell. |
-| `show_lp_cost_messages` | `true` | Action bar LP notifications. |
-| `ars_lp_base_multiplier` | `1.0` | Base LP multiplier for Ars spells. |
-| `irons_lp_base_multiplier` | `0.5` | Base LP multiplier for Iron's spells. |
-| `ars_lp_minimum_cost` | `10` | Minimum LP per Ars cast. |
-| `irons_lp_minimum_cost` | `10` | Minimum LP per Iron's cast. |
-
-### Aura system (Virtue Ring)
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `aura_max_default` | `1000` | Starting max aura. |
-| `aura_regen_rate` | `0.5` | Aura regenerated per tick (10/sec at 20 TPS). |
-| `aura_base_multiplier` | `1.0` | Base aura cost multiplier. |
-| `aura_tier1_multiplier` | `1.0` | Tier 1 spell aura multiplier. |
-| `aura_tier2_multiplier` | `1.5` | Tier 2 spell aura multiplier. |
-| `aura_tier3_multiplier` | `2.0` | Tier 3 spell aura multiplier. |
-| `aura_minimum_cost` | `5` | Minimum aura per cast. |
-| `show_aura_messages` | `true` | Action bar aura notifications. |
-
-### Scroll costs
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `scroll_cost_mode` | `full` | Scroll resource cost mode (`full`/`lp_only`/`free`). |
-
-### Curio discounts
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `enable_curio_discounts` | `true` | Enable Blasphemy curio discounts. |
-| `blasphemy_discount` | `0.15` | Base Blasphemy discount (15%). |
-| `blasphemy_matching_school_bonus` | `0.10` | Extra discount for matching school (+10%). |
-| `allow_discount_stacking` | `true` | Allow discounts to stack with ring costs. |
-
 ### Spell scaling
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `spell_power_cap` | `3.0` | Maximum total spell power multiplier from Iron's attributes. |
-| `blasphemy_lp_discount` | `0.85` | LP cost discount from matching Blasphemy curio (0.85 = 85%). |
-| `blasphemy_aura_discount` | `0.85` | Aura cost discount from matching Blasphemy curio (0.85 = 85%). |
 | `source_jar_synergy_multiplier` | `5.0` | Multiplier for Source Jar proximity regen bonus. |
 | `ritual_mana_infusion_amount` | `500.0` | Mana added by Ritual of Mana Infusion. |
 
-### Other
+### Cross-cast
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `respect_armor_bonuses` | `true` | Route armor mana perks to active source. |
-| `respect_enchantments` | `true` | Include mana enchantment bonuses. |
+| `cross_cast_cost_multiplier` | `1.25` | Overhead applied to cross-cast spell base mana cost. |
+| `enable_per_cast_reagent` | `false` | Reserved hook for a future per-cast reagent system. |
+
+### Removed in the NeoForge 1.21.1 port
+
+The following config sections from the Forge 1.20.1 build are no longer surfaced (the underlying features are gone with Sanctified Legacy / Covenant of the Seven removal): `enable_lp_system`, `lp_source_mode`, `death_on_insufficient_lp`, `show_lp_cost_messages`, `ars_lp_*`, `irons_lp_*`, `aura_*`, `virtue_ring_discount`, `blasphemy_*`, `hide_mana_bar_with_ring`, `scroll_cost_mode`. Dead config keys may still appear in autogenerated config files until a follow-up cleanup pass; they have no effect on gameplay.
 
 ---
 
@@ -225,67 +152,44 @@ The mod hides redundant mana bars based on mode:
 - **hybrid**: Shows the bar selected by `hybrid_mana_bar`.
 - **separate / disabled**: Both bars may show.
 
-## Changelog
+The mana-bar overlay registration moves from Forge's `RegisterGuiOverlaysEvent` to NeoForge's `RegisterGuiLayersEvent`. The mixin and overlay code is currently stubbed pending Phase 3 (Ars 5.x / Iron's 3.15.6 overlay re-targeting).
 
-### v1.9.0
-- **Stabilization pass: five P0 fixes for serious-modpack readiness.**
-  - **AffinitySyncPacket** no longer crashes dedicated servers — client logic moved to a new `ClientAffinityPacketHandler` and the packet wraps the capability mutation in `DistExecutor.unsafeRunWhenOn(Dist.CLIENT, …)`. Pre-1.9.0 the packet imported `net.minecraft.client.Minecraft` directly while being registered unconditionally on the common bus.
-  - **Iron's Spellbooks is actually optional now.** `IronsLPHandler` was an unconditional `@Mod.EventBusSubscriber` while importing Iron's APIs at the file header; the annotation is gone and the handler is instance-registered behind the existing `ModList.get().isLoaded("irons_spellbooks")` block. `SpellScalingUtil`'s static initializer (which referenced Iron's `AttributeRegistry.*_SPELL_POWER` slots) is converted to lazy double-checked init. New `IronsCompat` exposes a cached `isLoaded()` for hot paths.
-  - **Scroll LP handling is now a real transaction.** `MixinScrollItem` rewritten as **validate → cast → commit**: HEAD stages a per-player pending entry and either cancels (safe mode) or lets the scroll proceed (death mode); RETURN reads the original `use` result and either consumes LP (success), kills the player explicitly (death mode), or no-ops (cast didn't actually consume the action). LP no longer disappears for failed casts.
-  - **Cooldown "namespacing" was a lie — now removed.** The `String modNamespace` parameter on `UnifiedCooldownManager` was never part of the storage key; only the debug log saw it. Parameter dropped from every public method, both callers updated. Cooldowns are now documented as **global per category** by design — an Ars OFFENSIVE cast and an Iron's OFFENSIVE cast intentionally collide. NBT and packet wire formats unchanged.
-- **Half-wired systems finished.**
-  - **Iron's-side progression hook** (`IronsProgressionHandler`) listens to Iron's `SpellOnCastEvent` and feeds the same `ProgressionData` map + `<school>_spell_power` attribute application that Ars-side already does. The shared logic lives in a new `ProgressionAttributes` helper.
-  - **Iron's-side affinity hook** (`IronsAffinityHandler`) mirrors `AffinityHandler` for Iron's casts. `AffinityType` gains `HOLY`, `ENDER`, `BLOOD`, `EVOCATION`, `ELDRITCH` so every Iron's stock school maps onto an entry. Adding enum values is forward and backward compatible.
-  - **Ars spell scaling actually wired** — new `ArsSpellScalingHandler` computes `SpellScalingUtil.getMultiplierForCaster` on each Ars `SpellCastEvent`, stages it for the casting player with a 60-tick window, and applies it on `LivingHurtEvent` for spell-flavored damage from that player. Final amount is clamped against `spell_power_cap`. Filter rejects melee/environmental damage so the bonus only flows to actual spell hits.
-  - **Affinity decay tick handler** (`AffinityDecayHandler`) ticks each player every `affinity_decay_interval_ticks` (default 1200 = 60 s) and prorates `affinity_decay_rate` from per-day to per-interval. Default for `enable_affinity_decay` is now `false` for fresh configs to avoid surprising existing players whose 1.8.9 config had it (no-op-ly) on; existing config files retain their previous setting.
-  - **Login affinity sync** (`AffinitySyncOnLoginHandler`) fires one `AffinitySyncPacket` per non-zero school when the player joins, so HUD reflects persisted state immediately instead of waiting for the next cast.
-- **Configuration:** new `affinity_decay_interval_ticks` (default 1200, range 20–24000); changed default for `enable_affinity_decay` to `false` for fresh installs.
-- **Backward compatibility:** strict. AffinityData, ProgressionData, CooldownData, AuraCapability NBT shapes unchanged. Network protocol stays at "1". Inscribed cross-cast items unaffected. No removed config keys, no renamed config keys. Existing 1.8.9 saves load cleanly.
-- See [CHANGELOG.md](CHANGELOG.md) for the full list and follow-up notes.
+## Commands
 
-### v1.8.9
-- **Cross-Spell Inscription is now reachable in survival** -- the Spell Transcription ritual has been wired to the world for the first time. An Enchanting Apparatus recipe (Ars novice spellbook + Iron's spellbook + archwood log + source gem block, 2000 source) crafts the ritual tablet that activates a brazier; previously the tablet existed only via `/give` because Ars Nouveau builds tablet items during its own item RegisterEvent and never saw our common-setup ritual. The mod now owns the tablet through a dedicated `DeferredRegister<Item>` and splices it into Ars's `ritualItemMap` at startup. Same flow for the new Spell Uninscription tablet.
-- **Spell Transcription rewritten with strict disambiguation** -- exactly one source and exactly one blank target in the brazier's three-block radius. More than one of either category fails with a chat message naming what was found. Items already carrying an Ars Nouveau spell at NBT root are rejected as targets to keep right-click resolution unambiguous; already-inscribed items in range are rejected with a "uninscribe first" hint. Every failure produces a lang-keyed, item-named message; no silent failures.
-- **New Spell Uninscription ritual** -- mirrors the inscribe flow with strict intake (exactly one inscribed item, no other items in range). The strip removes both the cross-spell list and the cycle index, and collapses an empty residual root tag to null so the result is bit-identical to a fresh blank target. Iron's-independent: the tablet and ritual register without Iron's loaded so legacy inscribed items can still be cleaned up after Iron's is removed. Apparatus recipe: blank parchment + water bucket + source gem + archwood log, 500 source.
-- **Cross-cast cost multiplier** -- new `cross_cast_cost_multiplier` config (default `1.25`, range `0.5`-`5.0`) charges a flat overhead on spells cast from inscribed items. Applies to both Iron's spells from non-Iron's items and Ars spells from non-Ars items, exactly once per cast, before mana deduction. Routed through `BridgeManager` so it composes cleanly with the active mana mode and the SEPARATE-mode dual-cost split. New `enable_per_cast_reagent` config reserved as a future hook (default `false`, no-op today).
-- **Theming** -- inscribe plays enchantment-glyph particles + the enchantment-table sound; uninscribe plays ash + smoke + the fire-extinguish sound.
-- **Test harness** -- JUnit 5 lands with two test classes: a CompoundTag-level inscribe/uninscribe round-trip (5 cases) and a disambiguation-predicate suite (7 cases). Twelve tests total, all green under `./gradlew test`. The cross-cast NBT manipulation is extracted into a Bootstrap-free `CrossCastNbt` helper so the contract is testable without booting Minecraft. See [CHANGELOG.md](CHANGELOG.md) for details.
+| Command | Permission | Description |
+| --- | --- | --- |
+| `/ans mana setdefault <value>` | Op 2 | Set the default max mana. |
+| `/ans mana getdefault` | — | View the current default max mana. |
+| `/ans debug` | Op 2 | Toggle debug mode at runtime. |
+| `/ans info <player>` | Op 2 | Show mana and resonance (ring/aura info removed in 1.21.1). |
+| `/ans mode` | — | Show current mana unification mode. |
 
-### v1.8.8
-- **Cross-system mana regen unit mismatch fixed** -- Iron's `MANA_REGEN` is a percentage-of-pool multiplier; Ars regen is absolute mana/sec. Three callsites previously wrote a value from one system directly into the other without converting units, so an Ars Mana Regen III enchantment on wizard armor could compound into hundreds of mana/sec. All cross-system regen translations now route through a new `ManaRegenBridge` that converts via the wearer's current max pool. Three new config knobs (`cross_system_regen_conversion`, `cross_system_regen_multiplier`, `cross_system_regen_reference_pool`) control the conversion strategy. Also tightened the enchantment-detection heuristic in `EquipmentIntegration` from a broad `description.contains("mana")` string match to specific Ars enchantment IDs, eliminating spurious +50 max-mana grants from unrelated enchantments. See [CHANGELOG.md](CHANGELOG.md) for details.
+## Known work in progress
 
-### v1.8.6
-- **Cursed/Virtue Ring polish and LP hardening** -- Mana bar is now hidden while either ring is equipped (new `hide_mana_bar_with_ring` config, default on). Cursed Ring detection now recognizes both `enigmaticlegacy:cursed_ring` and `covenant_of_the_seven:cursed_ring`. Ring and Blasphemy curio detection is cached per-player so a single spell cast no longer triggers 5+ curio-inventory scans. LP pending-cost maps upgraded to `ConcurrentHashMap` with `PlayerLoggedOutEvent` eviction in all three handlers. Added defensive guards against non-positive LP costs, null Blood Magic Soul Networks, and floating-point health drift below the 1-HP buffer. See [CHANGELOG.md](CHANGELOG.md) for details.
+The NeoForge 1.21.1 port is staged. Phase 0 (build / metadata / loader / networking / attachments / data components / Sanctified deletion / 1.9.0 stabilization NeoForge port), Phase 1 (Sanctified upstream decision), Phase 4 (recipe tag + conditions), and Phase 5 (data-component round-trip test) are complete. Pending phases:
 
-### v1.8.3
-- **Spell Transcription ritual is now functional** -- The previously no-op ritual now actually inscribes a cross-mod spell onto a target item, exposing the cross-casting runtime to survival play. Removed the dead `ProgressionSyncPacket` and deprecated `XpConverter`, and added a defensive guard in `AuraCapability` for early capability attach. See [CHANGELOG.md](CHANGELOG.md) for details.
-
-### v1.8.0 -- v1.8.2
-- Upstream compatibility overhaul for Ars Nouveau 4.12.7 and Iron's Spellbooks 3.15.5.1: central `SpellAnalysis` utility corrects glyph classification across all systems, rituals migrated to the current `onEnd()` lifecycle, LP death prevention rewritten as scoped cast transactions, overlay controllers consolidated, and Ars armor mana bonuses fixed in `ARS_PRIMARY` mode. See [CHANGELOG.md](CHANGELOG.md) for the full list.
-
-### v1.7.0
-- Major quality and stability release: fixed SEPARATE mode mana loss, safe mode killing players, pending cost TTL under server lag, double event firing, and more. Added additive spell scaling with configurable cap, ring conflict notifications, new `/ans` commands, expanded translations, and performance optimizations. See [CHANGELOG.md](CHANGELOG.md) for full details.
-
-## Troubleshooting
-
-- **Ars mana not changing in iss_primary**: Ensure Iron's is installed (3.15.x). Check logs for mixin failures.
-- **Gear perks not affecting mana**: Confirm `respect_armor_bonuses=true` and the correct mode. In `separate`, perks are not cross-applied.
-- **Double mana bars**: Verify your mode and check for overlay conflicts from other UI mods.
-- **"Insufficient LP" despite enough hearts**: Ensure `lp_source_mode` is not `BLOOD_MAGIC_ONLY` without Blood Magic installed. Default is `BLOOD_MAGIC_PRIORITY`.
-- **Scrolls casting for free**: Verify `scroll_cost_mode` is set to `full` (default).
+- **Phase 2** — re-verify all 9 mixins against the pinned Ars Nouveau 5.11.1 and Iron's Spells 3.15.6 jars. Particular hazards: `ManaCap` method rename, `SpellResolver.expendMana`/`canCast` signatures, `MagicData` mana methods, `ManaBarOverlay.render` (the Forge `ForgeGui` it referenced does not exist on NeoForge 1.21.1).
+- **Phase 3** — 22 files carry `TODO(Phase 11)` markers for gameplay re-attach: `CrossCastingHandler` (cast invocation, `SpellCostCalcEvent`, right-click intercept), bridge layer (`ArsNativeBridge`, `ManaUtil`), several event handlers (`ArsManaCalcHandler`, `ResonanceEvents`, `RegenSynergyHandler`, `CurioDiscountHandler`, `EquipmentHandler`, `CastingAuthority`), `EquipmentIntegration`, `SpellScalingUtil`, `SpellAnalysis`, client overlay handlers, and the scroll-use mixin.
+- **Phase 6** — full Curios 1.21.1 integration. Will replace the Sanctified curio-feature footprint with a generic Curios bridge gated by `ModList.isLoaded("curios")`.
+- **Phase 7** — verification gates (`./gradlew build` / `test` / `runClient` / `runServer` / `runGameTestServer`) and the V1–V10 manual scenarios from [TESTING_GUIDE.md](TESTING_GUIDE.md).
 
 ## Building from source
 
-1. Install JDK 17.
-2. Run:
+Requires JDK 21.
 
 ```bash
 ./gradlew build
 ```
 
-Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven; no manual jar placement required.
+Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven (pinned file IDs in [`gradle.properties`](gradle.properties)); no manual jar placement required. The NeoForge `moddev` Gradle plugin handles deobf and run configuration.
+
+Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`.
 
 Output jar: `build/libs/ars_n_spells-1.9.0.jar`
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full version history, including the NeoForge 1.21.1 port notes at the top.
 
 ## License
 

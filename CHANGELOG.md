@@ -2,6 +2,101 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] — NeoForge 1.21.1 port (2026-05-10, in progress)
+
+Loader, Minecraft, and language version bump from **Forge 1.20.1 / Java 17** to **NeoForge 1.21.1 / Java 21**, against Ars Nouveau 5.11.1 and Iron's Spells 'n Spellbooks 1.21.1-3.15.6. The `mod_version` stays at 1.9.0 — this is the same release, ported, not a feature bump.
+
+The port is staged. Phases 0, 1, 4, and 5 (round-trip test) are in this changeset. Phases 2 (mixin re-verification), 3 (22 `TODO(Phase 11)` gameplay re-attach markers), 6 (full Curios integration), and 7 (verification) are tracked work-in-progress; see [README §Known work in progress](README.md#known-work-in-progress).
+
+### Build, metadata, language
+
+- ForgeGradle replaced with [`net.neoforged.moddev`](build.gradle) 2.0.78. Java toolchain `17` → `21`. Mixin Gradle plugin removed (moddev wires mixin natively). New named runs: `runClient`, `runServer`, `runGameTestServer`, `runData`. Parchment mappings `2024.11.17` for 1.21.1 wired in.
+- `gradle.properties` pins `minecraft_version=1.21.1`, `neoforge_version=21.1.84`, Ars Nouveau Curse file `7417840` (5.11.1), Iron's Curse file `7907341` (1.21.1-3.15.6). The optional `sanctified_*` properties exist but stay blank — see Removed below.
+- `META-INF/mods.toml` deleted; replaced by [`META-INF/neoforge.mods.toml`](src/main/resources/META-INF/neoforge.mods.toml). Declares NeoForge required, Minecraft `[1.21.1,1.22)`, Ars Nouveau `[5.0.0,)` required, Iron's `[1.21.1-3.0.0,)` optional.
+- `pack.mcmeta` updated to `pack_format` 34 (1.21.1 data + resource pack format); legacy `forge:resource_pack_format` / `forge:data_pack_format` keys removed.
+- `ars_n_spells.mixins.json` `compatibilityLevel` `JAVA_17` → `JAVA_21`. The `refmap` key is gone — `moddev` handles remapping.
+
+### Loader / bootstrap
+
+- [`ArsNSpells`](src/main/java/com/otectus/arsnspells/ArsNSpells.java) main class no longer uses `FMLJavaModLoadingContext.get()`/`ModLoadingContext.get()` static lookups; the constructor takes `(IEventBus modBus, ModContainer container)` and `container.registerConfig(...)` replaces the old loading-context call. `MinecraftForge.EVENT_BUS` → `NeoForge.EVENT_BUS`. The previous `AttachCapabilitiesEvent`/`RegisterCapabilitiesEvent` listeners are gone (no longer needed; see attachments below).
+- Client bootstrap (`ArsNSpellsClient`, `ManaBarController`, `OverlayDiagnostics`) is currently a stub set — overlay registration moves from Forge's `RegisterGuiOverlaysEvent` to NeoForge's `RegisterGuiLayersEvent`. Pending Phase 3.
+- Commands moved to `net.neoforged.neoforge.event.RegisterCommandsEvent` with no semantic change.
+
+### Networking
+
+- Forge `SimpleChannel` / `NetworkRegistry` / `NetworkDirection` / `DistExecutor` entirely removed. The three sync packets are replaced by record-based payloads:
+  - [`AffinitySyncPayload`](src/main/java/com/otectus/arsnspells/network/AffinitySyncPayload.java)
+  - [`CooldownSyncPayload`](src/main/java/com/otectus/arsnspells/network/CooldownSyncPayload.java)
+  - [`ResonanceSyncPayload`](src/main/java/com/otectus/arsnspells/network/ResonanceSyncPayload.java)
+- Each implements `CustomPacketPayload`, declares a static `Type<>`, a `StreamCodec`, and a `handleOnClient` whose client-only inner class is annotated `@OnlyIn(Dist.CLIENT)` for classload safety on dedicated servers.
+- [`PacketHandler`](src/main/java/com/otectus/arsnspells/network/PacketHandler.java) now registers via `RegisterPayloadHandlersEvent` and sends via `PacketDistributor.sendToPlayer`. The Resonance payload is still gated by `ModList.isLoaded("irons_spellbooks")` at registration time, but every payload type lives in its own `ResourceLocation` so server / client mod-set skew no longer corrupts a shared channel.
+- `ClientAffinityPacketHandler` deleted — its work moved into `AffinitySyncPayload.ClientHandler`.
+- Deleted: `AffinitySyncPacket`, `CooldownSyncPacket`, `ResonanceSyncPacket`.
+
+### Player state — attachments
+
+- [`AttachmentTypes`](src/main/java/com/otectus/arsnspells/data/AttachmentTypes.java) registers three NeoForge attachments: `AFFINITY` (`copyOnDeath`), `PROGRESSION` (`copyOnDeath`), and `COOLDOWN` (intentionally no `copyOnDeath` — cooldowns reset on respawn). All three serialize via a Codec on the data class.
+- Deleted: `ModCapabilityProvider`, the `bridge_data` capability `ResourceLocation`, and the `PlayerEvent.Clone` capability copy logic that wrapped them. The data classes themselves ([`AffinityData`](src/main/java/com/otectus/arsnspells/data/AffinityData.java), [`CooldownData`](src/main/java/com/otectus/arsnspells/data/CooldownData.java), [`ProgressionData`](src/main/java/com/otectus/arsnspells/data/ProgressionData.java)) are now plain POJOs.
+
+### Item state — data components
+
+- Cross-cast inscription storage moves from root NBT keys (`arsnspells:cross_spells` list, `arsnspells:cross_spell_index` int) to a single `DataComponentType<CrossModSpellList>` registered as `ars_n_spells:cross_spells` ([`ModDataComponents`](src/main/java/com/otectus/arsnspells/spell/ModDataComponents.java)).
+- New record types: [`CrossModSpell`](src/main/java/com/otectus/arsnspells/spell/CrossModSpell.java) (one entry: spell id, level, type, optional Ars CompoundTag, optional Iron's cast source) and [`CrossModSpellList`](src/main/java/com/otectus/arsnspells/spell/CrossModSpellList.java) (immutable list + selected index, with `Codec` and `StreamCodec`). [`CrossModSpellComponents`](src/main/java/com/otectus/arsnspells/spell/CrossModSpellComponents.java) is the helper façade — all `getOrCreateTag` / `setTag(null)` callsites are gone.
+- **Breaking persistence change.** Items inscribed under the previous Forge 1.20.1 build will not migrate automatically; their root-NBT entries are silently ignored by the new component reader. The mod is in-development; a migrator is not in scope for this port.
+- Deleted: `CrossCastNbt`.
+
+### Resource locations and registries
+
+- Zero `new ResourceLocation(...)` callsites remain. All call paths use `ResourceLocation.fromNamespaceAndPath(...)` (two-arg) or `ResourceLocation.parse(...)` (one-arg).
+- `ForgeRegistries` callsites replaced with `BuiltInRegistries` for `ITEM`, `ENCHANTMENT`, `MOB_EFFECT`, `ATTRIBUTE`, `BLOCK` lookups. `RegistryObject<Item>` → `DeferredHolder<Item, ?>` via `DeferredRegister.Items`.
+- `AttributeModifier` now takes a `ResourceLocation` as its id (no more `UUID` constructor); the cross-mod progression modifier is rekeyed to `ars_n_spells:cross_mod_school_progression`.
+
+### Mixins
+
+- [`ars_n_spells.mixins.json`](src/main/resources/ars_n_spells.mixins.json): `MixinSanctifiedAbstractSpell` entry removed (see Removed below). Compatibility level `JAVA_21`. The 9 remaining mixins (5 Ars, 4 Iron's) carry `TODO(Phase 11)` markers for target re-verification against the actual 1.21.1 dependency jars — none have been confirmed yet.
+- [`ArsNSpellsMixinPlugin`](src/main/java/com/otectus/arsnspells/mixin/ArsNSpellsMixinPlugin.java): Sanctified clause removed. The Iron's-classpath probe remains and gates the 4 Iron's-side mixins.
+- Known Phase 2 hazards: `ManaCap` (6 methods), `SpellResolver.expendMana`/`canCast`, `ManaCapEvents.playerOnTick`, `MagicData.getMana/setMana/addMana`, `AbstractSpell.getSpellPower`/`canBeCastedBy`, `Scroll.use`, and `ManaBarOverlay.render` — the last one almost certainly needs a signature rewrite because Forge's `ForgeGui` parameter doesn't exist on NeoForge 1.21.1 (it's `LayeredDraw.Layer` / `GuiLayer`).
+
+### 1.9.0 stabilization handlers, NeoForge port
+
+The five P0 fixes and five finished-system handlers from the Forge 1.20.1 1.9.0 release were re-applied on top of the port skeleton:
+
+- [`AffinityDecayHandler`](src/main/java/com/otectus/arsnspells/events/AffinityDecayHandler.java) — uses NeoForge `PlayerTickEvent.Post`; reads/writes affinity via `player.getData(AttachmentTypes.AFFINITY.get())`; syncs via `AffinitySyncPayload`.
+- [`AffinitySyncOnLoginHandler`](src/main/java/com/otectus/arsnspells/events/AffinitySyncOnLoginHandler.java) — NeoForge `PlayerEvent.PlayerLoggedInEvent`, same attachment + payload flow.
+- [`ArsSpellScalingHandler`](src/main/java/com/otectus/arsnspells/events/ArsSpellScalingHandler.java) — `LivingHurtEvent` → `LivingDamageEvent.Pre`; uses `event.getNewDamage` / `setNewDamage`.
+- [`IronsAffinityHandler`](src/main/java/com/otectus/arsnspells/events/IronsAffinityHandler.java), [`IronsProgressionHandler`](src/main/java/com/otectus/arsnspells/events/IronsProgressionHandler.java) — Iron's `SpellOnCastEvent` listeners; attachment-backed.
+- [`ProgressionAttributes`](src/main/java/com/otectus/arsnspells/progression/ProgressionAttributes.java) — `ForgeRegistries.ATTRIBUTES.getValue(...)` replaced with `BuiltInRegistries.ATTRIBUTE.getHolder(...)`; `AttributeModifier` constructed with `ResourceLocation` id.
+- New config key: `affinity_decay_interval_ticks` (default 1200, range 20–24000) — preserved on the port.
+
+The bootstrap registrations of these handlers (and their `ModList.isLoaded("irons_spellbooks")` gating) survive on `NeoForge.EVENT_BUS`.
+
+### Resources
+
+- Recipe tag namespace: `forge:logs/archwood` → `c:logs/archwood` (NeoForge common-tag namespace) in both `spell_transcription.json` and `spell_uninscription.json`.
+- `spell_transcription.json` is gated with `neoforge:conditions` `mod_loaded irons_spellbooks` so an Ars-only install no longer attempts to load an Iron's-dependent tablet recipe.
+- Lang file: keys for `commands.ans.info.cursed_ring`, `commands.ans.info.virtue_ring`, `message.ars_n_spells.lp.*`, `message.ars_n_spells.aura.*`, `message.ars_n_spells.ring_conflict`, and `message.ars_n_spells.lp.insufficient_need` are removed (the features are gone — see below).
+
+### Tests
+
+- The two Forge-era test classes (`CrossCastNbtRoundTripTest`, `InscriptionInputsPredicateTest`) were deleted on the port branch. The first is replaced by [`CrossModSpellListRoundTripTest`](src/test/java/com/otectus/arsnspells/spell/CrossModSpellListRoundTripTest.java) — 7 Bootstrap-free Codec round-trip cases against `CrossModSpellList`. The second is deferred to Phase 3, since `InscriptionInputs.readSource` is itself stubbed pending the Ars / Iron's parchment-source API re-attach.
+- Unit tests run via `./gradlew test` and remain Bootstrap-free.
+
+### Removed (Branch B — Sanctified Legacy / Covenant of the Seven absent on NeoForge 1.21.1)
+
+The CurseForge listing for Sanctified Legacy / Covenant of the Seven shipped its most recent file (`sanctified_legacy-2.2.5.jar`, January 2026) still targeting Minecraft 1.20.1 / Forge. No NeoForge 1.21.1 distribution exists at the time of the port. Per the approved port plan (Branch B), the entire Sanctified-coupled feature footprint is **deleted** from the codebase, with a Curios integration planned to replace its curio-feature surface area in Phase 6:
+
+- Deleted classes: `compat/SanctifiedLegacyCompat` (788 lines), `compat/ScrollLPTracker`, `events/CursedRingHandler`, `events/VirtueRingHandler`, `events/LPDeathPrevention`, `events/IronsLPHandler`, `mixin/sanctified/MixinSanctifiedAbstractSpell` (whole `mixin/sanctified/` directory removed).
+- Deleted aura system: `aura/AuraCapability`, `aura/AuraCapabilityProvider`, `aura/AuraManager`, `aura/AuraTickHandler`, `aura/IAuraCapability`. Aura was only consumed by the Virtue Ring path — removing the ring removed the only sink.
+- Stripped from [`MixinSpellResolverMana`](src/main/java/com/otectus/arsnspells/mixin/ars/MixinSpellResolverMana.java): Cursed Ring / Virtue Ring branches that cancelled `expendMana` when a ring was equipped.
+- Stripped from [`ArsNSpellsCommands`](src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java): `cursed_ring` / `virtue_ring` / `aura` info display in `/ans info`.
+- Stripped from [`ArsNSpells`](src/main/java/com/otectus/arsnspells/ArsNSpells.java): `SanctifiedLegacyCompat.init()` / `isAvailable()` calls in the config-loading lifecycle.
+- Stripped from lang file: LP / aura / ring-conflict / ring-status keys.
+- Dead config keys (`ENABLE_LP_SYSTEM`, `LP_SOURCE_MODE`, `DEATH_ON_INSUFFICIENT_LP`, `SHOW_LP_COST_MESSAGES`, `ARS_LP_*`, `IRONS_LP_*`, `AURA_*`, `VIRTUE_RING_DISCOUNT`, `BLASPHEMY_*`, `HIDE_MANA_BAR_WITH_RING`) remain declared in `AnsConfig` until a cosmetic cleanup pass. No code reads them. They are harmless config-file clutter.
+
+The previous v1.9.0 (Forge 1.20.1) entry below documents the pre-port behavior of these systems and is preserved for historical reference.
+
+---
+
 ## [1.9.0] - 2026-05-10
 
 ### Bug Fixes (P0 stabilization pass)

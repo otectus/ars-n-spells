@@ -1,25 +1,23 @@
-# Testing Guide — Ars 'n' Spells 1.9.0
+# Testing Guide — Ars 'n' Spells 1.9.0 (NeoForge 1.21.1)
 
-This guide covers manual verification scenarios for the systems shipped in
-1.9.0. It supersedes the pre-1.8 testing notes (which documented the old flat
-"Ring of Virtue 20% discount" model — current Virtue Ring converts mana costs
-to **aura**, see the [README](README.md) for the up-to-date description).
+This guide covers manual verification scenarios for Ars 'n' Spells **on NeoForge 1.21.1**. It supersedes the pre-port Forge 1.20.1 testing notes (which documented the Sanctified Legacy / Covenant of the Seven ring systems — those integrations are removed in this release; see [README §Removed](README.md#removed-in-the-neoforge-1211-port) and the [CHANGELOG](CHANGELOG.md) for context).
 
-For an at-a-glance description of features and configuration, start with the
-[README](README.md). For the change history, see [CHANGELOG.md](CHANGELOG.md).
+For an at-a-glance description of features and configuration, start with the [README](README.md). For the change history, see [CHANGELOG.md](CHANGELOG.md).
+
+> **Port status.** The NeoForge 1.21.1 port is staged. Several scenarios below are **gated on Phase 3** (the 22 `TODO(Phase 11)` gameplay re-attach markers) — they will only pass once the relevant handler / mixin is back online against Ars Nouveau 5.11.1 and Iron's Spells 1.21.1-3.15.6. Each scenario notes whether it is verifiable now or requires Phase 3 work first.
 
 ## Prerequisites
 
 | Mod | Version | Required for tests below |
 | --- | --- | --- |
-| Minecraft (Forge) | 1.20.1 / 47.2.0+ | All tests |
-| Ars Nouveau | 4.12.7 | All tests |
-| Iron's Spells 'n Spellbooks | 3.15.x | "Ars + Iron's" tests, scaling, progression, scrolls |
-| Covenant of the Seven (Sanctified Legacy) | Any | Cursed/Virtue Ring tests |
-| Blood Magic | Any | LP source `BLOOD_MAGIC_*` tests |
+| Minecraft (NeoForge) | 1.21.1 / 21.1.84+ | All tests |
+| Java | 21 | All tests (build + runtime) |
+| Ars Nouveau | 5.11.1+ | All tests |
+| Iron's Spells 'n Spellbooks | 1.21.1-3.15.6+ | "Ars + Iron's" tests, scaling, progression |
 
-Drop `build/libs/ars_n_spells-1.9.0.jar` into the instance's `mods/` folder
-alongside the dependencies.
+The previous Forge 1.20.1 testing guide also referenced Covenant of the Seven (Sanctified Legacy) and Blood Magic. Both prerequisites are gone — see [CHANGELOG §Removed](CHANGELOG.md).
+
+Drop `build/libs/ars_n_spells-1.9.0.jar` into the instance's `mods/` folder alongside the dependencies. The Gradle dev environment exposes `runClient`, `runServer`, `runGameTestServer`, and `runData` tasks.
 
 To enable verbose log output during testing, set in `config/ars_n_spells-common.toml`:
 
@@ -27,244 +25,154 @@ To enable verbose log output during testing, set in `config/ars_n_spells-common.
 debug_mode = true
 ```
 
-This adds `[Cooldown]`, `[CurioDiscount]`, and similar log prefixes to most
-event paths.
+This adds `[Cooldown]`, `[Affinity]`, and similar log prefixes to most event paths.
 
-## P0 regression scenarios (1.9.0 stabilization pass)
+## Verification gates (G1–G7)
 
-These scenarios exercise the five critical fixes called out in the 1.9.0
-changelog. If any of them fails, do not ship.
+Run these gradle tasks against the worktree before any manual scenario. Each gate must pass.
 
-### S1 — Dedicated server boot, Ars only (no Iron's installed)
+| Gate | Command | Pass criterion |
+| --- | --- | --- |
+| **G1 — Build** | `./gradlew --refresh-dependencies clean build` | `BUILD SUCCESSFUL`, 0 compile errors, no `mods.toml` references. |
+| **G2 — JUnit** | `./gradlew test` | All test classes pass. `CrossModSpellListRoundTripTest` is in place; `InscriptionInputsPredicateTest` is deferred to Phase 3. |
+| **G3 — Datagen** | `./gradlew runData` | Task exits 0; `src/generated/resources/` exists. |
+| **G4 — Mixin apply (Ars only)** | `./gradlew runClient` without Iron's | 5 Ars mixins apply (after Phase 2 verification); Iron's mixins skip silently; no `Mixin apply failed`. |
+| **G5 — Mixin apply (Ars + Iron's)** | `./gradlew runClient` with both pinned | All 9 active mixins apply. |
+| **G6 — Dedicated server (Ars only)** | `./gradlew runServer` without Iron's | Server reaches `Done (…)! For help, type 'help'`, 0 stack traces, 0 `NoClassDefFoundError` for `io.redspace.*`. |
+| **G7 — Dedicated server (Ars + Iron's)** | `./gradlew runServer` with Iron's pinned | Same; payload registration log line visible for `affinity_sync`, `cooldown_sync`, `resonance_sync`. |
 
-Validates **P0-1** (packet sidedness) and **P0-2** (Iron's classload safety).
+Gates G4 / G5 are blocked on Phase 2 (mixin re-verification) and may fail until that pass lands.
 
-1. Run a dedicated server with this jar and Ars Nouveau, **without** Iron's
-   Spellbooks on the classpath.
-2. Boot to the title.
+## V1 — V10 manual scenarios
 
-Pass: server reaches "Done (...)! For help, type 'help'" with no
-`NoClassDefFoundError`, no `ClassNotFoundException`, and no warnings about
-`io.redspace.ironsspellbooks.*` symbols. Joining a player and casting any
-Ars spell does not crash.
+These scenarios exercise gameplay equivalence to the Forge 1.20.1 build. Each is documented with a Phase-gate so you know whether to expect it to pass against the current commit.
 
-Failure modes to watch for: `IronsLPHandler` failing to load (would mean the
-de-auto-subscribe didn't take), `SpellScalingUtil` static-init crash (would
-mean the lazy-init refactor isn't being respected by some caller).
+### V1 — Boot integrity (both world configurations) — gated on G6 / G7
 
-### S2 — AffinitySyncPacket on Ars + Iron's
+1. Run a dedicated server with Ars Nouveau only on NeoForge 1.21.1. Reach `Done`.
+2. Repeat with Ars Nouveau + Iron's Spells 'n Spellbooks both installed.
 
-Validates **P0-1**.
+Pass: both boots complete with 0 stack traces, 0 mixin apply failures, 0 `NoClassDefFoundError` for `io.redspace.*` symbols in the Ars-only run. Joining a player and casting any Ars spell does not crash.
 
-1. Server with Ars + Iron's. Single-player or dedicated server, both behave the same.
-2. Cast any Ars spell whose dominant school maps to an `AffinityType`
-   (e.g., a Projectile + Ignite Ars spell → FIRE).
-3. Observe the affinity HUD / state on the casting client.
+Failure modes to watch for: a missed Iron's-gating call (would mean an Iron's import classloaded on the Ars-only server), `SpellScalingUtil` lazy-init crash, mixin target-not-found errors.
 
-Pass: affinity level for that school increments by 1 and the client reflects
-the new value within one tick. No `Wrong dist` warning in the server log.
+### V2 — Cross-cast Ars → Iron's — gated on Phase 3
 
-### S3 — Scroll cast, sufficient LP (Cursed Ring)
+1. Brazier-craft the Spell Transcription tablet with Iron's installed.
+2. Inscribe Iron's `irons_spellbooks:fireball` onto an Ars parchment via the Transcription ritual.
+3. Equip the inscribed parchment and right-click to cast.
 
-Validates **P0-3** happy path.
+Pass: Iron's fireball entity spawns; Iron's mana is consumed in HYBRID mode; Ars-side progression increments by 1.
 
-1. Equip Cursed Ring (Sanctified Legacy). Ensure player health is >5 hearts
-   so health-source LP is plentiful, OR have Blood Magic Soul Network filled.
-2. Cast an Iron's spell from a scroll whose mana cost is non-zero.
+Currently blocked on Phase 3 — [`CrossCastingHandler`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) needs Ars `Spell.CODEC` serialization, `SpellCaster.castSpell`, `SpellCostCalcEvent`, and the `PlayerInteractEvent.RightClickItem` intercept re-wired against the new APIs.
 
-Pass: the scroll consumes the action; LP is consumed exactly once at the
-amount shown in the action-bar message. Player does not take residual damage.
+### V3 — Cross-cast Iron's → Ars — gated on Phase 3
 
-### S4 — Scroll cast, insufficient LP, safe mode
+1. Inscribe an Ars `lightning + amplify` glyph chain onto an Iron's spellbook slot via the Transcription ritual.
+2. Cast from the spellbook in ARS_PRIMARY mode.
 
-Validates **P0-3** safe-mode branch.
+Pass: Ars effect resolves; Ars mana is consumed. Same Phase 3 dependency as V2.
 
-1. Set `death_on_insufficient_lp = false` in config.
-2. Drain LP below the calculated cost (e.g., set health to 1 heart with a
-   high-cost scroll spell).
-3. Cast the scroll.
+### V4 — Affinity decay + login sync round-trip — should pass after Phase 2
 
-Pass: scroll cast is cancelled; **no LP consumed**; player takes a small
-silent health loss (2 HP) as the safety nudge; action-bar shows
-"Insufficient LP - Scroll Cancelled".
+1. Build FIRE affinity to level 50 by casting fire spells. Set `affinity_decay_interval_ticks = 100` (faster cycle for testing) and `enable_affinity_decay = true`.
+2. Log out, log back in. Observe HUD reflects the persisted level immediately (Login sync via [`AffinitySyncOnLoginHandler`](src/main/java/com/otectus/arsnspells/events/AffinitySyncOnLoginHandler.java)).
+3. Wait several decay intervals (~25 s at the test setting); relog again.
 
-### S5 — Scroll cast, insufficient LP, death mode
+Pass: decayed value persists. [`AffinityDecayHandler`](src/main/java/com/otectus/arsnspells/events/AffinityDecayHandler.java) is wired and uses `PlayerTickEvent.Post`, the attachment, and the `AffinitySyncPayload`. The original 1.9.0 decay math (per-day rate prorated to per-interval) is preserved.
 
-Validates **P0-3** death-mode branch — the path that pre-1.9.0 had no enforcer.
+### V5 — *(reserved; was Cursed Ring scroll under load)*
 
-1. Set `death_on_insufficient_lp = true` in config.
-2. Drain LP below the calculated cost.
-3. Cast the scroll.
+Removed. The Cursed Ring / scroll-LP feature path is deleted as part of the Sanctified Legacy removal. No replacement scenario.
 
-Pass: scroll cast resolves once (you see the spell effect); player dies once
-(`DEATH: Insufficient LP (N LP required)` action-bar message); no double
-hurt, no "spell cast for free with no consequence" outcome. Pre-1.9.0 the
-spell would proceed and the player would survive — that is the bug.
+### V6 — Resonance multiplier — gated on Phase 3
 
-### S6 — Cooldown global-per-category
+1. Cast an Iron's spell.
+2. `/attribute @s irons_spellbooks:spell_power get`.
+3. Confirm the value is base × resonance modifier; confirm the resonance payload syncs within ≤1 tick.
 
-Validates **P0-4** intentional cross-mod blocking.
+Currently blocked on Phase 3 — [`ResonanceEvents`](src/main/java/com/otectus/arsnspells/events/ResonanceEvents.java) and [`RegenSynergyHandler`](src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java) carry `TODO(Phase 11)` markers for Iron's `SpellOnCastEvent` re-attach.
+
+### V7 — Cooldown global-per-category — gated on Phase 3
 
 1. Set `enable_cooldown_system = true` and `enable_cross_mod_cooldowns = true`.
 2. Cast an Ars `OFFENSIVE` spell (e.g., Projectile + Ignite).
-3. Within the cooldown window (default ~20 ticks; check
-   `cooldown_category_duration`), cast an Iron's `OFFENSIVE` spell.
+3. Within the cooldown window, cast an Iron's `OFFENSIVE` spell.
 
-Pass: the second cast is blocked. This is the intended behavior in 1.9.0 —
-cooldowns are global per category and do **not** isolate by mod.
+Pass: the second cast is blocked. By design — see [README §Cooldowns](README.md#cooldowns) for the global-per-category rationale.
 
-## Finished-system scenarios (1.9.0)
+Gated on Phase 3 — [`CooldownHandler`](src/main/java/com/otectus/arsnspells/events/CooldownHandler.java) and [`IronsCooldownHandler`](src/main/java/com/otectus/arsnspells/events/IronsCooldownHandler.java) need their cast-event hooks re-attached.
 
-### S7 — Iron's-side progression hook
+### V8 — Death cycle preserving progression — should pass after Phase 2
 
-Validates **T5a**.
+1. Build progression to a known value with a few Ars casts. Note `irons_spellbooks:fire_spell_power` attribute.
+2. `/kill`. Respawn.
+3. Re-check the attribute and the affinity level.
 
-1. Ars + Iron's. Note the player's `irons_spellbooks:fire_spell_power` value
-   via `/attribute @s irons_spellbooks:fire_spell_power get`.
-2. Cast an Iron's fire spell several times.
-3. Re-check the attribute value.
+Pass: attribute modifier and affinity level are preserved. Probes `AttachmentType.Builder.copyOnDeath` on `AFFINITY` and `PROGRESSION` ([`AttachmentTypes`](src/main/java/com/otectus/arsnspells/data/AttachmentTypes.java)). Cooldown intentionally resets (no `copyOnDeath`).
 
-Pass: the value increases via a transient additive modifier named
-"Cross-Mod School Progression". After 100 casts the bonus is roughly +0.10
-(0.1% per cast, capped at +25%).
+### V9 — Config hot-reload — should pass now
 
-### S8 — Iron's-side affinity hook
+1. Toggle `enable_cross_mod_cooldowns` in `config/ars_n_spells-common.toml`.
+2. `/reload`.
 
-Validates **T5b**.
+Pass: no server crash; the new config value takes effect without restart.
 
-1. Ars + Iron's.
-2. Cast an Iron's fire spell.
-3. Inspect AffinityData (in absence of UI: read the player NBT or use a debug
-   command).
+### V10 — World save/load integrity — should pass after Phase 3
 
-Pass: `AffinityLevels.FIRE` increments by 1 and an `AffinitySyncPacket` is
-sent to the casting player.
+1. With non-zero affinity, non-zero progression, and an inscribed parchment in a chest, save the world.
+2. Stop the server, restart, reload.
 
-### S9 — Ars spell scaling actually applied
-
-Validates **T5c**.
-
-1. Ars + Iron's. Stand near a damageable target dummy.
-2. Cast an Ars projectile damage spell. Note the damage dealt.
-3. Increase `irons_spellbooks:spell_power` on the player (via
-   `/attribute @s irons_spellbooks:spell_power base set 2.0`).
-4. Cast the same spell.
-
-Pass: the second cast deals roughly twice the damage, capped by
-`spell_power_cap` (default 3.0).
-
-### S10 — Affinity decay (opt-in)
-
-Validates **T5d**.
-
-1. Set `enable_affinity_decay = true` and `affinity_decay_interval_ticks = 100`
-   (faster cycle for testing).
-2. Cast a spell to build, e.g., FIRE affinity to level 50.
-3. Stop casting and wait several decay intervals (~25 s at the test setting).
-
-Pass: affinity level decreases at each interval; client receives an
-`AffinitySyncPacket` per affected school. With `affinity_decay_rate = 0.01`
-and the test interval, level 50 loses 1 per cycle (floor of `50 * 0.01 *
-(100/24000) ≈ 0.0021`, but the implementation floors to a minimum of 1 to
-ensure progress).
-
-### S11 — Login sync for affinity
-
-Validates **T5e**.
-
-1. Build affinity in any school to level > 0.
-2. Disconnect and reconnect to the server (or relog into the world).
-
-Pass: HUD/state shows the persisted level immediately on join, without
-requiring another cast to trigger a sync.
-
-## Sanctified Legacy / curio scenarios
-
-These exercise the existing pre-1.9.0 paths; they are unchanged in 1.9.0 but
-listed here because the old testing guide content was the only doc covering
-them and it was wrong about the Virtue Ring model.
-
-### S12 — Cursed Ring (LP costs, Ars spell)
-
-1. Equip Cursed Ring. Pick `lp_source_mode`.
-2. Cast an Ars spell with non-zero mana cost.
-
-Pass: mana cost is converted to LP; LP is deducted from health (or Blood
-Magic Soul Network depending on mode). Pre-cast validation prevents casting
-if LP is insufficient (safe mode) or proceeds with death (death mode).
-
-### S13 — Virtue Ring (aura costs)
-
-1. Equip Virtue Ring (Ring of the Seven Virtues).
-2. Cast an Ars spell with non-zero mana cost.
-
-Pass: mana cost is converted to **aura** (not a flat discount — that was the
-pre-1.5 model and is no longer how Virtue Ring works). Aura regenerates over
-time per `aura_regen_rate`; insufficient aura cancels the cast with an
-action-bar message per `show_aura_messages`.
-
-### S14 — Blasphemy curio discounts
-
-1. Equip a Blasphemy curio (e.g., `fire_blasphemy`).
-2. Cast a non-fire spell, then a fire spell.
-
-Pass: both casts get the base 15% mana discount (`blasphemy_discount`); the
-fire cast gets an additional 10% from the matching-school bonus
-(`blasphemy_matching_school_bonus`). With `allow_discount_stacking = true`
-discounts compose with ring conversions.
+Pass: affinity and progression persist; the chest item's `CrossModSpellList` data component is intact and right-clicking the item still casts (Phase 3 dependency for the cast itself; the component persistence should already work).
 
 ## Inscription / cross-cast scenarios
 
-These haven't changed in 1.9.0 but are still load-bearing for survival
-gameplay. See [README §Cross-mod spell casting](README.md) for the full flow.
+### S15 — Strict disambiguation on the brazier — gated on Phase 3
 
-### S15 — Strict disambiguation on the brazier
-
-1. Drop two filled Ars spell parchments (two sources) within three blocks of
-   the Spell Transcription brazier.
+1. Drop two filled Ars spell parchments (two sources) within three blocks of the Spell Transcription brazier.
 2. Activate the ritual.
 
-Pass: ritual fails with a chat message naming both items and explaining that
-exactly one source + one blank target are required. Pre-1.8.9 this would
-either silently pick one or corrupt an item.
+Pass: ritual fails with a chat message naming both items. Pre-1.8.9 this would either silently pick one or corrupt an item.
 
-### S16 — Spell Uninscription returns a bit-identical blank
+The ritual classifier ([`InscriptionInputs`](src/main/java/com/otectus/arsnspells/rituals/InscriptionInputs.java)) currently classifies everything as a blank target because `readSource` is a Phase 3 stub. The ritual will short-circuit on "no source" instead of producing the disambiguation message. Once Phase 3 resolves `readSource` against Ars 5.x `SpellCaster` / Iron's 3.15.6 `ISpellContainer`, this scenario becomes verifiable.
 
-1. Inscribe a cross-cast spell onto a target item. Note its NBT.
-2. Run the Spell Uninscription ritual on the inscribed item.
-3. Compare the resulting NBT to a fresh blank target item.
+### S16 — Spell Uninscription returns a bit-identical blank — should pass now
 
-Pass: NBT is bit-identical (no residual root tags). The same item can be
-re-inscribed cleanly.
+1. Manually set the `ars_n_spells:cross_spells` data component on a target item (`/data modify entity @s SelectedItem.components` or programmatic test).
+2. Run the Spell Uninscription ritual.
+3. Compare the resulting item's component map to a fresh blank target.
+
+Pass: the `ars_n_spells:cross_spells` component is gone; component map equality holds. The new [`CrossModSpellComponents.clear`](src/main/java/com/otectus/arsnspells/spell/CrossModSpellComponents.java) call removes the component entirely (rather than leaving an empty list), matching the Forge-era `tag.isEmpty() ⇒ setTag(null)` collapse.
+
+## Removed scenarios
+
+The following scenarios from the Forge 1.20.1 testing guide are no longer applicable:
+
+- **S3** (Scroll cast, sufficient LP — Cursed Ring) — Cursed Ring is gone.
+- **S4** (Scroll cast, insufficient LP, safe mode) — Cursed Ring LP system is gone.
+- **S5** (Scroll cast, insufficient LP, death mode) — same.
+- **S12** (Cursed Ring LP costs on an Ars spell) — Cursed Ring is gone.
+- **S13** (Virtue Ring aura costs) — Virtue Ring + aura system are gone.
+- **S14** (Blasphemy curio discounts) — Blasphemy curios are gone.
+
+If a future Curios integration in Phase 6 reintroduces curio-driven discounts, equivalent scenarios will be added here.
 
 ## Troubleshooting
 
-- **Server crashes during boot with `NoClassDefFoundError` for an Iron's class
-  on an Ars-only install**: a class was missed by the classload-safety pass.
-  Grep the stack trace for `io.redspace.ironsspellbooks` and ensure the
-  origin class is registered behind `IronsCompat.isLoaded()` or
-  `ModList.get().isLoaded("irons_spellbooks")`.
-- **Affinity HUD shows zero after relog with non-zero NBT**: the
-  `AffinitySyncOnLoginHandler` didn't fire. Check that
-  `enable_affinity_system = true` and that the player capability is being
-  attached (look for `bridge_data` capability resource location in any debug
-  capability dump).
-- **Cooldowns blocking spells from the "wrong" mod**: this is intentional in
-  1.9.0. Cooldowns are global per category by design; see README §Cooldowns.
-- **Ars spell damage not scaling with Iron's spell power**: ensure Iron's is
-  installed (the scaling handler is gated on Iron's), `enable_resonance_system`
-  and `enable_affinity_system` are at their default values, and the spell's
-  damage source contains "magic", "ars_nouveau", "onFire", or "inFire" — the
-  filter rejects melee/environmental damage from the same player.
+- **Server crashes during boot with `NoClassDefFoundError` for an Iron's class on an Ars-only install**: a class was missed by the classload-safety pass. Grep the stack trace for `io.redspace.ironsspellbooks` and ensure the origin class is registered behind `IronsCompat.isLoaded()` or `ModList.get().isLoaded("irons_spellbooks")`.
+- **Affinity HUD shows zero after relog with non-zero attachment data**: the `AffinitySyncOnLoginHandler` didn't fire. Check that `enable_affinity_system = true` and that the player attachment is being serialized (`/data get entity @s` should show the `ars_n_spells:affinity` attachment).
+- **Cooldowns blocking spells from the "wrong" mod**: this is intentional. Cooldowns are global per category by design; see [README §Cooldowns](README.md#cooldowns).
+- **Cast nothing-happens on inscribed item**: Phase 3 work-in-progress. [`CrossCastingHandler`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) right-click intercept is stubbed pending Ars / Iron's API re-attach. See the `TODO(Phase 11)` markers in source.
+- **Recipes failing to load with `Unknown tag c:logs/archwood`**: confirm Ars Nouveau 5.11.1+ is installed — it ships the `c:` namespace common tag set. If Ars's tag still uses `forge:logs/archwood` on your specific build, fall back to `forge:logs/archwood` temporarily.
+- **Mixin apply failure for `ManaBarOverlay.render`**: expected before Phase 2. Iron's 3.15.6 likely re-targets to NeoForge's `LayeredDraw.Layer` instead of Forge's `ForgeGui` parameter. Update the mixin signature accordingly.
 
 ## Reporting issues
 
 Include in the bug report:
-1. Mod versions (Ars Nouveau, Iron's Spellbooks, Sanctified Legacy / Covenant
-   of the Seven, Blood Magic if installed) and Forge version.
-2. The relevant `config/ars_n_spells-common.toml` keys.
-3. `logs/latest.log` excerpts. With `debug_mode = true` enabled, look for log
-   lines prefixed `[Cooldown]`, `[CurioDiscount]`, `[Affinity]`, or messages
-   from `MixinScrollItem`, `IronsLPHandler`, `LPDeathPrevention`.
-4. The exact reproduction steps tied to one of the scenarios above where
-   possible.
+
+1. NeoForge version (must be 1.21.1 / 21.1.84+), Minecraft 1.21.1.
+2. Ars Nouveau and Iron's Spells 'n Spellbooks versions.
+3. The relevant `config/ars_n_spells-common.toml` keys.
+4. `logs/latest.log` excerpts. With `debug_mode = true` enabled, look for log lines prefixed `[Cooldown]`, `[Affinity]`, or messages from the mixin / payload register lifecycle.
+5. The exact reproduction steps tied to one of the scenarios above where possible.
+6. If the issue may be Phase 3-related, mention which `TODO(Phase 11)` marker (if any) is in the suspected code path.
