@@ -14,6 +14,25 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * DISABLED in ars_n_spells.mixins.json pending Phase 2 verification against
+ * Ars Nouveau 5.11.4. Re-enable in the config once the @Shadow fields below
+ * are confirmed to exist on the current target class.
+ *
+ * The 1.21.1 hotfix on 2026-05-10 took this out of the rotation after
+ * `@Shadow @Final private LivingEntity livingEntity` was rejected against
+ * `ManaCap` at mixin-apply time (`InvalidMixinException: field not located`),
+ * which aborted `RegisterCapabilitiesEvent` dispatch and crashed mod load.
+ *
+ * Phase 2 work: decompile the deobfuscated Ars 5.x jar and verify the
+ * actual field names + types on `ManaCap`. The whole mixin may need to be
+ * replaced with a NeoForge `ManaCalcEvent` listener (if upstream now
+ * exposes one) rather than shadowing internals — that would be much more
+ * robust to future Ars patch bumps.
+ *
+ * @see com.otectus.arsnspells.bridge.BridgeManager — the sole consumer of
+ *      the methods this mixin used to intercept.
+ */
 @Mixin(value = ManaCap.class, remap = false)
 public abstract class MixinManaCapability {
 

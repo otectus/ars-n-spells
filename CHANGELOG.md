@@ -8,6 +8,31 @@ Loader, Minecraft, and language version bump from **Forge 1.20.1 / Java 17** to 
 
 The port is staged. Phases 0, 1, 4, and 5 (round-trip test) are in this changeset. Phases 2 (mixin re-verification), 3 (22 `TODO(Phase 11)` gameplay re-attach markers), 6 (full Curios integration), and 7 (verification) are tracked work-in-progress; see [README §Known work in progress](README.md#known-work-in-progress).
 
+### Runtime hotfix (2026-05-10) — mana unification mixins disabled pending Phase 2
+
+First runtime test against the live `ars_nouveau-1.21.1-5.11.4.jar` aborted mod load:
+
+```
+@Shadow field livingEntity was not located in the target class
+com.hollingsworth.arsnouveau.common.capability.ManaCap. No refMap loaded.
+Mixin [ars_n_spells.mixins.json:ars.MixinManaCapability …] FAILED during APPLY
+```
+
+The 4.12-era field names `livingEntity` / `mana` / `maxMana` on `ManaCap` have drifted in Ars Nouveau 5.x. The mixin transformer aborts class load for `ManaCap`, which aborts Ars's `RegisterCapabilitiesEvent` handler, which aborts the whole mod load.
+
+To make the mod load while Phase 2 verification is pending, four mixins were removed from `ars_n_spells.mixins.json`:
+
+- `ars.MixinManaCapability` — `@Shadow livingEntity`/`mana`/`maxMana` against `ManaCap` (confirmed failing).
+- `ars.MixinSpellResolverMana` — `@Shadow spellContext`/`getResolveCost()` against `SpellResolver`. Same drift-risk family.
+- `ars.MixinSpellResolverContext` — `@Shadow spellContext`, `canCast(LivingEntity)` against `SpellResolver`.
+- `irons.MixinIronsMagicDataMana` — `@Shadow mana`/`serverPlayer` against Iron's `MagicData`. Same risk on the Iron's side.
+
+The disabled source files retain a `DISABLED in ars_n_spells.mixins.json pending Phase 2` doc-comment marker. The five remaining mixins (`MixinSpellResolverPreCast`, `MixinArsPotionEffects`, `MixinIronsSpellDamage`, `MixinScrollItem`, `MixinIronsManaBarOverlay`) are either empty `@Pseudo` stubs or use `require = 0` injectors, so they cannot abort load.
+
+**Behavioural effect:** mana unification interception is inert. All five `mana_unification_mode` settings currently behave like `disabled`: each mod uses its own mana pool, with no cross-system cost routing, conversion-rate scaling, or HYBRID/SEPARATE pool sharing. Resonance, spell scaling, affinity, progression, cooldowns, cross-cast inscription, and rituals are unaffected (none of these go through the disabled mixins).
+
+Phase 2 verification spec — decompile the deobfuscated Ars 5.11.4 and Iron's 3.15.6 jars; for each disabled mixin, confirm the actual field names + types and method signatures; either patch the `@Shadow` declarations or replace the mixin with an event-bus listener that doesn't need to shadow internals.
+
 ### Build, metadata, language
 
 - ForgeGradle replaced with [`net.neoforged.moddev`](build.gradle) 2.0.78. Java toolchain `17` → `21`. Mixin Gradle plugin removed (moddev wires mixin natively). New named runs: `runClient`, `runServer`, `runGameTestServer`, `runData`. Parchment mappings `2024.11.17` for 1.21.1 wired in.

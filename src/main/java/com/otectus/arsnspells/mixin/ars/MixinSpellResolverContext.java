@@ -12,9 +12,19 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Captures the spell context for use by cost calculation handlers.
- * Injects into canCast() which is called by all cast paths and
+ * DISABLED in ars_n_spells.mixins.json pending Phase 2 verification against
+ * Ars Nouveau 5.11.4. Re-enable in the config once `@Shadow public
+ * SpellContext spellContext` and `canCast(LivingEntity)` are confirmed
+ * against the current `SpellResolver`. The 1.21.1 hotfix on 2026-05-10
+ * disabled this preemptively — same drift-risk family as
+ * `MixinSpellResolverMana`.
+ *
+ * Purpose: captures the spell context for use by cost calculation
+ * handlers. Injects into canCast() which is called by all cast paths and
  * triggers SpellCostCalcEvent via getResolveCost() -> enoughMana().
+ *
+ * Phase 2 work: verify field + method signatures against the actual
+ * upstream jar.
  */
 @Mixin(value = SpellResolver.class, remap = false)
 public class MixinSpellResolverContext {
