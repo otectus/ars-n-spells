@@ -71,6 +71,16 @@ neoForge {
     }
 }
 
+// Make the test source set inherit Minecraft + NeoForge from the main source set.
+// moddev doesn't do this automatically; without it, JUnit tests can't resolve
+// net.minecraft.* or com.mojang.serialization.* imports.
+sourceSets {
+    test {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
 dependencies {
     if (findProperty('ars_nouveau_file')?.toString()?.trim()) {
         implementation "curse.maven:ars-nouveau-${ars_nouveau_project.tokenize('-').last()}:${ars_nouveau_file}"
