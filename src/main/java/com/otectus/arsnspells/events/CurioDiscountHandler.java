@@ -83,12 +83,10 @@ public class CurioDiscountHandler {
     private static double calculateDiscountMultiplier(Player player, SpellCostCalcEvent event) {
         double multiplier = 1.0;
 
-        // Virtue Ring no longer provides a mana discount — it converts mana to aura via
-        // VirtueRingHandler. If the Virtue Ring is active, the cost has already been zeroed
-        // by VirtueRingHandler at HIGHEST priority, so this handler won't be reached (cost <= 0).
-        // Only Blasphemy discounts apply here (for non-ring or Cursed Ring users).
-
-        // Check for Blasphemy discount
+        // Only Blasphemy discounts apply here. The Virtue Ring zeroed the cost at HIGHEST
+        // priority (VirtueRingHandler) by converting mana to aura, so this LOW-priority
+        // handler doesn't see Virtue Ring wearers (we return early when cost <= 0 above).
+        // Blasphemy discount
         String spellSchool = determineSpellSchool(event);
         BlasphemyDiscountResult blasphemyResult = calculateBlasphemyDiscount(player, spellSchool);
 

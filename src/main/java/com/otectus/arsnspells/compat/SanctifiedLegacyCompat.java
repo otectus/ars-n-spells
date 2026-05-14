@@ -217,9 +217,11 @@ public class SanctifiedLegacyCompat {
 
     /**
      * Check if the player has both the Cursed Ring and Virtue Ring equipped (conflict state).
+     * Covenant of the Seven ships both rings, so either source mod is sufficient — the previous
+     * AND-gate silently dropped the conflict notification on C7-only setups.
      */
     public static boolean hasBothRings(Player player) {
-        if (!isLoaded || !isEnigmaticLegacyLoaded) return false;
+        if (!isLoaded && !isEnigmaticLegacyLoaded) return false;
         CurioState state = getState(player);
         return state.cursedRing && state.virtueRing;
     }
@@ -596,7 +598,7 @@ public class SanctifiedLegacyCompat {
      * @return true if player has matching Blasphemy curio
      */
     public static boolean hasMatchingBlasphemy(Player player, String schoolType) {
-        if (!isLoaded || schoolType == null) {
+        if (!isAvailable() || schoolType == null) {
             return false;
         }
         ResourceLocation id = new ResourceLocation(MOD_ID, schoolType.toLowerCase() + "_blasphemy");

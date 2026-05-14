@@ -103,7 +103,6 @@ public class AnsConfig {
     // CURIO DISCOUNT SYSTEM
     // ========================================
     public static final ForgeConfigSpec.BooleanValue ENABLE_CURIO_DISCOUNTS;
-    public static final ForgeConfigSpec.DoubleValue VIRTUE_RING_DISCOUNT;
     public static final ForgeConfigSpec.DoubleValue BLASPHEMY_DISCOUNT;
     public static final ForgeConfigSpec.DoubleValue BLASPHEMY_MATCHING_SCHOOL_BONUS;
     public static final ForgeConfigSpec.BooleanValue ALLOW_DISCOUNT_STACKING;
@@ -138,6 +137,7 @@ public class AnsConfig {
     // ========================================
     // AURA SYSTEM (Ring of Seven Virtues)
     // ========================================
+    public static final ForgeConfigSpec.BooleanValue ENABLE_AURA_SYSTEM;
     public static final ForgeConfigSpec.IntValue AURA_MAX_DEFAULT;
     public static final ForgeConfigSpec.DoubleValue AURA_REGEN_RATE;
     public static final ForgeConfigSpec.DoubleValue AURA_BASE_MULTIPLIER;
@@ -146,6 +146,7 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue AURA_TIER3_MULTIPLIER;
     public static final ForgeConfigSpec.IntValue AURA_MINIMUM_COST;
     public static final ForgeConfigSpec.BooleanValue SHOW_AURA_MESSAGES;
+    public static final ForgeConfigSpec.BooleanValue SHOW_AURA_HUD;
 
     // ========================================
     // SCROLL COST SYSTEM
@@ -569,13 +570,11 @@ public class AnsConfig {
         );
         
         ENABLE_CURIO_DISCOUNTS = BUILDER
-            .comment("Enable mana cost discounts from Ring of Virtue and Blasphemy curios")
+            .comment("Enable mana cost discounts from Blasphemy curios.",
+                     "Note: the Ring of Virtue is no longer a mana discount — it converts mana to",
+                     "aura via VirtueRingHandler. The legacy virtue_ring_discount key was removed in 1.10.0.")
             .define("enable_curio_discounts", true);
-        
-        VIRTUE_RING_DISCOUNT = BUILDER
-            .comment("Mana cost discount from Ring of Virtue (0.20 = 20% reduction)")
-            .defineInRange("virtue_ring_discount", 0.20, 0.0, 1.0);
-        
+
         BLASPHEMY_DISCOUNT = BUILDER
             .comment("Base mana cost discount from Blasphemy curios (0.15 = 15% reduction)")
             .defineInRange("blasphemy_discount", 0.15, 0.0, 1.0);
@@ -727,6 +726,11 @@ public class AnsConfig {
             "Aura regenerates passively over time."
         );
 
+        ENABLE_AURA_SYSTEM = BUILDER
+            .comment("Master toggle for the Virtue Ring aura system.",
+                     "When disabled, spells use normal mana even with the Virtue Ring equipped.")
+            .define("enable_aura_system", true);
+
         AURA_MAX_DEFAULT = BUILDER
             .comment("Default maximum aura pool")
             .defineInRange("aura_max_default", 1000, 100, 100000);
@@ -753,11 +757,17 @@ public class AnsConfig {
 
         AURA_MINIMUM_COST = BUILDER
             .comment("Minimum aura cost for any spell")
-            .defineInRange("aura_minimum_cost", 5, 1, 10000);
+            .defineInRange("aura_minimum_cost", 10, 1, 10000);
 
         SHOW_AURA_MESSAGES = BUILDER
             .comment("Show aura cost messages in action bar when casting spells")
             .define("show_aura_messages", true);
+
+        SHOW_AURA_HUD = BUILDER
+            .comment("Draw the Ars 'n' Spells aura HUD bar above the hotbar while wearing the Virtue Ring.",
+                     "Disable this if Sanctified Legacy / Covenant of the Seven provides its own aura HUD",
+                     "and you want to avoid stacked overlays.")
+            .define("show_aura_hud", true);
 
         BUILDER.pop();
 

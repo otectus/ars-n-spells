@@ -85,6 +85,14 @@ public class EquipmentHandler {
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         EquipmentIntegration.clearCache(event.getEntity());
     }
+
+    // Note: a CurioChangeEvent listener would invalidate the 20-tick curio cache instantly
+    // and clear pending aura/LP costs on ring swap. It's been deferred because the event
+    // class lives in `top.theillusivec4.curios.api.event`, which isn't on the transitive
+    // compile classpath without an explicit Curios dependency in build.gradle. The
+    // existing 20-tick cache TTL plus the Pre/Post ring-state re-verify already gate the
+    // correctness case (no double-charge after unequip); the only remaining UX gap is
+    // up to ~1 s of "ring just equipped but not active yet" latency on the cast hot-path.
     
     /**
      * Update player's max mana based on equipment

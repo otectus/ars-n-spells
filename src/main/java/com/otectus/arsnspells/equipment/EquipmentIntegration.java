@@ -502,15 +502,13 @@ public class EquipmentIntegration {
             boolean hasVirtue = (boolean) hasVirtueMethod.invoke(null, player);
             boolean hasBlasphemy = (boolean) hasBlasphemyMethod.invoke(null, player);
             
-            // Calculate base discount (will be refined per-spell in CurioDiscountHandler)
+            // Base discount comes only from Blasphemy now. The Virtue Ring converts mana to
+            // aura instead of discounting it (handled in VirtueRingHandler).
             double baseDiscount = 0.0;
-            if (hasVirtue) {
-                baseDiscount = AnsConfig.VIRTUE_RING_DISCOUNT.get();
+            if (hasBlasphemy) {
+                baseDiscount = AnsConfig.BLASPHEMY_DISCOUNT.get();
             }
-            if (hasBlasphemy && (AnsConfig.ALLOW_DISCOUNT_STACKING.get() || !hasVirtue)) {
-                baseDiscount += AnsConfig.BLASPHEMY_DISCOUNT.get();
-            }
-            
+
             return new CurioDiscountData(hasVirtue, hasBlasphemy, baseDiscount);
         } catch (Exception e) {
             logDebug("Failed to calculate curio discounts: {}", e.getMessage());

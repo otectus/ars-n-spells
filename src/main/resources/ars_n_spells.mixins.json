@@ -11,6 +11,8 @@
     "ars.MixinSpellResolverPreCast",
     "ars.MixinSpellResolverContext",
     "ars.MixinArsPotionEffects",
+    "irons.MagicDataAccessor",
+    "irons.MixinIronsCastValidation",
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem",

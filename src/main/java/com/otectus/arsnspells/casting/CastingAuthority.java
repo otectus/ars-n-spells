@@ -63,14 +63,9 @@ public class CastingAuthority {
             logDebug("canCastArsSpell: Sanctified Legacy not available");
         }
 
-        // SANCTIFIED LEGACY INTEGRATION: Check for Virtue Ring
-        if (SanctifiedLegacyCompat.isAvailable() && SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
-            // Virtue Ring provides a mana discount (configured in VIRTUE_RING_DISCOUNT)
-            // The discount is applied via CurioDiscountHandler on SpellCostCalcEvent
-            // Just continue to normal mana validation - the discounted cost will be checked
-            logDebug("Virtue Ring detected - mana discount will be applied by CurioDiscountHandler");
-            // Fall through to normal mana validation below
-        }
+        // SANCTIFIED LEGACY INTEGRATION: Virtue Ring is handled by VirtueRingHandler
+        // (mana cost zeroed at SpellCostCalcEvent; aura consumed at SpellResolveEvent.Post).
+        // The aura sufficiency check happens in MixinSpellResolverPreCast.
 
         // Check for alternate resource costs (health, aura, etc.)
         AlternateResourceCost altCost = detectAlternateResourceCost(player, manaCost);

@@ -35,7 +35,7 @@ public abstract class MixinSpellResolverMana {
                         ci.cancel();
                         return;
                     }
-                    if (SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
+                    if (AnsConfig.ENABLE_AURA_SYSTEM.get() && SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
                         // Aura was already consumed by VirtueRingHandler
                         ci.cancel();
                         return;

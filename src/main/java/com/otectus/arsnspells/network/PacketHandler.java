@@ -24,6 +24,9 @@ public class PacketHandler {
         }
         INSTANCE.registerMessage(id++, AffinitySyncPacket.class, AffinitySyncPacket::toBytes, AffinitySyncPacket::new, AffinitySyncPacket::handle);
         INSTANCE.registerMessage(id++, CooldownSyncPacket.class, CooldownSyncPacket::toBytes, CooldownSyncPacket::new, CooldownSyncPacket::handle);
+        // Aura sync is appended at the end so the IDs of pre-existing packets don't shift
+        // for clients running mixed mod versions.
+        INSTANCE.registerMessage(id++, AuraSyncPacket.class, AuraSyncPacket::toBytes, AuraSyncPacket::new, AuraSyncPacket::handle);
     }
 
     public static void sendToClient(Object msg, ServerPlayer player) {

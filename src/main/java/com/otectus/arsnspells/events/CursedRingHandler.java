@@ -23,19 +23,29 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Handles Cursed Ring LP consumption for Ars Nouveau spells.
  * Uses event-based approach instead of mixins for better compatibility.
+ *
+ * <p>Consumption is split across Pre and Post:
+ * <ul>
+ *   <li>{@code SpellCostCalcEvent}: stamps pending LP cost, zeros mana cost.</li>
+ *   <li>{@code SpellResolveEvent.Pre}: validation-only — re-verifies the player still
+ *       wears the Cursed Ring; drops the pending cost if state changed.</li>
+ *   <li>{@code SpellResolveEvent.Post}: actually consumes LP. Post only fires for
+ *       resolved (non-cancelled) spells — prevents "paid but didn't cast" if another
+ *       HIGHEST handler cancels at Pre after ours runs.</li>
+ * </ul>
  */
 @Mod.EventBusSubscriber(modid = "ars_n_spells")
 public class CursedRingHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CursedRingHandler.class);
-    
+
     // Track which spells have had LP consumed (to prevent double-consumption).
     // ConcurrentHashMap because event handlers can fire from network/tick threads.
     private static final Map<UUID, PendingLPCost> pendingCosts = new ConcurrentHashMap<>();
     private static final java.util.Set<UUID> ringConflictNotified = ConcurrentHashMap.newKeySet();
-    
+
     /**
-     * Calculate and validate LP cost when Cursed Ring is equipped.
-     * This runs BEFORE the spell resolves.
+     * Calculate and stamp LP cost when Cursed Ring is equipped.
+     * This runs at the cost-calc event, BEFORE the spell resolves.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onSpellCostCalc(SpellCostCalcEvent event) {
@@ -59,13 +69,15 @@ public class CursedRingHandler {
         // Check if wearing Cursed Ring - handle it regardless of mana unification setting
         // This prevents Sanctified Legacy's native (buggy) handling from interfering
         if (!SanctifiedLegacyCompat.isWearingCursedRing(player)) {
+            // Make sure no stale entry from a previous wearing session can be consumed.
+            pendingCosts.remove(player.getUUID());
             return;
         }
 
-        
+
         LOGGER.debug("Cursed Ring detected on {} - Spell will use LP instead of mana",
             player.getName().getString());
-        
+
         int manaCost = event.currentCost;
         if (manaCost <= 0) {
             LOGGER.debug("Zero cost spell - allowing");
@@ -89,15 +101,15 @@ public class CursedRingHandler {
             lpCost = (int) Math.max(AnsConfig.ARS_LP_MINIMUM_COST.get(), Math.round(lpCost * blasphemyMultiplier));
             LOGGER.debug("Blasphemy discount applied: {} LP -> {} LP", originalCost, lpCost);
         }
-        
+
         LOGGER.debug("Spell will cost {} LP (base mana: {})", lpCost, manaCost);
-        
+
         // Store the LP cost for consumption in the resolve event
         pendingCosts.put(player.getUUID(), new PendingLPCost(lpCost, player.tickCount));
-        
+
         // Set mana cost to 0 so Ars Nouveau doesn't consume mana
         event.currentCost = 0;
-        
+
         LOGGER.debug("Mana cost set to 0 (LP will be consumed on spell resolve)");
     }
 
@@ -131,23 +143,32 @@ public class CursedRingHandler {
             pendingCosts.remove(player.getUUID());
         }
     }
-    
+
     /**
-     * Consume LP when the spell actually resolves.
-     * This runs AFTER cost calculation but BEFORE spell effects.
-     * 
-     * CRITICAL: We must consume LP but NOT cancel the event, otherwise spell effects won't apply.
+     * Clear any pending LP cost by UUID (use when only the UUID is available, e.g.
+     * curio change events).
+     */
+    public static void clearPendingLPCost(UUID uuid) {
+        if (uuid != null) {
+            pendingCosts.remove(uuid);
+        }
+    }
+
+    /**
+     * Pre-resolve gate: re-verify the player still wears the ring. If they don't
+     * (e.g. unequipped between cost calc and resolve), drop the pending cost so the
+     * Post handler can't consume it.
+     *
+     * <p>This does NOT consume LP — that happens on Post.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onSpellResolve(SpellResolveEvent.Pre event) {
+    public static void onSpellResolvePre(SpellResolveEvent.Pre event) {
         if (!SanctifiedLegacyCompat.isAvailable()) {
             return;
         }
-
         if (!AnsConfig.ENABLE_LP_SYSTEM.get()) {
             return;
         }
-
         if (event.context == null) {
             return;
         }
@@ -156,79 +177,118 @@ public class CursedRingHandler {
         if (!(caster instanceof ServerPlayer player)) {
             return;
         }
-        
-        // Check if we have a pending LP cost for this player
+
         PendingLPCost pending = pendingCosts.get(player.getUUID());
         if (pending == null) {
-            return; // No LP cost pending (not wearing Cursed Ring)
+            return;
         }
-        
-        // Check if the pending cost is still valid (within 100 game ticks)
+
         if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
-            LOGGER.warn("   Pending LP cost expired for {}", player.getName().getString());
             pendingCosts.remove(player.getUUID());
             return;
         }
-        
-        // Only consume once per spell cast
+
+        if (!SanctifiedLegacyCompat.isWearingCursedRing(player)) {
+            LOGGER.debug("Cursed Ring no longer equipped on {} between cost calc and resolve - dropping pending cost",
+                player.getName().getString());
+            pendingCosts.remove(player.getUUID());
+        }
+    }
+
+    /**
+     * Post-resolve commit: spell cast succeeded, charge LP.
+     * Post only fires for resolved (non-cancelled) spells — this is the safest place to
+     * deduct the resource.
+     *
+     * <p>If LP consumption fails here (e.g. Blood Magic syphoned LP between canCast and Post),
+     * the death-penalty config determines fallback behaviour. The spell has already cast either way.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onSpellResolvePost(SpellResolveEvent.Post event) {
+        if (!SanctifiedLegacyCompat.isAvailable()) {
+            return;
+        }
+        if (!AnsConfig.ENABLE_LP_SYSTEM.get()) {
+            return;
+        }
+        if (event.context == null) {
+            return;
+        }
+
+        LivingEntity caster = event.context.getUnwrappedCaster();
+        if (!(caster instanceof ServerPlayer player)) {
+            return;
+        }
+
+        PendingLPCost pending = pendingCosts.remove(player.getUUID());
+        if (pending == null) {
+            return;
+        }
+
+        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
+            LOGGER.warn("Pending LP cost expired for {}", player.getName().getString());
+            return;
+        }
+
         if (pending.consumed) {
             return;
         }
-        
-        LOGGER.debug("Consuming {} LP from {}'s Soul Network", pending.lpCost, player.getName().getString());
-        
-        // Attempt to consume LP
-        boolean success = SanctifiedLegacyCompat.consumeLP(player, pending.lpCost);
-        
-        if (!success) {
-            // LP consumption failed
-            LOGGER.warn("   [FAIL] LP consumption failed");
-            
-            boolean deathPenalty = AnsConfig.DEATH_ON_INSUFFICIENT_LP.get();
-            
-            if (deathPenalty) {
-                // Death penalty mode: Allow spell to cast but kill the player
-                LOGGER.warn("   [DEATH] Death penalty enabled - player will die but spell will cast");
-                pending.consumed = true;
-                
-                // Kill the player
-                player.hurt(player.damageSources().magic(), Float.MAX_VALUE);
-                
-                if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
-                    player.displayClientMessage(Component.translatable("message.ars_n_spells.lp.death", pending.lpCost).withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD), true);
-                }
-                
-                // Don't cancel - let spell execute
-            } else {
-                // Safe mode: Set immune flag BEFORE any damage can propagate,
-                // then cancel spell and apply silent health loss (bypasses damage events).
-                // This prevents Corpse mod from seeing a death event and moving inventory.
-                LPDeathPrevention.setLPImmune(player);
-                LOGGER.warn("   Safe mode - cancelling spell, applying minor damage");
-                event.setCanceled(true);
-                pendingCosts.remove(player.getUUID());
 
-                // Apply minor health penalty silently (bypasses damage events entirely)
+        if (!SanctifiedLegacyCompat.isWearingCursedRing(player)) {
+            LOGGER.debug("Cursed Ring removed before resolve completion on {} - skipping LP consume",
+                player.getName().getString());
+            return;
+        }
+
+        LOGGER.debug("Consuming {} LP from {}'s Soul Network", pending.lpCost, player.getName().getString());
+
+        boolean success = SanctifiedLegacyCompat.consumeLP(player, pending.lpCost);
+
+        if (!success) {
+            LOGGER.warn("LP consumption failed at Post for {} (spell already cast)",
+                player.getName().getString());
+
+            boolean deathPenalty = AnsConfig.DEATH_ON_INSUFFICIENT_LP.get();
+
+            if (deathPenalty) {
+                // Death penalty: spell cast, but kill the player.
+                pending.consumed = true;
+                player.hurt(player.damageSources().magic(), Float.MAX_VALUE);
+
+                if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
+                    player.displayClientMessage(
+                        Component.translatable("message.ars_n_spells.lp.death", pending.lpCost)
+                            .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD),
+                        true);
+                }
+            } else {
+                // Safe mode at Post: can't cancel any more (spell already cast).
+                // Apply minor health penalty silently so the player notices the failure.
+                LPDeathPrevention.setLPImmune(player);
                 SanctifiedLegacyCompat.applySilentHealthLoss(player, 2.0f);
 
                 if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
-                    player.displayClientMessage(Component.translatable("message.ars_n_spells.lp.insufficient").withStyle(ChatFormatting.RED), true);
+                    player.displayClientMessage(
+                        Component.translatable("message.ars_n_spells.lp.insufficient")
+                            .withStyle(ChatFormatting.RED),
+                        true);
                 }
-
-                // Clear immune flag next tick after all event processing is complete
                 LPDeathPrevention.clearLPImmune(player);
             }
-        } else {
-            LOGGER.debug("LP consumed successfully - spell will execute");
-            pending.consumed = true;
-            
-            if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
-                player.displayClientMessage(Component.translatable("message.ars_n_spells.lp.consumed", pending.lpCost).withStyle(ChatFormatting.GOLD), true);
-            }
-            // Don't remove from map yet - let it expire naturally to prevent double-consumption
+            return;
+        }
+
+        LOGGER.debug("LP consumed successfully");
+        pending.consumed = true;
+
+        if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
+            player.displayClientMessage(
+                Component.translatable("message.ars_n_spells.lp.consumed", pending.lpCost)
+                    .withStyle(ChatFormatting.GOLD),
+                true);
         }
     }
-    
+
     /**
      * Clean up expired pending costs periodically.
      */
@@ -237,7 +297,7 @@ public class CursedRingHandler {
         if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) {
             return;
         }
-        
+
         if (event.player.tickCount % 100 == 0) { // Every 5 seconds
             int now = event.player.tickCount;
             pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().tickStamp > PENDING_COST_TTL_TICKS);
@@ -258,7 +318,7 @@ public class CursedRingHandler {
             }
         }
     }
-    
+
     /**
      * Evict per-player state on disconnect so stale UUIDs don't linger until TTL sweep.
      * Also clears the shared curio-state cache so logins under the same UUID re-scan.

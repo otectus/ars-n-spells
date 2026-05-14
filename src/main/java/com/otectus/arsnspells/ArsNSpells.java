@@ -90,6 +90,7 @@ public class ArsNSpells {
             MinecraftForge.EVENT_BUS.register(new RegenSynergyHandler());
             MinecraftForge.EVENT_BUS.register(new CrossCastIronsHandler());
             MinecraftForge.EVENT_BUS.register(new IronsLPHandler());
+            MinecraftForge.EVENT_BUS.register(new IronsAuraHandler());
         }
 
         MinecraftForge.EVENT_BUS.register(this);
@@ -149,8 +150,66 @@ public class ArsNSpells {
             LOGGER.error("FAILED to initialize Sanctified Legacy compatibility", e);
         }
 
+        // Ring/Iron's integration self-check. Catches silent mixin or registration
+        // failures that would otherwise produce "nothing happens when I cast".
+        if (ModList.get().isLoaded("irons_spellbooks")) {
+            runRingIntegrationSelfCheck();
+        }
+
         LOGGER.info("========================================");
         LOGGER.info("OK Ars 'n' Spells initialization complete");
         LOGGER.info("========================================");
+    }
+
+    /**
+     * Verify that the mixins and event subscribers required for the ring/Iron's
+     * integration actually applied at classload. Mixin only WARNs on @Redirect
+     * conflicts — a downstream silent failure ("nothing happens when casting")
+     * is the usual symptom. Logging at startup gives the user a single line to
+     * grep for if the integration ever silently breaks.
+     */
+    private static void runRingIntegrationSelfCheck() {
+        StringBuilder report = new StringBuilder("[SelfCheck] Iron's ring integration: ");
+        boolean ok = true;
+
+        // 1. Is the MagicDataAccessor interface attached to Iron's MagicData?
+        try {
+            Class<?> magicData = Class.forName("io.redspace.ironsspellbooks.api.magic.MagicData");
+            Class<?> accessor = Class.forName("com.otectus.arsnspells.mixin.irons.MagicDataAccessor");
+            boolean attached = accessor.isAssignableFrom(magicData);
+            report.append("MagicDataAccessor=").append(attached ? "OK" : "MISSING ");
+            if (!attached) ok = false;
+        } catch (Throwable t) {
+            report.append("MagicDataAccessor=ERROR(").append(t.getClass().getSimpleName()).append(") ");
+            ok = false;
+        }
+
+        // 2. Are IronsAuraHandler / IronsLPHandler registered on the EVENT_BUS?
+        // We can't introspect the bus's listener list directly without API access,
+        // so we just verify the classes were loaded (which happens lazily when
+        // ArsNSpells.<init> registered them).
+        report.append("| IronsAuraHandler=")
+            .append(canLoad("com.otectus.arsnspells.events.IronsAuraHandler") ? "OK" : "MISSING ");
+        report.append("| IronsLPHandler=")
+            .append(canLoad("com.otectus.arsnspells.events.IronsLPHandler") ? "OK" : "MISSING ");
+        report.append("| MixinIronsCastValidation=")
+            .append(canLoad("com.otectus.arsnspells.mixin.irons.MixinIronsCastValidation") ? "OK" : "MISSING ");
+
+        if (ok) {
+            LOGGER.info(report.toString());
+        } else {
+            LOGGER.error(report.toString());
+            LOGGER.error("[SelfCheck] Ring/Iron's integration is degraded — casts may silently fail.");
+            LOGGER.error("[SelfCheck] Check the early-startup log for '@Redirect conflict' or '@Mixin' warnings.");
+        }
+    }
+
+    private static boolean canLoad(String className) {
+        try {
+            Class.forName(className, false, ArsNSpells.class.getClassLoader());
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 }

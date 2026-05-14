@@ -26,6 +26,16 @@ import java.util.concurrent.ConcurrentHashMap;
  * Handles Virtue Ring aura consumption for Ars Nouveau spells.
  * When the Ring of Seven Virtues is equipped, mana costs are replaced with aura costs.
  * Mirrors the architecture of CursedRingHandler for LP.
+ *
+ * <p>Consumption is split across Pre and Post:
+ * <ul>
+ *   <li>{@code SpellCostCalcEvent}: stamps the pending aura cost and zeros the mana cost.</li>
+ *   <li>{@code SpellResolveEvent.Pre}: validation-only — re-verifies the player still wears
+ *       the ring; cancels the cast and drops the pending cost if state changed.</li>
+ *   <li>{@code SpellResolveEvent.Post}: actually consumes aura, since Post only fires when
+ *       the cast succeeded. This prevents "paid but didn't cast" if another HIGHEST handler
+ *       cancels at Pre after ours runs.</li>
+ * </ul>
  */
 @Mod.EventBusSubscriber(modid = "ars_n_spells")
 public class VirtueRingHandler {
@@ -44,6 +54,10 @@ public class VirtueRingHandler {
             return;
         }
 
+        if (!AnsConfig.ENABLE_AURA_SYSTEM.get()) {
+            return;
+        }
+
         LivingEntity caster = event.context != null ? event.context.getUnwrappedCaster() : null;
         if (!(caster instanceof Player player)) {
             return;
@@ -54,6 +68,8 @@ public class VirtueRingHandler {
         }
 
         if (!SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
+            // Make sure no stale entry from a previous wearing session can be consumed.
+            pendingCosts.remove(player.getUUID());
             return;
         }
 
@@ -121,14 +137,30 @@ public class VirtueRingHandler {
     }
 
     /**
-     * Consume aura when the spell resolves.
+     * Clear any pending aura cost by UUID (use when only the UUID is available, e.g.
+     * curio change events).
+     */
+    public static void clearPendingAuraCost(UUID uuid) {
+        if (uuid != null) {
+            pendingCosts.remove(uuid);
+        }
+    }
+
+    /**
+     * Pre-resolve gate: re-verify the player still wears the ring. If they don't
+     * (e.g. unequipped between cost calc and resolve), drop the pending cost so the
+     * Post handler can't consume it.
+     *
+     * <p>This does NOT consume aura — that happens on Post.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onSpellResolve(SpellResolveEvent.Pre event) {
+    public static void onSpellResolvePre(SpellResolveEvent.Pre event) {
         if (!SanctifiedLegacyCompat.isAvailable()) {
             return;
         }
-
+        if (!AnsConfig.ENABLE_AURA_SYSTEM.get()) {
+            return;
+        }
         if (event.context == null) {
             return;
         }
@@ -144,8 +176,46 @@ public class VirtueRingHandler {
         }
 
         if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
-            LOGGER.warn("Pending aura cost expired for {}", player.getName().getString());
             pendingCosts.remove(player.getUUID());
+            return;
+        }
+
+        if (!SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
+            LOGGER.debug("Virtue Ring no longer equipped on {} between cost calc and resolve - dropping pending cost",
+                player.getName().getString());
+            pendingCosts.remove(player.getUUID());
+        }
+    }
+
+    /**
+     * Post-resolve commit: spell cast succeeded, charge aura.
+     * Post only fires for resolved (non-cancelled) spells — this is the safest place to
+     * deduct the resource.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onSpellResolvePost(SpellResolveEvent.Post event) {
+        if (!SanctifiedLegacyCompat.isAvailable()) {
+            return;
+        }
+        if (!AnsConfig.ENABLE_AURA_SYSTEM.get()) {
+            return;
+        }
+        if (event.context == null) {
+            return;
+        }
+
+        LivingEntity caster = event.context.getUnwrappedCaster();
+        if (!(caster instanceof ServerPlayer player)) {
+            return;
+        }
+
+        PendingAuraCost pending = pendingCosts.remove(player.getUUID());
+        if (pending == null) {
+            return;
+        }
+
+        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
+            LOGGER.warn("Pending aura cost expired for {}", player.getName().getString());
             return;
         }
 
@@ -153,14 +223,20 @@ public class VirtueRingHandler {
             return;
         }
 
+        if (!SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
+            LOGGER.debug("Virtue Ring removed before resolve completion on {} - skipping aura consume",
+                player.getName().getString());
+            return;
+        }
+
         LOGGER.debug("Consuming {} aura from {}", pending.auraCost, player.getName().getString());
 
         boolean success = AuraManager.consumeAura(player, pending.auraCost);
-
         if (!success) {
-            LOGGER.warn("Insufficient aura - cancelling spell");
-            event.setCanceled(true);
-            pendingCosts.remove(player.getUUID());
+            // Should be rare — the canCast pre-validation in MixinSpellResolverPreCast already
+            // gated this. Log and skip.
+            LOGGER.warn("Aura consumption failed at Post for {} (spell already cast)",
+                player.getName().getString());
 
             if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
                 int currentAura = AuraManager.getAura(player);
@@ -170,17 +246,18 @@ public class VirtueRingHandler {
                     true
                 );
             }
-        } else {
-            pending.consumed = true;
+            return;
+        }
 
-            if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
-                int remaining = AuraManager.getAura(player);
-                player.displayClientMessage(
-                    Component.translatable("message.ars_n_spells.aura.consumed", pending.auraCost, remaining)
-                        .withStyle(ChatFormatting.AQUA),
-                    true
-                );
-            }
+        pending.consumed = true;
+
+        if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
+            int remaining = AuraManager.getAura(player);
+            player.displayClientMessage(
+                Component.translatable("message.ars_n_spells.aura.consumed", pending.auraCost, remaining)
+                    .withStyle(ChatFormatting.AQUA),
+                true
+            );
         }
     }
 

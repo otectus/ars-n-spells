@@ -1,8 +1,12 @@
 package com.otectus.arsnspells.aura;
 
+import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.network.AuraSyncPacket;
+import com.otectus.arsnspells.network.PacketHandler;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.common.capabilities.Capability;
@@ -75,6 +79,37 @@ public class AuraCapabilityProvider implements ICapabilitySerializable<CompoundT
             });
         });
         event.getOriginal().invalidateCaps();
+
+        // Force a fresh sync to the cloned player so the HUD reflects post-respawn state.
+        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
+            event.getEntity().getCapability(AURA_CAP).ifPresent(cap -> {
+                if (cap instanceof AuraCapability ac) {
+                    sendSync(serverPlayer, ac);
+                }
+            });
+        }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
+            serverPlayer.getCapability(AURA_CAP).ifPresent(cap -> {
+                if (cap instanceof AuraCapability ac) {
+                    sendSync(serverPlayer, ac);
+                }
+            });
+        }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
+            serverPlayer.getCapability(AURA_CAP).ifPresent(cap -> {
+                if (cap instanceof AuraCapability ac) {
+                    sendSync(serverPlayer, ac);
+                }
+            });
+        }
     }
 
     @SubscribeEvent
@@ -85,6 +120,36 @@ public class AuraCapabilityProvider implements ICapabilitySerializable<CompoundT
         if (event.player.level().isClientSide()) {
             return;
         }
-        event.player.getCapability(AURA_CAP).ifPresent(IAuraCapability::regenTick);
+        event.player.getCapability(AURA_CAP).ifPresent(cap -> {
+            cap.regenTick();
+            if (event.player instanceof ServerPlayer serverPlayer && cap instanceof AuraCapability ac) {
+                if (ac.isDirty() && shouldSyncThisTick(event.player.tickCount)) {
+                    sendSync(serverPlayer, ac);
+                }
+            }
+        });
+    }
+
+    private static boolean shouldSyncThisTick(int tick) {
+        int interval;
+        try {
+            interval = AnsConfig.MANA_SYNC_INTERVAL.get();
+        } catch (Exception e) {
+            interval = 5;
+        }
+        if (interval <= 0) {
+            interval = 5;
+        }
+        return tick % interval == 0;
+    }
+
+    private static void sendSync(ServerPlayer serverPlayer, AuraCapability cap) {
+        try {
+            PacketHandler.sendToClient(new AuraSyncPacket(cap.getAura(), cap.getMaxAura()), serverPlayer);
+            cap.clearDirty();
+        } catch (Exception ignored) {
+            // Packet send can fail during early lifecycle (e.g. before connection is ready);
+            // leave the dirty flag set so the next tick re-attempts.
+        }
     }
 }

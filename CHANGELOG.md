@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.0] - 2026-05-12
+
+### Ring of Virtues and Ring of Curses — correctness pass
+
+Investigation found five correctness bugs in the Sanctified Legacy / Covenant of the Seven ring integration. Symptoms ranged from "the rings silently do nothing on a C7-only modpack" to "the player pays both mana and aura on the same spell after unequipping the ring mid-cast." All are fixed in 1.10.0.
+
+- **`hasBothRings` AND-gate fix.** [SanctifiedLegacyCompat.java:222](src/main/java/com/otectus/arsnspells/compat/SanctifiedLegacyCompat.java) returned `false` whenever **either** Covenant of the Seven **or** Enigmatic Legacy was missing. But C7 ships both rings — meaning a C7-only modpack with both rings equipped silently dropped through every ring path: `isWearingCursedRing` cancelled out, `isWearingVirtueRing` cancelled out, ring-conflict notification never fired, and the player paid mana while believing aura was being consumed. The guard is now `&&` instead of `||`. `hasMatchingBlasphemy` was also tightened to use `isAvailable()` for consistency.
+- **Stale pending-cost can't leak across spells anymore.** [VirtueRingHandler](src/main/java/com/otectus/arsnspells/events/VirtueRingHandler.java) and [CursedRingHandler](src/main/java/com/otectus/arsnspells/events/CursedRingHandler.java) used to consume the pending aura/LP cost purely on UUID lookup at `SpellResolveEvent.Pre`. If another HIGHEST-priority handler cancelled a spell between `SpellCostCalcEvent` and `SpellResolveEvent.Pre`, the pending cost lingered for up to 5 seconds; the next spell — even with the ring unequipped — was charged aura/LP **and** mana ([MixinSpellResolverMana](src/main/java/com/otectus/arsnspells/mixin/ars/MixinSpellResolverMana.java) only cancels mana if you're currently wearing the ring). Both handlers now re-verify `isWearingVirtueRing` / `isWearingCursedRing` at every consumption site and drop the stale entry if state changed.
+- **Resolve consumption moved from Pre to Post.** Consuming on `SpellResolveEvent.Pre` meant that if another mod cancelled the cast at Pre after our HIGHEST handler ran, the resource was charged but the spell never executed ("paid but didn't cast"). Aura/LP is now charged on `SpellResolveEvent.Post`, which only fires for resolved (non-cancelled) spells. Validation continues to happen at `canCast` ([MixinSpellResolverPreCast](src/main/java/com/otectus/arsnspells/mixin/ars/MixinSpellResolverPreCast.java)) so impossible casts still get blocked cleanly. Pre is kept as a state-drift gate that drops the pending entry if the ring came off between cost-calc and resolve.
+- **Iron's Spellbooks + Virtue Ring path now exists.** Previously, casting any Iron's spell while wearing the Virtue Ring drained Iron's mana — only the Cursed Ring had an Iron's handler. Symmetric coverage with the new [IronsAuraHandler](src/main/java/com/otectus/arsnspells/events/IronsAuraHandler.java): pre-cast validation against the aura pool, mana zeroed at `SpellOnCastEvent`, aura consumed instead. Insufficient aura cancels the cast with an action-bar message (no death penalty — Virtue Ring failure is intentionally non-punitive). Iron's scrolls get the same treatment via a new aura branch in [MixinScrollItem](src/main/java/com/otectus/arsnspells/mixin/irons/MixinScrollItem.java) plus [ScrollAuraTracker](src/main/java/com/otectus/arsnspells/compat/ScrollAuraTracker.java) for the HEAD→RETURN commit pattern that ScrollLPTracker already uses.
+- **`AuraCapability` no longer corrupts new players.** [AuraCapability.java](src/main/java/com/otectus/arsnspells/aura/AuraCapability.java) used to read `AURA_MAX_DEFAULT` in its constructor and fall back to **100** on `IllegalStateException`. `AttachCapabilitiesEvent` can fire before `ModConfigEvent.Loading`, so any player created before config load was permanently capped at 100 aura (10% of the configured default of 1000). The capability now defers initialization until first server-side access (so config is guaranteed loaded), and `loadNBTData` runs a one-shot migration: if a saved `maxAura == 100` and the configured default is higher, the player is reset to the configured default and an `ans_v110_migrated` marker is stamped onto the NBT so the heuristic only runs once. Users who legitimately wanted a 100-aura cap should re-apply their config preference after upgrading.
+
+### Aura HUD and sync
+
+The mana bar is hidden while the Virtue Ring is worn (since spells cost aura, not mana), but until now nothing replaced it — the player flew blind. 1.10.0 ships the missing pieces:
+
+- **New** [AuraSyncPacket](src/main/java/com/otectus/arsnspells/network/AuraSyncPacket.java) — server→client sync of `(aura, maxAura)`. Sent on login, dimension change, respawn (post-clone), and whenever the server-side capability marks itself dirty and the `mana_sync_interval` tick window elapses.
+- **New** [ClientAuraState](src/main/java/com/otectus/arsnspells/client/ClientAuraState.java) — client-side mirror, reset on disconnect.
+- **New** [AuraBarController](src/main/java/com/otectus/arsnspells/client/AuraBarController.java) — `RenderGuiOverlayEvent.Post` overlay drawn just above the hotbar in aqua tint when the local player wears the Virtue Ring. Hidden when `mc.options.hideGui`, when the ring isn't equipped, or when the aura system is disabled.
+
+### Ring swap mid-cast no longer leaks
+
+The previous handler had no signal for Curios slot changes (`LivingEquipmentChangeEvent` does not fire for Curios), so the per-player curio cache could stay stale for up to a second and a stamped pending cost could be consumed against the wrong wearer state. The cleanup now happens at the consumption site instead: both `SpellResolveEvent.Pre` and `SpellResolveEvent.Post` in the ring handlers re-check `isWearingVirtueRing` / `isWearingCursedRing` (with the freshness provided by the 20-tick `SanctifiedLegacyCompat` curio cache) and drop the pending entry when state has changed. A dedicated `CurioChangeEvent` listener that would cut the "ring just equipped → not active yet" latency from ~1 s to instant is deferred — the event class is not on this mod's transitive compile classpath without an extra `compileOnly` dependency declaration.
+
+### Configuration
+
+- **New: `enable_aura_system`** (default `true`) — master toggle mirroring `enable_lp_system`. When false, the Virtue Ring is ignored and spells use normal mana. Useful for modpacks that want LP but not aura.
+- **Removed: `virtue_ring_discount`** — the Ring of Virtue stopped being a mana discount in 1.2.0 (it converts mana to aura). The config key has been dead since then; setting it had no effect. Removed entirely in 1.10.0. Existing configs will get an "unknown key" warning on first load and can safely delete the line.
+- **Changed default: `aura_minimum_cost`** is now `10` (was `5`) — matches `ars_lp_minimum_cost`. Existing configs preserve whatever value the user set.
+
+### Commands
+
+- **New: `/ans aura`** — non-permissioned subcommand that prints the caller's own aura value. The existing `/ans info <player>` is unchanged (still op-only).
+
+### Known follow-ups (deferred to 1.11.0+)
+
+- `SERVER` / `CLIENT` config split. All keys still live on the single `COMMON` config.
+- Datapack registries for spell schools, cooldown categories, progression rules, cross-cast rules.
+- Cross-cast NBT re-validation at cast time (server-trust hardening).
+- Aura-specific rarity multipliers for Iron's spells (currently shared with the LP rarity knobs).
+
 ## [1.9.0] - 2026-05-10
 
 ### Bug Fixes (P0 stabilization pass)

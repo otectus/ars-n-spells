@@ -56,6 +56,9 @@ public class ArsNSpellsCommands {
                 .then(Commands.literal("mode")
                     .executes(ArsNSpellsCommands::showMode)
                 )
+                .then(Commands.literal("aura")
+                    .executes(ArsNSpellsCommands::showOwnAura)
+                )
         );
 
         LOGGER.debug("Ars 'n' Spells commands registered");
@@ -145,7 +148,54 @@ public class ArsNSpellsCommands {
             false
         );
 
+        // Iron's diagnostics: raw mana value (what Iron's natively sees) and whether the
+        // ring-bypass redirect would inflate it. Useful for diagnosing "spell silently
+        // doesn't cast" — if rawIronsMana < spellCost AND ringBypass is false, Iron's
+        // would reject the cast at canBeCastedBy with cast_error_mana.
+        //
+        // Reflection because this command file is loaded on Iron's-less servers too —
+        // a direct import would prevent the command class from loading at all.
+        if (com.otectus.arsnspells.compat.IronsCompat.isLoaded()) {
+            try {
+                Class<?> magicDataClass = Class.forName("io.redspace.ironsspellbooks.api.magic.MagicData");
+                Object md = magicDataClass
+                    .getMethod("getPlayerMagicData", net.minecraft.world.entity.LivingEntity.class)
+                    .invoke(null, target);
+                float rawMana = (Float) magicDataClass.getMethod("getMana").invoke(md);
+                boolean bypassActive = (cursed && AnsConfig.ENABLE_LP_SYSTEM.get())
+                    || (virtue && AnsConfig.ENABLE_AURA_SYSTEM.get());
+                context.getSource().sendSuccess(
+                    () -> net.minecraft.network.chat.Component.literal(String.format(
+                        "Iron's: rawMana=%.1f, ringBypass=%s", rawMana, bypassActive))
+                        .withStyle(ChatFormatting.GRAY),
+                    false);
+            } catch (Throwable t) {
+                context.getSource().sendSuccess(
+                    () -> net.minecraft.network.chat.Component.literal(
+                        "Iron's: <inspection failed: " + t.getClass().getSimpleName() + ">")
+                        .withStyle(ChatFormatting.RED),
+                    false);
+            }
+        }
+
         return 1;
+    }
+
+    private static int showOwnAura(CommandContext<CommandSourceStack> context) {
+        try {
+            ServerPlayer self = context.getSource().getPlayerOrException();
+            int aura = AuraManager.getAura(self);
+            int maxAura = AuraManager.getMaxAura(self);
+            context.getSource().sendSuccess(
+                () -> Component.translatable("commands.ans.info.aura", aura, maxAura)
+                    .withStyle(ChatFormatting.AQUA),
+                false
+            );
+            return 1;
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendFailure(Component.literal("This command must be run by a player."));
+            return 0;
+        }
     }
 
     private static int showMode(CommandContext<CommandSourceStack> context) {
