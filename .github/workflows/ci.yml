@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Gradle caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Cache ForgeGradle caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches/forge_gradle
+            build/forge
+          key: forgegradle-${{ runner.os }}-${{ hashFiles('gradle.properties', 'build.gradle') }}
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Compile
+        run: ./gradlew compileJava --no-daemon --stacktrace
+
+      - name: Test
+        run: ./gradlew test --no-daemon --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            build/reports/tests/test
+            build/test-results/test
+
+  # GameTests run as a separate job because they are slower and require the
+  # full ForgeGradle environment. Failures here are advisory in 2.0.0 — the
+  # scaffold lands in this release; the full 7-scenario suite is tracked for
+  # 2.0.1 alongside the structure NBT templates.
+  gametest:
+    name: GameTest server
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: build-and-test
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Gradle caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run GameTest server
+        run: ./gradlew runGameTestServer --no-daemon --stacktrace || true
+        # GameTest scaffold runs but full scenarios land in 2.0.1.
+
+      - name: Upload GameTest logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gametest-logs
+          path: run/logs

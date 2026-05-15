@@ -25,6 +25,17 @@ minecraft {
 
         client {}
         server { args '--nogui' }
+
+        // 2.0.0: gameTestServer run target for headless gameplay tests
+        // (Phase 3.3 of the audit roadmap). Tests live in
+        // src/main/java/com/otectus/arsnspells/gametest and are gated on the
+        // `ars_n_spells` namespace property so other mods' tests do not run.
+        gameTestServer {
+            args '--nogui'
+            property 'forge.enabledGameTestNamespaces', 'ars_n_spells'
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+        }
     }
 }
 

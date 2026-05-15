@@ -27,9 +27,18 @@ public class PacketHandler {
         // Aura sync is appended at the end so the IDs of pre-existing packets don't shift
         // for clients running mixed mod versions.
         INSTANCE.registerMessage(id++, AuraSyncPacket.class, AuraSyncPacket::toBytes, AuraSyncPacket::new, AuraSyncPacket::handle);
+        // CrossCastRequestPacket (C2S) — appended at the tail to preserve
+        // pre-existing packet IDs across the 1.10.x → 2.0.0 bump.
+        INSTANCE.registerMessage(id++, CrossCastRequestPacket.class,
+            CrossCastRequestPacket::toBytes, CrossCastRequestPacket::new, CrossCastRequestPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_SERVER));
     }
 
     public static void sendToClient(Object msg, ServerPlayer player) {
         INSTANCE.sendTo(msg, player.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+    }
+
+    public static void sendToServer(Object msg) {
+        INSTANCE.sendToServer(msg);
     }
 }

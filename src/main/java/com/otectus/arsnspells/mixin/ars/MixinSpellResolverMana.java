@@ -16,6 +16,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import com.otectus.arsnspells.util.CrossCastTrace;
 
 @Mixin(value = SpellResolver.class, remap = false)
 public abstract class MixinSpellResolverMana {
@@ -73,6 +74,12 @@ public abstract class MixinSpellResolverMana {
         if (consumed) {
             ci.cancel();
         }
+
+        CrossCastContext.Entry entry = CrossCastContext.peek(player);
+        java.util.UUID attemptId = entry != null ? entry.attemptId : null;
+        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+            CrossCastTrace.Stage.RESOURCE_SPEND,
+            "mode", mode, "cost", cost, "consumed", consumed);
     }
 
     @Inject(method = "expendMana", at = @At("TAIL"))

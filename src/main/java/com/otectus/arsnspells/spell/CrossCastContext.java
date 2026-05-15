@@ -16,29 +16,31 @@ public final class CrossCastContext {
     }
 
     public static void begin(Player player, CrossSpellType type, long gameTime) {
+        beginWithAttempt(player, type, gameTime, UUID.randomUUID());
+    }
+
+    public static void beginWithAttempt(Player player, CrossSpellType type, long gameTime, UUID attemptId) {
         if (player == null) {
             return;
         }
-        ACTIVE_CASTS.put(player.getUUID(), new Entry(type, gameTime + DEFAULT_TTL_TICKS));
+        ACTIVE_CASTS.put(player.getUUID(), new Entry(type, gameTime + DEFAULT_TTL_TICKS, attemptId));
     }
 
     public static void begin(Player player, CrossSpellType type, long gameTime, float arsCost, float issCost) {
-        if (player == null) {
-            return;
-        }
-        Entry entry = new Entry(type, gameTime + DEFAULT_TTL_TICKS);
-        entry.arsCost = arsCost;
-        entry.issCost = issCost;
-        entry.costsReady = true;
-        ACTIVE_CASTS.put(player.getUUID(), entry);
+        begin(player, type, gameTime, arsCost, issCost, null, UUID.randomUUID());
     }
 
     public static void begin(Player player, CrossSpellType type, long gameTime, float arsCost, float issCost,
         String spellId) {
+        begin(player, type, gameTime, arsCost, issCost, spellId, UUID.randomUUID());
+    }
+
+    public static void begin(Player player, CrossSpellType type, long gameTime, float arsCost, float issCost,
+        String spellId, UUID attemptId) {
         if (player == null) {
             return;
         }
-        Entry entry = new Entry(type, gameTime + DEFAULT_TTL_TICKS);
+        Entry entry = new Entry(type, gameTime + DEFAULT_TTL_TICKS, attemptId);
         entry.arsCost = arsCost;
         entry.issCost = issCost;
         entry.costsReady = true;
@@ -118,6 +120,14 @@ public final class CrossCastContext {
 
     public static final class Entry {
         public final CrossSpellType type;
+        /**
+         * Per-attempt UUID used to correlate trace logs across the cross-cast
+         * pipeline (client packet send -> server receive -> validate ->
+         * resource check -> upstream cast -> effect). Always non-null; the
+         * Phase 2 packet path generates a server-side UUID, while non-packet
+         * callers default to a random UUID.
+         */
+        public final UUID attemptId;
         private final long expiresAt;
         public float arsCost;
         public float issCost;
@@ -132,9 +142,10 @@ public final class CrossCastContext {
          */
         public boolean multiplierApplied;
 
-        private Entry(CrossSpellType type, long expiresAt) {
+        private Entry(CrossSpellType type, long expiresAt, UUID attemptId) {
             this.type = type;
             this.expiresAt = expiresAt;
+            this.attemptId = attemptId != null ? attemptId : UUID.randomUUID();
         }
 
         public boolean isExpired(long gameTime) {

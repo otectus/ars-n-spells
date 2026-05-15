@@ -14,6 +14,8 @@ import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.events.CursedRingHandler;
 import com.otectus.arsnspells.events.LPDeathPrevention;
 import com.otectus.arsnspells.events.VirtueRingHandler;
+import com.otectus.arsnspells.spell.CrossCastContext;
+import com.otectus.arsnspells.util.CrossCastTrace;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -203,5 +205,11 @@ public abstract class MixinSpellResolverPreCast {
         // Ars's native enoughMana() from running with stale ManaCap data.
         cir.setReturnValue(canCast);
         cir.cancel();
+
+        CrossCastContext.Entry entry = CrossCastContext.peek(player);
+        java.util.UUID attemptId = entry != null ? entry.attemptId : null;
+        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+            CrossCastTrace.Stage.RESOURCE_CHECK,
+            "cost", cost, "approved", canCast);
     }
 }

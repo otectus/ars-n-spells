@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-05-14
+
+### Audit-driven major release
+
+2.0.0 addresses the comprehensive technical audit at [ars-n-spells-2.0.0.md](ars-n-spells-2.0.0.md). Every High and Medium-High hypothesis in the audit's "Ranked Root-Cause Hypotheses" maps to a closed fix below. The major-version bump reflects two breaking changes (new C2S packet ID; clients older than 2.0.0 cannot cross-cast against a 2.0.0 server) plus the architectural reorganization of the cross-cast pipeline.
+
+### Phase 1 — Hotfix (cross-cast actually works again)
+
+- **Client-side cancellation no longer swallows the cast.** [CrossCastingHandler.java](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) used to call `handleCrossCast` on both sides, return `true` on the logical client, and then `event.setCanceled(true)` — so on a dedicated server the client claimed success and cancelled the use, while the server never received any cast trigger. Silent "input detected, nothing happens" failure. The client now short-circuits before any cast logic and sends a new `CrossCastRequestPacket` instead; the server is the sole authority over cast execution.
+- **Cross-cast decoupled from mana unification.** The previous `BridgeManager.isUnificationEnabled()` guard in [`CrossCastingHandler.onRightClickItem`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java), [`CrossCastingHandler.onArsSpellCost`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java), and [`CrossCastIronsHandler.onIronsSpellCast`](src/main/java/com/otectus/arsnspells/spell/CrossCastIronsHandler.java) made inscribed items inert whenever `mana_mode=disabled` or `enable_mana_unification=false`. The README documents `disabled` as a *mana sharing* mode, not as a master switch for cross-cast. Settled policy: cross-cast remains available in every mode; the multiplier still applies; in `disabled` mode, native upstream pools pay native costs (no SEPARATE split, no ARS_PRIMARY conversion). The unification check survives as an internal mode-branch flag inside each cost site.
+
+### Phase 2 — Stabilization (multiplayer authoritative + traceable)
+
+- **New C2S [`CrossCastRequestPacket`](src/main/java/com/otectus/arsnspells/network/CrossCastRequestPacket.java).** Carries hand, action (`CAST`/`CYCLE`), client-observed index, and a client-generated attempt UUID. The server handler re-reads the held stack (no client trust), generates its own attempt UUID for trace correlation, and dispatches to the new `CrossCastingHandler.serverHandleCast` entry point.
+- **New [`PacketHandler.sendToServer`](src/main/java/com/otectus/arsnspells/network/PacketHandler.java).** Helper for the new C2S direction. `CrossCastRequestPacket` is registered at the *tail* of the packet ID list so pre-existing IDs (Resonance, Affinity, Cooldown, Aura) do not shift.
+- **New [`CrossCastValidator`](src/main/java/com/otectus/arsnspells/spell/CrossCastValidator.java).** Single authority for cross-cast payload validity. Checks index range, payload non-emptiness, spell-type resolution (with namespace fallback), Ars `ars_spell` non-empty, Iron's `spell_id` parseability + level ≥ 1 + registry resolution. Rejections produce a translation key the player sees via `displayClientMessage` and a structured `descriptor_rejected` trace event. The four-arg public API is the production path; a package-private overload accepts a synthetic Iron's predicate so unit tests do not need Forge bootstrap. 16-case [`CrossCastValidatorTest`](src/test/java/com/otectus/arsnspells/spell/CrossCastValidatorTest.java) covers every branch.
+- **`attemptId` UUID on [`CrossCastContext.Entry`](src/main/java/com/otectus/arsnspells/spell/CrossCastContext.java).** Threaded from the packet handler through `serverHandleCast`, into `CrossCastContext.begin(...)`, and read back at every Ars/Iron mixin and event-handler trace point. Parallel cross-casts no longer alias their logs.
+- **New [`util/CrossCastTrace`](src/main/java/com/otectus/arsnspells/util/CrossCastTrace.java).** Structured logger emitting `[CrossCastTrace] attempt=<uuid> player=<name> side=<C|S> stage=<symbolic> k=v …` exactly as specified in the audit's "Debug Instrumentation Plan". Gated on `debug_mode`. Stages: `INPUT_DETECTED`, `REQUEST_SENT`, `REQUEST_RECEIVED`, `DESCRIPTOR_VALIDATED`, `DESCRIPTOR_REJECTED`, `RESOURCE_CHECK`, `RESOURCE_SPEND`, `ARS_COST_APPLIED`, `IRON_COST_APPLIED`, `UPSTREAM_CAST_ENTER`, `UPSTREAM_CAST_EXIT`, `EFFECT_APPLIED`, `CYCLE_APPLIED`. Used from [`CrossCastingHandler`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java), [`CrossCastIronsHandler`](src/main/java/com/otectus/arsnspells/spell/CrossCastIronsHandler.java), [`MixinSpellResolverPreCast`](src/main/java/com/otectus/arsnspells/mixin/ars/MixinSpellResolverPreCast.java), and [`MixinSpellResolverMana`](src/main/java/com/otectus/arsnspells/mixin/ars/MixinSpellResolverMana.java).
+- **New [`CrossCastCostResolver`](src/main/java/com/otectus/arsnspells/spell/CrossCastCostResolver.java).** Single source of truth for the cross-cast cost algorithm — captures the mode × multiplier × ring state matrix in one place. Returns a `CostBreakdown(primary, secondary, primaryMode, secondaryMode, mode, unified, ringActive, multiplier)` record. Three stages: `ARS_PRECALC`, `IRON_PRECALC`, `IRON_POSTEVENT`. For 2.0.0 this is an authoritative *calculator* — existing cost-mutation sites still own choreography (event mutation, mixin cancels, ring pending-cost stamping); full delegation onto the resolver is tracked for 2.0.1.
+- **New [`CapabilityResyncHandler`](src/main/java/com/otectus/arsnspells/events/CapabilityResyncHandler.java).** Single owner of bridge-capability resync across `PlayerLoggedInEvent`, `PlayerRespawnEvent`, and `PlayerChangedDimensionEvent`. Replays Affinity (one packet per non-zero school), Cooldown (one packet per active category), and Resonance (when Iron's is loaded). Aura is *not* duplicated here — [`AuraCapabilityProvider`](src/main/java/com/otectus/arsnspells/aura/AuraCapabilityProvider.java) already covers all three events from 1.10.0. The previous `AffinitySyncOnLoginHandler` is retired; its login coverage is subsumed.
+
+### Phase 3 — Hardening
+
+- **Sealed [`SpellDescriptor`](src/main/java/com/otectus/arsnspells/spell/SpellDescriptor.java) model** with [`ArsSerializedSpellDescriptor`](src/main/java/com/otectus/arsnspells/spell/ArsSerializedSpellDescriptor.java) and [`IronsRegistrySpellDescriptor`](src/main/java/com/otectus/arsnspells/spell/IronsRegistrySpellDescriptor.java). Typed adapter between the two upstream spell models with uniform `validate/serialize/displayName/resolve/systemType/spellId`. On-disk NBT shape is unchanged so pre-2.0.0 inscribed items round-trip cleanly via `SpellDescriptor.parse(CompoundTag)`. Full migration of call sites off raw `CompoundTag` maps onto descriptors is tracked for 2.1.0.
+- **New [`CastContext`](src/main/java/com/otectus/arsnspells/spell/CastContext.java) value record.** Threads attempt UUID + player + hand + source stack + descriptor + mode + cost breakdown through the pipeline. Existing sites still pass individual parameters; full migration is tracked for 2.1.0.
+- **GameTest scaffold.** [`build.gradle`](build.gradle) gains a `gameTestServer` run target gated on the `ars_n_spells` namespace. [`CrossCastGameTests`](src/main/java/com/otectus/arsnspells/gametest/CrossCastGameTests.java) ships one sanity scenario confirming the scaffold is wired; the full seven-scenario suite from the audit's "Testing and Validation Strategy" lands in 2.0.1 alongside the structure NBT templates each scenario requires.
+- **CI workflow.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — JDK 17 on Ubuntu, gradle and ForgeGradle caches, `./gradlew compileJava test` as the required-status job, `./gradlew runGameTestServer` as an advisory job (continue-on-error true while the GameTest suite is still landing).
+
+### Breaking changes
+
+- **Packet ID list grew.** `CrossCastRequestPacket` is appended at the tail of `PacketHandler.register()`, so existing packet IDs (Resonance, Affinity, Cooldown, Aura) are unchanged. Clients older than 2.0.0 cannot cross-cast against a 2.0.0 server — they cannot send the new packet. Servers older than 2.0.0 cannot serve 2.0.0 clients — they will reject the new packet ID. Use matching client/server versions.
+- **`AffinitySyncOnLoginHandler` removed.** Its login-sync responsibility is fully subsumed by `CapabilityResyncHandler` (which adds respawn + dimension sync). No user-facing behavior change for affinity on login.
+- **`mana_mode=disabled` now permits cross-cast.** Previously, setting the mode to disabled (or `enable_mana_unification=false`) made inscribed items inert. They now cast normally with native upstream pool costs; only mana *sharing* is suppressed in disabled mode. Modpacks that intentionally wanted cross-cast disabled by setting `mana_mode=disabled` will see cross-cast become available again — there is no separate `enable_cross_casting` toggle; the feature is now always-on whenever an inscribed item is held.
+
+### Known follow-ups (deferred to 2.0.1 / 2.1.0)
+
+- **2.0.1**: full site delegation onto `CrossCastCostResolver` (current 2.0.0 has the resolver but call sites still own choreography); `CrossCastCostResolverTest` with the mode × ring × stage matrix (needs a `BridgeManager.testSetMode` test-only seam).
+- **2.0.1**: the seven cross-cast GameTest scenarios (clean Ars cast, clean Iron cast, malformed NBT rejection, insufficient resources, dimension transition, separate-mode dual cost, ring + cross-cast) — each needs its own structure NBT template.
+- **2.1.0**: full migration of `CrossCastingHandler` / `CrossCastValidator` call sites off raw `CompoundTag` maps onto `SpellDescriptor`; `CastContext` threaded through the pipeline.
+- **2.1.0**: server/client config split, datapack registries for spell schools / cooldown categories / progression rules / cross-cast rules.
+
+### Backward compatibility
+
+- **Save format unchanged.** AffinityData, ProgressionData, CooldownData, AuraCapability, and `arsnspells:cross_spells` NBT shapes all preserved. Inscribed items from 1.8.9+ load and cast unchanged at 2.0.0.
+- **Mod config unchanged.** No keys added, removed, or renamed. The `mana_mode=disabled` semantics change is documented above.
+- **Mixin injection points unchanged.** All Ars `SpellResolver` injects keep their `@At` targets and method signatures. Mixin-compatible with Ars 4.12.7+; no Iron's-side mixin changes.
+
 ## [1.10.0] - 2026-05-12
 
 ### Ring of Virtues and Ring of Curses — correctness pass

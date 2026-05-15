@@ -1,9 +1,9 @@
-# Testing Guide — Ars 'n' Spells 1.9.0
+# Testing Guide — Ars 'n' Spells 2.0.0
 
 This guide covers manual verification scenarios for the systems shipped in
-1.9.0. It supersedes the pre-1.8 testing notes (which documented the old flat
-"Ring of Virtue 20% discount" model — current Virtue Ring converts mana costs
-to **aura**, see the [README](README.md) for the up-to-date description).
+2.0.0 (the audit-driven major release). It supersedes the pre-1.8 testing
+notes and adds the cross-cast pipeline validation matrix from the audit at
+[ars-n-spells-2.0.0.md](ars-n-spells-2.0.0.md).
 
 For an at-a-glance description of features and configuration, start with the
 [README](README.md). For the change history, see [CHANGELOG.md](CHANGELOG.md).
@@ -14,12 +14,13 @@ For an at-a-glance description of features and configuration, start with the
 | --- | --- | --- |
 | Minecraft (Forge) | 1.20.1 / 47.2.0+ | All tests |
 | Ars Nouveau | 4.12.7 | All tests |
-| Iron's Spells 'n Spellbooks | 3.15.x | "Ars + Iron's" tests, scaling, progression, scrolls |
+| Iron's Spells 'n Spellbooks | 3.15.x | "Ars + Iron's" tests, scaling, progression, scrolls, cross-cast |
 | Covenant of the Seven (Sanctified Legacy) | Any | Cursed/Virtue Ring tests |
 | Blood Magic | Any | LP source `BLOOD_MAGIC_*` tests |
 
-Drop `build/libs/ars_n_spells-1.9.0.jar` into the instance's `mods/` folder
-alongside the dependencies.
+Drop `build/libs/ars_n_spells-2.0.0.jar` into the instance's `mods/` folder
+alongside the dependencies. **2.0.0 introduces a new C2S packet ID; clients
+and servers must run matching versions.**
 
 To enable verbose log output during testing, set in `config/ars_n_spells-common.toml`:
 
@@ -27,8 +28,69 @@ To enable verbose log output during testing, set in `config/ars_n_spells-common.
 debug_mode = true
 ```
 
-This adds `[Cooldown]`, `[CurioDiscount]`, and similar log prefixes to most
-event paths.
+This adds `[Cooldown]`, `[CurioDiscount]`, `[CrossCastTrace]`, and similar log
+prefixes to most event paths.
+
+## 2.0.0 cross-cast pipeline matrix
+
+This matrix mirrors the audit's "Testing and Validation Strategy" table.
+Every cell here must pass before a 2.0.0 release candidate is signed off.
+
+To follow a single cast end-to-end, set `debug_mode=true` and grep
+`logs/latest.log` for `attempt=<uuid>` — the trace utility emits one line per
+pipeline stage with the same UUID:
+
+```
+[CrossCastTrace] attempt=<uuid> player=<name> side=C stage=request_sent  …
+[CrossCastTrace] attempt=<uuid> player=<name> side=S stage=request_received …
+[CrossCastTrace] attempt=<uuid> player=<name> side=S stage=descriptor_validated …
+[CrossCastTrace] attempt=<uuid> player=<name> side=S stage=resource_check approved=true
+[CrossCastTrace] attempt=<uuid> player=<name> side=S stage=upstream_cast_enter runtime=…
+[CrossCastTrace] attempt=<uuid> player=<name> side=S stage=upstream_cast_exit success=true
+```
+
+The client and server attempt UUIDs are different (one generated each side);
+the server logs both with `clientAttempt=…` in the `request_received` line so
+correlation across sides is one grep.
+
+### Matrix to run
+
+| Scenario | Mode | Expected | Where to look |
+| --- | --- | --- | --- |
+| Inscribed Ars spell, neutral target item | `iss_primary` | Cast succeeds, Iron's mana decreases by `cost × multiplier` | Full trace; one `resource_spend` line |
+| Inscribed Ars spell | `ars_primary` | Cast succeeds, Ars mana pays | Full trace; one `ars_cost_applied` line |
+| Inscribed Ars spell | `hybrid` | Cast succeeds, both pools sync | Full trace |
+| Inscribed Ars spell | `separate` | Cast succeeds, both pools pay split | Trace shows `ars_cost_applied` + `resource_spend` |
+| Inscribed Ars spell | `disabled` | **Cast still succeeds** (regression fix), Ars native pool pays multiplied cost | Full trace; no secondary spend |
+| Inscribed Iron spell | every mode | Same matrix, applied to Iron's | `iron_cost_applied` line |
+| Dedicated server, Ars-origin cross-cast | any | Server logs `request_received` and `upstream_cast_enter` | Server log only |
+| Dedicated server, Iron-origin cross-cast | any | Same | Server log only |
+| Malformed NBT (edit one field) | any | Translated denial message; one `descriptor_rejected` line | Action-bar message; trace WARN |
+| Death + respawn | any | Cross-cast still works immediately after respawn | Affinity/cooldown/resonance HUD reflects server state |
+| Nether transition | any | Same | Same |
+| Relog | any | Same | Same |
+| Sneak-right-click cycle | any | Index advances on the item, HUD message shows `n/total` | `cycle_applied` trace line |
+
+### Quick smoke test (5 minutes)
+
+1. Boot dedicated server with Ars + Iron's + this jar.
+2. `config/ars_n_spells-common.toml`: `debug_mode = true`.
+3. Inscribe one Iron's `fireball` onto an Ars novice spellbook (or any neutral
+   stack) via the Spell Transcription ritual.
+4. Hold the inscribed item, right-click. Confirm:
+   - The Iron's fireball actually fires (entity spawns, deals damage).
+   - `latest.log` has the full `[CrossCastTrace]` sequence with a single
+     `attempt=<uuid>` across all six stages.
+5. Set `mana_unification_mode = disabled` and reload. Right-click again.
+   Confirm the cast still works (regression fix vs 1.10.0 behavior).
+6. Manually corrupt the NBT (edit `arsnspells:cross_spells[0].spell_id` to
+   `irons_spellbooks:phantom_spell`). Right-click. Confirm an action-bar chat
+   message in red and a single `descriptor_rejected` trace line.
+
+## P0 regression scenarios (1.9.0 stabilization pass)
+
+These scenarios exercise the five critical fixes called out in the 1.9.0
+changelog. If any of them fails, do not ship.
 
 ## P0 regression scenarios (1.9.0 stabilization pass)
 

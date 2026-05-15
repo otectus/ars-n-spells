@@ -139,13 +139,13 @@ Config file: `config/ars_n_spells-common.toml`
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `enable_mana_unification` | `true` | Enables all mana bridging logic. |
-| `mana_unification_mode` | `iss_primary` | Which mana pool is authoritative. |
+| `enable_mana_unification` | `true` | Enables all mana bridging logic. **Note:** as of 2.0.0, this no longer disables cross-cast inscriptions — only the mana sharing between systems. Inscribed items always cast; only how the cost is routed changes. |
+| `mana_unification_mode` | `iss_primary` | Which mana pool is authoritative. The `disabled` value (and `enable_mana_unification=false`) means "native upstream pools pay; no sharing, no SEPARATE split, no ARS_PRIMARY conversion." Cross-cast still works in `disabled` mode; the `cross_cast_cost_multiplier` still applies. |
 | `enable_resonance_system` | `true` | Full-mana resonance bonuses (Iron's). |
 | `enable_cooldown_system` | `false` | Unified cooldown categories. |
 | `enable_progression_system` | `true` | Cross-mod progression XP. |
 | `enable_affinity_system` | `true` | Spell school affinity tracking. |
-| `debug_mode` | `false` | Verbose logging. |
+| `debug_mode` | `false` | Verbose logging. **Enables `[CrossCastTrace]` end-to-end pipeline tracing in 2.0.0+** — grep `latest.log` for `attempt=<uuid>` to get a single cast's full trace. |
 
 ### Mana conversion
 
@@ -227,6 +227,20 @@ The mod hides redundant mana bars based on mode:
 
 ## Changelog
 
+### v2.0.0 — Audit-driven major release
+
+Addresses the comprehensive audit at [ars-n-spells-2.0.0.md](ars-n-spells-2.0.0.md). Every High and Medium-High audit hypothesis maps to a closed fix.
+
+- **Cross-cast actually works on dedicated servers again.** Client used to claim success and cancel the use event before the server received any cast trigger, producing silent "input detected, nothing happens" failures. The client now sends a dedicated [`CrossCastRequestPacket`](src/main/java/com/otectus/arsnspells/network/CrossCastRequestPacket.java) (C2S, appended at the tail of `PacketHandler.register()` so existing IDs do not shift). The server is the sole cast authority via the new [`CrossCastingHandler.serverHandleCast`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) entry point.
+- **Cross-cast decoupled from mana unification.** `mana_mode=disabled` (and `enable_mana_unification=false`) used to make inscribed items inert. They now cast normally with native upstream pool costs — only mana *sharing* between systems is suppressed in those settings. The `cross_cast_cost_multiplier` still applies in all modes.
+- **End-to-end pipeline tracing.** Every cast attempt gets a server-generated UUID at packet receipt, threaded through [`CrossCastContext.Entry`](src/main/java/com/otectus/arsnspells/spell/CrossCastContext.java) and logged by the new [`util/CrossCastTrace`](src/main/java/com/otectus/arsnspells/util/CrossCastTrace.java) at every pipeline stage. Set `debug_mode=true` and grep `latest.log` for `attempt=<uuid>` to follow a single cast through input → request → validate → resource check → upstream cast → exit.
+- **Server-side payload validation.** New [`CrossCastValidator`](src/main/java/com/otectus/arsnspells/spell/CrossCastValidator.java) is the single authority for cross-cast payload validity (index range, spell-type resolution, Ars/Iron sub-payload sanity, Iron registry resolution). Rejections produce a translated chat message and a `descriptor_rejected` trace event. 16-case JUnit covers every branch.
+- **Capability resync on transitions.** New [`CapabilityResyncHandler`](src/main/java/com/otectus/arsnspells/events/CapabilityResyncHandler.java) replays Affinity, Cooldown, and Resonance state on login, respawn, and dimension change. (Aura already had this from 1.10.0 via `AuraCapabilityProvider`.) Players no longer see stale HUDs after death or Nether transition. The previous `AffinitySyncOnLoginHandler` is retired; its job is subsumed.
+- **Authoritative cost calculator.** New [`CrossCastCostResolver`](src/main/java/com/otectus/arsnspells/spell/CrossCastCostResolver.java) captures the mode × multiplier × ring state matrix in one place. For 2.0.0 it's a calculator (existing cost-mutation sites still own choreography); full site delegation lands in 2.0.1.
+- **Phase 3 hardening.** Sealed [`SpellDescriptor`](src/main/java/com/otectus/arsnspells/spell/SpellDescriptor.java) with `ArsSerializedSpellDescriptor` and `IronsRegistrySpellDescriptor`; [`CastContext`](src/main/java/com/otectus/arsnspells/spell/CastContext.java) record; GameTest scaffold; [`.github/workflows/ci.yml`](.github/workflows/ci.yml) for build + test + advisory GameTest jobs. Existing 1.8.9+ inscribed items round-trip unchanged.
+- **Breaking change:** clients older than 2.0.0 cannot cross-cast against a 2.0.0 server (and vice versa) because of the new packet ID. Use matching client/server versions.
+- **Backward compatibility:** save format, mod config keys, and mixin injection points all unchanged. See [CHANGELOG.md](CHANGELOG.md) for the full breakdown.
+
 ### v1.9.0
 - **Stabilization pass: five P0 fixes for serious-modpack readiness.**
   - **AffinitySyncPacket** no longer crashes dedicated servers — client logic moved to a new `ClientAffinityPacketHandler` and the packet wraps the capability mutation in `DistExecutor.unsafeRunWhenOn(Dist.CLIENT, …)`. Pre-1.9.0 the packet imported `net.minecraft.client.Minecraft` directly while being registered unconditionally on the common bus.
@@ -238,7 +252,7 @@ The mod hides redundant mana bars based on mode:
   - **Iron's-side affinity hook** (`IronsAffinityHandler`) mirrors `AffinityHandler` for Iron's casts. `AffinityType` gains `HOLY`, `ENDER`, `BLOOD`, `EVOCATION`, `ELDRITCH` so every Iron's stock school maps onto an entry. Adding enum values is forward and backward compatible.
   - **Ars spell scaling actually wired** — new `ArsSpellScalingHandler` computes `SpellScalingUtil.getMultiplierForCaster` on each Ars `SpellCastEvent`, stages it for the casting player with a 60-tick window, and applies it on `LivingHurtEvent` for spell-flavored damage from that player. Final amount is clamped against `spell_power_cap`. Filter rejects melee/environmental damage so the bonus only flows to actual spell hits.
   - **Affinity decay tick handler** (`AffinityDecayHandler`) ticks each player every `affinity_decay_interval_ticks` (default 1200 = 60 s) and prorates `affinity_decay_rate` from per-day to per-interval. Default for `enable_affinity_decay` is now `false` for fresh configs to avoid surprising existing players whose 1.8.9 config had it (no-op-ly) on; existing config files retain their previous setting.
-  - **Login affinity sync** (`AffinitySyncOnLoginHandler`) fires one `AffinitySyncPacket` per non-zero school when the player joins, so HUD reflects persisted state immediately instead of waiting for the next cast.
+  - **Login affinity sync** (`AffinitySyncOnLoginHandler`) fires one `AffinitySyncPacket` per non-zero school when the player joins, so HUD reflects persisted state immediately instead of waiting for the next cast. *(Retired in 2.0.0; superseded by `CapabilityResyncHandler` which adds respawn + dimension sync.)*
 - **Configuration:** new `affinity_decay_interval_ticks` (default 1200, range 20–24000); changed default for `enable_affinity_decay` to `false` for fresh installs.
 - **Backward compatibility:** strict. AffinityData, ProgressionData, CooldownData, AuraCapability NBT shapes unchanged. Network protocol stays at "1". Inscribed cross-cast items unaffected. No removed config keys, no renamed config keys. Existing 1.8.9 saves load cleanly.
 - See [CHANGELOG.md](CHANGELOG.md) for the full list and follow-up notes.

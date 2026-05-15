@@ -69,12 +69,14 @@ public class ArsNSpells {
         MinecraftForge.EVENT_BUS.register(new CooldownHandler());
         MinecraftForge.EVENT_BUS.register(new AffinityHandler());
         MinecraftForge.EVENT_BUS.register(new AffinityDecayHandler());
-        MinecraftForge.EVENT_BUS.register(new AffinitySyncOnLoginHandler());
+        // AffinitySyncOnLoginHandler retired in 2.0.0 — its job is subsumed by
+        // CapabilityResyncHandler (auto-registered, covers login/respawn/dim).
         // ArsNSpellsCommands has no @Mod.EventBusSubscriber, needs explicit registration
         MinecraftForge.EVENT_BUS.register(ArsNSpellsCommands.class);
         // Note: CrossCastingHandler, EquipmentHandler, CurioDiscountHandler, CursedRingHandler,
-        // VirtueRingHandler, LPDeathPrevention, AuraCapabilityProvider are auto-registered
-        // via @Mod.EventBusSubscriber — do NOT register them here to avoid double-firing.
+        // VirtueRingHandler, LPDeathPrevention, AuraCapabilityProvider,
+        // CapabilityResyncHandler are auto-registered via @Mod.EventBusSubscriber —
+        // do NOT register them here to avoid double-firing.
 
         if (ModList.get().isLoaded("irons_spellbooks")) {
             // Instance-registered handlers (no @Mod.EventBusSubscriber).
