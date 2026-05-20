@@ -57,6 +57,20 @@ public class IronsBridge implements IManaBridge {
     }
 
     @Override
+    public void addMana(Player player, float amount) {
+        if (player == null || player.level().isClientSide() || amount == 0.0f) return;
+        try {
+            MagicData data = MagicData.getPlayerMagicData(player);
+            if (data == null) return;
+            // MagicData.addMana is the atomic add; do NOT route through get+set or
+            // we lose concurrent regen between the read and the write.
+            data.addMana(amount);
+        } catch (Throwable e) {
+            logCriticalError("addMana", e);
+        }
+    }
+
+    @Override
     public float getMaxMana(Player player) {
         try {
             if (player == null) {

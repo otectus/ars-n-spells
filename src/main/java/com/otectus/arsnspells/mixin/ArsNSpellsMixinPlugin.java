@@ -16,8 +16,11 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String mixinPackage) {
-        ironsPresent = resourceExists("io/redspace/ironsspellbooks/api/spells/AbstractSpell.class")
-            && resourceExists("io/redspace/ironsspellbooks/api/magic/MagicData.class");
+        // ANS-CRIT-001: probe via Class.forName(name, false, loader) — this is more
+        // reliable inside the mixin bootstrap than ClassLoader.getResource on .class
+        // paths, and matches the canonical pattern used by ArsNSpells.canLoad.
+        ironsPresent = canLoadClass("io.redspace.ironsspellbooks.api.spells.AbstractSpell")
+            && canLoadClass("io.redspace.ironsspellbooks.api.magic.MagicData");
     }
 
     @Override
@@ -27,9 +30,14 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        // ANS-CRIT-001: MixinIronsCastValidation and MagicDataAccessor were missing
+        // from this gated list — both directly target Iron's classes, so on an
+        // Iron's-less server the mixin loader was crashing with NoClassDefFoundError.
         if (mixinClassName.endsWith("MixinIronsSpellDamage")
             || mixinClassName.endsWith("MixinIronsManaBarOverlay")
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
+            || mixinClassName.endsWith("MixinIronsCastValidation")
+            || mixinClassName.endsWith("MagicDataAccessor")
             || mixinClassName.endsWith("MixinScrollItem")
             || mixinClassName.endsWith("MixinSanctifiedAbstractSpell")) {
             return ironsPresent;
@@ -57,7 +65,12 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // No-op
     }
 
-    private static boolean resourceExists(String resourcePath) {
-        return ArsNSpellsMixinPlugin.class.getClassLoader().getResource(resourcePath) != null;
+    private static boolean canLoadClass(String fqn) {
+        try {
+            Class.forName(fqn, false, ArsNSpellsMixinPlugin.class.getClassLoader());
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 }

@@ -31,6 +31,14 @@ public class ArsNativeBridge implements IManaBridge {
     }
 
     @Override
+    public void addMana(Player player, float amount) {
+        if (player == null || player.level().isClientSide() || amount == 0.0f) return;
+        // IManaCap.addMana is the atomic add — do NOT route through get+set or
+        // we lose concurrent regen between the read and the write.
+        ManaUtil.getNativeMana(player).ifPresent(cap -> cap.addMana((double) amount));
+    }
+
+    @Override
     public float getMaxMana(Player player) {
         return ManaUtil.getNativeMana(player).map(cap -> (float)cap.getMaxMana())
             .orElse(AnsConfig.DEFAULT_MAX_MANA.get().floatValue());

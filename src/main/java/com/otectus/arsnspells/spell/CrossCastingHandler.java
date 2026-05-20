@@ -25,6 +25,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
@@ -307,7 +308,13 @@ public class CrossCastingHandler {
         }
     }
 
-    @SubscribeEvent
+    /**
+     * ANS-CRIT-004: runs at HIGHEST so the cross-cast multiplier applies to the
+     * unmodified base cost, BEFORE CursedRingHandler / VirtueRingHandler zero out
+     * event.currentCost to stamp pending LP/aura. Without this, ring wearers paid
+     * zero cross-cast overhead — the documented 1.25× premium silently became 0×1.25.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onArsSpellCost(SpellCostCalcEvent event) {
         LivingEntity caster = event.context != null ? event.context.getUnwrappedCaster() : null;
         if (!(caster instanceof Player player)) {
@@ -356,6 +363,20 @@ public class CrossCastingHandler {
                     logDebug("Insufficient Iron mana for cross-cast: need {}, have {}", issCost, issMana);
                     return;
                 }
+                // ANS-CRIT-002: pre-consume Iron's atomically with the Ars cost-calc.
+                // The previous design deferred the Iron's-side consume to the @TAIL of
+                // MixinSpellResolverMana, but the TAIL silently swallowed consume failures,
+                // letting Ars mana drain one-way. Consuming here makes the dual-cost
+                // atomic with the sufficiency check above, and the TAIL is now a no-op
+                // for entries that have already paid (issCost = 0).
+                if (issBridge != null && !issBridge.consumeMana(player, issCost)) {
+                    entry.blocked = true;
+                    event.currentCost = Integer.MAX_VALUE;
+                    CrossCastContext.clear(player);
+                    logDebug("Iron mana consume failed for cross-cast: need {}, have {}", issCost, issMana);
+                    return;
+                }
+                entry.issCost = 0.0f;
             }
 
             event.currentCost = Math.max(0, Math.round(arsCost));

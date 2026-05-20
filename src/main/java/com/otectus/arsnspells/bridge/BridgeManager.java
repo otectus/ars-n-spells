@@ -241,8 +241,11 @@ public class BridgeManager {
                     return false;
                 }
 
-                // Atomic dual-cost: capture state for rollback if second consumption fails
-                float arsManaBefore = arsBridge.getMana(player);
+                // ANS-CRIT-003: compensating refund (addMana) instead of snapshot+restore.
+                // The earlier setMana(arsManaBefore) pattern would clobber any concurrent
+                // regen/buff/ritual mana mutation landing between the snapshot and the
+                // rollback. addMana delegates to the backing API's atomic add, preserving
+                // concurrent deltas.
                 boolean arsSuccess = arsBridge.consumeMana(player, arsCost);
                 if (!arsSuccess) {
                     return false;
@@ -250,8 +253,7 @@ public class BridgeManager {
 
                 boolean issSuccess = issBridge.consumeMana(player, issCost);
                 if (!issSuccess) {
-                    // Rollback: restore Ars mana to pre-consumption value
-                    arsBridge.setMana(player, arsManaBefore);
+                    arsBridge.addMana(player, arsCost);
                     return false;
                 }
 

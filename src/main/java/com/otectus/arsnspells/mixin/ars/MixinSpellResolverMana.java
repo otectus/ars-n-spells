@@ -82,6 +82,14 @@ public abstract class MixinSpellResolverMana {
             "mode", mode, "cost", cost, "consumed", consumed);
     }
 
+    /**
+     * ANS-CRIT-002: this TAIL hook used to consume the Iron's side of a SEPARATE-mode
+     * cross-cast AFTER Ars had already drained, and silently swallowed consume failures,
+     * producing a one-way Ars drain when Iron's was empty. The Iron's side is now
+     * pre-consumed atomically with the Ars cost-calc in CrossCastingHandler.onArsSpellCost,
+     * which sets entry.issCost to 0 to signal "already paid". This TAIL now exists only
+     * to drain the context entry from ACTIVE_CASTS once the Ars resolve completes.
+     */
     @Inject(method = "expendMana", at = @At("TAIL"))
     private void arsnspells$consumeCrossCastSecondary(CallbackInfo ci) {
         if (!BridgeManager.isUnificationEnabled()) {
@@ -102,17 +110,24 @@ public abstract class MixinSpellResolverMana {
         if (entry == null || entry.type != CrossSpellType.ARS_NOUVEAU) {
             return;
         }
+        // Drain the context entry. entry.issCost will be 0 in the happy path (already
+        // pre-consumed by onArsSpellCost); the take() is just lifecycle cleanup.
         CrossCastContext.take(player);
         if (player.isCreative() || entry.issCost <= 0.0f) {
             return;
         }
+        // Defensive: if for some reason a cross-cast entry reached TAIL with issCost > 0
+        // (e.g. an upstream future bug skipped the pre-consume), still pay it here AND
+        // log a warning so the regression is visible.
         IManaBridge issBridge = BridgeManager.getSecondaryBridge();
         if (issBridge == null) {
             return;
         }
         boolean consumed = issBridge.consumeMana(player, entry.issCost);
         if (!consumed) {
-            // No cancel path here; log in debug to avoid spam
+            org.slf4j.LoggerFactory.getLogger(MixinSpellResolverMana.class)
+                .warn("Cross-cast Iron's-side consume failed at TAIL for {}: needed {}; pre-consume should have handled this",
+                    player.getName().getString(), entry.issCost);
         }
     }
 }

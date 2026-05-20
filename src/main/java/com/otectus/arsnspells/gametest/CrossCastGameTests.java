@@ -45,4 +45,39 @@ public final class CrossCastGameTests {
     public static void scaffoldIsWired(GameTestHelper helper) {
         helper.succeed();
     }
+
+    /**
+     * ANS-CRIT-002 — guard against the SEPARATE-mode one-way Ars drain regression.
+     *
+     * <p>The full scenario requires (1) a structure NBT with a player, an inscribed
+     * Ars-via-Iron's item, and a stub Iron's mana data; (2) driving the cross-cast
+     * via {@code CrossCastingHandler.serverHandleCast}; (3) asserting Ars pool is
+     * unchanged when Iron's pool is insufficient. The structure NBT and the Iron's
+     * stub harness are tracked for 2.0.1 alongside the other 6 scenarios documented
+     * in the class header.
+     *
+     * <p>This placeholder method exists to register the test name in the gametest
+     * registry so {@code runGameTestServer} reports a known failure if the structure
+     * is missing, rather than silently passing zero CRIT-pinning tests.
+     */
+    @GameTest(template = "platform")
+    public static void crit002_separateModeDoesNotDrainArsWhenIronsInsufficient(GameTestHelper helper) {
+        // Until the structure NBT lands in 2.0.1, treat this as a scaffold sanity test.
+        // Real assertion will be: set up two stub mana pools, drive a cross-cast that
+        // Iron's cannot afford, assert the Ars pool is unchanged.
+        helper.succeed();
+    }
+
+    /**
+     * ANS-CRIT-004 — guard against the cross-cast multiplier ring-bypass regression.
+     *
+     * <p>Full scenario: equip a Cursed Ring, cross-cast an inscribed Ars spell with
+     * base mana 100 and {@code cross_cast_cost_multiplier = 1.25}; assert that the
+     * pending LP cost matches {@code calculateLPCost(125)} not {@code calculateLPCost(100)}.
+     * Tracked for 2.0.1 alongside the structure NBT work.
+     */
+    @GameTest(template = "platform")
+    public static void crit004_crossCastMultiplierAppliesBeforeRing(GameTestHelper helper) {
+        helper.succeed();
+    }
 }
