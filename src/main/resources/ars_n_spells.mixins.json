@@ -9,7 +9,6 @@
     "ars.MixinManaCapability",
     "ars.MixinSpellResolverMana",
     "ars.MixinSpellResolverPreCast",
-    "ars.MixinSpellResolverContext",
     "ars.MixinArsPotionEffects",
     "irons.MagicDataAccessor",
     "irons.MixinIronsCastValidation",

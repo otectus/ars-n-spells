@@ -1,12 +1,16 @@
 package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
+import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.config.AnsConfig;
-import io.redspace.ironsspellbooks.api.magic.MagicData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 
+/**
+ * ANS-HIGH-002: routes the mana grant through {@link BridgeManager}. See
+ * {@link ManaInfusionRitual} for full rationale.
+ */
 public class ManaWellRitual extends AbstractRitual {
     @Override
     protected void tick() {
@@ -17,12 +21,8 @@ public class ManaWellRitual extends AbstractRitual {
         AABB area = new AABB(this.getPos()).inflate(range);
         float regenRate = AnsConfig.MANA_WELL_REGEN_RATE.get().floatValue();
 
-        this.getWorld().getEntitiesOfClass(Player.class, area).forEach(p -> {
-            MagicData data = MagicData.getPlayerMagicData(p);
-            if (data != null) {
-                data.addMana(regenRate);
-            }
-        });
+        this.getWorld().getEntitiesOfClass(Player.class, area).forEach(p ->
+            BridgeManager.getBridge().addMana(p, regenRate));
     }
 
     @Override

@@ -31,19 +31,43 @@ public abstract class MixinManaCapability {
 
     /**
      * Recursion guard: prevents infinite recursion when bridge == ArsNativeBridge
-     * (ARS_PRIMARY mode), since ArsNativeBridge.getMana() calls cap.getCurrentMana()
-     * which would trigger this mixin again.
+     * (ARS_PRIMARY mode), since {@code ArsNativeBridge.getMana()} calls
+     * {@code cap.getCurrentMana()} which would trigger this mixin again.
+     *
+     * <p>ANS-HIGH-010: per-player UUID set instead of a global boolean. The previous
+     * design used {@code ThreadLocal<Boolean>}, which meant ANY in-flight bridge call
+     * on the current thread blocked all other ManaCap operations for ALL players —
+     * so AoE / party-share spells that read other players' mana while one player's
+     * bridge call was active would silently fall through to native ManaCap data,
+     * bypassing the bridge.
      */
     @Unique
-    private static final ThreadLocal<Boolean> arsnspells$inBridgeCall = ThreadLocal.withInitial(() -> false);
+    private static final ThreadLocal<java.util.Set<java.util.UUID>> arsnspells$inBridgeCall =
+        ThreadLocal.withInitial(java.util.HashSet::new);
+
+    @Unique
+    private boolean arsnspells$enterGuard(Player player) {
+        java.util.Set<java.util.UUID> set = arsnspells$inBridgeCall.get();
+        return set.add(player.getUUID());
+    }
+
+    @Unique
+    private void arsnspells$exitGuard(Player player) {
+        java.util.Set<java.util.UUID> set = arsnspells$inBridgeCall.get();
+        set.remove(player.getUUID());
+        if (set.isEmpty()) {
+            // Avoid ThreadLocal leak on long-lived threads.
+            arsnspells$inBridgeCall.remove();
+        }
+    }
 
     @Inject(method = "getCurrentMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$getCurrentMana(CallbackInfoReturnable<Double> cir) {
-        if (arsnspells$inBridgeCall.get()) {
-            return; // Recursion guard: let native method run
-        }
         if (!(this.livingEntity instanceof Player player)) {
             return;
+        }
+        if (arsnspells$inBridgeCall.get().contains(player.getUUID())) {
+            return; // Recursion guard for THIS player only — let native method run
         }
         if (!BridgeManager.isUnificationEnabled()) {
             return;
@@ -58,8 +82,8 @@ public abstract class MixinManaCapability {
         if (mode != null && mode.isArsPrimary()) {
             return;
         }
+        arsnspells$enterGuard(player);
         try {
-            arsnspells$inBridgeCall.set(true);
             double current = (double) BridgeManager.getBridge().getMana(player);
             if (mode != null && mode.isHybrid()) {
                 int cap = arsnspells$arsNativeMaxMana > 0 ? arsnspells$arsNativeMaxMana : this.maxMana;
@@ -67,17 +91,17 @@ public abstract class MixinManaCapability {
             }
             cir.setReturnValue(current);
         } finally {
-            arsnspells$inBridgeCall.set(false);
+            arsnspells$exitGuard(player);
         }
     }
 
     @Inject(method = "getMaxMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$getMaxMana(CallbackInfoReturnable<Integer> cir) {
-        if (arsnspells$inBridgeCall.get()) {
-            return; // Recursion guard: let native method run
-        }
         if (!(this.livingEntity instanceof Player player)) {
             return;
+        }
+        if (arsnspells$inBridgeCall.get().contains(player.getUUID())) {
+            return; // Recursion guard for THIS player only — let native method run
         }
         if (!BridgeManager.isUnificationEnabled()) {
             return;
@@ -96,11 +120,11 @@ public abstract class MixinManaCapability {
             }
             return;
         }
+        arsnspells$enterGuard(player);
         try {
-            arsnspells$inBridgeCall.set(true);
             cir.setReturnValue((int) BridgeManager.getBridge().getMaxMana(player));
         } finally {
-            arsnspells$inBridgeCall.set(false);
+            arsnspells$exitGuard(player);
         }
     }
 
@@ -130,13 +154,13 @@ public abstract class MixinManaCapability {
         // Read-only sync: update shadow field from Iron's actual value.
         // Do NOT write 'amount' to Iron's — that would overwrite Iron's real mana
         // with stale Ars-internal values (typically 0).
+        arsnspells$enterGuard(player);
         try {
-            arsnspells$inBridgeCall.set(true);
             double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
             this.mana = ironsCurrentMana;  // Sync shadow field from Iron's for consistency
             cir.setReturnValue(amount);     // Return requested value to satisfy API contract
         } finally {
-            arsnspells$inBridgeCall.set(false);
+            arsnspells$exitGuard(player);
         }
     }
 
@@ -156,13 +180,13 @@ public abstract class MixinManaCapability {
         // a no-op. playerOnTick still runs for cap state maintenance and sync, but the
         // actual mana addition is discarded. Any addMana calls from Ars internal code
         // (e.g. potion effects restoring Ars mana) should not affect Iron's pool.
+        arsnspells$enterGuard(player);
         try {
-            arsnspells$inBridgeCall.set(true);
             double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
             this.mana = ironsCurrentMana;
             cir.setReturnValue(ironsCurrentMana);
         } finally {
-            arsnspells$inBridgeCall.set(false);
+            arsnspells$exitGuard(player);
         }
     }
 
@@ -181,13 +205,13 @@ public abstract class MixinManaCapability {
         // Spell consumption goes through MixinSpellResolverMana → BridgeManager →
         // IronsBridge.consumeMana() directly, bypassing ManaCap. Any other removeMana
         // calls from Ars are internal bookkeeping and should not affect Iron's pool.
+        arsnspells$enterGuard(player);
         try {
-            arsnspells$inBridgeCall.set(true);
             double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
             this.mana = ironsCurrentMana;
             cir.setReturnValue(ironsCurrentMana);
         } finally {
-            arsnspells$inBridgeCall.set(false);
+            arsnspells$exitGuard(player);
         }
     }
 
@@ -212,11 +236,11 @@ public abstract class MixinManaCapability {
         if (mode == null || !mode.isIssPrimary()) {
             return;
         }
+        arsnspells$enterGuard(player);
         try {
-            arsnspells$inBridgeCall.set(true);
             this.maxMana = (int) BridgeManager.getBridge().getMaxMana(player);
         } finally {
-            arsnspells$inBridgeCall.set(false);
+            arsnspells$exitGuard(player);
         }
         ci.cancel();
     }

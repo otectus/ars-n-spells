@@ -29,6 +29,16 @@ public final class ScrollLPTracker {
         return PENDING.remove(uuid);
     }
 
+    /**
+     * ANS-HIGH-025: explicit clear hook for logout cleanup. {@link #take} would
+     * also work, but {@code clear} is the symmetric name with
+     * {@link ScrollAuraTracker#clear(UUID)} and makes the intent obvious at the
+     * call site.
+     */
+    public static void clear(UUID uuid) {
+        PENDING.remove(uuid);
+    }
+
     public static final class Entry {
         public final int lpCost;
         public final boolean deathMode;

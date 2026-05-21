@@ -3,10 +3,12 @@ package com.otectus.arsnspells.events;
 import com.hollingsworth.arsnouveau.api.event.SpellCostCalcEvent;
 import com.hollingsworth.arsnouveau.api.event.SpellResolveEvent;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
+import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.aura.AuraManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
+import com.otectus.arsnspells.compat.ScrollAuraTracker;
 import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.util.CasterContext;
+import com.otectus.arsnspells.util.SpellAnalysis;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -81,10 +83,10 @@ public class VirtueRingHandler {
         LOGGER.debug("Virtue Ring detected on {} - Spell will use Aura instead of mana",
             player.getName().getString());
 
-        // Get first effect glyph for tier calculation
-        com.otectus.arsnspells.util.SpellAnalysis.Result analysis = CasterContext.getSpell()
-            .map(com.otectus.arsnspells.util.SpellAnalysis::analyze)
-            .orElse(null);
+        // ANS-HIGH-003: read the spell directly from the event context instead of a
+        // ThreadLocal. See CursedRingHandler for the full rationale.
+        Spell spell = event.context != null ? event.context.getSpell() : null;
+        SpellAnalysis.Result analysis = spell != null ? SpellAnalysis.analyze(spell) : null;
         AbstractSpellPart spellPart = analysis != null ? analysis.firstEffect() : null;
 
         // Calculate aura cost
@@ -102,8 +104,10 @@ public class VirtueRingHandler {
 
         LOGGER.debug("Spell will cost {} aura (base mana: {})", auraCost, manaCost);
 
-        // Store the aura cost for consumption on spell resolve
-        pendingCosts.put(player.getUUID(), new PendingAuraCost(auraCost, player.tickCount));
+        // ANS-HIGH-011: stamp with level.getGameTime() (server-global) instead of
+        // player.tickCount (per-player) — see CursedRingHandler for rationale.
+        pendingCosts.put(player.getUUID(),
+            new PendingAuraCost(auraCost, player.level().getGameTime()));
 
         // Set mana cost to 0 so Ars Nouveau doesn't consume mana
         event.currentCost = 0;
@@ -120,7 +124,7 @@ public class VirtueRingHandler {
         if (pending == null) {
             return -1;
         }
-        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
+        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
             pendingCosts.remove(player.getUUID());
             return -1;
         }
@@ -175,7 +179,7 @@ public class VirtueRingHandler {
             return;
         }
 
-        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
+        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
             pendingCosts.remove(player.getUUID());
             return;
         }
@@ -214,7 +218,7 @@ public class VirtueRingHandler {
             return;
         }
 
-        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
+        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
             LOGGER.warn("Pending aura cost expired for {}", player.getName().getString());
             return;
         }
@@ -270,8 +274,9 @@ public class VirtueRingHandler {
             return;
         }
         if (event.player.tickCount % 100 == 0) {
-            int now = event.player.tickCount;
-            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().tickStamp > PENDING_COST_TTL_TICKS);
+            // ANS-HIGH-011: server-global gameTime; see CursedRingHandler for rationale.
+            long now = event.player.level().getGameTime();
+            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().gameTimeStamp > PENDING_COST_TTL_TICKS);
         }
     }
 
@@ -280,19 +285,24 @@ public class VirtueRingHandler {
      */
     @SubscribeEvent
     public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
-        pendingCosts.remove(event.getEntity().getUUID());
+        UUID id = event.getEntity().getUUID();
+        pendingCosts.remove(id);
+        // ANS-HIGH-025: also drain the scroll aura tracker so a staged entry from a
+        // scroll cast whose RETURN inject was suppressed cannot leak across sessions.
+        ScrollAuraTracker.clear(id);
     }
 
-    private static final int PENDING_COST_TTL_TICKS = 100; // 5 seconds at 20 TPS
+    private static final long PENDING_COST_TTL_TICKS = 100L; // 5 seconds at 20 TPS
 
+    /** ANS-HIGH-011: gameTimeStamp (long, server-global) replaces tickStamp (int, per-player). */
     private static class PendingAuraCost {
         final int auraCost;
-        final int tickStamp;
+        final long gameTimeStamp;
         boolean consumed = false;
 
-        PendingAuraCost(int auraCost, int tickStamp) {
+        PendingAuraCost(int auraCost, long gameTimeStamp) {
             this.auraCost = auraCost;
-            this.tickStamp = tickStamp;
+            this.gameTimeStamp = gameTimeStamp;
         }
     }
 }

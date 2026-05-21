@@ -46,33 +46,45 @@ public class ConfigScreenFactory {
         @Override
         protected void init() {
             super.init();
-            
+
             // Clear existing options
             options.clear();
-            
+
             // Add configuration options
             addMasterToggles();
             addManaSettings();
             addSystemSettings();
-            
-            // Add Done button
+
+            // ANS-HIGH-016 part 2: gate mutation buttons on singleplayer.
+            // AnsConfig is now a SERVER-type config (registered server-side in ArsNSpells.java).
+            // On a dedicated server, AnsConfig.<KEY>.set(...) on the CLIENT side mutates only
+            // the client's mirror — it never propagates to the server, so toggles in this
+            // screen would be silent no-ops. Disable Save/Reset when not in singleplayer so
+            // the user is not misled. Operators on dedicated servers should edit the
+            // server-side toml directly or use the /ans command.
+            boolean canMutate = minecraft != null && minecraft.hasSingleplayerServer();
+
+            // Add Done button (always present; in multiplayer it's read-only "Close")
             this.addRenderableWidget(Button.builder(
-                Component.literal("Done"),
+                Component.literal(canMutate ? "Done" : "Close"),
                 button -> {
-                    saveConfig();
+                    if (canMutate) {
+                        saveConfig();
+                    }
                     minecraft.setScreen(parent);
                 })
                 .bounds(this.width / 2 - 100, this.height - 28, 200, 20)
                 .build()
             );
-            
-            // Add Reset to Defaults button
-            this.addRenderableWidget(Button.builder(
+
+            // Add Reset to Defaults button — disabled in multiplayer
+            Button resetButton = Button.builder(
                 Component.literal("Reset to Defaults"),
                 button -> resetToDefaults())
                 .bounds(this.width / 2 - 205, this.height - 28, 100, 20)
-                .build()
-            );
+                .build();
+            resetButton.active = canMutate;
+            this.addRenderableWidget(resetButton);
         }
         
         private void addMasterToggles() {

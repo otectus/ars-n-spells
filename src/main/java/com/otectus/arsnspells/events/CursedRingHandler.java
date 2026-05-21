@@ -3,8 +3,11 @@ package com.otectus.arsnspells.events;
 import com.hollingsworth.arsnouveau.api.event.SpellCostCalcEvent;
 import com.hollingsworth.arsnouveau.api.event.SpellResolveEvent;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
+import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
+import com.otectus.arsnspells.compat.ScrollLPTracker;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.util.SpellAnalysis;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -84,10 +87,12 @@ public class CursedRingHandler {
             return;
         }
 
-        // Get first effect glyph for tier calculation from CasterContext
-        com.otectus.arsnspells.util.SpellAnalysis.Result analysis = com.otectus.arsnspells.util.CasterContext.getSpell()
-            .map(com.otectus.arsnspells.util.SpellAnalysis::analyze)
-            .orElse(null);
+        // ANS-HIGH-003: read the spell directly from the event context instead of a
+        // ThreadLocal. The old CasterContext ThreadLocal leaked between casts when
+        // canCast threw (the @At("RETURN") clear didn't fire on exception), so a
+        // subsequent player's cost-calc could read the previous caster's spell.
+        Spell spell = event.context != null ? event.context.getSpell() : null;
+        SpellAnalysis.Result analysis = spell != null ? SpellAnalysis.analyze(spell) : null;
         AbstractSpellPart spellPart = analysis != null ? analysis.firstEffect() : null;
 
         // Calculate LP cost
@@ -104,8 +109,11 @@ public class CursedRingHandler {
 
         LOGGER.debug("Spell will cost {} LP (base mana: {})", lpCost, manaCost);
 
-        // Store the LP cost for consumption in the resolve event
-        pendingCosts.put(player.getUUID(), new PendingLPCost(lpCost, player.tickCount));
+        // ANS-HIGH-011: stamp with level.getGameTime() (server-global) instead of
+        // player.tickCount (per-player), so the periodic sweep can compare ALL
+        // entries against a single now-value without mixing player tickCounts.
+        pendingCosts.put(player.getUUID(),
+            new PendingLPCost(lpCost, player.level().getGameTime()));
 
         // Set mana cost to 0 so Ars Nouveau doesn't consume mana
         event.currentCost = 0;
@@ -127,7 +135,7 @@ public class CursedRingHandler {
             return -1;
         }
 
-        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
+        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
             pendingCosts.remove(player.getUUID());
             return -1;
         }
@@ -183,7 +191,7 @@ public class CursedRingHandler {
             return;
         }
 
-        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
+        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
             pendingCosts.remove(player.getUUID());
             return;
         }
@@ -225,7 +233,7 @@ public class CursedRingHandler {
             return;
         }
 
-        if (player.tickCount - pending.tickStamp > PENDING_COST_TTL_TICKS) {
+        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
             LOGGER.warn("Pending LP cost expired for {}", player.getName().getString());
             return;
         }
@@ -299,8 +307,11 @@ public class CursedRingHandler {
         }
 
         if (event.player.tickCount % 100 == 0) { // Every 5 seconds
-            int now = event.player.tickCount;
-            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().tickStamp > PENDING_COST_TTL_TICKS);
+            // ANS-HIGH-011: sweep against server-global gameTime so a long-uptime player A's
+            // sweep does not evict a freshly-joined player B's pending cost (which was stamped
+            // from B's own tickCount, which is much lower than A's).
+            long now = event.player.level().getGameTime();
+            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().gameTimeStamp > PENDING_COST_TTL_TICKS);
 
             // Ring conflict notification
             if (SanctifiedLegacyCompat.isAvailable() && !event.player.level().isClientSide()) {
@@ -329,21 +340,31 @@ public class CursedRingHandler {
         pendingCosts.remove(id);
         ringConflictNotified.remove(id);
         SanctifiedLegacyCompat.clearCacheFor(id);
+        // ANS-HIGH-025: also drain the scroll LP tracker. Without this, a scroll cast
+        // whose MixinScrollItem RETURN inject is suppressed by another mod's cancel
+        // would leak its staged entry forever.
+        ScrollLPTracker.clear(id);
     }
 
-    private static final int PENDING_COST_TTL_TICKS = 100; // 5 seconds at 20 TPS
+    private static final long PENDING_COST_TTL_TICKS = 100L; // 5 seconds at 20 TPS
 
     /**
      * Container for pending LP costs.
+     *
+     * <p>ANS-HIGH-011: {@code gameTimeStamp} (long) replaces the old {@code tickStamp}
+     * (int) so the periodic sweep can compare every entry against a single
+     * server-global {@code level.getGameTime()} value. The previous design used the
+     * casting player's {@code tickCount}, which mixed per-player counters and let a
+     * long-uptime player's sweep evict a freshly-joined player's pending cost.
      */
     private static class PendingLPCost {
         final int lpCost;
-        final int tickStamp;
+        final long gameTimeStamp;
         boolean consumed = false;
 
-        PendingLPCost(int lpCost, int tickStamp) {
+        PendingLPCost(int lpCost, long gameTimeStamp) {
             this.lpCost = lpCost;
-            this.tickStamp = tickStamp;
+            this.gameTimeStamp = gameTimeStamp;
         }
     }
 }

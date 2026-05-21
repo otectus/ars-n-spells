@@ -2,18 +2,20 @@ package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.hollingsworth.arsnouveau.api.spell.SpellCaster;
+import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.spell.CrossCastNbt;
-import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
-import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
-import io.redspace.ironsspellbooks.api.spells.SpellData;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+// ANS-HIGH-002: Iron's-only imports moved to IronsInscriptionReader so this class
+// is safe to classload on Iron's-less servers. Uninscription (which calls into this
+// class) must work even after Iron's has been uninstalled — that's the documented
+// recovery flow.
 
 /**
  * Classifies dropped items in a ritual brazier's work area into three disjoint
@@ -114,21 +116,15 @@ public final class InscriptionInputs {
             }
         }
 
-        try {
-            ISpellContainer container = ISpellContainer.get(stack);
-            if (container != null) {
-                SpellData data = container.getSpellAtIndex(0);
-                if (data != null) {
-                    AbstractSpell spell = data.getSpell();
-                    if (spell != null && spell.getSpellId() != null) {
-                        ResourceLocation id = ResourceLocation.tryParse(spell.getSpellId());
-                        if (id != null) {
-                            return InscriptionSource.irons(id, Math.max(1, data.getLevel()));
-                        }
-                    }
-                }
+        // ANS-HIGH-002: delegate Iron's parsing to the dedicated reader so the
+        // JVM never resolves Iron's classes when Iron's is absent. The reader
+        // self-gates on IronsCompat.isLoaded() too, but the call-site gate is
+        // what keeps the helper class from being verified at all.
+        if (IronsCompat.isLoaded()) {
+            InscriptionSource ironsSource = IronsInscriptionReader.tryRead(stack);
+            if (ironsSource != null) {
+                return ironsSource;
             }
-        } catch (Throwable ignored) {
         }
 
         return null;

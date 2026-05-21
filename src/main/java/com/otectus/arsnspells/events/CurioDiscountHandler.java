@@ -5,7 +5,7 @@ import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.util.CasterContext;
+import com.otectus.arsnspells.util.SpellAnalysis;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -107,9 +107,13 @@ public class CurioDiscountHandler {
      * @return The spell school identifier
      */
     private static String determineSpellSchool(SpellCostCalcEvent event) {
-        return CasterContext.getSpell()
-            .map(spell -> com.otectus.arsnspells.util.SpellAnalysis.analyze(spell).dominantSchool())
-            .orElse("generic");
+        // ANS-HIGH-003: read the spell directly from the event context instead of a
+        // ThreadLocal. See CursedRingHandler for the full rationale.
+        Spell spell = event.context != null ? event.context.getSpell() : null;
+        if (spell == null) {
+            return "generic";
+        }
+        return SpellAnalysis.analyze(spell).dominantSchool();
     }
     
     /**
