@@ -22,17 +22,14 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // paths, and matches the canonical pattern used by ArsNSpells.canLoad.
         ironsPresent = canLoadClass("io.redspace.ironsspellbooks.api.spells.AbstractSpell")
             && canLoadClass("io.redspace.ironsspellbooks.api.magic.MagicData");
-        // ANS-HIGH-009: probe a Sanctified Legacy marker class. MixinSanctifiedAbstractSpell
-        // injects into the canBeCraftedBy method that Sanctified Legacy adds via its own
-        // mixin to Iron's AbstractSpell. Without Sanctified, that target method is absent
-        // and require=0 saves the inject from crashing — but the architecture is brittle
-        // to refactors, so we gate explicitly.
-        // NEEDS MANUAL VERIFICATION: the exact Sanctified marker class path. We try two
-        // common patterns; if neither matches the actual jar, sanctifiedPresent stays
-        // false and the mixin is skipped (regression-safe — Sanctified absent = no need).
-        sanctifiedPresent = canLoadClass("net.sanctifiedlegacy.SanctifiedLegacy")
-            || canLoadClass("com.dt.sanctifiedlegacy.SanctifiedLegacy")
-            || canLoadClass("net.sanctified.SanctifiedMod");
+        // ANS-HIGH-009: probe the Covenant-of-the-Seven main class. The mod that
+        // people call "Sanctified Legacy" is actually published as
+        // `covenant_of_the_seven` (mod ID) with main class
+        // `net.llenzzz.covenant_of_the_seven.CovenantOfTheSeven`. It adds the
+        // `canBeCraftedBy` method that {@code MixinSanctifiedAbstractSpell} injects
+        // into; without it the inject would no-op (saved by require=0) but the
+        // architecture is brittle to refactors so we gate explicitly here.
+        sanctifiedPresent = canLoadClass("net.llenzzz.covenant_of_the_seven.CovenantOfTheSeven");
     }
 
     @Override
