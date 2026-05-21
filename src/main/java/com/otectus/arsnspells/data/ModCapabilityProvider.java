@@ -6,6 +6,7 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ICapabilitySerializable;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
@@ -47,9 +48,15 @@ public class ModCapabilityProvider implements ICapabilitySerializable<CompoundTa
 
     /**
      * Persist affinity and progression data across death/dimension change.
-     * Cooldown data intentionally NOT persisted (resets on death).
+     * Cooldown data resets on death (clone hook does not copy it) but IS persisted
+     * across server save/restart via {@link #serializeNBT()}.
+     *
+     * <p>ANS-HIGH-008: registered at HIGHEST priority so capability copy completes
+     * BEFORE any third-party {@code PlayerEvent.Clone} handler at default priority
+     * reads our caps. Without this, a HIGHEST-priority reader from another mod
+     * would see the freshly-default state.
      */
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onPlayerClone(PlayerEvent.Clone event) {
         event.getOriginal().reviveCaps();
         event.getOriginal().getCapability(AffinityData.AFFINITY_DATA).ifPresent(oldData -> {

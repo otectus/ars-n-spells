@@ -44,7 +44,7 @@ public class IronsAuraHandler {
         // ENTRY-POINT TRACE (always-on): proves SpellPreCastEvent reached this handler.
         // If you don't see this line in the log when casting Iron's, the cast never
         // reached the server-side event bus — investigate Iron's client-side gating.
-        LOGGER.info("[IronsAuraHandler] PreCast event received from Iron's (player={}, spell={}, level={}, side={})",
+        LOGGER.debug("[IronsAuraHandler] PreCast event received from Iron's (player={}, spell={}, level={}, side={})",
             player == null ? "null" : player.getName().getString(),
             event.getSpellId(), event.getSpellLevel(),
             player == null ? "?" : (player.level().isClientSide() ? "CLIENT" : "SERVER"));
@@ -54,12 +54,12 @@ public class IronsAuraHandler {
         }
 
         if (!SanctifiedLegacyCompat.isAvailable()) {
-            LOGGER.info("[IronsAuraHandler] PreCast skip: Sanctified Legacy compat not available");
+            LOGGER.debug("[IronsAuraHandler] PreCast skip: Sanctified Legacy compat not available");
             return;
         }
 
         if (!AnsConfig.ENABLE_AURA_SYSTEM.get()) {
-            LOGGER.info("[IronsAuraHandler] PreCast skip: enable_aura_system=false");
+            LOGGER.debug("[IronsAuraHandler] PreCast skip: enable_aura_system=false");
             return;
         }
 
@@ -70,7 +70,7 @@ public class IronsAuraHandler {
         }
 
         if (player.isCreative()) {
-            LOGGER.info("[IronsAuraHandler] PreCast skip: player {} is creative", player.getName().getString());
+            LOGGER.debug("[IronsAuraHandler] PreCast skip: player {} is creative", player.getName().getString());
             return;
         }
 
@@ -83,7 +83,7 @@ public class IronsAuraHandler {
         int spellLevel = event.getSpellLevel();
         int manaCost = spell.getManaCost(spellLevel);
         if (manaCost <= 0) {
-            LOGGER.info("[IronsAuraHandler] PreCast: zero-cost spell {} — skipping aura charge", event.getSpellId());
+            LOGGER.debug("[IronsAuraHandler] PreCast: zero-cost spell {} — skipping aura charge", event.getSpellId());
             return;
         }
 
@@ -109,7 +109,7 @@ public class IronsAuraHandler {
         int maxAura = AuraManager.getMaxAura(player);
         boolean hasEnough = currentAura >= discountedCost;
 
-        LOGGER.info("[IronsAuraHandler] PreCast fired: player={}, spell={}, level={}, rarity={}, mana={}, auraCost={}{}, aura={}/{}, sufficient={}",
+        LOGGER.debug("[IronsAuraHandler] PreCast fired: player={}, spell={}, level={}, rarity={}, mana={}, auraCost={}{}, aura={}/{}, sufficient={}",
             player.getName().getString(), event.getSpellId(), spellLevel, rarity.name(),
             manaCost, discountedCost,
             blasphemyMultiplier < 1.0 ? " (blasphemy " + auraCost + "->" + discountedCost + ")" : "",
@@ -125,7 +125,7 @@ public class IronsAuraHandler {
                         .withStyle(ChatFormatting.AQUA),
                     true);
             }
-            LOGGER.info("[IronsAuraHandler] Insufficient aura - cancelled Iron's spell for {} (need {}, have {})",
+            LOGGER.debug("[IronsAuraHandler] Insufficient aura - cancelled Iron's spell for {} (need {}, have {})",
                 player.getName().getString(), discountedCost, currentAura);
             return;
         }
@@ -142,7 +142,7 @@ public class IronsAuraHandler {
     public void onIronsSpellCast(SpellOnCastEvent event) {
         Player player = event.getEntity();
         int manaCostBefore = event.getManaCost();
-        LOGGER.info("[IronsAuraHandler] OnCast event received from Iron's (player={}, spell={}, manaCost={})",
+        LOGGER.debug("[IronsAuraHandler] OnCast event received from Iron's (player={}, spell={}, manaCost={})",
             player == null ? "null" : player.getName().getString(),
             event.getSpellId(), manaCostBefore);
 
@@ -165,7 +165,7 @@ public class IronsAuraHandler {
 
         PendingIronsAura pending = pendingCosts.remove(player.getUUID());
         if (pending == null) {
-            LOGGER.info("[IronsAuraHandler] OnCast: no pending aura cost staged for {} (PreCast may have skipped)",
+            LOGGER.debug("[IronsAuraHandler] OnCast: no pending aura cost staged for {} (PreCast may have skipped)",
                 player.getName().getString());
             return;
         }
@@ -181,7 +181,7 @@ public class IronsAuraHandler {
         boolean success = AuraManager.consumeAura(player, pending.auraCost);
         int remaining = AuraManager.getAura(player);
 
-        LOGGER.info("[IronsAuraHandler] OnCast fired: player={}, spell={}, pending={}, consumed={}, aura={}, manaCostBefore={}, manaCostAfter=0",
+        LOGGER.debug("[IronsAuraHandler] OnCast fired: player={}, spell={}, pending={}, consumed={}, aura={}, manaCostBefore={}, manaCostAfter=0",
             player.getName().getString(), event.getSpellId(), pending.auraCost,
             success, remaining, manaCostBefore);
 
@@ -240,8 +240,14 @@ public class IronsAuraHandler {
     }
 
     /**
-     * Calculate aura cost for Iron's spells using the same shape as the LP formula
-     * (base × level scaling × rarity), but driven by aura config knobs.
+     * Calculate aura cost for Iron's spells.
+     *
+     * <p>ANS-HIGH-018: rarity multipliers now use {@code IRONS_AURA_<RARITY>_MULTIPLIER}
+     * keys (introduced for this fix) instead of reusing the LP rarity table. The LP rarity
+     * scale (defaults 1.0/1.5/2.0/3.0/5.0) was inappropriate for aura because aura regen
+     * is much slower than LP regen; at level 10 legendary the old formula produced
+     * ~10× the mana cost in aura, which is unspendable against a 1000-cap pool.
+     * The new IRONS_AURA_* defaults are gentler (1.0/1.25/1.5/1.75/2.0).
      */
     private static int calculateIronsAuraCost(int manaCost, int spellLevel, String rarity) {
         double baseMultiplier = AnsConfig.AURA_BASE_MULTIPLIER.get();
@@ -251,26 +257,23 @@ public class IronsAuraHandler {
         double levelScale = 1.0 + (spellLevel * levelMultiplier);
         base *= levelScale;
 
-        // Use rarity multipliers from the LP system as a stand-in — aura rarity scaling
-        // shares the same intent (higher rarity → higher resource cost). Adding aura-specific
-        // rarity knobs is a follow-up; right now it's the only sensible source.
-        double rarityMultiplier = lpRarityMultiplier(rarity);
+        double rarityMultiplier = auraRarityMultiplier(rarity);
         int finalCost = (int) Math.round(base * rarityMultiplier);
 
         int minimum = AnsConfig.AURA_MINIMUM_COST.get();
         return Math.max(minimum, finalCost);
     }
 
-    private static double lpRarityMultiplier(String rarity) {
+    private static double auraRarityMultiplier(String rarity) {
         if (rarity == null) {
             return 1.0;
         }
         switch (rarity.toUpperCase()) {
-            case "COMMON":     return AnsConfig.IRONS_LP_COMMON_MULTIPLIER.get();
-            case "UNCOMMON":   return AnsConfig.IRONS_LP_UNCOMMON_MULTIPLIER.get();
-            case "RARE":       return AnsConfig.IRONS_LP_RARE_MULTIPLIER.get();
-            case "EPIC":       return AnsConfig.IRONS_LP_EPIC_MULTIPLIER.get();
-            case "LEGENDARY":  return AnsConfig.IRONS_LP_LEGENDARY_MULTIPLIER.get();
+            case "COMMON":     return AnsConfig.IRONS_AURA_COMMON_MULTIPLIER.get();
+            case "UNCOMMON":   return AnsConfig.IRONS_AURA_UNCOMMON_MULTIPLIER.get();
+            case "RARE":       return AnsConfig.IRONS_AURA_RARE_MULTIPLIER.get();
+            case "EPIC":       return AnsConfig.IRONS_AURA_EPIC_MULTIPLIER.get();
+            case "LEGENDARY":  return AnsConfig.IRONS_AURA_LEGENDARY_MULTIPLIER.get();
             default:           return 1.0;
         }
     }

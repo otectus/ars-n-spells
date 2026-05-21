@@ -13,6 +13,7 @@ import java.util.Set;
  */
 public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
     private boolean ironsPresent;
+    private boolean sanctifiedPresent;
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -21,6 +22,17 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // paths, and matches the canonical pattern used by ArsNSpells.canLoad.
         ironsPresent = canLoadClass("io.redspace.ironsspellbooks.api.spells.AbstractSpell")
             && canLoadClass("io.redspace.ironsspellbooks.api.magic.MagicData");
+        // ANS-HIGH-009: probe a Sanctified Legacy marker class. MixinSanctifiedAbstractSpell
+        // injects into the canBeCraftedBy method that Sanctified Legacy adds via its own
+        // mixin to Iron's AbstractSpell. Without Sanctified, that target method is absent
+        // and require=0 saves the inject from crashing — but the architecture is brittle
+        // to refactors, so we gate explicitly.
+        // NEEDS MANUAL VERIFICATION: the exact Sanctified marker class path. We try two
+        // common patterns; if neither matches the actual jar, sanctifiedPresent stays
+        // false and the mixin is skipped (regression-safe — Sanctified absent = no need).
+        sanctifiedPresent = canLoadClass("net.sanctifiedlegacy.SanctifiedLegacy")
+            || canLoadClass("com.dt.sanctifiedlegacy.SanctifiedLegacy")
+            || canLoadClass("net.sanctified.SanctifiedMod");
     }
 
     @Override
@@ -30,6 +42,13 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        // ANS-HIGH-009: MixinSanctifiedAbstractSpell needs BOTH Iron's (to load AbstractSpell)
+        // AND Sanctified Legacy (which adds the canBeCraftedBy method). Without Sanctified,
+        // require=0 saves us, but the explicit gate documents the intent and is robust to
+        // future refactors that might add a require=1 inject.
+        if (mixinClassName.endsWith("MixinSanctifiedAbstractSpell")) {
+            return ironsPresent && sanctifiedPresent;
+        }
         // ANS-CRIT-001: MixinIronsCastValidation and MagicDataAccessor were missing
         // from this gated list — both directly target Iron's classes, so on an
         // Iron's-less server the mixin loader was crashing with NoClassDefFoundError.
@@ -38,8 +57,7 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
             || mixinClassName.endsWith("MixinIronsCastValidation")
             || mixinClassName.endsWith("MagicDataAccessor")
-            || mixinClassName.endsWith("MixinScrollItem")
-            || mixinClassName.endsWith("MixinSanctifiedAbstractSpell")) {
+            || mixinClassName.endsWith("MixinScrollItem")) {
             return ironsPresent;
         }
         return true;

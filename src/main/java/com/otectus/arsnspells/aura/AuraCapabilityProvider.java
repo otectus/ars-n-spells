@@ -17,6 +17,7 @@ import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.jetbrains.annotations.NotNull;
@@ -67,7 +68,11 @@ public class AuraCapabilityProvider implements ICapabilitySerializable<CompoundT
         }
     }
 
-    @SubscribeEvent
+    /**
+     * ANS-HIGH-008: HIGHEST priority so aura cap copy completes before any third-party
+     * Clone handler reads it.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onPlayerClone(PlayerEvent.Clone event) {
         // Copy aura data on death/dimension change
         event.getOriginal().reviveCaps();

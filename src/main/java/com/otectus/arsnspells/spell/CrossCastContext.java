@@ -129,18 +129,23 @@ public final class CrossCastContext {
          */
         public final UUID attemptId;
         private final long expiresAt;
-        public float arsCost;
-        public float issCost;
-        public boolean costsReady;
-        public boolean blocked;
-        public String spellId;
+        // ANS-HIGH-004: volatile so writes from the cost-calc event are visible to the
+        // TAIL mixin (which may run on a different thread under exotic mod chains) and
+        // to concurrent peek() readers.
+        public volatile float arsCost;
+        public volatile float issCost;
+        public volatile boolean costsReady;
+        public volatile boolean blocked;
+        public volatile String spellId;
         /**
-         * One-shot guard for the cross-cast cost multiplier on the Ars side.
-         * The Ars cost-calc event can fire more than once during a resolve
-         * (preview vs. actual deduction). The multiplier applies on the first
-         * fire only; subsequent fires see this true and pass through.
+         * ANS-HIGH-004: one-shot guard via AtomicBoolean. The Ars cost-calc event can
+         * fire more than once during a resolve (preview vs. actual deduction). The
+         * previous boolean read-then-write was racy under overlapping cross-casts;
+         * {@link #tryMarkMultiplierApplied()} uses compareAndSet so exactly one
+         * caller wins the first-application slot.
          */
-        public boolean multiplierApplied;
+        private final java.util.concurrent.atomic.AtomicBoolean multiplierApplied =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
 
         private Entry(CrossSpellType type, long expiresAt, UUID attemptId) {
             this.type = type;
@@ -150,6 +155,15 @@ public final class CrossCastContext {
 
         public boolean isExpired(long gameTime) {
             return gameTime >= expiresAt;
+        }
+
+        /** Atomic check-and-mark. Returns true iff this is the first caller. */
+        public boolean tryMarkMultiplierApplied() {
+            return multiplierApplied.compareAndSet(false, true);
+        }
+
+        public boolean isMultiplierApplied() {
+            return multiplierApplied.get();
         }
     }
 

@@ -12,6 +12,10 @@ import java.util.function.Supplier;
  * HUD overlay can render without polling.
  */
 public class AuraSyncPacket {
+    /** ANS-HIGH-005: matches AnsConfig.AURA_MAX_DEFAULT ceiling (100000) so payload bounds
+     *  cap the HUD's worst-case render at the same value the server config accepts. */
+    private static final int MAX_REASONABLE_AURA = 100_000;
+
     private final int aura;
     private final int maxAura;
 
@@ -21,8 +25,14 @@ public class AuraSyncPacket {
     }
 
     public AuraSyncPacket(FriendlyByteBuf buf) {
-        this.aura = buf.readInt();
-        this.maxAura = buf.readInt();
+        // ANS-HIGH-005: clamp both ints at decode so a hostile or version-skewed server
+        // cannot feed Integer.MAX_VALUE into the HUD overlay. maxAura is bounded to a
+        // reasonable ceiling; aura is then bounded to [0, maxAura] so the render path
+        // never sees aura > maxAura (the render math would otherwise compute width > BAR_WIDTH).
+        int rawAura = buf.readInt();
+        int rawMax = buf.readInt();
+        this.maxAura = Math.max(1, Math.min(MAX_REASONABLE_AURA, rawMax));
+        this.aura = Math.max(0, Math.min(this.maxAura, rawAura));
     }
 
     public void toBytes(FriendlyByteBuf buf) {

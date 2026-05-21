@@ -134,6 +134,16 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue IRONS_LP_EPIC_MULTIPLIER;
     public static final ForgeConfigSpec.DoubleValue IRONS_LP_LEGENDARY_MULTIPLIER;
 
+    // ANS-HIGH-018: Aura Rarity Multipliers for Iron's Spells (independent of LP rarity scale).
+    // Iron's aura costs used to reuse the LP rarity table, producing 5×-10× over-cost on
+    // legendary spells with the Virtue Ring. These knobs let pack authors tune aura
+    // separately from LP. Defaults are deliberately gentler than the LP scale.
+    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_COMMON_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_UNCOMMON_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_RARE_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_EPIC_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_LEGENDARY_MULTIPLIER;
+
     // ========================================
     // AURA SYSTEM (Ring of Seven Virtues)
     // ========================================
@@ -180,7 +190,9 @@ public class AnsConfig {
     // CROSS-CAST INSCRIPTION
     // ========================================
     public static final ForgeConfigSpec.DoubleValue CROSS_CAST_COST_MULTIPLIER;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_PER_CAST_REAGENT;
+    // ANS-HIGH-027: ENABLE_PER_CAST_REAGENT removed — was a reserved hook with zero
+    // readers; setting it had no effect. If the per-cast reagent feature ever lands,
+    // re-add the key alongside the implementation.
 
     // ========================================
     // PERFORMANCE TUNING
@@ -713,7 +725,27 @@ public class AnsConfig {
         IRONS_LP_LEGENDARY_MULTIPLIER = BUILDER
             .comment("LP multiplier for LEGENDARY rarity spells")
             .defineInRange("irons_lp_legendary_multiplier", 5.0, 0.1, 100.0);
-        
+
+        // ANS-HIGH-018: aura rarity multipliers. Defaults are gentler than the LP
+        // rarity scale because aura regen is slower than LP regen. Pre-fix, the LP
+        // rarity scale was reused for aura cost, producing 10× over-cost on legendary
+        // Iron's spells cast with the Virtue Ring.
+        IRONS_AURA_COMMON_MULTIPLIER = BUILDER
+            .comment("Aura multiplier for COMMON rarity Iron's spells")
+            .defineInRange("irons_aura_common_multiplier", 1.0, 0.1, 10.0);
+        IRONS_AURA_UNCOMMON_MULTIPLIER = BUILDER
+            .comment("Aura multiplier for UNCOMMON rarity Iron's spells")
+            .defineInRange("irons_aura_uncommon_multiplier", 1.25, 0.1, 10.0);
+        IRONS_AURA_RARE_MULTIPLIER = BUILDER
+            .comment("Aura multiplier for RARE rarity Iron's spells")
+            .defineInRange("irons_aura_rare_multiplier", 1.5, 0.1, 10.0);
+        IRONS_AURA_EPIC_MULTIPLIER = BUILDER
+            .comment("Aura multiplier for EPIC rarity Iron's spells")
+            .defineInRange("irons_aura_epic_multiplier", 1.75, 0.1, 10.0);
+        IRONS_AURA_LEGENDARY_MULTIPLIER = BUILDER
+            .comment("Aura multiplier for LEGENDARY rarity Iron's spells")
+            .defineInRange("irons_aura_legendary_multiplier", 2.0, 0.1, 10.0);
+
         BUILDER.pop();
 
         // ========================================
@@ -876,15 +908,8 @@ public class AnsConfig {
             )
             .defineInRange("cross_cast_cost_multiplier", 1.25, 0.5, 5.0);
 
-        ENABLE_PER_CAST_REAGENT = BUILDER
-            .comment(
-                "Reserved hook for a future per-cast reagent system. When enabled, inscribed",
-                "items would consume a physical reagent per cast in addition to mana. The",
-                "reagent itself, item, and consumption hook are not implemented yet -- this",
-                "flag exists only so future work can be gated without re-shuffling config",
-                "keys. Leave at the default (false)."
-            )
-            .define("enable_per_cast_reagent", false);
+        // ANS-HIGH-027: ENABLE_PER_CAST_REAGENT registration removed — had no readers,
+        // setting it had zero effect. Re-add alongside an implementation if/when shipped.
 
         BUILDER.pop();
 
@@ -946,37 +971,41 @@ public class AnsConfig {
     }
     
     /**
-     * Safe config save with retry logic to handle file locks
+     * ANS-HIGH-017: async config save.
+     *
+     * <p>The previous implementation did up to {@code 100 + 200 + 400 = 700 ms} of
+     * {@code Thread.sleep} retries plus three blocking {@code SPEC.save()} calls on the
+     * caller's thread. Callers include {@code /ans} command handlers (server main thread)
+     * and the in-game config screen (render thread). Under file-lock contention (antivirus,
+     * OneDrive, simultaneous editor session) this froze the server tick for almost a
+     * full second.
+     *
+     * <p>Now we dispatch the save to a single-thread daemon executor. The caller never
+     * blocks; success is logged async and failures are logged with full stack at WARN
+     * (not retried — NightConfig already serialises writes internally).
      */
+    private static final java.util.concurrent.ExecutorService SAVE_EXEC =
+        java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "AnsConfig-Save");
+            t.setDaemon(true);
+            return t;
+        });
+
     public static boolean safeSave() {
-        int maxRetries = 3;
-        int retryDelay = 100; // ms
-        
-        for (int i = 0; i < maxRetries; i++) {
+        SAVE_EXEC.submit(() -> {
             try {
                 SPEC.save();
                 org.slf4j.LoggerFactory.getLogger(AnsConfig.class).info("OK Config saved successfully");
-                return true;
             } catch (Exception e) {
                 org.slf4j.LoggerFactory.getLogger(AnsConfig.class).warn(
-                    "Config save attempt {} of {} failed: {}", i + 1, maxRetries, e.getMessage());
-
-                if (i < maxRetries - 1) {
-                    try {
-                        Thread.sleep(retryDelay);
-                        retryDelay *= 2; // Exponential backoff
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        org.slf4j.LoggerFactory.getLogger(AnsConfig.class).error("Config save retry interrupted");
-                        return false;
-                    }
-                } else {
-                    org.slf4j.LoggerFactory.getLogger(AnsConfig.class).error(
-                        "FAILED to save config after {} attempts", maxRetries, e);
-                }
+                    "Config save failed (will not retry to avoid stalling the caller thread): {}",
+                    e.getMessage(), e);
             }
-        }
-        
-        return false;
+        });
+        // Returns true to mean "save scheduled successfully" (the executor's submit
+        // never rejects a daemon task). Callers that previously branched on the
+        // boolean to display feedback may show "saved" optimistically; the async log
+        // is the source of truth for whether the file write actually succeeded.
+        return true;
     }
 }

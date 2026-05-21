@@ -16,7 +16,8 @@ import java.util.stream.Collectors;
 public class ResonanceManager {
     // Fixed: Use UUID instead of Player to prevent garbage collection issues
     private static final Map<UUID, Double> resonanceCache = new ConcurrentHashMap<>();
-    private static double clientResonance = 1.0;
+    /** ANS-HIGH-007 / E-MED-06: volatile so the network-thread write is visible to the render thread. */
+    private static volatile double clientResonance = 1.0;
 
     public static double getResonance(Player player) {
         if (player == null || !AnsConfig.ENABLE_RESONANCE_SYSTEM.get()) {
@@ -29,7 +30,13 @@ public class ResonanceManager {
     }
 
     public static void setClientResonance(float value) {
-        clientResonance = (double) value;
+        // ANS-HIGH-006 (receiver defense-in-depth): packet decode already clamps but
+        // we re-check here so any future caller (commands, debug menu) can't corrupt
+        // the static field with a NaN.
+        if (!Float.isFinite(value)) {
+            return;
+        }
+        clientResonance = Math.max(0.0, Math.min(100.0, (double) value));
     }
 
     public static void computeResonance(Player player) {
@@ -45,11 +52,17 @@ public class ResonanceManager {
                 return;
             }
             double maxMana = player.getAttributeValue(AttributeRegistry.MAX_MANA.get());
-            double manaPercent = data.getMana() / Math.max(1.0, maxMana);
+            // ANS-HIGH-007: clamp manaPercent to [0,1]. Iron's MagicData.getMana() can
+            // briefly exceed maxMana from external buff scripts or attribute injection;
+            // without the clamp, resonance scales unboundedly into spell damage.
+            double rawPercent = data.getMana() / Math.max(1.0, maxMana);
+            double manaPercent = Math.max(0.0, Math.min(1.0, rawPercent));
             double strength = AnsConfig.RESONANCE_STRENGTH.get();
-            
-            // Scaling Iron's spell damage based on current mana % and mod progress
-            double resonance = 1.0 + (manaPercent * strength * 0.2);
+            double cap = AnsConfig.MAX_DAMAGE_MULTIPLIER.get();
+
+            // Cap the final resonance to the documented MAX_DAMAGE_MULTIPLIER ceiling.
+            double resonance = Math.min(cap, 1.0 + (manaPercent * strength * 0.2));
+            if (!Double.isFinite(resonance)) resonance = 1.0;
             resonanceCache.put(player.getUUID(), resonance);
         } catch (Exception e) {
             // Silently fail if Iron's API is unavailable

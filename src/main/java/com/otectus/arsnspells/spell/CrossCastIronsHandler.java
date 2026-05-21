@@ -1,9 +1,11 @@
 package com.otectus.arsnspells.spell;
 
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.util.CrossCastTrace;
+import com.otectus.arsnspells.util.ManaUtil;
 import io.redspace.ironsspellbooks.api.events.SpellOnCastEvent;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -52,7 +54,7 @@ public class CrossCastIronsHandler {
                 int multiplied = Math.max(0, Math.round(baseEventCost * multiplier));
                 if (unified && mode == ManaUnificationMode.ARS_PRIMARY) {
                     multiplied = Math.max(0, (int) Math.round(
-                        multiplied * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get()));
+                        multiplied * effectiveIronToArsRate(player)));
                 }
                 event.setManaCost(multiplied);
             }
@@ -77,8 +79,26 @@ public class CrossCastIronsHandler {
         // currency conversion applies only when mana unification is enabled;
         // the cross-cast multiplier does not apply here.
         if (unified && mode == ManaUnificationMode.ARS_PRIMARY) {
-            int adjusted = (int) Math.round(event.getManaCost() * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
+            int adjusted = (int) Math.round(event.getManaCost() * effectiveIronToArsRate(player));
             event.setManaCost(Math.max(0, adjusted));
         }
+    }
+
+    /**
+     * ANS-HIGH-012: pool-aware conversion rate. The raw config value is a flat scalar
+     * (default 1.0), which at default pool sizes (Ars max ~100, Iron's max ~1000) makes
+     * a 50-mana Iron's spell cost 50 Ars mana — 50% of the Ars pool vs. 5% of Iron's.
+     * Multiplying by arsMax/ironsMax restores cost proportionality across pools.
+     * Mirrors the design in {@link ManaRegenBridge#convertIronsToArs}.
+     */
+    private static double effectiveIronToArsRate(Player player) {
+        double base = AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get();
+        if (player == null) return base;
+        double arsMax = ManaUtil.getNativeMana(player)
+            .map(c -> (double) c.getMaxMana())
+            .orElseGet(() -> AnsConfig.DEFAULT_MAX_MANA.get());
+        double ironsMax = ManaRegenBridge.getCurrentIronsMaxMana(player);
+        if (ironsMax <= 0.0 || arsMax <= 0.0) return base;
+        return base * (arsMax / ironsMax);
     }
 }

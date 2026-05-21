@@ -23,9 +23,9 @@ import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Handles equipment integration between Ars Nouveau and Iron's Spellbooks.
@@ -33,9 +33,12 @@ import java.util.UUID;
  */
 public class EquipmentIntegration {
     private static final Logger LOGGER = LoggerFactory.getLogger(EquipmentIntegration.class);
-    
-    // Cache for expensive calculations
-    private static final Map<UUID, CachedEquipmentData> equipmentCache = new HashMap<>();
+
+    // ANS-HIGH-014: ConcurrentHashMap (was HashMap). Mutated from LivingEquipmentChangeEvent,
+    // PlayerLoggedOutEvent, tick handler, and cost-calc spell handler — HashMap.put mid-resize
+    // during another path's iteration produced CME on long-running servers. Matches the
+    // ConcurrentHashMap pattern in SanctifiedLegacyCompat.java:72.
+    private static final Map<UUID, CachedEquipmentData> equipmentCache = new ConcurrentHashMap<>();
     private static final long CACHE_DURATION_MS = 1000; // 1 second cache
 
     private static final UUID ARS_TO_IRON_MAX_MANA_ID = UUID.fromString("d3e1f1d1-6b39-4ec7-9a4a-7e6d706a8b9b");

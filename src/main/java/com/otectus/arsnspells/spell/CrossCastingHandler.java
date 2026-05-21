@@ -326,9 +326,11 @@ public class CrossCastingHandler {
             return;
         }
 
-        // One-shot: a single cast can produce more than one cost-calc fire
-        // (preview vs. resolve). Apply our adjustments on the first only.
-        if (entry.multiplierApplied) {
+        // ANS-HIGH-004: atomic check-and-mark. The Ars cost-calc event can fire more
+        // than once during a resolve (preview vs. actual deduction). compareAndSet
+        // ensures exactly one caller applies the multiplier even under overlapping
+        // cross-casts on different threads.
+        if (!entry.tryMarkMultiplierApplied()) {
             return;
         }
 
@@ -351,7 +353,8 @@ public class CrossCastingHandler {
             entry.arsCost = arsCost;
             entry.issCost = issCost;
             entry.costsReady = true;
-            entry.multiplierApplied = true;
+            // ANS-HIGH-004: multiplierApplied was already set atomically at the top of
+            // this handler via tryMarkMultiplierApplied. No further write needed here.
 
             if (!player.isCreative() && issCost > 0.0f) {
                 IManaBridge issBridge = BridgeManager.getSecondaryBridge();
@@ -391,9 +394,7 @@ public class CrossCastingHandler {
 
         // Non-SEPARATE (or unified=false): Ars deducts the full multiplied
         // cost from its own pool. The multiplier is the only adjustment we
-        // make. Mark the entry as applied; it will TTL-expire harmlessly
-        // since the TAIL hook only consumes secondary pool in SEPARATE+unified.
-        entry.multiplierApplied = true;
+        // make. multiplierApplied was set atomically at the top.
         event.currentCost = totalCost;
         CrossCastTrace.log(entry.attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.ARS_COST_APPLIED,

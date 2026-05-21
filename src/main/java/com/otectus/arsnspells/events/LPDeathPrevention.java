@@ -78,8 +78,16 @@ public class LPDeathPrevention {
 
     /**
      * Intercept damage events to prevent death from insufficient LP.
-     * Only blocks damage that occurs in the same tick as the LP cast transaction,
-     * preventing broad magic immunity from leaking to unrelated damage sources.
+     * Only blocks damage that occurs in the same tick as the LP cast transaction.
+     *
+     * <p>ANS-HIGH-022: damage-type filter simplified. The previous filter checked
+     * {@code contains("magic") || contains("indirectMagic") || contains("sacrifice")} —
+     * "indirectMagic" was dead (already matched by "magic") and the explicit list
+     * missed mod-added magic damage types (Mahou Tsukai "witherCurse",
+     * Apotheosis "magicArrow"), defeating the safe-mode design. The same-tick scope
+     * ({@code player.tickCount != transaction.playerTickCount}) is the real guard;
+     * trusting it lets us block any damage that lands in the cast tick, regardless
+     * of the source's msgId.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onPlayerHurt(LivingHurtEvent event) {
@@ -101,20 +109,17 @@ public class LPDeathPrevention {
             return;
         }
 
-        // Only block damage that occurs in the same tick as the cast transaction
+        // Only block damage that occurs in the same tick as the cast transaction.
+        // This is the real safety guard — same-tick scope means any damage landing
+        // here is a downstream effect of the cast we just intercepted.
         if (player.tickCount != transaction.playerTickCount) {
             return;
         }
 
-        String damageType = event.getSource().getMsgId();
-        if (damageType.contains("magic") ||
-            damageType.contains("indirectMagic") ||
-            damageType.contains("sacrifice")) {
-
-            LOGGER.debug("Canceling LP-related damage for {} (type: {}, amount: {}, tick: {})",
-                player.getName().getString(), damageType, event.getAmount(), player.tickCount);
-            event.setCanceled(true);
-        }
+        LOGGER.debug("Canceling same-tick damage for {} (type: {}, amount: {}, tick: {})",
+            player.getName().getString(), event.getSource().getMsgId(), event.getAmount(),
+            player.tickCount);
+        event.setCanceled(true);
     }
 
     /**
@@ -152,6 +157,17 @@ public class LPDeathPrevention {
                     true
                 );
             }
+        }
+    }
+
+    /**
+     * ANS-HIGH-021: evict per-player state on disconnect so a stale immune flag
+     * does not survive until another player's periodic sweep would catch it.
+     */
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() != null) {
+            activeTransactions.remove(event.getEntity().getUUID());
         }
     }
 

@@ -13,12 +13,16 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class RegenSynergyHandler {
-    private static final Map<UUID, SourceJarCache> sourceJarCacheMap = new HashMap<>();
+    // ANS-HIGH-015: ConcurrentHashMap. Forge serialises player events on the main
+    // thread in 1.20.1, but the field is shared across all online players and the
+    // design had zero thread-safety guarantee; matches the pattern at
+    // ResonanceManager.resonanceCache.
+    private static final Map<UUID, SourceJarCache> sourceJarCacheMap = new ConcurrentHashMap<>();
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {

@@ -39,18 +39,45 @@ public class ProgressionHandler {
      */
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            reapplyAllBonuses(player);
+        }
+    }
+
+    /**
+     * ANS-HIGH-024: also re-apply on respawn. Transient attribute modifiers don't
+     * survive death (the new Player entity gets fresh attributes), so without this
+     * a player who casts 200 fire spells, dies, respawns sees +0% fire spell power
+     * until their next fire cast incrementally re-applies it.
+     */
+    @SubscribeEvent
+    public void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            reapplyAllBonuses(player);
+        }
+    }
+
+    /**
+     * ANS-HIGH-024: same for dimension change (Player instance is replaced).
+     */
+    @SubscribeEvent
+    public void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            reapplyAllBonuses(player);
+        }
+    }
+
+    private void reapplyAllBonuses(ServerPlayer player) {
         if (!AnsConfig.ENABLE_PROGRESSION_SYSTEM.get() || !AnsConfig.ENABLE_CROSS_MOD_PROGRESSION.get()) {
             return;
         }
-        if (event.getEntity() instanceof ServerPlayer player) {
-            player.getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(data -> {
-                data.getAllCastCounts().forEach((school, count) -> {
-                    double bonus = data.getBonusForSchool(school);
-                    if (bonus > 0) {
-                        ProgressionAttributes.applyTransientBonus(player, school, bonus);
-                    }
-                });
+        player.getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(data -> {
+            data.getAllCastCounts().forEach((school, count) -> {
+                double bonus = data.getBonusForSchool(school);
+                if (bonus > 0) {
+                    ProgressionAttributes.applyTransientBonus(player, school, bonus);
+                }
             });
-        }
+        });
     }
 }

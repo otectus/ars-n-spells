@@ -119,11 +119,14 @@ public class BridgeManager {
         LOGGER.info("========================================");
     }
 
+    /** ANS-OPT-016: cached fallback so the null path does not allocate per call. */
+    private static final IManaBridge FALLBACK_BRIDGE = new ArsNativeBridge();
+
     /**
-     * Get the active mana bridge
+     * Get the active mana bridge.
      */
     public static IManaBridge getBridge() {
-        return activeBridge != null ? activeBridge : new ArsNativeBridge();
+        return activeBridge != null ? activeBridge : FALLBACK_BRIDGE;
     }
 
     /**

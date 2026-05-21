@@ -62,7 +62,14 @@ public class ArsNSpells {
         }
         ModItemsRegistry.register(modEventBus);
 
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AnsConfig.SPEC, "ars_n_spells-common.toml");
+        // ANS-HIGH-016: register as SERVER (was COMMON). Gameplay tunables — resonance,
+        // conversion rates, dual-cost percentages, ring toggles — must be server-authoritative
+        // on dedicated servers, otherwise the in-game config screen on a client silently
+        // no-ops because COMMON configs don't auto-sync from client to server. SERVER configs
+        // are loaded server-side and auto-synced to clients on login.
+        // Existing user configs at config/ars_n_spells-common.toml will be ignored; document
+        // this in the 2.0.1 CHANGELOG.
+        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, AnsConfig.SPEC, "ars_n_spells-server.toml");
 
         MinecraftForge.EVENT_BUS.addGenericListener(Entity.class, this::onAttachCapabilities);
         // Instance-registered handlers (no @Mod.EventBusSubscriber, use instance @SubscribeEvent methods)

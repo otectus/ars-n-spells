@@ -42,7 +42,7 @@ public class IronsLPHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onIronsSpellPreCast(SpellPreCastEvent event) {
         Player player = event.getEntity();
-        LOGGER.info("[IronsLPHandler] PreCast event received from Iron's (player={}, spell={}, level={}, side={})",
+        LOGGER.debug("[IronsLPHandler] PreCast event received from Iron's (player={}, spell={}, level={}, side={})",
             player == null ? "null" : player.getName().getString(),
             event.getSpellId(), event.getSpellLevel(),
             player == null ? "?" : (player.level().isClientSide() ? "CLIENT" : "SERVER"));
@@ -52,12 +52,12 @@ public class IronsLPHandler {
         }
 
         if (!SanctifiedLegacyCompat.isAvailable()) {
-            LOGGER.info("[IronsLPHandler] PreCast skip: Sanctified Legacy compat not available");
+            LOGGER.debug("[IronsLPHandler] PreCast skip: Sanctified Legacy compat not available");
             return;
         }
 
         if (!AnsConfig.ENABLE_LP_SYSTEM.get()) {
-            LOGGER.info("[IronsLPHandler] PreCast skip: enable_lp_system=false");
+            LOGGER.debug("[IronsLPHandler] PreCast skip: enable_lp_system=false");
             return;
         }
 
@@ -67,7 +67,7 @@ public class IronsLPHandler {
         }
 
         if (player.isCreative()) {
-            LOGGER.info("[IronsLPHandler] PreCast skip: player {} is creative", player.getName().getString());
+            LOGGER.debug("[IronsLPHandler] PreCast skip: player {} is creative", player.getName().getString());
             return;
         }
 
@@ -80,7 +80,7 @@ public class IronsLPHandler {
         int spellLevel = event.getSpellLevel();
         int manaCost = spell.getManaCost(spellLevel);
         if (manaCost <= 0) {
-            LOGGER.info("[IronsLPHandler] PreCast: zero-cost spell {} — skipping LP charge", event.getSpellId());
+            LOGGER.debug("[IronsLPHandler] PreCast: zero-cost spell {} — skipping LP charge", event.getSpellId());
             return;
         }
 
@@ -94,7 +94,7 @@ public class IronsLPHandler {
 
         boolean hasEnough = SanctifiedLegacyCompat.hasEnoughLP(player, lpCost);
 
-        LOGGER.info("[IronsLPHandler] PreCast fired: player={}, spell={}, level={}, rarity={}, mana={}, lpCost={}, sufficient={}, deathMode={}",
+        LOGGER.debug("[IronsLPHandler] PreCast fired: player={}, spell={}, level={}, rarity={}, mana={}, lpCost={}, sufficient={}, deathMode={}",
             player.getName().getString(), event.getSpellId(), spellLevel, rarity.name(),
             manaCost, lpCost, hasEnough, AnsConfig.DEATH_ON_INSUFFICIENT_LP.get());
 
@@ -137,7 +137,7 @@ public class IronsLPHandler {
     public void onIronsSpellCast(SpellOnCastEvent event) {
         Player player = event.getEntity();
         int manaCostBefore = event.getManaCost();
-        LOGGER.info("[IronsLPHandler] OnCast event received from Iron's (player={}, spell={}, manaCost={})",
+        LOGGER.debug("[IronsLPHandler] OnCast event received from Iron's (player={}, spell={}, manaCost={})",
             player == null ? "null" : player.getName().getString(),
             event.getSpellId(), manaCostBefore);
 
@@ -159,7 +159,7 @@ public class IronsLPHandler {
 
         PendingIronsLP pending = pendingCosts.remove(player.getUUID());
         if (pending == null) {
-            LOGGER.info("[IronsLPHandler] OnCast: no pending LP cost staged for {} (PreCast may have skipped)",
+            LOGGER.debug("[IronsLPHandler] OnCast: no pending LP cost staged for {} (PreCast may have skipped)",
                 player.getName().getString());
             return;
         }
@@ -173,7 +173,7 @@ public class IronsLPHandler {
         event.setManaCost(0);
 
         boolean success = SanctifiedLegacyCompat.consumeLP(player, pending.lpCost);
-        LOGGER.info("[IronsLPHandler] OnCast fired: player={}, spell={}, pending={}, consumed={}, manaCostBefore={}, manaCostAfter=0",
+        LOGGER.debug("[IronsLPHandler] OnCast fired: player={}, spell={}, pending={}, consumed={}, manaCostBefore={}, manaCostAfter=0",
             player.getName().getString(), event.getSpellId(), pending.lpCost, success, manaCostBefore);
         if (!success) {
             LOGGER.warn("[IronsLPHandler] LP consumption failed for {}", player.getName().getString());

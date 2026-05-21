@@ -19,8 +19,12 @@ public final class ClientAuraState {
     private ClientAuraState() {}
 
     public static void update(int newAura, int newMaxAura) {
-        aura = Math.max(0, newAura);
-        maxAura = Math.max(1, newMaxAura);
+        // ANS-HIGH-005 (defense-in-depth): bound the upper end so a hostile or
+        // garbled payload cannot push the HUD into a "2147483647 / 1" render.
+        // Cap matches AnsConfig.AURA_MAX_DEFAULT ceiling; aura is clamped to
+        // [0, maxAura] so the render fraction is always in [0, 1].
+        maxAura = Math.max(1, Math.min(100_000, newMaxAura));
+        aura = Math.max(0, Math.min(maxAura, newAura));
         initialized = true;
     }
 
