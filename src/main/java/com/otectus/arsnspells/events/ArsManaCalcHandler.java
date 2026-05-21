@@ -75,7 +75,19 @@ public class ArsManaCalcHandler {
             return;
         }
 
-        EquipmentIntegration.syncIronsMaxToArs(player, event.getMax());
+        // ANS-MED-001 (NEEDS VERIFY): defer the syncIronsMaxToArs call to the next
+        // server tick to break any potential reentrancy chain — Iron's MAX_MANA
+        // mutations downstream might in turn fire MaxManaCalcEvent. The defensive
+        // tell() pattern has no observable behaviour change in the no-reentry case
+        // (one-tick latency on attribute sync) but eliminates the stack-overflow
+        // hazard if Iron's internal event behaviour ever evolves.
+        final int finalMax = event.getMax();
+        if (player.getServer() != null) {
+            player.getServer().tell(new net.minecraft.server.TickTask(0,
+                () -> EquipmentIntegration.syncIronsMaxToArs(player, finalMax)));
+        } else {
+            EquipmentIntegration.syncIronsMaxToArs(player, finalMax);
+        }
     }
 
     @SubscribeEvent

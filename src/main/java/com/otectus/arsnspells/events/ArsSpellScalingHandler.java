@@ -97,10 +97,12 @@ public class ArsSpellScalingHandler {
      */
     private static boolean isSpellDamage(String type) {
         if (type == null) return false;
+        // ANS-MED-041: dropped the onFire / inFire heuristic. Those msgIds match lava
+        // and campfire damage too, which had nothing to do with the player's spell —
+        // a fire wizard standing in lava had their lava damage scaled by the active
+        // spell-power multiplier. Restrict to magic / ars_nouveau namespaces only.
         return type.contains("magic")
-            || type.contains("ars_nouveau")
-            || type.equals("onFire")
-            || type.equals("inFire");
+            || type.contains("ars_nouveau");
     }
 
     private static final class ScalingEntry {

@@ -12,7 +12,11 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 
 public class ResonanceEvents {
-    private int cleanupCounter = 0;
+    // ANS-MED-028: cleanup tracking moved to a server-wide ServerTickEvent handler
+    // below. The per-player tick counter previously incremented N times per
+    // (40-tick) window with N players, causing cleanup to fire much more often
+    // than the "60 seconds" the comment claimed.
+    private int serverCleanupTickCounter = 0;
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
@@ -25,13 +29,25 @@ public class ResonanceEvents {
             && event.player instanceof ServerPlayer player) {
             ResonanceManager.computeResonance(player);
             PacketHandler.sendToClient(new ResonanceSyncPacket((float) ResonanceManager.getResonance(player)), player);
+        }
+    }
 
-            // Periodic cleanup: every 1200 ticks (60 seconds)
-            cleanupCounter++;
-            if (cleanupCounter >= 30) { // 30 * 40 ticks = 1200 ticks
-                cleanupCounter = 0;
-                ResonanceManager.cleanupOfflinePlayers(player.getServer());
-            }
+    /**
+     * ANS-MED-028: server-global cleanup, fires once per 1200 server ticks
+     * (60 seconds) regardless of player count.
+     */
+    @SubscribeEvent
+    public void onServerTick(TickEvent.ServerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
+        if (!ModList.get().isLoaded("irons_spellbooks")) {
+            return;
+        }
+        serverCleanupTickCounter++;
+        if (serverCleanupTickCounter >= 1200) {
+            serverCleanupTickCounter = 0;
+            ResonanceManager.cleanupOfflinePlayers(event.getServer());
         }
     }
 

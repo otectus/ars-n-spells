@@ -84,7 +84,9 @@ public final class InscriptionInputs {
         try {
             Spell parsed = Spell.fromTag(stack.getOrCreateTag());
             return parsed != null && parsed.recipe != null && !parsed.recipe.isEmpty();
-        } catch (Throwable ignored) {
+        } catch (Exception ignored) {
+            // ANS-MED-020: narrowed from Throwable to Exception so LinkageError and
+            // other Error subclasses propagate instead of silently masking real bugs.
             return false;
         }
     }
@@ -98,12 +100,14 @@ public final class InscriptionInputs {
     public static InscriptionSource readSource(ItemStack stack) {
         if (stack.isEmpty()) return null;
 
+        // ANS-MED-020 / ANS-LOW-019: narrow from Throwable to Exception so
+        // LinkageError / OutOfMemoryError propagate instead of being silently masked.
         try {
             Spell arsSpell = new SpellCaster(stack).getSpell();
             if (arsSpell != null && arsSpell.recipe != null && !arsSpell.recipe.isEmpty()) {
                 return InscriptionSource.ars(arsSpell);
             }
-        } catch (Throwable ignored) {
+        } catch (Exception ignored) {
         }
         if (stack.hasTag()) {
             try {
@@ -112,7 +116,7 @@ public final class InscriptionInputs {
                     && !parchmentSpell.recipe.isEmpty()) {
                     return InscriptionSource.ars(parchmentSpell);
                 }
-            } catch (Throwable ignored) {
+            } catch (Exception ignored) {
             }
         }
 

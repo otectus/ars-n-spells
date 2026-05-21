@@ -11,6 +11,11 @@ import java.util.Map;
 public class AffinityData {
     public static final Capability<AffinityData> AFFINITY_DATA = CapabilityManager.get(new CapabilityToken<>() {});
 
+    /**
+     * ANS-MED-013: server-main-thread only. All known mutation sites are event
+     * handlers / packet handlers that dispatch via enqueueWork onto the main thread.
+     * Plain HashMap is intentional; do NOT mutate from async tasks.
+     */
     private final Map<AffinityType, Integer> levels = new HashMap<>();
 
     public int getLevel(AffinityType type) {
@@ -32,6 +37,8 @@ public class AffinityData {
     }
 
     public void loadFromNBT(CompoundTag nbt) {
+        // ANS-MED-012: clear before load so a second call cannot merge with stale state.
+        levels.clear();
         if (nbt.contains("AffinityLevels")) {
             CompoundTag tag = nbt.getCompound("AffinityLevels");
             for (AffinityType type : AffinityType.values()) {

@@ -71,9 +71,11 @@ public abstract class MixinSpellResolverMana {
         }
 
         boolean consumed = BridgeManager.consumeManaForMode(player, cost, true);
-        if (consumed) {
-            ci.cancel();
-        }
+        // ANS-MED-010: cancel even on consume failure. Otherwise the upstream Ars
+        // native expendMana would run with stale ManaCap data and decrement the Ars
+        // pool, even though our bridge already failed — producing a double-deduct
+        // when the bridge returns later in a successful state.
+        ci.cancel();
 
         CrossCastContext.Entry entry = CrossCastContext.peek(player);
         java.util.UUID attemptId = entry != null ? entry.attemptId : null;

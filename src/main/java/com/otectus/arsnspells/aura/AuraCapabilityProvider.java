@@ -63,7 +63,15 @@ public class AuraCapabilityProvider implements ICapabilitySerializable<CompoundT
 
     @SubscribeEvent
     public static void onAttachCapabilities(AttachCapabilitiesEvent<Entity> event) {
-        if (event.getObject() instanceof Player) {
+        if (event.getObject() instanceof Player player) {
+            // ANS-MED-014 (NEEDS VERIFY): aura is server-authoritative; the client
+            // mirrors via ClientAuraState. Attaching the cap on the client side creates
+            // a parallel local copy that diverges from the server config (different
+            // max-aura defaults, no regen) and confuses any third-party mod that reads
+            // the cap from the client. Gate on !isClientSide. Flag for manual verify:
+            // if a Sanctified Legacy or Covenant mod queries our cap on the client,
+            // that integration breaks.
+            if (player.level().isClientSide()) return;
             event.addCapability(IDENTIFIER, new AuraCapabilityProvider());
         }
     }

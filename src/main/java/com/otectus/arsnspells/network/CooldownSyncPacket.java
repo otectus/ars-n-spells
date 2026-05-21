@@ -16,12 +16,18 @@ public class CooldownSyncPacket {
     }
 
     public CooldownSyncPacket(FriendlyByteBuf buf) {
-        this.categoryName = buf.readUtf();
-        this.timestamp = buf.readLong();
+        // ANS-MED-016: bounded readUtf.
+        this.categoryName = buf.readUtf(32);
+        // ANS-MED-017: clamp the timestamp to a sane ceiling so a hostile server
+        // cannot set an effectively-infinite cooldown via Long.MAX_VALUE. 1e12
+        // ticks is ~1.5 million IRL years — plenty of headroom for any legitimate
+        // cooldown.
+        long raw = buf.readLong();
+        this.timestamp = Math.max(0L, Math.min(raw, 1_000_000_000_000L));
     }
 
     public void toBytes(FriendlyByteBuf buf) {
-        buf.writeUtf(categoryName);
+        buf.writeUtf(categoryName, 32);
         buf.writeLong(timestamp);
     }
 

@@ -67,9 +67,12 @@ public class CurioDiscountHandler {
             
             event.currentCost = discountedCost;
             
-            logDebug("Applied curio discount to {}: {} mana -> {} mana (saved {} mana, {:.1f}% discount)",
-                player.getName().getString(), currentCost, discountedCost, savedMana, 
-                (1.0 - discountMultiplier) * 100);
+            // ANS-MED-026: SLF4J does not accept the `{:.1f}` placeholder — it took it as
+            // a literal and silently dropped the trailing arg. Use String.format for the
+            // formatted percent and SLF4J `{}` for the rest.
+            logDebug("Applied curio discount to {}: {} mana -> {} mana (saved {} mana, {} discount)",
+                player.getName().getString(), currentCost, discountedCost, savedMana,
+                String.format("%.1f%%", (1.0 - discountMultiplier) * 100));
         }
     }
     

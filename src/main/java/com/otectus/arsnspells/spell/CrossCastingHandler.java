@@ -197,16 +197,24 @@ public class CrossCastingHandler {
         CrossCastContext.beginWithAttempt(player, CrossSpellType.ARS_NOUVEAU,
             player.level().getGameTime(), attemptId);
 
+        // ANS-MED-002: wrap upstream cast in try/finally so the CrossCastContext entry
+        // is cleared even if caster.castSpell throws. Without this, an exception in
+        // any link of the Ars cast chain left a stale entry in ACTIVE_CASTS for up to
+        // the TTL window, contaminating the next cost-calc fire.
+        boolean success = false;
         CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "runtime", "ARS");
-        InteractionResultHolder<ItemStack> result = caster.castSpell(player.level(), player, hand, null, spell);
-        boolean success = result.getResult().consumesAction();
-        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-            CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "ARS", "success", success);
-        if (!success) {
-            CrossCastContext.clear(player);
+        try {
+            InteractionResultHolder<ItemStack> result = caster.castSpell(player.level(), player, hand, null, spell);
+            success = result.getResult().consumesAction();
+            return success;
+        } finally {
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "ARS", "success", success);
+            if (!success) {
+                CrossCastContext.clear(player);
+            }
         }
-        return success;
     }
 
     private static boolean castIronsSpell(Player player, ItemStack item, CompoundTag spellData,
@@ -262,35 +270,45 @@ public class CrossCastingHandler {
             CrossCastContext.begin(player, CrossSpellType.IRONS_SPELLBOOKS,
                 player.level().getGameTime(), arsCost, issCost, spell.getSpellId(), attemptId);
 
+            // ANS-MED-002: try/finally for context cleanup on exception.
+            boolean success = false;
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
                 CrossCastTrace.Stage.UPSTREAM_CAST_ENTER,
                 "runtime", "IRON", "spell", spellId, "mode", mode, "unified", unified);
-            boolean success = CrossCastContext.withManaCheckOverride(player, issPercent,
-                () -> spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT));
-            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "IRON", "success", success);
-            if (!success) {
-                CrossCastContext.clear(player);
+            try {
+                success = CrossCastContext.withManaCheckOverride(player, issPercent,
+                    () -> spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT));
+                return success;
+            } finally {
+                CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                    CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "IRON", "success", success);
+                if (!success) {
+                    CrossCastContext.clear(player);
+                }
             }
-            return success;
         }
 
         // Non-SEPARATE (including unified=false): Iron's owns the cost
         // calculation. The CrossCastIronsHandler applies the multiplier when
         // SpellOnCastEvent fires; ARS_PRIMARY currency conversion only runs
         // when unification is enabled.
+        // ANS-MED-002: try/finally for context cleanup on exception.
         CrossCastContext.begin(player, CrossSpellType.IRONS_SPELLBOOKS,
             player.level().getGameTime(), 0.0f, 0.0f, spell.getSpellId(), attemptId);
+        boolean success = false;
         CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.UPSTREAM_CAST_ENTER,
             "runtime", "IRON", "spell", spellId, "mode", mode, "unified", unified);
-        boolean success = spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT);
-        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-            CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "IRON", "success", success);
-        if (!success) {
-            CrossCastContext.clear(player);
+        try {
+            success = spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT);
+            return success;
+        } finally {
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "IRON", "success", success);
+            if (!success) {
+                CrossCastContext.clear(player);
+            }
         }
-        return success;
     }
 
     private static io.redspace.ironsspellbooks.api.spells.CastSource parseCastSource(
@@ -470,15 +488,14 @@ public class CrossCastingHandler {
     }
 
     private static int getSelectedIndex(CompoundTag tag, int size) {
+        // ANS-MED-006: read-only. The old version wrote back to NBT when the stored
+        // index was out of range, which mutated the stack during what looks like a
+        // pure read and produced surprising NBT churn on shared-stack reads.
         if (size <= 0) {
             return 0;
         }
         int index = tag.getInt(TAG_SPELL_INDEX);
-        if (index < 0 || index >= size) {
-            index = 0;
-            tag.putInt(TAG_SPELL_INDEX, index);
-        }
-        return index;
+        return (index < 0 || index >= size) ? 0 : index;
     }
 
     private static void setSelectedIndex(CompoundTag tag, int index) {

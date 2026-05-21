@@ -139,9 +139,19 @@ public class BridgeManager {
     /**
      * Get the current mana unification mode.
      * Cached at init time — changing mana_unification_mode requires a restart.
+     *
+     * <p>ANS-MED-018: if called before {@link #init} runs (e.g. early client render
+     * frames during world load), fall back to reading the config directly so callers
+     * never see a {@code null} mode and stale-state branches don't fire.
      */
     public static ManaUnificationMode getCurrentMode() {
-        return currentMode;
+        ManaUnificationMode cached = currentMode;
+        if (cached != null) return cached;
+        try {
+            return AnsConfig.getManaMode();
+        } catch (Throwable t) {
+            return ManaUnificationMode.DISABLED;
+        }
     }
 
     /**

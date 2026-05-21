@@ -21,6 +21,11 @@ public class CooldownHandler {
             CooldownCategory category = SpellAnalysis.analyze(event.spell).category();
 
             if (UnifiedCooldownManager.isOnCooldown(player, category)) {
+                // ANS-MED-027 (NEEDS VERIFY): Ars Nouveau's SpellCastEvent is documented
+                // as @Cancelable in 4.12.x (parent SpellEvent class). If a future Ars
+                // version makes it non-cancellable, this will be a silent no-op and
+                // cooldown enforcement will fall back to the per-spell-class gating in
+                // SpellResolver. Verify cancellability in dev when upgrading Ars.
                 event.setCanceled(true);
             } else {
                 long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);

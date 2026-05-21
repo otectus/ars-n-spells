@@ -489,34 +489,18 @@ public class EquipmentIntegration {
         if (!AnsConfig.ENABLE_CURIO_DISCOUNTS.get()) {
             return CurioDiscountData.NONE;
         }
-        
-        // Import SanctifiedLegacyCompat at the top of the file
-        // Check if Sanctified Legacy is available
         if (!ModList.get().isLoaded("covenant_of_the_seven")) {
             return CurioDiscountData.NONE;
         }
-        
-        try {
-            // Use reflection-safe approach
-            Class<?> compatClass = Class.forName("com.otectus.arsnspells.compat.SanctifiedLegacyCompat");
-            java.lang.reflect.Method hasVirtueMethod = compatClass.getMethod("hasVirtueRing", Player.class);
-            java.lang.reflect.Method hasBlasphemyMethod = compatClass.getMethod("hasAnyBlasphemy", Player.class);
-            
-            boolean hasVirtue = (boolean) hasVirtueMethod.invoke(null, player);
-            boolean hasBlasphemy = (boolean) hasBlasphemyMethod.invoke(null, player);
-            
-            // Base discount comes only from Blasphemy now. The Virtue Ring converts mana to
-            // aura instead of discounting it (handled in VirtueRingHandler).
-            double baseDiscount = 0.0;
-            if (hasBlasphemy) {
-                baseDiscount = AnsConfig.BLASPHEMY_DISCOUNT.get();
-            }
 
-            return new CurioDiscountData(hasVirtue, hasBlasphemy, baseDiscount);
-        } catch (Exception e) {
-            logDebug("Failed to calculate curio discounts: {}", e.getMessage());
-            return CurioDiscountData.NONE;
-        }
+        // ANS-MED-021: direct call instead of Class.forName + Method.invoke. The previous
+        // reflection setup silently degraded to "no discount" if a future refactor renamed
+        // hasVirtueRing or hasAnyBlasphemy. Since SanctifiedLegacyCompat lives in the same
+        // mod jar, there is no classloader-safety reason for the reflection.
+        boolean hasVirtue = com.otectus.arsnspells.compat.SanctifiedLegacyCompat.hasVirtueRing(player);
+        boolean hasBlasphemy = com.otectus.arsnspells.compat.SanctifiedLegacyCompat.hasAnyBlasphemy(player);
+        double baseDiscount = hasBlasphemy ? AnsConfig.BLASPHEMY_DISCOUNT.get() : 0.0;
+        return new CurioDiscountData(hasVirtue, hasBlasphemy, baseDiscount);
     }
 
     /**

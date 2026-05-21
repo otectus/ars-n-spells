@@ -119,6 +119,13 @@ public abstract class MixinIronsCastValidation {
         if (last != null && now - last < LOG_THROTTLE_MS) {
             return;
         }
+        // ANS-MED-003: opportunistic eviction every 64th call so the throttle map
+        // does not grow unbounded across player churn. We only ever look at the
+        // most recent timestamp per player, so anything older than 60s is dead state.
+        if ((lastLogMs.size() & 63) == 0) {
+            long cutoff = now - 60_000L;
+            lastLogMs.entrySet().removeIf(e -> e.getValue() < cutoff);
+        }
         lastLogMs.put(id, now);
         LOGGER.info(message, args);
     }

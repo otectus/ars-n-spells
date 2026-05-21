@@ -19,12 +19,18 @@ public class AffinitySyncPacket {
     }
 
     public AffinitySyncPacket(FriendlyByteBuf buf) {
-        this.typeName = buf.readUtf();
-        this.level = buf.readInt();
+        // ANS-MED-016: bounded readUtf so a hostile payload cannot allocate a 32k
+        // string per packet (default cap is Short.MAX_VALUE). AffinityType names
+        // are at most ~16 chars in any sane build.
+        this.typeName = buf.readUtf(64);
+        int raw = buf.readInt();
+        // Clamp level to the AffinityData range so a stray int does not corrupt
+        // the client mirror.
+        this.level = Math.max(0, Math.min(100, raw));
     }
 
     public void toBytes(FriendlyByteBuf buf) {
-        buf.writeUtf(typeName);
+        buf.writeUtf(typeName, 64);
         buf.writeInt(level);
     }
 

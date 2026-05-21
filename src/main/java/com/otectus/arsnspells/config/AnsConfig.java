@@ -22,10 +22,10 @@ public class AnsConfig {
     // ========================================
     public static final ForgeConfigSpec.DoubleValue CONVERSION_RATE_ARS_TO_IRON;
     public static final ForgeConfigSpec.DoubleValue CONVERSION_RATE_IRON_TO_ARS;
-    public static final ForgeConfigSpec.DoubleValue HYBRID_SYNC_RATE;
+    // ANS-MED-031: HYBRID_SYNC_RATE removed — had zero readers, modpack-tuning trap.
     public static final ForgeConfigSpec.ConfigValue<String> HYBRID_MANA_BAR;
     public static final ForgeConfigSpec.BooleanValue HIDE_MANA_BAR_WITH_RING;
-    public static final ForgeConfigSpec.BooleanValue ALLOW_MANA_OVERFLOW;
+    // ANS-MED-031: ALLOW_MANA_OVERFLOW removed — had zero readers.
     public static final ForgeConfigSpec.DoubleValue DUAL_COST_ARS_PERCENTAGE;
     public static final ForgeConfigSpec.DoubleValue DUAL_COST_ISS_PERCENTAGE;
     public static final ForgeConfigSpec.DoubleValue DEFAULT_MAX_MANA;
@@ -86,15 +86,18 @@ public class AnsConfig {
     // ========================================
     // PROGRESSION SYSTEM
     // ========================================
-    public static final ForgeConfigSpec.DoubleValue PROGRESSION_XP_MULTIPLIER;
-    public static final ForgeConfigSpec.IntValue MAX_PROGRESSION_LEVEL;
+    // ANS-MED-031 (NEEDS VERIFY): PROGRESSION_XP_MULTIPLIER and MAX_PROGRESSION_LEVEL
+    // removed — no readers in the production source. If a third-party mod or KubeJS
+    // script reflects these keys, that integration silently breaks. Verify in dev
+    // before pushing.
     public static final ForgeConfigSpec.BooleanValue ENABLE_CROSS_MOD_PROGRESSION;
 
     // ========================================
     // AFFINITY SYSTEM
     // ========================================
-    public static final ForgeConfigSpec.DoubleValue AFFINITY_BONUS_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue MAX_AFFINITY_BONUS;
+    // ANS-MED-031 (NEEDS VERIFY): AFFINITY_BONUS_MULTIPLIER and MAX_AFFINITY_BONUS
+    // removed — no readers in the production source. Same NEEDS-VERIFY caveat as
+    // the progression keys.
     public static final ForgeConfigSpec.BooleanValue ENABLE_AFFINITY_DECAY;
     public static final ForgeConfigSpec.DoubleValue AFFINITY_DECAY_RATE;
     public static final ForgeConfigSpec.IntValue AFFINITY_DECAY_INTERVAL_TICKS;
@@ -225,8 +228,12 @@ public class AnsConfig {
             .define("mana_unification_mode", "iss_primary");
         
         ENABLE_MANA_UNIFICATION = BUILDER
-            .comment("Master toggle for all mana unification features")
+            .comment("Master toggle for all mana unification features.",
+                "NOTE: when false, mana_unification_mode is forced to DISABLED regardless",
+                "of its configured value. Prefer mana_unification_mode = \"disabled\" for",
+                "the canonical 'off' state — this boolean is the master kill-switch.")
             .define("enable_mana_unification", true);
+        // ANS-MED-033: comment expanded so modpack authors understand the precedence.
         
         ENABLE_RESONANCE_SYSTEM = BUILDER
             .comment("Master toggle for the Resonance system (full mana bonuses)")
@@ -261,16 +268,17 @@ public class AnsConfig {
         
         CONVERSION_RATE_ARS_TO_IRON = BUILDER
             .comment("Conversion rate from Ars mana to Iron's mana (1.0 = 1:1)")
-            .defineInRange("conversion_rate_ars_to_iron", 1.0, 0.01, 100.0);
-        
+            // ANS-MED-032: tightened upper bound from 100 to 10 — a 100x conversion
+            // combined with other multipliers could blow past Float.MAX_VALUE in
+            // pathological stacking. 10x covers any reasonable rebalance.
+            .defineInRange("conversion_rate_ars_to_iron", 1.0, 0.01, 10.0);
+
         CONVERSION_RATE_IRON_TO_ARS = BUILDER
             .comment("Conversion rate from Iron's mana to Ars mana (1.0 = 1:1)")
-            .defineInRange("conversion_rate_iron_to_ars", 1.0, 0.01, 100.0);
-        
-        HYBRID_SYNC_RATE = BUILDER
-            .comment("How often hybrid pools sync (in ticks, 20 = 1 second)")
-            .defineInRange("hybrid_sync_rate", 1.0, 0.1, 10.0);
-        
+            .defineInRange("conversion_rate_iron_to_ars", 1.0, 0.01, 10.0);
+
+        // ANS-MED-031: HYBRID_SYNC_RATE registration removed — no readers.
+
         HYBRID_MANA_BAR = BUILDER
             .comment(
                 "Which mana bar to display in HYBRID mode:",
@@ -289,10 +297,8 @@ public class AnsConfig {
             )
             .define("hide_mana_bar_with_ring", true);
 
-        ALLOW_MANA_OVERFLOW = BUILDER
-            .comment("Allow mana to overflow max capacity during conversion")
-            .define("allow_mana_overflow", false);
-        
+        // ANS-MED-031: ALLOW_MANA_OVERFLOW registration removed — no readers.
+
         DUAL_COST_ARS_PERCENTAGE = BUILDER
             .comment("Percentage of Ars mana cost in SEPARATE mode (0.5 = 50%)")
             .defineInRange("dual_cost_ars_percentage", 0.5, 0.0, 1.0);
@@ -303,8 +309,9 @@ public class AnsConfig {
         
         DEFAULT_MAX_MANA = BUILDER
             .comment("Default maximum mana fallback when the native system returns no value.",
-                     "Can be changed at runtime with /arsnspells mana setdefault <value>",
+                     "Can be changed at runtime with /ans mana setdefault <value>",
                      "Applies to both Ars Nouveau and Iron's Spellbooks bridge fallbacks.")
+            // ANS-MED-029: comment corrected /arsnspells -> /ans (the actual command root).
             .defineInRange("default_max_mana", 100.0, 1.0, 100000.0);
 
         respectArmorBonuses = BUILDER
@@ -522,14 +529,10 @@ public class AnsConfig {
             "Requires ENABLE_PROGRESSION_SYSTEM master toggle."
         );
         
-        PROGRESSION_XP_MULTIPLIER = BUILDER
-            .comment("Multiplier for cross-mod XP gains")
-            .defineInRange("progression_xp_multiplier", 1.0, 0.0, 10.0);
-        
-        MAX_PROGRESSION_LEVEL = BUILDER
-            .comment("Maximum level for cross-mod progression bonuses")
-            .defineInRange("max_progression_level", 100, 1, 1000);
-        
+        // ANS-MED-031 (NEEDS VERIFY): PROGRESSION_XP_MULTIPLIER and MAX_PROGRESSION_LEVEL
+        // registrations removed — see field-declaration comment above.
+
+
         ENABLE_CROSS_MOD_PROGRESSION = BUILDER
             .comment("Allow Ars spells to grant ISS XP and vice versa")
             .define("enable_cross_mod_progression", true);
@@ -545,14 +548,10 @@ public class AnsConfig {
             "Requires ENABLE_AFFINITY_SYSTEM master toggle."
         );
         
-        AFFINITY_BONUS_MULTIPLIER = BUILDER
-            .comment("Multiplier for affinity bonuses")
-            .defineInRange("affinity_bonus_multiplier", 1.0, 0.0, 10.0);
-        
-        MAX_AFFINITY_BONUS = BUILDER
-            .comment("Maximum bonus from affinity (0.25 = 25% max bonus)")
-            .defineInRange("max_affinity_bonus", 0.25, 0.0, 10.0);
-        
+        // ANS-MED-031 (NEEDS VERIFY): AFFINITY_BONUS_MULTIPLIER and MAX_AFFINITY_BONUS
+        // registrations removed — see field-declaration comment above.
+
+
         ENABLE_AFFINITY_DECAY = BUILDER
             .comment("Enable affinity decay when not casting matching-school spells.",
                      "Default changed to false in 1.9.0 — the previous true default was a no-op",
@@ -875,8 +874,10 @@ public class AnsConfig {
         BUILDER.comment("Configuration for Ars 'n' Spells custom rituals.");
 
         RITUAL_MANA_INFUSION_AMOUNT = BUILDER
-            .comment("Amount of mana added by the Ritual of Mana Infusion")
-            .defineInRange("ritual_mana_infusion_amount", 500.0, 1.0, 100000.0);
+            .comment("Amount of mana added by the Ritual of Mana Infusion.",
+                "Capped at 10000 to prevent trivial infinite-mana from repeat casts.")
+            // ANS-MED-034: upper bound tightened from 100000 to 10000.
+            .defineInRange("ritual_mana_infusion_amount", 500.0, 1.0, 10000.0);
 
         MANA_WELL_RANGE = BUILDER
             .comment("Radius in blocks for Mana Well ritual effect")
@@ -925,8 +926,11 @@ public class AnsConfig {
             .defineInRange("source_jar_cache_move_threshold", 4.0, 1.0, 32.0);
         
         MANA_SYNC_INTERVAL = BUILDER
-            .comment("Mana synchronization interval (ticks, lower = more responsive but higher CPU)")
-            .defineInRange("mana_sync_interval", 1, 1, 100);
+            .comment("Mana / aura synchronization interval (ticks, lower = more responsive but higher CPU).",
+                "On dedicated servers with many players, keep this >= 5 to avoid per-tick",
+                "MagicData scans across the player roster.")
+            // ANS-MED-035: default raised 1 -> 5, floor raised 1 -> 2.
+            .defineInRange("mana_sync_interval", 5, 2, 100);
         
         ENABLE_CACHING = BUILDER
             .comment("Enable caching for expensive calculations")

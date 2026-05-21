@@ -110,12 +110,21 @@ public class UnifiedCooldownManager {
 
     /**
      * Clear all cooldowns for a player.
+     *
+     * <p>ANS-MED-015: also pushes {@code CooldownSyncPacket(cat, 0L)} per category to
+     * the client so the HUD bar clears. Without this, an admin {@code /ans} command
+     * that cleared cooldowns server-side would leave the client HUD showing the old
+     * timer until the next cast in that category.
      */
     public static void clearCooldowns(Player player) {
         if (player != null) {
             player.getCapability(CooldownData.COOLDOWN_CAP).ifPresent(data -> {
                 for (CooldownCategory cat : CooldownCategory.values()) {
-                    data.setLastCast(cat, 0);
+                    data.setCooldownEnd(cat, 0);
+                    if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                        com.otectus.arsnspells.network.PacketHandler.sendToClient(
+                            new com.otectus.arsnspells.network.CooldownSyncPacket(cat, 0L), sp);
+                    }
                 }
             });
             logDebug("Cleared all cooldowns for {}", player.getName().getString());
@@ -124,13 +133,20 @@ public class UnifiedCooldownManager {
 
     /**
      * Clear cooldown for a specific category for a player.
+     *
+     * <p>ANS-MED-015: also pushes a 0-end CooldownSyncPacket to the client.
      */
     public static void clearCooldown(Player player, CooldownCategory category) {
         if (player != null && category != null) {
             player.getCapability(CooldownData.COOLDOWN_CAP).ifPresent(data -> {
-                data.setLastCast(category, 0);
+                data.setCooldownEnd(category, 0);
+                if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                    com.otectus.arsnspells.network.PacketHandler.sendToClient(
+                        new com.otectus.arsnspells.network.CooldownSyncPacket(category, 0L), sp);
+                }
             });
-            logDebug("Cleared cooldown for {} category {} for {}",
+            // ANS-MED-015 (placeholder count fix): only 2 placeholders, 2 args.
+            logDebug("Cleared cooldown for category {} on player {}",
                     category.getDisplayName(), player.getName().getString());
         }
     }

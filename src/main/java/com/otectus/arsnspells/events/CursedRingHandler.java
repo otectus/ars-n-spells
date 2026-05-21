@@ -261,7 +261,18 @@ public class CursedRingHandler {
             if (deathPenalty) {
                 // Death penalty: spell cast, but kill the player.
                 pending.consumed = true;
-                player.hurt(player.damageSources().magic(), Float.MAX_VALUE);
+                // ANS-MED-024: defer player.hurt(MAX_VALUE) to the next server tick.
+                // Firing LivingHurtEvent / LivingDeathEvent inside the spell-resolve
+                // call stack invites re-entry hazards (a third-party death listener
+                // could trigger spell events that re-enter cost-calc with stale state).
+                // The deferred call breaks the stack cleanly.
+                final ServerPlayer victim = player;
+                if (victim.getServer() != null) {
+                    victim.getServer().tell(new net.minecraft.server.TickTask(0,
+                        () -> victim.hurt(victim.damageSources().magic(), Float.MAX_VALUE)));
+                } else {
+                    victim.hurt(victim.damageSources().magic(), Float.MAX_VALUE);
+                }
 
                 if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
                     player.displayClientMessage(

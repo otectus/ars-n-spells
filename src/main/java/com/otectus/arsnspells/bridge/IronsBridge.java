@@ -9,7 +9,11 @@ import org.slf4j.LoggerFactory;
 
 public class IronsBridge implements IManaBridge {
     private static final Logger LOGGER = LoggerFactory.getLogger(IronsBridge.class);
-    private static boolean errorLogged = false;
+    // ANS-MED-007: per-op fail-once set instead of a single global boolean. The old
+    // design latched true on the FIRST error of any kind and silenced ALL subsequent
+    // errors — masking genuine regressions that happen after an unrelated startup hiccup.
+    private static final java.util.Set<String> loggedOps =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     @Override
     public float getMana(Player player) {
@@ -84,9 +88,11 @@ public class IronsBridge implements IManaBridge {
     }
 
     private void logCriticalError(String op, Throwable e) {
-        if (!errorLogged) {
-            LOGGER.error("Ars 'n' Spells: Iron's Spells API failure during {} - integration may be unstable.", op);
-            errorLogged = true;
+        // ANS-MED-007: log once per op-name, so getMana/setMana/addMana/consumeMana
+        // failures each get exactly one ERROR line in the log instead of the first
+        // one silencing all the others.
+        if (loggedOps.add(op)) {
+            LOGGER.error("Ars 'n' Spells: Iron's Spells API failure during {} - integration may be unstable.", op, e);
         }
     }
 

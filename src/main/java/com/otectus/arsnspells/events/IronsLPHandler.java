@@ -246,9 +246,16 @@ public class IronsLPHandler {
      * Called by MixinScrollItem to integrate with the LP tracking system.
      */
     public static void storePendingScrollLP(Player player, int lpCost, int manaCost) {
-        if (player != null) {
-            pendingCosts.put(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
+        if (player == null) return;
+        // ANS-MED-030: reject absurd values so a buggy or hostile caller cannot stage
+        // a death-magnitude LP charge on the next Iron's cast. 100_000 is well above
+        // any legitimate scroll cost.
+        if (lpCost < 0 || lpCost > 100_000 || manaCost < 0 || manaCost > 100_000) {
+            LOGGER.warn("storePendingScrollLP: rejecting absurd cost (lp={}, mana={}) for {}",
+                lpCost, manaCost, player.getName().getString());
+            return;
         }
+        pendingCosts.put(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
     }
 
     /**
