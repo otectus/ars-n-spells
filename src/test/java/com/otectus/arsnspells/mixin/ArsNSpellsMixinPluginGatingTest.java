@@ -93,23 +93,24 @@ class ArsNSpellsMixinPluginGatingTest {
     }
 
     @Test
-    void canLoadClass_returnsFalseForNonexistentClass() throws Exception {
-        // Probe a guaranteed-absent class to confirm the probe is exception-safe.
-        java.lang.reflect.Method canLoad = ArsNSpellsMixinPlugin.class
-            .getDeclaredMethod("canLoadClass", String.class);
-        canLoad.setAccessible(true);
-        boolean result = (boolean) canLoad.invoke(null,
-            "com.example.definitely.not.a.real.Class");
-        assertFalse(result, "canLoadClass must return false for a non-existent class");
+    void resourceExists_returnsFalseForNonexistentResource() throws Exception {
+        // Probe a guaranteed-absent .class path to confirm the probe is exception-safe.
+        java.lang.reflect.Method probe = ArsNSpellsMixinPlugin.class
+            .getDeclaredMethod("resourceExists", String.class);
+        probe.setAccessible(true);
+        boolean result = (boolean) probe.invoke(null,
+            "com/example/definitely/not/a/real/Class.class");
+        assertFalse(result,
+            "resourceExists must return false for a non-existent .class path");
     }
 
     @Test
-    void canLoadClass_returnsTrueForJavaLangObject() throws Exception {
-        // Sanity probe: java.lang.Object is always present.
-        java.lang.reflect.Method canLoad = ArsNSpellsMixinPlugin.class
-            .getDeclaredMethod("canLoadClass", String.class);
-        canLoad.setAccessible(true);
-        boolean result = (boolean) canLoad.invoke(null, "java.lang.Object");
-        assertTrue(result, "canLoadClass must return true for java.lang.Object");
+    void resourceExists_returnsTrueForJavaLangObject() throws Exception {
+        // Sanity probe: java.lang.Object's .class file is on every Java classpath.
+        java.lang.reflect.Method probe = ArsNSpellsMixinPlugin.class
+            .getDeclaredMethod("resourceExists", String.class);
+        probe.setAccessible(true);
+        boolean result = (boolean) probe.invoke(null, "java/lang/Object.class");
+        assertTrue(result, "resourceExists must return true for java/lang/Object.class");
     }
 }

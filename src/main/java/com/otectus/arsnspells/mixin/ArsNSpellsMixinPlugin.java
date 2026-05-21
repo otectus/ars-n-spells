@@ -17,19 +17,25 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String mixinPackage) {
-        // ANS-CRIT-001: probe via Class.forName(name, false, loader) — this is more
-        // reliable inside the mixin bootstrap than ClassLoader.getResource on .class
-        // paths, and matches the canonical pattern used by ArsNSpells.canLoad.
-        ironsPresent = canLoadClass("io.redspace.ironsspellbooks.api.spells.AbstractSpell")
-            && canLoadClass("io.redspace.ironsspellbooks.api.magic.MagicData");
+        // CRITICAL: do NOT classload these targets — other mods' mixins need them
+        // un-loaded until the mixin processor reaches their config. getResource on
+        // the .class path is the only safe probe inside an IMixinConfigPlugin.
+        //
+        // Earlier this method called Class.forName(name, false, loader); even with
+        // initialize=false the JVM still classloads the target, which broke
+        // mixins.covenant_of_the_seven.json:irons_spellbooks.AbstractSpellMixin —
+        // Covenant's AbstractSpellMixin could not transform AbstractSpell because
+        // our probe had already loaded it. See `MixinTargetAlreadyLoadedException`
+        // in latest.log of the deployment where this crash was observed.
+        ironsPresent = resourceExists("io/redspace/ironsspellbooks/api/spells/AbstractSpell.class")
+            && resourceExists("io/redspace/ironsspellbooks/api/magic/MagicData.class");
         // ANS-HIGH-009: probe the Covenant-of-the-Seven main class. The mod that
         // people call "Sanctified Legacy" is actually published as
         // `covenant_of_the_seven` (mod ID) with main class
-        // `net.llenzzz.covenant_of_the_seven.CovenantOfTheSeven`. It adds the
-        // `canBeCraftedBy` method that {@code MixinSanctifiedAbstractSpell} injects
-        // into; without it the inject would no-op (saved by require=0) but the
-        // architecture is brittle to refactors so we gate explicitly here.
-        sanctifiedPresent = canLoadClass("net.llenzzz.covenant_of_the_seven.CovenantOfTheSeven");
+        // `net.llenzzz.covenant_of_the_seven.CovenantOfTheSeven`. Same
+        // classpath-only probe as the Iron's-class checks above — must not
+        // classload.
+        sanctifiedPresent = resourceExists("net/llenzzz/covenant_of_the_seven/CovenantOfTheSeven.class");
     }
 
     @Override
@@ -80,12 +86,22 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // No-op
     }
 
-    private static boolean canLoadClass(String fqn) {
-        try {
-            Class.forName(fqn, false, ArsNSpellsMixinPlugin.class.getClassLoader());
-            return true;
-        } catch (Throwable t) {
-            return false;
-        }
+    /**
+     * Probe a class file's existence on the classpath WITHOUT classloading it.
+     *
+     * <p>We used to call {@code Class.forName(name, false, loader)} here, but even
+     * with {@code initialize=false} the JVM still classloads the target. That
+     * broke other mods' mixin preparation when our probe ran inside {@code onLoad}
+     * — any subsequent mixin targeting the probed class would fail with
+     * {@code MixinTargetAlreadyLoadedException}. Specifically
+     * {@code mixins.covenant_of_the_seven.json:irons_spellbooks.AbstractSpellMixin}
+     * could not transform {@code AbstractSpell} after our probe touched it.
+     *
+     * <p>{@code getResource} on a {@code .class} path checks the classpath manifest
+     * only — it never invokes the classloader's resolution step, so the target
+     * stays un-loaded and downstream mixins can still attach.
+     */
+    private static boolean resourceExists(String classFilePath) {
+        return ArsNSpellsMixinPlugin.class.getClassLoader().getResource(classFilePath) != null;
     }
 }
