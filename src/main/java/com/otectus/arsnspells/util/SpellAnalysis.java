@@ -6,7 +6,6 @@ import com.hollingsworth.arsnouveau.api.spell.AbstractEffect;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.cooldown.CooldownCategory;
-import com.otectus.arsnspells.cooldown.SpellCategoryMapper;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -173,22 +172,21 @@ public final class SpellAnalysis {
     }
 
     /**
-     * Derive cooldown category using the static SpellCategoryMapper as primary
-     * source, with an improved string heuristic as fallback.
+     * Derive cooldown category from the spell's first effect glyph using a
+     * string-based heuristic on the glyph's registry path.
+     *
+     * <p>ANS-OPT-003: the previous design also consulted a hardcoded
+     * {@code SpellCategoryMapper} lookup table as a primary source. The mapper
+     * has been removed because (a) the heuristic covers the same ground via
+     * path keywords and (b) the hardcoded table silently desynced from
+     * upstream Iron's / Ars updates when new glyphs were added.
      */
     public static CooldownCategory deriveCategory(@Nullable AbstractSpellPart effect) {
         if (effect == null || effect.getRegistryName() == null) {
             return CooldownCategory.UTILITY;
         }
 
-        // Primary: look up in the comprehensive static mapping
-        String id = effect.getRegistryName().toString();
-        CooldownCategory mapped = SpellCategoryMapper.getArsCategory(id);
-        if (mapped != null) {
-            return mapped;
-        }
-
-        // Fallback: heuristic based on glyph path
+        // Heuristic based on glyph path
         String path = effect.getRegistryName().getPath().toLowerCase(Locale.ROOT);
 
         if (path.contains("damage") || path.contains("dmg") || path.contains("harm")

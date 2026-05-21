@@ -8,7 +8,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 
 public final class CrossCastContext {
-    private static final long DEFAULT_TTL_TICKS = 200L;
+    // ANS-OPT-006: 200 -> 100 ticks (5 seconds at 20 TPS) so the cross-cast context
+    // TTL aligns with CursedRingHandler.PENDING_COST_TTL_TICKS and
+    // VirtueRingHandler.PENDING_COST_TTL_TICKS. Faster eviction = less stale-state
+    // hazard if anything in the pipeline forgets to clear() on its own.
+    private static final long DEFAULT_TTL_TICKS = 100L;
     private static final Map<UUID, Entry> ACTIVE_CASTS = new ConcurrentHashMap<>();
     private static final ThreadLocal<ManaCheckOverride> MANA_CHECK_OVERRIDE = new ThreadLocal<>();
 

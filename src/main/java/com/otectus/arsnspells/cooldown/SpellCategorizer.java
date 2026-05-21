@@ -7,9 +7,11 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.Locale;
 
 /**
- * @deprecated Use {@link SpellAnalysis#analyze} and {@link SpellAnalysis.Result#category()} instead.
+ * ANS-OPT-002: file-level {@code @Deprecated} removed. {@code categorizeIronsSpell}
+ * below is the live consumer (used by {@code IronsCooldownHandler}); the
+ * deprecation banner at the file level was misleading since only the
+ * {@code categorizeArsGlyph} helper is actually deprecated.
  */
-@Deprecated
 public class SpellCategorizer {
     /**
      * @deprecated Use {@code SpellAnalysis.analyze(spell).category()} instead.

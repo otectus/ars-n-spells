@@ -77,9 +77,12 @@ public class ConfigScreenFactory {
                 .build()
             );
 
-            // Add Reset to Defaults button — disabled in multiplayer
+            // Add Reset Toggles button — disabled in multiplayer
+            // ANS-OPT-018: renamed from "Reset to Defaults" because resetToDefaults()
+            // only resets the 8 boolean toggles visible in the UI, not the 90+ other
+            // config keys. "Reset Toggles" matches what the button actually does.
             Button resetButton = Button.builder(
-                Component.literal("Reset to Defaults"),
+                Component.literal("Reset Toggles"),
                 button -> resetToDefaults())
                 .bounds(this.width / 2 - 205, this.height - 28, 100, 20)
                 .build();
