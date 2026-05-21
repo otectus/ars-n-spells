@@ -98,11 +98,20 @@ public class SanctifiedLegacyCompat {
     private static java.lang.reflect.Method syphonMethod = null;
 
     // --- Covenant aura bridge ---
-    // Path A (preferred): ModUtils.consumeAura / getCurrentAura if Covenant exposes them.
-    // Path B (fallback): use ModUtils.getVirtuousFraction(Player) × ModUtils.getMaxAura(Player).
-    // Path C (degraded): log ERROR at init; consume returns false (no payment), hasEnough
-    //                    returns true (don't block the cast). Visible in the green bar
-    //                    not moving when an Ars Nouveau spell is cast under the Virtue Ring.
+    // Path 0 (PREFERRED for reads): ClientResourceData.getCurrentAura() — the same static
+    //                               getter Covenant's own HUD reads from. Always available
+    //                               on the client when Covenant is loaded; verified by
+    //                               `javap -p` on the deployed Covenant jar.
+    // Path A: ModUtils.consumeAura / getCurrentAura if Covenant exposes them on ModUtils.
+    //         As of Covenant 2.2.6 these do NOT exist on ModUtils; the previous deploy
+    //         logged [DEGRADED] because all three name-probes failed. Kept for future
+    //         versions in case the API surface shifts.
+    // Path B: ModUtils.getVirtuousFraction(Player) × ModUtils.getMaxAura(Player) — also
+    //         currently fails because getMaxAura doesn't exist.
+    // Path C (degraded fallback): consume returns false (no payment), hasEnough returns
+    //                             true (don't block the cast). Visible in the green bar
+    //                             not moving when an Ars Nouveau spell is cast.
+    private static java.lang.reflect.Method clientResourceDataGetCurrentAuraMethod = null; // path 0
     private static java.lang.reflect.Method covenantConsumeAuraMethod = null;
     private static java.lang.reflect.Method covenantGetCurrentAuraMethod = null;
     private static java.lang.reflect.Method covenantGetMaxAuraMethod = null;
@@ -209,8 +218,22 @@ public class SanctifiedLegacyCompat {
      */
     private static void initCovenantAuraReflection() {
         try {
-            Class<?> modUtils = Class.forName("net.llenzzz.covenant_of_the_seven.util.ModUtils");
+            // Path 0: ClientResourceData.getCurrentAura() — the canonical read path on the
+            // client. Verified by `javap -p` on Covenant 2.2.6-hotfix:
+            //   public static int getCurrentAura()
+            // No Player arg; reads a static field that Covenant's own HUD also reads.
+            try {
+                Class<?> crd = Class.forName("net.llenzzz.covenant_of_the_seven.client.ClientResourceData");
+                clientResourceDataGetCurrentAuraMethod = tryGetStatic(crd, "getCurrentAura");
+            } catch (ClassNotFoundException e) {
+                // No client-side data class (e.g. dedicated-server context) — leave null.
+            }
 
+            // Paths A/B: ModUtils name-probes. Kept as belt-and-suspenders. As of Covenant
+            // 2.2.6 the consume/getCurrentAura/getMaxAura methods do not exist on ModUtils;
+            // only getVirtuousFraction(Player) resolves. Verified via deployment log:
+            // "[DEGRADED] consume=false, getCurrent=false, getMax=false, fraction=true".
+            Class<?> modUtils = Class.forName("net.llenzzz.covenant_of_the_seven.util.ModUtils");
             covenantGetVirtuousFractionMethod = tryGetStatic(modUtils, "getVirtuousFraction", Player.class);
             for (String name : new String[]{"consumeAura", "drainAura", "spendAura", "tryConsumeAura"}) {
                 covenantConsumeAuraMethod = tryGetStatic(modUtils, name, Player.class, int.class);
@@ -226,17 +249,22 @@ public class SanctifiedLegacyCompat {
             }
 
             covenantAuraReflectionResolved = true;
+            boolean haveCRD = clientResourceDataGetCurrentAuraMethod != null;
             boolean haveConsume = covenantConsumeAuraMethod != null;
             boolean haveGetCurrent = covenantGetCurrentAuraMethod != null;
             boolean haveGetMax = covenantGetMaxAuraMethod != null;
             boolean haveFraction = covenantGetVirtuousFractionMethod != null;
-            if (haveConsume && (haveGetCurrent || (haveFraction && haveGetMax))) {
-                LOGGER.info("  [OK] Covenant aura reflection initialized — consume={}, getCurrent={}, getMax={}, fraction={}",
-                    haveConsume, haveGetCurrent, haveGetMax, haveFraction);
+            boolean canRead = haveCRD || haveGetCurrent || (haveFraction && haveGetMax);
+            if (canRead) {
+                LOGGER.info("  [OK] Covenant aura reflection initialized — clientResourceData={}, consume={}, getCurrent={}, getMax={}, fraction={}",
+                    haveCRD, haveConsume, haveGetCurrent, haveGetMax, haveFraction);
             } else {
-                LOGGER.error("  [DEGRADED] Covenant aura reflection partial — consume={}, getCurrent={}, getMax={}, fraction={}",
-                    haveConsume, haveGetCurrent, haveGetMax, haveFraction);
-                LOGGER.error("  [DEGRADED] Virtue Ring Ars casts will succeed but may NOT deduct aura — green bar won't move.");
+                LOGGER.error("  [DEGRADED] Covenant aura reflection partial — clientResourceData={}, consume={}, getCurrent={}, getMax={}, fraction={}",
+                    haveCRD, haveConsume, haveGetCurrent, haveGetMax, haveFraction);
+                LOGGER.error("  [DEGRADED] No read path resolved — peak tracker will stay at 1 and the bar will look broken.");
+            }
+            if (!haveConsume) {
+                LOGGER.warn("  [WARN] Covenant has no public consumeAura helper; Ars-spell aura deduction will rely on Covenant's own SpellPreCastEvent handling.");
             }
         } catch (Throwable t) {
             covenantAuraReflectionResolved = false;
@@ -244,7 +272,10 @@ public class SanctifiedLegacyCompat {
         }
     }
 
-    /** Look up a static method by name + parameter types; return null on miss. */
+    /**
+     * Look up a static method by name + parameter types; return null on miss.
+     * Varargs allows zero-arg lookups for static getters (e.g. ClientResourceData.getCurrentAura).
+     */
     private static java.lang.reflect.Method tryGetStatic(Class<?> owner, String name, Class<?>... params) {
         try {
             java.lang.reflect.Method m = owner.getMethod(name, params);
@@ -270,6 +301,15 @@ public class SanctifiedLegacyCompat {
         if (!covenantAuraReflectionResolved) return true; // degraded: allow
 
         try {
+            // Path 0 (preferred): ClientResourceData.getCurrentAura(). Player arg is unused
+            // — Covenant tracks current aura per-client, not per-Player. Works for the local
+            // player (the only one whose Covenant aura the client knows about).
+            if (clientResourceDataGetCurrentAuraMethod != null) {
+                Object v = clientResourceDataGetCurrentAuraMethod.invoke(null);
+                if (v instanceof Number) {
+                    return ((Number) v).intValue() >= cost;
+                }
+            }
             if (covenantGetCurrentAuraMethod != null) {
                 Object v = covenantGetCurrentAuraMethod.invoke(null, player);
                 if (v instanceof Number) {
@@ -321,8 +361,16 @@ public class SanctifiedLegacyCompat {
      * available either.
      */
     public static int getCovenantAura(Player player) {
-        if (player == null || !covenantAuraReflectionResolved) return 0;
+        if (!covenantAuraReflectionResolved) return 0;
         try {
+            // Path 0 (preferred): ClientResourceData.getCurrentAura(). Static, no Player
+            // arg — see the comment in hasEnoughCovenantAura. Returns the local-client
+            // aura value, which is exactly what we need for HUD/peak tracking.
+            if (clientResourceDataGetCurrentAuraMethod != null) {
+                Object v = clientResourceDataGetCurrentAuraMethod.invoke(null);
+                if (v instanceof Number) return ((Number) v).intValue();
+            }
+            if (player == null) return 0;
             if (covenantGetCurrentAuraMethod != null) {
                 Object v = covenantGetCurrentAuraMethod.invoke(null, player);
                 if (v instanceof Number) return ((Number) v).intValue();

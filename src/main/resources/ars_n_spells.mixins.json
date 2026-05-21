@@ -19,7 +19,7 @@
   ],
   "client": [
     "irons.MixinIronsManaBarOverlay",
-    "covenant.MixinAuraContainerOverlay"
+    "covenant.MixinResourceBarOverlay"
   ],
   "injectors": {
     "defaultRequire": 1
