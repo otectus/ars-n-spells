@@ -52,6 +52,12 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("MixinSanctifiedAbstractSpell")) {
             return ironsPresent && sanctifiedPresent;
         }
+        // MixinAuraContainerOverlay targets Covenant's client-side aura HUD class. The
+        // target won't exist on a Covenant-less install, so gate on sanctifiedPresent
+        // to keep the mixin loader from even attempting application.
+        if (mixinClassName.endsWith("MixinAuraContainerOverlay")) {
+            return sanctifiedPresent;
+        }
         // ANS-CRIT-001: MixinIronsCastValidation and MagicDataAccessor were missing
         // from this gated list — both directly target Iron's classes, so on an
         // Iron's-less server the mixin loader was crashing with NoClassDefFoundError.

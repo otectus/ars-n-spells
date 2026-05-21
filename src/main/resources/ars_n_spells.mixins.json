@@ -18,7 +18,8 @@
     "sanctified.MixinSanctifiedAbstractSpell"
   ],
   "client": [
-    "irons.MixinIronsManaBarOverlay"
+    "irons.MixinIronsManaBarOverlay",
+    "covenant.MixinAuraContainerOverlay"
   ],
   "injectors": {
     "defaultRequire": 1
