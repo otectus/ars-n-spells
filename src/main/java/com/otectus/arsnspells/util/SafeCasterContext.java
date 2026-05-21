@@ -48,7 +48,14 @@ public class SafeCasterContext implements AutoCloseable {
     /**
      * Manual cleanup method for cases where try-with-resources cannot be used.
      * Prefer using try-with-resources with create() instead.
+     *
+     * @deprecated ANS-LOW-035: the static clear() bypasses the try-with-resources
+     *             contract that the class is built around. New code should NOT call
+     *             this — use the AutoCloseable path. The method is retained as a
+     *             rare emergency hatch (e.g. test teardown) but is now flagged so
+     *             the compiler steers callers toward the safe path.
      */
+    @Deprecated
     public static void clear() {
         CASTER.remove();
         ACTIVE_SPELL.remove();

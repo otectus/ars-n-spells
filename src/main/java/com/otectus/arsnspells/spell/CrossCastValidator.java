@@ -91,7 +91,11 @@ public final class CrossCastValidator {
 
     private static boolean defaultIronCheck(ResourceLocation spellId) {
         if (!ModList.get().isLoaded("irons_spellbooks")) {
-            return true;  // No Iron's installed; accept any ID — cast path will no-op.
+            // ANS-LOW-010: return false instead of true so the validator emits a clear
+            // failure reason instead of silently letting the cast path no-op downstream
+            // with no diagnostic. Iron's-less servers should reject Iron's-id inscriptions
+            // outright; the trace log then carries a useful reasonKey for triage.
+            return false;
         }
         return ironSpellResolvable(spellId);
     }

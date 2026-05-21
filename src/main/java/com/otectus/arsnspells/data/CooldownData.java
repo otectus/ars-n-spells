@@ -32,6 +32,9 @@ public class CooldownData {
     public void setLastCast(CooldownCategory cat, long time) { setCooldownEnd(cat, time); }
 
     public void save(CompoundTag nbt) {
+        // ANS-LOW-016: NBT key is "BridgeCooldowns" for backwards-compatibility with
+        // existing player save files dating to when this lived in the bridge module.
+        // Do not rename without a migration step.
         CompoundTag tag = new CompoundTag();
         cooldowns.forEach((cat, time) -> tag.putLong(cat.name(), time));
         nbt.put("BridgeCooldowns", tag);

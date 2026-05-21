@@ -43,6 +43,19 @@ public class ArsSpellScalingHandler {
     private static final int WINDOW_TICKS = 60; // 3 seconds at 20 TPS
     private static final Map<UUID, ScalingEntry> ACTIVE = new ConcurrentHashMap<>();
 
+    /**
+     * ANS-LOW-031: evict per-player state on logout so the ACTIVE map cannot leak
+     * stale UUIDs over a long server uptime. Tick-window expiry covers the normal
+     * case, but a player who logs out mid-cast leaves their entry until another
+     * tick happens.
+     */
+    @SubscribeEvent
+    public void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() != null) {
+            ACTIVE.remove(event.getEntity().getUUID());
+        }
+    }
+
     @SubscribeEvent
     public void onArsSpellCast(SpellCastEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {

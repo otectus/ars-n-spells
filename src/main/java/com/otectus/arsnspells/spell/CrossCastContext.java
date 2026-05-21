@@ -180,8 +180,19 @@ public final class CrossCastContext {
             this.issPercent = issPercent;
         }
 
-        public boolean isUnlimited() {
+        /**
+         * ANS-LOW-014: renamed from {@code isUnlimited} — the actual semantic is
+         * "ISS contributes 0% of dual cost, so the Iron's pool sufficiency check
+         * should be bypassed". The old name suggested an infinite resource.
+         */
+        public boolean bypassesIronsCheck() {
             return issPercent <= 0.0f;
+        }
+
+        /** @deprecated misleading name — use {@link #bypassesIronsCheck()} instead. */
+        @Deprecated
+        public boolean isUnlimited() {
+            return bypassesIronsCheck();
         }
     }
 }

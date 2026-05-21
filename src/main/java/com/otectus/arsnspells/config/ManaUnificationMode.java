@@ -79,7 +79,11 @@ public enum ManaUnificationMode {
     }
     
     /**
-     * Get mode from config string value
+     * Get mode from config string value.
+     *
+     * <p>ANS-LOW-020: log a WARN when the configured value doesn't match a known
+     * mode so typos like {@code "iss-primary"} (hyphen) or {@code "ars_primary "} (trailing
+     * space) show up in the log instead of silently falling back to ISS_PRIMARY.
      */
     public static ManaUnificationMode fromString(String value) {
         for (ManaUnificationMode mode : values()) {
@@ -87,7 +91,11 @@ public enum ManaUnificationMode {
                 return mode;
             }
         }
-        return ISS_PRIMARY; // Default fallback
+        org.slf4j.LoggerFactory.getLogger(ManaUnificationMode.class).warn(
+            "Unknown mana_unification_mode '{}', falling back to ISS_PRIMARY. "
+                + "Valid values: iss_primary, ars_primary, hybrid, separate, disabled.",
+            value);
+        return ISS_PRIMARY;
     }
     
     /**

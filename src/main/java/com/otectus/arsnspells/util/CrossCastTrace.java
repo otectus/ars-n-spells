@@ -79,6 +79,11 @@ public final class CrossCastTrace {
             if (i > 0) sb.append(' ');
             sb.append(kv[i]).append('=').append(kv[i + 1]);
         }
+        // ANS-LOW-028: explicitly note the orphaned final argument so debug consumers
+        // notice the odd-length kv array instead of silently truncating.
+        if ((kv.length & 1) == 1) {
+            sb.append(" !ORPHAN=").append(kv[kv.length - 1]);
+        }
         return sb.toString();
     }
 }

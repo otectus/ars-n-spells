@@ -11,8 +11,14 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 public class IronsCooldownHandler {
+    /**
+     * ANS-LOW-032: renamed from {@code onIronsSpellCast} because the handler listens
+     * to {@code SpellPreCastEvent}, not {@code SpellOnCastEvent}. Forge auto-discovers
+     * {@code @SubscribeEvent} methods by signature, so the rename is transparent to
+     * the event bus.
+     */
     @SubscribeEvent
-    public void onIronsSpellCast(SpellPreCastEvent event) {
+    public void onIronsSpellPreCast(SpellPreCastEvent event) {
         // CRITICAL FIX: Do NOT apply unified cooldowns to Iron's Spellbooks
         // Iron's has its own internal cooldown system that should not be interfered with
         // Only apply unified cooldowns if explicitly configured for cross-mod cooldowns

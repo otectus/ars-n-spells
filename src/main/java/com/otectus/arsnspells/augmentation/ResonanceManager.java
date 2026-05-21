@@ -81,10 +81,10 @@ public class ResonanceManager {
      */
     public static void cleanupOfflinePlayers(MinecraftServer server) {
         if (server == null) return;
-        Set<UUID> onlineUUIDs = server.getPlayerList().getPlayers().stream()
-            .map(p -> p.getUUID())
-            .collect(Collectors.toSet());
-        resonanceCache.keySet().removeIf(uuid -> !onlineUUIDs.contains(uuid));
+        // ANS-LOW-018: removeIf with a direct getPlayer lookup avoids allocating a
+        // Set<UUID> just for the contains check. The lookup is O(1) on Minecraft's
+        // PlayerList map, so this is also faster for large player counts.
+        resonanceCache.keySet().removeIf(uuid -> server.getPlayerList().getPlayer(uuid) == null);
     }
 
     /**

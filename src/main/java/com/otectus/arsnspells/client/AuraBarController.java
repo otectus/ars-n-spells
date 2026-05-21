@@ -57,7 +57,16 @@ public class AuraBarController {
             if (!SanctifiedLegacyCompat.isAvailable()) {
                 return;
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            // ANS-LOW-002: swallow the config-read failure but log it (throttled by
+            // the diagnostic timer below) so unexpected NPEs during early world load
+            // don't disappear silently.
+            long nowMs = System.currentTimeMillis();
+            if (nowMs - lastDiagLogMs > 5000) {
+                lastDiagLogMs = nowMs;
+                org.slf4j.LoggerFactory.getLogger(AuraBarController.class)
+                    .warn("AuraBarController config read failed: {}", e.getMessage());
+            }
             return;
         }
 
