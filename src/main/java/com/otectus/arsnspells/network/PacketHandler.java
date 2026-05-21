@@ -9,7 +9,10 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import net.minecraftforge.fml.ModList;
 
 public class PacketHandler {
-    private static final String PROTOCOL_VERSION = "1";
+    // PROTOCOL_VERSION bumped 1 -> 2 in the aura-subsystem deletion: AuraSyncPacket
+    // was removed, which shifts all subsequent packet IDs down by one slot. A client
+    // running the old jar would mis-parse our packets — hard-fail at connect instead.
+    private static final String PROTOCOL_VERSION = "2";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ArsNSpells.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -34,13 +37,10 @@ public class PacketHandler {
         INSTANCE.registerMessage(id++, CooldownSyncPacket.class,
             CooldownSyncPacket::toBytes, CooldownSyncPacket::new, CooldownSyncPacket::handle,
             java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
-        // Aura sync is appended at the end so the IDs of pre-existing packets don't shift
-        // for clients running mixed mod versions.
-        INSTANCE.registerMessage(id++, AuraSyncPacket.class,
-            AuraSyncPacket::toBytes, AuraSyncPacket::new, AuraSyncPacket::handle,
-            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
-        // CrossCastRequestPacket (C2S) — appended at the tail to preserve
-        // pre-existing packet IDs across the 1.10.x → 2.0.0 bump.
+        // AuraSyncPacket removed in the aura-subsystem deletion: Covenant of the Seven
+        // owns the aura state and renders its own HUD, so we no longer need to sync.
+        // CrossCastRequestPacket (C2S) shifted down one slot; PROTOCOL_VERSION was bumped
+        // to force a hard-fail at connect for clients on the old jar.
         INSTANCE.registerMessage(id++, CrossCastRequestPacket.class,
             CrossCastRequestPacket::toBytes, CrossCastRequestPacket::new, CrossCastRequestPacket::handle,
             java.util.Optional.of(NetworkDirection.PLAY_TO_SERVER));

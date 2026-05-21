@@ -4,7 +4,6 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
-import com.otectus.arsnspells.aura.AuraManager;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
@@ -119,11 +118,12 @@ public class ArsNSpellsCommands {
             false
         );
 
-        // Aura info
-        int aura = AuraManager.getAura(target);
-        int maxAura = AuraManager.getMaxAura(target);
+        // Aura info — Covenant of the Seven owns aura state; we read it via reflection
+        // bridge. Max-aura is not always exposed by Covenant's API, so display "?" if
+        // the bridge could not resolve it.
+        int aura = SanctifiedLegacyCompat.getCovenantAura(target);
         context.getSource().sendSuccess(
-            () -> Component.translatable("commands.ans.info.aura", aura, maxAura),
+            () -> Component.translatable("commands.ans.info.aura", aura, "?"),
             false
         );
 
@@ -163,7 +163,7 @@ public class ArsNSpellsCommands {
                     .invoke(null, target);
                 float rawMana = (Float) magicDataClass.getMethod("getMana").invoke(md);
                 boolean bypassActive = (cursed && AnsConfig.ENABLE_LP_SYSTEM.get())
-                    || (virtue && AnsConfig.ENABLE_AURA_SYSTEM.get());
+                    || virtue;
                 context.getSource().sendSuccess(
                     () -> net.minecraft.network.chat.Component.literal(String.format(
                         "Iron's: rawMana=%.1f, ringBypass=%s", rawMana, bypassActive))
@@ -184,10 +184,10 @@ public class ArsNSpellsCommands {
     private static int showOwnAura(CommandContext<CommandSourceStack> context) {
         try {
             ServerPlayer self = context.getSource().getPlayerOrException();
-            int aura = AuraManager.getAura(self);
-            int maxAura = AuraManager.getMaxAura(self);
+            // Covenant of the Seven owns the aura state; we delegate via reflection.
+            int aura = SanctifiedLegacyCompat.getCovenantAura(self);
             context.getSource().sendSuccess(
-                () -> Component.translatable("commands.ans.info.aura", aura, maxAura)
+                () -> Component.translatable("commands.ans.info.aura", aura, "?")
                     .withStyle(ChatFormatting.AQUA),
                 false
             );

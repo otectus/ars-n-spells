@@ -2,13 +2,8 @@ package com.otectus.arsnspells.events;
 
 import com.hollingsworth.arsnouveau.api.event.SpellCostCalcEvent;
 import com.hollingsworth.arsnouveau.api.event.SpellResolveEvent;
-import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
-import com.hollingsworth.arsnouveau.api.spell.Spell;
-import com.otectus.arsnspells.aura.AuraManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
-import com.otectus.arsnspells.compat.ScrollAuraTracker;
 import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.util.SpellAnalysis;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -26,8 +21,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Handles Virtue Ring aura consumption for Ars Nouveau spells.
- * When the Ring of Seven Virtues is equipped, mana costs are replaced with aura costs.
- * Mirrors the architecture of CursedRingHandler for LP.
+ *
+ * <p>When the Ring of Seven Virtues is equipped, mana costs are replaced with
+ * aura costs. The aura itself is owned by Covenant of the Seven — this handler
+ * computes the cost we want to charge for the cast, then routes the read and
+ * write through {@link SanctifiedLegacyCompat}'s reflection bridges so that
+ * Covenant's native green HUD reflects every deduction.
  *
  * <p>Consumption is split across Pre and Post:
  * <ul>
@@ -56,10 +55,6 @@ public class VirtueRingHandler {
             return;
         }
 
-        if (!AnsConfig.ENABLE_AURA_SYSTEM.get()) {
-            return;
-        }
-
         LivingEntity caster = event.context != null ? event.context.getUnwrappedCaster() : null;
         if (!(caster instanceof Player player)) {
             return;
@@ -83,26 +78,14 @@ public class VirtueRingHandler {
         LOGGER.debug("Virtue Ring detected on {} - Spell will use Aura instead of mana",
             player.getName().getString());
 
-        // ANS-HIGH-003: read the spell directly from the event context instead of a
-        // ThreadLocal. See CursedRingHandler for the full rationale.
-        Spell spell = event.context != null ? event.context.getSpell() : null;
-        SpellAnalysis.Result analysis = spell != null ? SpellAnalysis.analyze(spell) : null;
-        AbstractSpellPart spellPart = analysis != null ? analysis.firstEffect() : null;
+        // Ars has no native mapping in Covenant's getAuraCost (which expects an Iron's
+        // AbstractSpell). Use the mana cost directly, scaled by the configurable
+        // ARS_VIRTUE_AURA_MULTIPLIER knob (default 1.0).
+        double multiplier = AnsConfig.ARS_VIRTUE_AURA_MULTIPLIER.get();
+        int auraCost = (int) Math.max(1, Math.round(manaCost * multiplier));
 
-        // Calculate aura cost
-        int auraCost = AuraManager.calculateAuraCost(manaCost, spellPart);
-
-        // Apply Blasphemy discount to aura cost
-        String spellSchool = analysis != null ? analysis.dominantSchool() : "generic";
-        double blasphemyMultiplier = SanctifiedLegacyCompat.getBlasphemyAuraMultiplier(player, spellSchool);
-        if (blasphemyMultiplier < 1.0) {
-            int originalCost = auraCost;
-            auraCost = (int) Math.max(AnsConfig.AURA_MINIMUM_COST.get(),
-                Math.round(auraCost * blasphemyMultiplier));
-            LOGGER.debug("Blasphemy discount applied to aura: {} -> {}", originalCost, auraCost);
-        }
-
-        LOGGER.debug("Spell will cost {} aura (base mana: {})", auraCost, manaCost);
+        LOGGER.debug("Spell will cost {} aura (base mana: {}, multiplier: {})",
+            auraCost, manaCost, multiplier);
 
         // ANS-HIGH-011: stamp with level.getGameTime() (server-global) instead of
         // player.tickCount (per-player) — see CursedRingHandler for rationale.
@@ -162,9 +145,6 @@ public class VirtueRingHandler {
         if (!SanctifiedLegacyCompat.isAvailable()) {
             return;
         }
-        if (!AnsConfig.ENABLE_AURA_SYSTEM.get()) {
-            return;
-        }
         if (event.context == null) {
             return;
         }
@@ -201,9 +181,6 @@ public class VirtueRingHandler {
         if (!SanctifiedLegacyCompat.isAvailable()) {
             return;
         }
-        if (!AnsConfig.ENABLE_AURA_SYSTEM.get()) {
-            return;
-        }
         if (event.context == null) {
             return;
         }
@@ -235,34 +212,31 @@ public class VirtueRingHandler {
 
         LOGGER.debug("Consuming {} aura from {}", pending.auraCost, player.getName().getString());
 
-        boolean success = AuraManager.consumeAura(player, pending.auraCost);
+        boolean success = SanctifiedLegacyCompat.consumeCovenantAura(player, pending.auraCost);
         if (!success) {
             // Should be rare — the canCast pre-validation in MixinSpellResolverPreCast already
-            // gated this. Log and skip.
-            LOGGER.warn("Aura consumption failed at Post for {} (spell already cast)",
+            // gated this. Log and skip. Note: in "degraded mode" (Covenant reflection unresolved),
+            // consumeCovenantAura intentionally returns false; this is logged at startup, not here.
+            LOGGER.debug("Aura consumption failed at Post for {} (spell already cast, no payment made)",
                 player.getName().getString());
 
-            if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
-                int currentAura = AuraManager.getAura(player);
-                player.displayClientMessage(
-                    Component.translatable("message.ars_n_spells.aura.insufficient", pending.auraCost, currentAura)
-                        .withStyle(ChatFormatting.AQUA),
-                    true
-                );
-            }
+            int currentAura = SanctifiedLegacyCompat.getCovenantAura(player);
+            player.displayClientMessage(
+                Component.translatable("message.ars_n_spells.aura.insufficient", pending.auraCost, currentAura)
+                    .withStyle(ChatFormatting.AQUA),
+                true
+            );
             return;
         }
 
         pending.consumed = true;
 
-        if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
-            int remaining = AuraManager.getAura(player);
-            player.displayClientMessage(
-                Component.translatable("message.ars_n_spells.aura.consumed", pending.auraCost, remaining)
-                    .withStyle(ChatFormatting.AQUA),
-                true
-            );
-        }
+        int remaining = SanctifiedLegacyCompat.getCovenantAura(player);
+        player.displayClientMessage(
+            Component.translatable("message.ars_n_spells.aura.consumed", pending.auraCost, remaining)
+                .withStyle(ChatFormatting.AQUA),
+            true
+        );
     }
 
     /**
@@ -287,9 +261,8 @@ public class VirtueRingHandler {
     public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
         UUID id = event.getEntity().getUUID();
         pendingCosts.remove(id);
-        // ANS-HIGH-025: also drain the scroll aura tracker so a staged entry from a
-        // scroll cast whose RETURN inject was suppressed cannot leak across sessions.
-        ScrollAuraTracker.clear(id);
+        // ScrollAuraTracker cleanup removed: the tracker was deleted along with the
+        // Iron's-aura-scroll intercept (Covenant handles Iron's scroll aura natively).
     }
 
     private static final long PENDING_COST_TTL_TICKS = 100L; // 5 seconds at 20 TPS

@@ -36,8 +36,9 @@ public abstract class MixinSpellResolverMana {
                         ci.cancel();
                         return;
                     }
-                    if (AnsConfig.ENABLE_AURA_SYSTEM.get() && SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
-                        // Aura was already consumed by VirtueRingHandler
+                    if (SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
+                        // Aura was already consumed via SanctifiedLegacyCompat.consumeCovenantAura
+                        // in VirtueRingHandler's SpellResolveEvent.Post hook.
                         ci.cancel();
                         return;
                     }

@@ -6,7 +6,6 @@ import com.hollingsworth.arsnouveau.api.spell.SpellContext;
 import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
 import com.hollingsworth.arsnouveau.api.spell.SpellValidationError;
 import com.hollingsworth.arsnouveau.common.util.PortUtil;
-import com.otectus.arsnspells.aura.AuraManager;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.casting.CastingAuthority;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
@@ -152,25 +151,24 @@ public abstract class MixinSpellResolverPreCast {
                     }
                 }
 
-                // Virtue Ring aura validation
+                // Virtue Ring aura validation \u2014 Covenant of the Seven owns the aura
+                // state; we read/spend via SanctifiedLegacyCompat reflection bridges.
                 if (SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
                     int pendingAuraCost = VirtueRingHandler.getPendingAuraCost(player);
                     if (pendingAuraCost > 0) {
                         LOGGER.debug("PRE-CAST VALIDATION (Aura): Player={}, Aura Cost={}",
                             player.getName().getString(), pendingAuraCost);
 
-                        boolean hasEnough = AuraManager.hasEnoughAura(player, pendingAuraCost);
+                        boolean hasEnough = SanctifiedLegacyCompat.hasEnoughCovenantAura(player, pendingAuraCost);
                         if (!hasEnough) {
                             LOGGER.warn("SPELL CAST DENIED (Aura) for {}", player.getName().getString());
                             VirtueRingHandler.clearPendingAuraCost(player);
 
-                            if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
-                                int currentAura = AuraManager.getAura(player);
-                                player.displayClientMessage(
-                                    Component.literal("\u00a7bInsufficient Aura: Need " + pendingAuraCost
-                                        + ", have " + currentAura),
-                                    true);
-                            }
+                            int currentAura = SanctifiedLegacyCompat.getCovenantAura(player);
+                            player.displayClientMessage(
+                                Component.literal("\u00a7bInsufficient Aura: Need " + pendingAuraCost
+                                    + ", have " + currentAura),
+                                true);
                             cir.setReturnValue(false);
                             cir.cancel();
                             return;

@@ -1,6 +1,5 @@
 package com.otectus.arsnspells.events;
 
-import com.otectus.arsnspells.aura.AuraCapabilityProvider;
 import com.otectus.arsnspells.data.ModCapabilityProvider;
 import org.junit.jupiter.api.Test;
 
@@ -11,12 +10,14 @@ import java.nio.file.Paths;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * ANS-HIGH-008 — verifies that both capability providers'
- * {@code onPlayerClone} handlers run at {@code EventPriority.HIGHEST}.
+ * ANS-HIGH-008 — verifies that {@code ModCapabilityProvider.onPlayerClone}
+ * runs at {@code EventPriority.HIGHEST}. The companion
+ * {@code AuraCapabilityProvider} assertion was removed alongside the
+ * aura-subsystem deletion.
  *
- * <p>Without this, a third-party HIGHEST-priority {@code PlayerEvent.Clone}
+ * <p>Without HIGHEST, a third-party HIGHEST-priority {@code PlayerEvent.Clone}
  * handler could read our caps before we copy them, seeing freshly-default state
- * (player's affinity/progression/aura appears reset).
+ * (player's affinity/progression appears reset).
  */
 class CapabilityProviderPriorityTest {
 
@@ -35,26 +36,9 @@ class CapabilityProviderPriorityTest {
     }
 
     @Test
-    void auraCapabilityProvider_onPlayerClone_isHighest() throws IOException {
-        String src = Files.readString(Paths.get(
-            "src/main/java/com/otectus/arsnspells/aura/AuraCapabilityProvider.java"));
-        int methodIdx = src.indexOf("public static void onPlayerClone");
-        assertTrue(methodIdx > 0, "onPlayerClone must exist");
-        String preceding = src.substring(Math.max(0, methodIdx - 200), methodIdx);
-        assertTrue(preceding.contains("priority = EventPriority.HIGHEST"),
-            "AuraCapabilityProvider.onPlayerClone must run at EventPriority.HIGHEST (ANS-HIGH-008)");
-    }
-
-    @Test
     void modCapabilityProvider_classLoads() {
         // Smoke test: ensure ModCapabilityProvider classloads without bootstrap issues.
         assertTrue(ModCapabilityProvider.class.getName()
             .endsWith("ModCapabilityProvider"));
-    }
-
-    @Test
-    void auraCapabilityProvider_classLoads() {
-        assertTrue(AuraCapabilityProvider.class.getName()
-            .endsWith("AuraCapabilityProvider"));
     }
 }

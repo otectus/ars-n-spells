@@ -137,29 +137,13 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue IRONS_LP_EPIC_MULTIPLIER;
     public static final ForgeConfigSpec.DoubleValue IRONS_LP_LEGENDARY_MULTIPLIER;
 
-    // ANS-HIGH-018: Aura Rarity Multipliers for Iron's Spells (independent of LP rarity scale).
-    // Iron's aura costs used to reuse the LP rarity table, producing 5×-10× over-cost on
-    // legendary spells with the Virtue Ring. These knobs let pack authors tune aura
-    // separately from LP. Defaults are deliberately gentler than the LP scale.
-    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_COMMON_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_UNCOMMON_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_RARE_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_EPIC_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue IRONS_AURA_LEGENDARY_MULTIPLIER;
-
     // ========================================
-    // AURA SYSTEM (Ring of Seven Virtues)
+    // VIRTUE RING (Ring of Seven Virtues) - aura cost knob
     // ========================================
-    public static final ForgeConfigSpec.BooleanValue ENABLE_AURA_SYSTEM;
-    public static final ForgeConfigSpec.IntValue AURA_MAX_DEFAULT;
-    public static final ForgeConfigSpec.DoubleValue AURA_REGEN_RATE;
-    public static final ForgeConfigSpec.DoubleValue AURA_BASE_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue AURA_TIER1_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue AURA_TIER2_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue AURA_TIER3_MULTIPLIER;
-    public static final ForgeConfigSpec.IntValue AURA_MINIMUM_COST;
-    public static final ForgeConfigSpec.BooleanValue SHOW_AURA_MESSAGES;
-    public static final ForgeConfigSpec.BooleanValue SHOW_AURA_HUD;
+    // Covenant of the Seven owns the aura state, regen, max pool, and HUD. We only
+    // need to know how to map an Ars Nouveau mana cost to an aura cost when the
+    // Virtue Ring is worn — Covenant has no native getAuraCost(ArsSpell) method.
+    public static final ForgeConfigSpec.DoubleValue ARS_VIRTUE_AURA_MULTIPLIER;
 
     // ========================================
     // SCROLL COST SYSTEM
@@ -175,7 +159,6 @@ public class AnsConfig {
     // BLASPHEMY RING DISCOUNTS
     // ========================================
     public static final ForgeConfigSpec.DoubleValue BLASPHEMY_LP_DISCOUNT;
-    public static final ForgeConfigSpec.DoubleValue BLASPHEMY_AURA_DISCOUNT;
 
     // ========================================
     // SOURCE JAR SYNERGY
@@ -725,80 +708,29 @@ public class AnsConfig {
             .comment("LP multiplier for LEGENDARY rarity spells")
             .defineInRange("irons_lp_legendary_multiplier", 5.0, 0.1, 100.0);
 
-        // ANS-HIGH-018: aura rarity multipliers. Defaults are gentler than the LP
-        // rarity scale because aura regen is slower than LP regen. Pre-fix, the LP
-        // rarity scale was reused for aura cost, producing 10× over-cost on legendary
-        // Iron's spells cast with the Virtue Ring.
-        IRONS_AURA_COMMON_MULTIPLIER = BUILDER
-            .comment("Aura multiplier for COMMON rarity Iron's spells")
-            .defineInRange("irons_aura_common_multiplier", 1.0, 0.1, 10.0);
-        IRONS_AURA_UNCOMMON_MULTIPLIER = BUILDER
-            .comment("Aura multiplier for UNCOMMON rarity Iron's spells")
-            .defineInRange("irons_aura_uncommon_multiplier", 1.25, 0.1, 10.0);
-        IRONS_AURA_RARE_MULTIPLIER = BUILDER
-            .comment("Aura multiplier for RARE rarity Iron's spells")
-            .defineInRange("irons_aura_rare_multiplier", 1.5, 0.1, 10.0);
-        IRONS_AURA_EPIC_MULTIPLIER = BUILDER
-            .comment("Aura multiplier for EPIC rarity Iron's spells")
-            .defineInRange("irons_aura_epic_multiplier", 1.75, 0.1, 10.0);
-        IRONS_AURA_LEGENDARY_MULTIPLIER = BUILDER
-            .comment("Aura multiplier for LEGENDARY rarity Iron's spells")
-            .defineInRange("irons_aura_legendary_multiplier", 2.0, 0.1, 10.0);
-
         BUILDER.pop();
 
         // ========================================
-        // AURA SYSTEM (Ring of Seven Virtues)
+        // VIRTUE RING (Ring of Seven Virtues)
         // ========================================
-        BUILDER.push("Aura System");
+        // The parallel aura subsystem (max pool, regen, HUD, rarity/tier tables) was
+        // removed because Covenant of the Seven already owns all of those. The only
+        // knob we still need is the Ars-mana → aura-cost mapping, since Covenant has
+        // no native ars-spell cost function.
+        BUILDER.push("Virtue Ring");
         BUILDER.comment(
-            "Aura resource system for Ring of Seven Virtues.",
-            "When wearing the Virtue Ring, spell mana costs are replaced with aura costs.",
-            "Aura regenerates passively over time."
+            "Cost-mapping knob for Ars Nouveau spells cast while wearing the Ring of",
+            "Seven Virtues. Covenant of the Seven owns the actual aura pool, regen,",
+            "max, and HUD — we only decide how to translate an Ars mana cost into an",
+            "aura cost. Iron's Spellbooks spells are handled entirely by Covenant's",
+            "native integration and do not use this knob."
         );
 
-        ENABLE_AURA_SYSTEM = BUILDER
-            .comment("Master toggle for the Virtue Ring aura system.",
-                     "When disabled, spells use normal mana even with the Virtue Ring equipped.")
-            .define("enable_aura_system", true);
-
-        AURA_MAX_DEFAULT = BUILDER
-            .comment("Default maximum aura pool")
-            .defineInRange("aura_max_default", 1000, 100, 100000);
-
-        AURA_REGEN_RATE = BUILDER
-            .comment("Aura regenerated per tick (20 ticks = 1 second). 0.5 = 10 aura/sec")
-            .defineInRange("aura_regen_rate", 0.5, 0.0, 100.0);
-
-        AURA_BASE_MULTIPLIER = BUILDER
-            .comment("Base conversion from mana cost to aura cost (mana x this = base aura)")
-            .defineInRange("aura_base_multiplier", 1.0, 0.1, 100.0);
-
-        AURA_TIER1_MULTIPLIER = BUILDER
-            .comment("Aura cost multiplier for Tier 1 glyphs")
-            .defineInRange("aura_tier1_multiplier", 1.0, 0.1, 10.0);
-
-        AURA_TIER2_MULTIPLIER = BUILDER
-            .comment("Aura cost multiplier for Tier 2 glyphs")
-            .defineInRange("aura_tier2_multiplier", 1.5, 0.1, 10.0);
-
-        AURA_TIER3_MULTIPLIER = BUILDER
-            .comment("Aura cost multiplier for Tier 3 glyphs")
-            .defineInRange("aura_tier3_multiplier", 2.0, 0.1, 10.0);
-
-        AURA_MINIMUM_COST = BUILDER
-            .comment("Minimum aura cost for any spell")
-            .defineInRange("aura_minimum_cost", 10, 1, 10000);
-
-        SHOW_AURA_MESSAGES = BUILDER
-            .comment("Show aura cost messages in action bar when casting spells")
-            .define("show_aura_messages", true);
-
-        SHOW_AURA_HUD = BUILDER
-            .comment("Draw the Ars 'n' Spells aura HUD bar above the hotbar while wearing the Virtue Ring.",
-                     "Disable this if Sanctified Legacy / Covenant of the Seven provides its own aura HUD",
-                     "and you want to avoid stacked overlays.")
-            .define("show_aura_hud", true);
+        ARS_VIRTUE_AURA_MULTIPLIER = BUILDER
+            .comment("Multiplier applied to Ars Nouveau mana cost to derive the Covenant-aura cost.",
+                     "1.0 = aura cost equals mana cost. Tune up to make the Virtue Ring path more",
+                     "expensive than vanilla casting, or down to make it cheaper.")
+            .defineInRange("ars_virtue_aura_multiplier", 1.0, 0.1, 10.0);
 
         BUILDER.pop();
 
@@ -847,9 +779,8 @@ public class AnsConfig {
             .comment("LP cost discount when matching Blasphemy is equipped (0.85 = 85% discount, pay only 15%)")
             .defineInRange("blasphemy_lp_discount", 0.85, 0.0, 1.0);
 
-        BLASPHEMY_AURA_DISCOUNT = BUILDER
-            .comment("Aura cost discount when matching Blasphemy is equipped (0.85 = 85% discount, pay only 15%)")
-            .defineInRange("blasphemy_aura_discount", 0.85, 0.0, 1.0);
+        // Aura Blasphemy discount removed alongside the parallel aura subsystem.
+        // Covenant of the Seven applies its own Blasphemy-based aura discount natively.
 
         BUILDER.pop();
 

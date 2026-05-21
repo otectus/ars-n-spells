@@ -20,11 +20,12 @@ class PacketHandlerDirectionGuardsTest {
         String src = Files.readString(Paths.get(
             "src/main/java/com/otectus/arsnspells/network/PacketHandler.java"));
         // Count the number of S2C packet registrations that include the direction guard.
-        // 4 S2C packets (Resonance, Affinity, Cooldown, Aura) + 1 C2S (CrossCastRequest).
+        // 3 S2C packets remain (Resonance, Affinity, Cooldown) after AuraSyncPacket was
+        // deleted in the aura-subsystem refactor; CrossCastRequestPacket is the single C2S.
         // The direction marker is Optional.of(NetworkDirection.PLAY_TO_CLIENT).
         long s2cGuards = countOccurrences(src, "Optional.of(NetworkDirection.PLAY_TO_CLIENT)");
-        assertTrue(s2cGuards >= 4,
-            "All four S2C packets must register with NetworkDirection.PLAY_TO_CLIENT "
+        assertTrue(s2cGuards >= 3,
+            "All three remaining S2C packets must register with NetworkDirection.PLAY_TO_CLIENT "
                 + "(ANS-HIGH-013); found " + s2cGuards + " occurrences");
 
         // The single C2S packet keeps its PLAY_TO_SERVER guard.

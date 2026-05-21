@@ -1,8 +1,6 @@
 package com.otectus.arsnspells;
 
 import com.otectus.arsnspells.commands.ArsNSpellsCommands;
-import com.otectus.arsnspells.aura.AuraCapabilityProvider;
-import com.otectus.arsnspells.aura.IAuraCapability;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
@@ -99,7 +97,8 @@ public class ArsNSpells {
             MinecraftForge.EVENT_BUS.register(new RegenSynergyHandler());
             MinecraftForge.EVENT_BUS.register(new CrossCastIronsHandler());
             MinecraftForge.EVENT_BUS.register(new IronsLPHandler());
-            MinecraftForge.EVENT_BUS.register(new IronsAuraHandler());
+            // IronsAuraHandler deleted: Covenant of the Seven's own Iron's integration
+            // deducts aura natively for Iron's spells. We were double-paying.
         }
 
         MinecraftForge.EVENT_BUS.register(this);
@@ -108,7 +107,6 @@ public class ArsNSpells {
     private void registerCaps(RegisterCapabilitiesEvent event) {
         event.register(AffinityData.class);
         event.register(CooldownData.class);
-        event.register(IAuraCapability.class);
         event.register(ProgressionData.class);
     }
 
@@ -193,12 +191,11 @@ public class ArsNSpells {
             ok = false;
         }
 
-        // 2. Are IronsAuraHandler / IronsLPHandler registered on the EVENT_BUS?
+        // 2. Is IronsLPHandler registered on the EVENT_BUS?
         // We can't introspect the bus's listener list directly without API access,
         // so we just verify the classes were loaded (which happens lazily when
-        // ArsNSpells.<init> registered them).
-        report.append("| IronsAuraHandler=")
-            .append(canLoad("com.otectus.arsnspells.events.IronsAuraHandler") ? "OK" : "MISSING ");
+        // ArsNSpells.<init> registered them). IronsAuraHandler was deleted as part of
+        // the aura-subsystem cleanup — Covenant owns Iron's-spell aura now.
         report.append("| IronsLPHandler=")
             .append(canLoad("com.otectus.arsnspells.events.IronsLPHandler") ? "OK" : "MISSING ");
         report.append("| MixinIronsCastValidation=")

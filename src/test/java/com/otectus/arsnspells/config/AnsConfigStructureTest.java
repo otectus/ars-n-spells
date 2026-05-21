@@ -30,22 +30,36 @@ import static org.junit.jupiter.api.Assertions.fail;
 class AnsConfigStructureTest {
 
     @Test
-    void newIronsAuraRarityKeys_existAsStaticFields() {
-        String[] required = {
-            "IRONS_AURA_COMMON_MULTIPLIER",
-            "IRONS_AURA_UNCOMMON_MULTIPLIER",
-            "IRONS_AURA_RARE_MULTIPLIER",
-            "IRONS_AURA_EPIC_MULTIPLIER",
+    void parallelAuraConfigKeys_areRemoved() {
+        // Aura subsystem deletion: all 14 AURA_* keys + BLASPHEMY_AURA_DISCOUNT
+        // must be gone. Covenant of the Seven now owns aura state and HUD; we
+        // only keep ARS_VIRTUE_AURA_MULTIPLIER as the mana→aura cost knob.
+        String[] removed = {
+            "ENABLE_AURA_SYSTEM", "AURA_MAX_DEFAULT", "AURA_REGEN_RATE",
+            "AURA_BASE_MULTIPLIER", "AURA_TIER1_MULTIPLIER", "AURA_TIER2_MULTIPLIER",
+            "AURA_TIER3_MULTIPLIER", "AURA_MINIMUM_COST", "SHOW_AURA_MESSAGES",
+            "SHOW_AURA_HUD", "BLASPHEMY_AURA_DISCOUNT",
+            "IRONS_AURA_COMMON_MULTIPLIER", "IRONS_AURA_UNCOMMON_MULTIPLIER",
+            "IRONS_AURA_RARE_MULTIPLIER", "IRONS_AURA_EPIC_MULTIPLIER",
             "IRONS_AURA_LEGENDARY_MULTIPLIER",
         };
-        for (String name : required) {
+        for (String name : removed) {
             try {
-                Field f = AnsConfig.class.getDeclaredField(name);
-                assertNotNull(f, name + " field must exist");
-            } catch (NoSuchFieldException e) {
-                fail("AnsConfig is missing the required field " + name
-                    + " (ANS-HIGH-018 introduces the aura rarity multipliers)");
+                AnsConfig.class.getDeclaredField(name);
+                fail(name + " should have been removed during the aura-subsystem deletion");
+            } catch (NoSuchFieldException expected) {
+                // good — field is gone
             }
+        }
+    }
+
+    @Test
+    void arsVirtueAuraMultiplier_exists() {
+        try {
+            Field f = AnsConfig.class.getDeclaredField("ARS_VIRTUE_AURA_MULTIPLIER");
+            assertNotNull(f, "ARS_VIRTUE_AURA_MULTIPLIER must exist after the aura refactor");
+        } catch (NoSuchFieldException e) {
+            fail("AnsConfig.ARS_VIRTUE_AURA_MULTIPLIER must exist (replacement knob for the deleted aura system)");
         }
     }
 

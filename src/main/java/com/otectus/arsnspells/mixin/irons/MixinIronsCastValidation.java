@@ -75,14 +75,15 @@ public abstract class MixinIronsCastValidation {
         }
 
         // ----- 1. Ring bypass (highest priority) -----
+        // Virtue Ring bypass: Covenant of the Seven owns Iron's aura now — bypass Iron's
+        // own mana check so Covenant's own SpellPreCastEvent listener can take over.
         boolean wearsCursed = false;
         boolean wearsVirtue = false;
         try {
             if (SanctifiedLegacyCompat.isAvailable()) {
                 wearsCursed = AnsConfig.ENABLE_LP_SYSTEM.get()
                     && SanctifiedLegacyCompat.isWearingCursedRing(player);
-                wearsVirtue = AnsConfig.ENABLE_AURA_SYSTEM.get()
-                    && SanctifiedLegacyCompat.isWearingVirtueRing(player);
+                wearsVirtue = SanctifiedLegacyCompat.isWearingVirtueRing(player);
             }
         } catch (IllegalStateException configNotReady) {
             // Config not loaded yet (very early game tick) — fall through to no-ring behaviour.

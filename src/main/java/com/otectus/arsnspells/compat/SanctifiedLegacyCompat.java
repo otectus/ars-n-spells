@@ -97,6 +97,18 @@ public class SanctifiedLegacyCompat {
     private static java.lang.reflect.Method getCurrentEssenceMethod = null;
     private static java.lang.reflect.Method syphonMethod = null;
 
+    // --- Covenant aura bridge ---
+    // Path A (preferred): ModUtils.consumeAura / getCurrentAura if Covenant exposes them.
+    // Path B (fallback): use ModUtils.getVirtuousFraction(Player) × ModUtils.getMaxAura(Player).
+    // Path C (degraded): log ERROR at init; consume returns false (no payment), hasEnough
+    //                    returns true (don't block the cast). Visible in the green bar
+    //                    not moving when an Ars Nouveau spell is cast under the Virtue Ring.
+    private static java.lang.reflect.Method covenantConsumeAuraMethod = null;
+    private static java.lang.reflect.Method covenantGetCurrentAuraMethod = null;
+    private static java.lang.reflect.Method covenantGetMaxAuraMethod = null;
+    private static java.lang.reflect.Method covenantGetVirtuousFractionMethod = null;
+    private static boolean covenantAuraReflectionResolved = false;
+
     /**
      * LP Source modes for config.
      */
@@ -128,6 +140,10 @@ public class SanctifiedLegacyCompat {
 
             if (isBloodMagicLoaded) {
                 initBloodMagicReflection();
+            }
+
+            if (isLoaded) {
+                initCovenantAuraReflection();
             }
 
             // Warn if LP_SOURCE_MODE is BLOOD_MAGIC_ONLY but Blood Magic isn't installed
@@ -178,6 +194,150 @@ public class SanctifiedLegacyCompat {
      */
     public static boolean isBloodMagicAvailable() {
         return isBloodMagicLoaded && bloodMagicNetworkClass != null;
+    }
+
+    /**
+     * Resolve Covenant of the Seven's public aura API at startup. We name-probe
+     * several plausible method names so we survive small refactors on Covenant's
+     * side; missing methods leave the field null and the caller falls back to a
+     * lower-fidelity path.
+     *
+     * <p>The result is logged once so the user can tell which path resolved.
+     * "Degraded" (neither consume nor getCurrent resolved) means Virtue Ring
+     * casts will succeed but won't deduct aura — the green HUD won't move. Bring
+     * the log back if that happens.
+     */
+    private static void initCovenantAuraReflection() {
+        try {
+            Class<?> modUtils = Class.forName("net.llenzzz.covenant_of_the_seven.util.ModUtils");
+
+            covenantGetVirtuousFractionMethod = tryGetStatic(modUtils, "getVirtuousFraction", Player.class);
+            for (String name : new String[]{"consumeAura", "drainAura", "spendAura", "tryConsumeAura"}) {
+                covenantConsumeAuraMethod = tryGetStatic(modUtils, name, Player.class, int.class);
+                if (covenantConsumeAuraMethod != null) break;
+            }
+            for (String name : new String[]{"getCurrentAura", "getAura", "getStoredAura", "getVirtuousAmount"}) {
+                covenantGetCurrentAuraMethod = tryGetStatic(modUtils, name, Player.class);
+                if (covenantGetCurrentAuraMethod != null) break;
+            }
+            for (String name : new String[]{"getMaxAura", "getMaxStoredAura", "getMaxVirtuousAmount"}) {
+                covenantGetMaxAuraMethod = tryGetStatic(modUtils, name, Player.class);
+                if (covenantGetMaxAuraMethod != null) break;
+            }
+
+            covenantAuraReflectionResolved = true;
+            boolean haveConsume = covenantConsumeAuraMethod != null;
+            boolean haveGetCurrent = covenantGetCurrentAuraMethod != null;
+            boolean haveGetMax = covenantGetMaxAuraMethod != null;
+            boolean haveFraction = covenantGetVirtuousFractionMethod != null;
+            if (haveConsume && (haveGetCurrent || (haveFraction && haveGetMax))) {
+                LOGGER.info("  [OK] Covenant aura reflection initialized — consume={}, getCurrent={}, getMax={}, fraction={}",
+                    haveConsume, haveGetCurrent, haveGetMax, haveFraction);
+            } else {
+                LOGGER.error("  [DEGRADED] Covenant aura reflection partial — consume={}, getCurrent={}, getMax={}, fraction={}",
+                    haveConsume, haveGetCurrent, haveGetMax, haveFraction);
+                LOGGER.error("  [DEGRADED] Virtue Ring Ars casts will succeed but may NOT deduct aura — green bar won't move.");
+            }
+        } catch (Throwable t) {
+            covenantAuraReflectionResolved = false;
+            LOGGER.error("  [FAIL] Covenant aura reflection failed entirely — Virtue Ring Ars casts will skip aura payment", t);
+        }
+    }
+
+    /** Look up a static method by name + parameter types; return null on miss. */
+    private static java.lang.reflect.Method tryGetStatic(Class<?> owner, String name, Class<?>... params) {
+        try {
+            java.lang.reflect.Method m = owner.getMethod(name, params);
+            if (java.lang.reflect.Modifier.isStatic(m.getModifiers())) {
+                return m;
+            }
+            return null;
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Return true if the player has at least {@code cost} Covenant aura.
+     *
+     * <p>Degraded behaviour: when reflection didn't resolve, returns {@code true}
+     * so the cast isn't blocked on an internal failure of ours. The companion
+     * {@link #consumeCovenantAura(Player, int)} then returns false (no payment),
+     * which is visible because the green HUD doesn't move.
+     */
+    public static boolean hasEnoughCovenantAura(Player player, int cost) {
+        if (player == null || cost <= 0) return true;
+        if (!covenantAuraReflectionResolved) return true; // degraded: allow
+
+        try {
+            if (covenantGetCurrentAuraMethod != null) {
+                Object v = covenantGetCurrentAuraMethod.invoke(null, player);
+                if (v instanceof Number) {
+                    return ((Number) v).intValue() >= cost;
+                }
+            }
+            if (covenantGetVirtuousFractionMethod != null && covenantGetMaxAuraMethod != null) {
+                Object f = covenantGetVirtuousFractionMethod.invoke(null, player);
+                Object m = covenantGetMaxAuraMethod.invoke(null, player);
+                if (f instanceof Number && m instanceof Number) {
+                    double fraction = ((Number) f).doubleValue();
+                    int max = ((Number) m).intValue();
+                    return (int) (fraction * max) >= cost;
+                }
+            }
+        } catch (Throwable t) {
+            LOGGER.debug("hasEnoughCovenantAura reflection failed", t);
+        }
+        return true; // degraded: don't block on reflection bugs
+    }
+
+    /**
+     * Spend {@code cost} aura from the player's Covenant pool. Returns true on
+     * successful deduction; false if reflection didn't resolve or the call
+     * returned a "could not pay" signal.
+     */
+    public static boolean consumeCovenantAura(Player player, int cost) {
+        if (player == null || cost <= 0) return false;
+        if (!covenantAuraReflectionResolved || covenantConsumeAuraMethod == null) return false;
+        try {
+            Object result = covenantConsumeAuraMethod.invoke(null, player, cost);
+            if (result instanceof Boolean) {
+                return (Boolean) result;
+            }
+            if (result instanceof Number) {
+                return ((Number) result).intValue() >= cost;
+            }
+            // void return type: assume success
+            return true;
+        } catch (Throwable t) {
+            LOGGER.error("consumeCovenantAura reflection failed", t);
+            return false;
+        }
+    }
+
+    /**
+     * Read the player's current Covenant aura. Returns 0 if reflection didn't
+     * resolve a getCurrentAura method and the fallback (fraction × max) wasn't
+     * available either.
+     */
+    public static int getCovenantAura(Player player) {
+        if (player == null || !covenantAuraReflectionResolved) return 0;
+        try {
+            if (covenantGetCurrentAuraMethod != null) {
+                Object v = covenantGetCurrentAuraMethod.invoke(null, player);
+                if (v instanceof Number) return ((Number) v).intValue();
+            }
+            if (covenantGetVirtuousFractionMethod != null && covenantGetMaxAuraMethod != null) {
+                Object f = covenantGetVirtuousFractionMethod.invoke(null, player);
+                Object m = covenantGetMaxAuraMethod.invoke(null, player);
+                if (f instanceof Number && m instanceof Number) {
+                    return (int) (((Number) f).doubleValue() * ((Number) m).intValue());
+                }
+            }
+        } catch (Throwable t) {
+            LOGGER.debug("getCovenantAura reflection failed", t);
+        }
+        return 0;
     }
 
     /**
@@ -626,15 +786,10 @@ public class SanctifiedLegacyCompat {
             ? (1.0 - AnsConfig.BLASPHEMY_LP_DISCOUNT.get()) : 1.0;
     }
 
-    /**
-     * Get the Aura-specific Blasphemy multiplier using the configurable discount.
-     * @return (1.0 - discount) if matching Blasphemy equipped, 1.0 otherwise
-     */
-    public static double getBlasphemyAuraMultiplier(Player player, String schoolType) {
-        return hasMatchingBlasphemy(player, schoolType)
-            ? (1.0 - AnsConfig.BLASPHEMY_AURA_DISCOUNT.get()) : 1.0;
-    }
-    
+    // getBlasphemyAuraMultiplier removed alongside the parallel aura subsystem.
+    // Covenant of the Seven applies its own Blasphemy-based aura discount natively.
+
+
     // ========================================
     // MANA DISCOUNT SUPPORT (Ring of Virtue & Blasphemy)
     // ========================================

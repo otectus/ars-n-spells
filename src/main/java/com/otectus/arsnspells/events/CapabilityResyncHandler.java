@@ -25,10 +25,9 @@ import net.minecraftforge.fml.common.Mod;
  * transition until the next cast forced a per-event sync.
  *
  * <p>This handler subscribes to the three transition events and pushes a full
- * snapshot of every bridge-owned client-visible capability. {@link
- * com.otectus.arsnspells.aura.AuraCapabilityProvider} already covers Aura on
- * all three events (added in 1.10.0), so we deliberately skip Aura here to
- * avoid double-firing.
+ * snapshot of every bridge-owned client-visible capability. Aura is no longer
+ * tracked here — Covenant of the Seven owns the aura state and renders its
+ * own HUD as of the aura-subsystem deletion.
  *
  * <p>The existing {@code ResonanceEvents.onPlayerLogin} also computes and
  * sends resonance on login; this handler skips resonance on login for the
@@ -48,8 +47,7 @@ public final class CapabilityResyncHandler {
         syncAffinity(player);
         syncCooldowns(player);
         // Resonance login is handled by ResonanceEvents.onPlayerLogin (which
-        // also recomputes the value). Aura login is handled by
-        // AuraCapabilityProvider.onPlayerLoggedInEvent.
+        // also recomputes the value).
     }
 
     @SubscribeEvent
@@ -60,7 +58,6 @@ public final class CapabilityResyncHandler {
         syncAffinity(player);
         syncCooldowns(player);
         syncResonance(player);
-        // Aura respawn is handled by AuraCapabilityProvider.onPlayerClone.
     }
 
     @SubscribeEvent
@@ -71,7 +68,6 @@ public final class CapabilityResyncHandler {
         syncAffinity(player);
         syncCooldowns(player);
         syncResonance(player);
-        // Aura dimension is handled by AuraCapabilityProvider.onPlayerChangedDimension.
     }
 
     private static void syncAffinity(ServerPlayer player) {

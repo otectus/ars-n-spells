@@ -1,8 +1,6 @@
 package com.otectus.arsnspells.mixin.irons;
 
-import com.otectus.arsnspells.aura.AuraManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
-import com.otectus.arsnspells.compat.ScrollAuraTracker;
 import com.otectus.arsnspells.compat.ScrollLPTracker;
 import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
@@ -123,39 +121,9 @@ public class MixinScrollItem {
             }
         }
 
-        // --- Virtue Ring aura path (applies in `full` mode; skipped in `lp_only`/`free`) ---
-        if (SanctifiedLegacyCompat.isAvailable()
-                && AnsConfig.ENABLE_AURA_SYSTEM.get()
-                && SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
-            if ("free".equals(scrollMode) || "lp_only".equals(scrollMode)) {
-                // Modes that already make scrolls mana-free also waive aura.
-                return;
-            }
-            if (manaCost > 0) {
-                int auraCost = (int) Math.max(AnsConfig.AURA_MINIMUM_COST.get(),
-                    Math.round(manaCost * AnsConfig.AURA_BASE_MULTIPLIER.get()));
-
-                LOGGER.debug("Scroll aura validation: spell={}, level={}, auraCost={}",
-                    spell.getSpellId(), spellLevel, auraCost);
-
-                if (!AuraManager.hasEnoughAura(player, auraCost)) {
-                    LOGGER.warn("Insufficient aura for scroll - cancelling");
-                    cir.setReturnValue(InteractionResultHolder.fail(stack));
-                    if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
-                        int currentAura = AuraManager.getAura(player);
-                        player.displayClientMessage(
-                            Component.translatable("message.ars_n_spells.aura.insufficient", auraCost, currentAura)
-                                .withStyle(ChatFormatting.AQUA),
-                            true);
-                    }
-                    return;
-                }
-
-                ScrollAuraTracker.stage(player.getUUID(), auraCost);
-                // Scroll proceeds; aura commits at RETURN if Iron's accepts the use.
-                return;
-            }
-        }
+        // Virtue Ring aura path removed: Covenant of the Seven's own Iron's-spell
+        // integration deducts aura for scroll casts natively. We no longer intercept
+        // here — the previous double-payment bug went with the deletion.
 
         // --- Mana cost validation (based on scroll_cost_mode) ---
         if ("free".equals(scrollMode) || "lp_only".equals(scrollMode)) {
@@ -185,30 +153,8 @@ public class MixinScrollItem {
         InteractionResultHolder<ItemStack> result = cir.getReturnValue();
         boolean castSucceeded = result != null && result.getResult().consumesAction();
 
-        // Aura commit (Virtue Ring path) — process before LP because the two paths are
-        // mutually exclusive: a player wears one ring or the other, not both meaningfully.
-        ScrollAuraTracker.Entry pendingAura = ScrollAuraTracker.take(player.getUUID());
-        if (pendingAura != null) {
-            if (!castSucceeded) {
-                LOGGER.debug("Scroll cast did not consume action; skipping aura commit for {}",
-                    player.getName().getString());
-            } else if (!SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
-                LOGGER.debug("Virtue Ring removed mid-cast for {} — skipping aura commit",
-                    player.getName().getString());
-            } else {
-                boolean ok = AuraManager.consumeAura(player, pendingAura.auraCost);
-                if (!ok) {
-                    LOGGER.warn("Scroll aura commit failed for {} despite successful validation",
-                        player.getName().getString());
-                } else if (AnsConfig.SHOW_AURA_MESSAGES.get()) {
-                    int remaining = AuraManager.getAura(player);
-                    player.displayClientMessage(
-                        Component.translatable("message.ars_n_spells.aura.consumed",
-                            pendingAura.auraCost, remaining).withStyle(ChatFormatting.AQUA),
-                        true);
-                }
-            }
-        }
+        // Aura commit removed alongside the HEAD-side aura intercept — see the note
+        // above. Only the Cursed-Ring / LP commit path remains.
 
         ScrollLPTracker.Entry pending = ScrollLPTracker.take(player.getUUID());
         if (pending == null) {
