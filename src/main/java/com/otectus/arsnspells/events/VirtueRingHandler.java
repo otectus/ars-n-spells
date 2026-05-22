@@ -214,18 +214,15 @@ public class VirtueRingHandler {
 
         boolean success = SanctifiedLegacyCompat.consumeCovenantAura(player, pending.auraCost);
         if (!success) {
-            // Should be rare — the canCast pre-validation in MixinSpellResolverPreCast already
-            // gated this. Log and skip. Note: in "degraded mode" (Covenant reflection unresolved),
-            // consumeCovenantAura intentionally returns false; this is logged at startup, not here.
-            LOGGER.debug("Aura consumption failed at Post for {} (spell already cast, no payment made)",
-                player.getName().getString());
-
-            int currentAura = SanctifiedLegacyCompat.getCovenantAura(player);
-            player.displayClientMessage(
-                Component.translatable("message.ars_n_spells.aura.insufficient", pending.auraCost, currentAura)
-                    .withStyle(ChatFormatting.AQUA),
-                true
-            );
+            // Either ambient aura was genuinely insufficient OR Nature's Aura reflection
+            // failed to resolve at startup (degraded mode — already logged at boot). In
+            // both cases the spell has already cast and we don't surface a chat message
+            // because the bar IS the canonical visual cue: it either didn't move (no
+            // aura was deducted) or moved by less than requested (partial drain). A
+            // post-cast "Insufficient Aura" chat message would be misleading because
+            // the player CAN see the bar value and the spell DID succeed.
+            LOGGER.warn("Aura consumption returned false for {} (cost={}); bar will not reflect this cast",
+                player.getName().getString(), pending.auraCost);
             return;
         }
 

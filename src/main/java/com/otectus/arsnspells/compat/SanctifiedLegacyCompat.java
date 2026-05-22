@@ -118,6 +118,18 @@ public class SanctifiedLegacyCompat {
     private static java.lang.reflect.Method covenantGetVirtuousFractionMethod = null;
     private static boolean covenantAuraReflectionResolved = false;
 
+    // --- Nature's Aura bridge ---
+    // Covenant's "aura" is not a per-player resource — it's a sample of the world's
+    // ambient aura via IAuraChunk.triangulateAuraInArea(level, playerPos, 35). To
+    // deduct aura we must drain it from the surrounding chunks via the same public
+    // Nature's Aura API. drainAura at the highest-aura spot is the canonical pattern
+    // (Aura Cache, Sky Channeler, every Nature's Aura consumer item does this).
+    private static java.lang.reflect.Method auraChunkGetAuraChunkMethod = null;
+    private static java.lang.reflect.Method auraChunkGetHighestSpotMethod = null;
+    private static java.lang.reflect.Method auraChunkTriangulateMethod = null;
+    private static java.lang.reflect.Method auraChunkDrainAuraMethod = null;
+    private static boolean naturesAuraReflectionResolved = false;
+
     /**
      * LP Source modes for config.
      */
@@ -153,6 +165,7 @@ public class SanctifiedLegacyCompat {
 
             if (isLoaded) {
                 initCovenantAuraReflection();
+                initNaturesAuraReflection();
             }
 
             // Warn if LP_SOURCE_MODE is BLOOD_MAGIC_ONLY but Blood Magic isn't installed
@@ -288,6 +301,61 @@ public class SanctifiedLegacyCompat {
         }
     }
 
+    /** Look up an instance method by name + parameter types; return null on miss. */
+    private static java.lang.reflect.Method tryGetInstance(Class<?> owner, String name, Class<?>... params) {
+        try {
+            return owner.getMethod(name, params);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Resolve Nature's Aura's IAuraChunk API at startup. This is the actual write path
+     * for "consuming Covenant aura" — Covenant samples ambient aura via
+     * IAuraChunk.triangulateAuraInArea, so any drain on the surrounding chunks shows up
+     * in Covenant's bar on the next tick.
+     *
+     * <p>Required signatures (Nature's Aura 39.4, verified by javap):
+     * <pre>
+     *   public static IAuraChunk getAuraChunk(Level, BlockPos)
+     *   public static BlockPos getHighestSpot(Level, BlockPos, int radius, BlockPos defaultPos)
+     *   public static int triangulateAuraInArea(Level, BlockPos, int radius)
+     *   public abstract int drainAura(BlockPos, int amount)  // returns amount actually drained
+     * </pre>
+     */
+    private static void initNaturesAuraReflection() {
+        try {
+            Class<?> chunkCls = Class.forName("de.ellpeck.naturesaura.api.aura.chunk.IAuraChunk");
+            Class<?> levelCls = Class.forName("net.minecraft.world.level.Level");
+            Class<?> posCls = Class.forName("net.minecraft.core.BlockPos");
+
+            auraChunkGetAuraChunkMethod = tryGetStatic(chunkCls, "getAuraChunk", levelCls, posCls);
+            auraChunkGetHighestSpotMethod = tryGetStatic(chunkCls, "getHighestSpot", levelCls, posCls, int.class, posCls);
+            auraChunkTriangulateMethod = tryGetStatic(chunkCls, "triangulateAuraInArea", levelCls, posCls, int.class);
+            auraChunkDrainAuraMethod = tryGetInstance(chunkCls, "drainAura", posCls, int.class);
+
+            naturesAuraReflectionResolved = true;
+            boolean ok = auraChunkGetAuraChunkMethod != null
+                && auraChunkGetHighestSpotMethod != null
+                && auraChunkTriangulateMethod != null
+                && auraChunkDrainAuraMethod != null;
+            if (ok) {
+                LOGGER.info("  [OK] Nature's Aura reflection initialized — drain=true, triangulate=true, getHighestSpot=true, getAuraChunk=true");
+            } else {
+                LOGGER.error("  [DEGRADED] Nature's Aura reflection partial — drain={}, triangulate={}, getHighestSpot={}, getAuraChunk={}",
+                    auraChunkDrainAuraMethod != null,
+                    auraChunkTriangulateMethod != null,
+                    auraChunkGetHighestSpotMethod != null,
+                    auraChunkGetAuraChunkMethod != null);
+                LOGGER.error("  [DEGRADED] Ars-spell aura deduction will silently fail; the green HUD bar won't move on Ars casts.");
+            }
+        } catch (Throwable t) {
+            naturesAuraReflectionResolved = false;
+            LOGGER.error("  [FAIL] Nature's Aura reflection failed (class missing?) — Ars-spell aura deduction disabled", t);
+        }
+    }
+
     /**
      * Return true if the player has at least {@code cost} Covenant aura.
      *
@@ -298,12 +366,25 @@ public class SanctifiedLegacyCompat {
      */
     public static boolean hasEnoughCovenantAura(Player player, int cost) {
         if (player == null || cost <= 0) return true;
+        // Server-authoritative path first — IAuraChunk.triangulateAuraInArea returns
+        // the same number Covenant uses for the bar. Works on both single-player and
+        // dedicated servers (ClientResourceData isn't populated on dedicated).
+        try {
+            if (player instanceof net.minecraft.server.level.ServerPlayer
+                && naturesAuraReflectionResolved
+                && auraChunkTriangulateMethod != null) {
+                Object v = auraChunkTriangulateMethod.invoke(null,
+                    player.level(), player.blockPosition(), 35);
+                if (v instanceof Number) {
+                    return ((Number) v).intValue() >= cost;
+                }
+            }
+        } catch (Throwable t) {
+            LOGGER.debug("hasEnoughCovenantAura: triangulate failed", t);
+        }
         if (!covenantAuraReflectionResolved) return true; // degraded: allow
 
         try {
-            // Path 0 (preferred): ClientResourceData.getCurrentAura(). Player arg is unused
-            // — Covenant tracks current aura per-client, not per-Player. Works for the local
-            // player (the only one whose Covenant aura the client knows about).
             if (clientResourceDataGetCurrentAuraMethod != null) {
                 Object v = clientResourceDataGetCurrentAuraMethod.invoke(null);
                 if (v instanceof Number) {
@@ -332,27 +413,57 @@ public class SanctifiedLegacyCompat {
     }
 
     /**
-     * Spend {@code cost} aura from the player's Covenant pool. Returns true on
-     * successful deduction; false if reflection didn't resolve or the call
-     * returned a "could not pay" signal.
+     * Spend {@code cost} aura from the world around the player. Returns {@code true}
+     * iff a positive amount was actually drained.
+     *
+     * <p>Covenant has no per-player consume API because its aura value is just a
+     * sample of the ambient Nature's Aura level in the chunks around the player
+     * (radius 35, same as Covenant's {@code triangulateAuraInArea} call). To
+     * "consume aura" we drain it from the highest-aura spot in that area via
+     * Nature's Aura's public {@code IAuraChunk.drainAura}. Covenant's own
+     * {@code ResourceSyncEvents.getPlayerAuraChunk} will pick up the change on
+     * the next server tick and ship a fresh {@code CurrentAuraSyncPacket} to the
+     * client, which is what makes the HUD bar move.
+     *
+     * <p>This is the canonical Nature's Aura consume pattern used by every
+     * official aura sink in the ecosystem (Aura Cache, Sky Channeler, etc.).
+     *
+     * <p>Must be called on the logical server (we touch world state). The
+     * companion check {@code player instanceof ServerPlayer} short-circuits
+     * otherwise — calling from a non-server context returns false silently.
      */
     public static boolean consumeCovenantAura(Player player, int cost) {
         if (player == null || cost <= 0) return false;
-        if (!covenantAuraReflectionResolved || covenantConsumeAuraMethod == null) return false;
-        try {
-            Object result = covenantConsumeAuraMethod.invoke(null, player, cost);
-            if (result instanceof Boolean) {
-                return (Boolean) result;
-            }
-            if (result instanceof Number) {
-                return ((Number) result).intValue() >= cost;
-            }
-            // void return type: assume success
-            return true;
-        } catch (Throwable t) {
-            LOGGER.error("consumeCovenantAura reflection failed", t);
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer)) return false;
+        if (!naturesAuraReflectionResolved
+            || auraChunkGetAuraChunkMethod == null
+            || auraChunkGetHighestSpotMethod == null
+            || auraChunkDrainAuraMethod == null) {
             return false;
         }
+        try {
+            net.minecraft.world.level.Level level = player.level();
+            net.minecraft.core.BlockPos playerPos = player.blockPosition();
+            // 35 matches Covenant's triangulation radius — anywhere inside this area is
+            // guaranteed to affect the next ambient-aura sample.
+            Object highest = auraChunkGetHighestSpotMethod.invoke(null, level, playerPos, 35, playerPos);
+            if (!(highest instanceof net.minecraft.core.BlockPos)) return false;
+            net.minecraft.core.BlockPos spot = (net.minecraft.core.BlockPos) highest;
+            Object chunkObj = auraChunkGetAuraChunkMethod.invoke(null, level, spot);
+            if (chunkObj == null) return false;
+            Object drainedObj = auraChunkDrainAuraMethod.invoke(chunkObj, spot, cost);
+            if (drainedObj instanceof Number) {
+                int drained = ((Number) drainedObj).intValue();
+                if (drained > 0) {
+                    LOGGER.debug("Drained {} aura from chunk spot {} for {} (requested {})",
+                        drained, spot, player.getName().getString(), cost);
+                    return true;
+                }
+            }
+        } catch (Throwable t) {
+            LOGGER.error("consumeCovenantAura: IAuraChunk drain failed", t);
+        }
+        return false;
     }
 
     /**
@@ -361,11 +472,21 @@ public class SanctifiedLegacyCompat {
      * available either.
      */
     public static int getCovenantAura(Player player) {
-        if (!covenantAuraReflectionResolved) return 0;
         try {
-            // Path 0 (preferred): ClientResourceData.getCurrentAura(). Static, no Player
-            // arg — see the comment in hasEnoughCovenantAura. Returns the local-client
-            // aura value, which is exactly what we need for HUD/peak tracking.
+            // Server-authoritative path: ask Nature's Aura directly for the ambient aura
+            // around the player. This is exactly what Covenant samples in its server-tick
+            // sync handler, so it's the truth — and it works on dedicated servers where
+            // ClientResourceData is never populated.
+            if (player instanceof net.minecraft.server.level.ServerPlayer
+                && naturesAuraReflectionResolved
+                && auraChunkTriangulateMethod != null) {
+                Object v = auraChunkTriangulateMethod.invoke(null,
+                    player.level(), player.blockPosition(), 35);
+                if (v instanceof Number) return ((Number) v).intValue();
+            }
+            if (!covenantAuraReflectionResolved) return 0;
+            // Client-context path: ClientResourceData.getCurrentAura() — what Covenant's
+            // own HUD reads from. Player arg is unused (it's a per-client singleton).
             if (clientResourceDataGetCurrentAuraMethod != null) {
                 Object v = clientResourceDataGetCurrentAuraMethod.invoke(null);
                 if (v instanceof Number) return ((Number) v).intValue();
