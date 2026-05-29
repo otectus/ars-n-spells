@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2026-05-29
+
+### Mana unification mode is changeable in-game again
+
+2.0.0 left the mana mode effectively unchangeable: the in-game config screen's "Mana Mode" row was a dead stub (getter `() -> true`, setter `value -> {}`, with a never-implemented `// Mode cycling handled separately` note), `/ans mode` only *printed* the mode, and `MANA_UNIFICATION_MODE.set(...)` was called nowhere. The only path left was hand-editing a TOML — and the docs pointed at the wrong file (see below). 2.0.1 restores a working path, applied **live** (no restart).
+
+- **The config screen "Mana Mode" row now cycles.** [ConfigScreenFactory.java](src/main/java/com/otectus/arsnspells/config/ConfigScreenFactory.java) gains a non-boolean "cycling" `ConfigOption` variant; clicking the Mana Mode row advances `mana_unification_mode` through `iss_primary → ars_primary → hybrid → separate → disabled` and writes it via `AnsConfig.MANA_UNIFICATION_MODE.set`. Gated to singleplayer by the existing `canMutate` (`hasSingleplayerServer()`) check — read-only behavior on dedicated servers is unchanged.
+- **New op command `/ans mode set <mode>`.** [ArsNSpellsCommands.java](src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java) — permission level 2, tab-completes the five mode names, strictly validates input (a typo is reported, not silently coerced to ISS the way `ManaUnificationMode.fromString` would), persists, and echoes the requested *and* now-active mode. `/ans mode` (display only) is unchanged.
+- **Changes apply live.** New [`BridgeManager.refreshMode()`](src/main/java/com/otectus/arsnspells/bridge/BridgeManager.java) re-reads the configured mode and re-selects the active/secondary bridges at runtime; the command calls it directly (server thread) and the config screen marshals it onto the integrated server. The three bridge-state fields are now `volatile`. **Caveat:** on a dedicated server a mid-session change applies to server-side gameplay immediately, but a connected client's HUD may reflect the new mode only after reconnecting.
+- **Test seam.** New package-private `BridgeManager.testSetMode(...)` — the seam the 2.0.1 `CrossCastCostResolverTest` roadmap item called for — sets the cached mode without constructing bridges, keeping unit tests bootstrap-free.
+
+### Config file location (documenting the 2.0.0 COMMON → SERVER move)
+
+2.0.0 switched the config to `ModConfig.Type.SERVER` ([ArsNSpells.java](src/main/java/com/otectus/arsnspells/ArsNSpells.java), `ANS-HIGH-016`) but deferred documenting it to this release. The live config file is now **per-world**:
+
+- `<world>/serverconfig/ars_n_spells-server.toml` — singleplayer: `.minecraft/saves/<World>/serverconfig/`; dedicated server: `<server>/world/serverconfig/`.
+- The old global `config/ars_n_spells-common.toml` is **ignored**. Settings made there before upgrading do not carry over — re-apply them in the new per-world file (or via the config screen / `/ans` commands). This is the most common cause of a mana mode that appears "stuck."
+
+### Documentation
+
+- Corrected the stale `config/ars_n_spells-common.toml` path in [README.md](README.md), [CURSEFORGE_DESCRIPTION.md](CURSEFORGE_DESCRIPTION.md), and [TESTING_GUIDE.md](TESTING_GUIDE.md) to the per-world server-config path.
+- Added a "Changing the mode" note to the README mana-unification section (in-game screen / `/ans mode set` / direct file edit; applies live).
+- Fixed the stale README title version (`v1.9.0` → `v2.0.1`).
+
 ## [2.0.0] - 2026-05-14
 
 ### Audit-driven major release
@@ -48,8 +72,6 @@ All notable changes to this project will be documented in this file.
 - **Save format unchanged.** AffinityData, ProgressionData, CooldownData, AuraCapability, and `arsnspells:cross_spells` NBT shapes all preserved. Inscribed items from 1.8.9+ load and cast unchanged at 2.0.0.
 - **Mod config unchanged.** No keys added, removed, or renamed. The `mana_mode=disabled` semantics change is documented above.
 - **Mixin injection points unchanged.** All Ars `SpellResolver` injects keep their `@At` targets and method signatures. Mixin-compatible with Ars 4.12.7+; no Iron's-side mixin changes.
-
-## [1.10.0] - 2026-05-12
 
 ### Ring of Virtues and Ring of Curses — correctness pass
 

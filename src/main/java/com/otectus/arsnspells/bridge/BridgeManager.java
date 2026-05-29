@@ -15,9 +15,11 @@ import org.slf4j.LoggerFactory;
  */
 public class BridgeManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(BridgeManager.class);
-    private static IManaBridge activeBridge;
-    private static IManaBridge secondaryBridge; // For hybrid/separate modes
-    private static ManaUnificationMode currentMode;
+    // ANS 2.0.1: volatile — refreshMode() can re-assign these at runtime (server
+    // thread) while the client render thread reads them for HUD mode checks.
+    private static volatile IManaBridge activeBridge;
+    private static volatile IManaBridge secondaryBridge; // For hybrid/separate modes
+    private static volatile ManaUnificationMode currentMode;
     private static boolean isIronsLoaded = false;
 
     public static void init(FMLCommonSetupEvent event) {
@@ -34,6 +36,38 @@ public class BridgeManager {
             // Log initialization
             logInitialization();
         });
+    }
+
+    /**
+     * Re-read the configured mana mode and re-select bridges at runtime.
+     *
+     * <p>ANS 2.0.1: lets {@code /ans mode set} and the in-game config screen apply a
+     * mode change live instead of requiring a restart. Bridges are stateless (see the
+     * singleton {@link #FALLBACK_BRIDGE}), so re-running {@link #initializeBridges()}
+     * is safe. {@code synchronized} serialises concurrent refreshes; the volatile
+     * fields give readers a consistent latest reference. Callers must persist the
+     * config value ({@code AnsConfig.MANA_UNIFICATION_MODE.set} + {@code safeSave})
+     * first, and invoke this on the server thread (command handlers already are; the
+     * config screen marshals via the integrated server executor).
+     */
+    public static synchronized void refreshMode() {
+        currentMode = AnsConfig.getManaMode();
+        initializeBridges();
+        logInitialization();
+    }
+
+    /**
+     * Test-only seam: set the cached mode without constructing bridges.
+     *
+     * <p>Bridge construction ({@link IronsBridge}/{@link ArsNativeBridge}) touches mod
+     * APIs that are absent from the unit-test classpath, so tests cannot call
+     * {@link #refreshMode()}. This sets only the cached enum, which is enough to drive
+     * the mode-read branches ({@link #getCurrentMode}, {@link #usesSharedPool},
+     * {@link #usesDualCost}, {@link #getManaForMode}). Also the seam the 2.0.1
+     * CrossCastCostResolverTest roadmap item depends on.
+     */
+    static void testSetMode(ManaUnificationMode mode) {
+        currentMode = mode;
     }
 
     /**

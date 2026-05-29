@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v1.9.0)
+# Ars 'n' Spells (v2.0.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -28,6 +28,8 @@ Five modes are available via the `mana_unification_mode` config:
 | `hybrid` | Shared bidirectional pool. A config option (`hybrid_mana_bar`) controls which HUD bar is displayed. |
 | `separate` | Independent pools. Cross-mod casts split costs between both pools. |
 | `disabled` | No mana integration; each mod uses its own pool. |
+
+**Changing the mode:** in singleplayer, open Mods → Ars 'n' Spells → Config and click the **Mana Mode** row to cycle it (applies on *Done*). Server operators can run `/ans mode set <mode>`. Either path — or editing the config file directly — takes effect **without a restart** as of 2.0.1. Confirm the active mode with `/ans mode`.
 
 Conversion rates (`conversion_rate_ars_to_iron`, `conversion_rate_iron_to_ars`) and dual-cost percentages are configurable.
 
@@ -133,7 +135,7 @@ Iron's Spellbooks scrolls now respect resource costs. The `scroll_cost_mode` con
 
 ## Configuration
 
-Config file: `config/ars_n_spells-common.toml`
+Config file (per-world, server-authoritative): `<world>/serverconfig/ars_n_spells-server.toml` — singleplayer: `.minecraft/saves/<World>/serverconfig/`; dedicated server: `<server>/world/serverconfig/`. (Changed from `config/ars_n_spells-common.toml` in 2.0.0 when the config became `ModConfig.Type.SERVER`; the old global file is ignored.)
 
 ### Master toggles
 

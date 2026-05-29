@@ -1,6 +1,7 @@
 package com.otectus.arsnspells.config;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.otectus.arsnspells.bridge.BridgeManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -37,6 +38,10 @@ public class ConfigScreenFactory {
         private final Screen parent;
         private final List<ConfigOption> options = new ArrayList<>();
         private int scrollOffset = 0;
+        // ANS 2.0.1: true only in singleplayer (integrated server). Gates the new
+        // Mana Mode cycle row and the Save/Reset buttons — SERVER-config writes from a
+        // client mirror are no-ops on a dedicated server.
+        private boolean canMutate = false;
         
         protected ArsNSpellsConfigScreen(Screen parent) {
             super(Component.literal("Ars 'n' Spells Configuration"));
@@ -62,7 +67,7 @@ public class ConfigScreenFactory {
             // screen would be silent no-ops. Disable Save/Reset when not in singleplayer so
             // the user is not misled. Operators on dedicated servers should edit the
             // server-side toml directly or use the /ans command.
-            boolean canMutate = minecraft != null && minecraft.hasSingleplayerServer();
+            canMutate = minecraft != null && minecraft.hasSingleplayerServer();
 
             // Add Done button (always present; in multiplayer it's read-only "Close")
             this.addRenderableWidget(Button.builder(
@@ -128,11 +133,13 @@ public class ConfigScreenFactory {
         }
         
         private void addManaSettings() {
+            // ANS 2.0.1: a real cycling row (was a dead stub: getter () -> true, setter
+            // value -> {}). Click advances mana_unification_mode; saveConfig() applies it live.
             options.add(new ConfigOption(
                 "Mana Mode",
-                "Current: " + AnsConfig.MANA_UNIFICATION_MODE.get(),
-                () -> true,
-                value -> {} // Mode cycling handled separately
+                "Click to cycle the mana unification mode",
+                () -> AnsConfig.MANA_UNIFICATION_MODE.get(),
+                this::cycleManaMode
             ));
             
             options.add(new ConfigOption(
@@ -149,7 +156,22 @@ public class ConfigScreenFactory {
                 value -> AnsConfig.respectEnchantments.set(value)
             ));
         }
-        
+
+        /** Advance mana_unification_mode to the next value in enum order (wraps). */
+        private void cycleManaMode() {
+            String current = AnsConfig.MANA_UNIFICATION_MODE.get();
+            ManaUnificationMode[] modes = ManaUnificationMode.values();
+            int idx = 0;
+            for (int i = 0; i < modes.length; i++) {
+                if (modes[i].getConfigName().equalsIgnoreCase(current)) {
+                    idx = i;
+                    break;
+                }
+            }
+            String next = modes[(idx + 1) % modes.length].getConfigName();
+            AnsConfig.MANA_UNIFICATION_MODE.set(next);
+        }
+
         private void addSystemSettings() {
             options.add(new ConfigOption(
                 "Debug Mode",
@@ -184,10 +206,19 @@ public class ConfigScreenFactory {
                 // Draw option description
                 graphics.drawString(this.font, option.description, x, y + 12, 0x888888);
                 
-                // Draw toggle button
-                String buttonText = option.getValue() ? "ON" : "OFF";
-                int buttonColor = option.getValue() ? 0x00FF00 : 0xFF0000;
-                
+                // Draw the control: cycling rows (e.g. Mana Mode) show their current
+                // value; boolean rows show ON/OFF. A cycling row greys out when it
+                // cannot be mutated (multiplayer).
+                String buttonText;
+                int buttonColor;
+                if (option.isCycle()) {
+                    buttonText = option.displaySupplier.get();
+                    buttonColor = canMutate ? 0xFFFFFF : 0x888888;
+                } else {
+                    buttonText = option.getValue() ? "ON" : "OFF";
+                    buttonColor = option.getValue() ? 0x00FF00 : 0xFF0000;
+                }
+
                 graphics.drawString(this.font, buttonText, x + 280, y + 5, buttonColor);
                 
                 y += 35;
@@ -203,14 +234,21 @@ public class ConfigScreenFactory {
             
             for (int i = scrollOffset; i < options.size() && y < this.height - 50; i++) {
                 ConfigOption option = options.get(i);
-                
-                // Check if click is on toggle button area
-                if (mouseX >= x + 270 && mouseX <= x + 310 && 
+
+                // Cycling rows render wider text (a mode name), so give them a wider hit-box.
+                int rightEdge = option.isCycle() ? x + 380 : x + 310;
+                if (mouseX >= x + 270 && mouseX <= rightEdge &&
                     mouseY >= y && mouseY <= y + 20) {
-                    option.toggle();
+                    if (option.isCycle()) {
+                        if (canMutate) {
+                            option.onCycle.run();
+                        }
+                    } else {
+                        option.toggle();
+                    }
                     return true;
                 }
-                
+
                 y += 35;
             }
             
@@ -226,7 +264,14 @@ public class ConfigScreenFactory {
         private void saveConfig() {
             // Use safe save method with retry logic
             boolean success = AnsConfig.safeSave();
-            
+
+            // ANS 2.0.1: apply config changes (notably a Mana Mode cycle) live. This
+            // screen runs on the render thread; BridgeManager.refreshMode() mutates
+            // state the server thread reads, so marshal it onto the integrated server.
+            if (minecraft != null && minecraft.getSingleplayerServer() != null) {
+                minecraft.getSingleplayerServer().execute(BridgeManager::refreshMode);
+            }
+
             // Show message to player
             if (minecraft != null && minecraft.player != null) {
                 if (success) {
@@ -272,20 +317,43 @@ public class ConfigScreenFactory {
         final String description;
         final java.util.function.Supplier<Boolean> getter;
         final java.util.function.Consumer<Boolean> setter;
-        
-        ConfigOption(String name, String description, 
+        // ANS 2.0.1: a "cycle" row (e.g. Mana Mode) renders a string value and advances
+        // it on click instead of toggling ON/OFF. Both are null for boolean rows.
+        final java.util.function.Supplier<String> displaySupplier;
+        final Runnable onCycle;
+
+        /** Boolean toggle row. */
+        ConfigOption(String name, String description,
                     java.util.function.Supplier<Boolean> getter,
                     java.util.function.Consumer<Boolean> setter) {
             this.name = name;
             this.description = description;
             this.getter = getter;
             this.setter = setter;
+            this.displaySupplier = null;
+            this.onCycle = null;
         }
-        
+
+        /** Cycling row: {@code displaySupplier} provides the current value text, {@code onCycle} advances it. */
+        ConfigOption(String name, String description,
+                    java.util.function.Supplier<String> displaySupplier,
+                    Runnable onCycle) {
+            this.name = name;
+            this.description = description;
+            this.getter = null;
+            this.setter = null;
+            this.displaySupplier = displaySupplier;
+            this.onCycle = onCycle;
+        }
+
+        boolean isCycle() {
+            return onCycle != null;
+        }
+
         boolean getValue() {
             return getter.get();
         }
-        
+
         void toggle() {
             setter.accept(!getValue());
         }

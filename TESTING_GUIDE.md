@@ -18,11 +18,11 @@ For an at-a-glance description of features and configuration, start with the
 | Covenant of the Seven (Sanctified Legacy) | Any | Cursed/Virtue Ring tests |
 | Blood Magic | Any | LP source `BLOOD_MAGIC_*` tests |
 
-Drop `build/libs/ars_n_spells-2.0.0.jar` into the instance's `mods/` folder
+Drop `build/libs/ars_n_spells-2.0.1.jar` into the instance's `mods/` folder
 alongside the dependencies. **2.0.0 introduces a new C2S packet ID; clients
 and servers must run matching versions.**
 
-To enable verbose log output during testing, set in `config/ars_n_spells-common.toml`:
+To enable verbose log output during testing, set in `<world>/serverconfig/ars_n_spells-server.toml`:
 
 ```toml
 debug_mode = true
@@ -74,7 +74,7 @@ correlation across sides is one grep.
 ### Quick smoke test (5 minutes)
 
 1. Boot dedicated server with Ars + Iron's + this jar.
-2. `config/ars_n_spells-common.toml`: `debug_mode = true`.
+2. `<world>/serverconfig/ars_n_spells-server.toml`: `debug_mode = true`.
 3. Inscribe one Iron's `fireball` onto an Ars novice spellbook (or any neutral
    stack) via the Spell Transcription ritual.
 4. Hold the inscribed item, right-click. Confirm:
@@ -324,7 +324,7 @@ re-inscribed cleanly.
 Include in the bug report:
 1. Mod versions (Ars Nouveau, Iron's Spellbooks, Sanctified Legacy / Covenant
    of the Seven, Blood Magic if installed) and Forge version.
-2. The relevant `config/ars_n_spells-common.toml` keys.
+2. The relevant `<world>/serverconfig/ars_n_spells-server.toml` keys.
 3. `logs/latest.log` excerpts. With `debug_mode = true` enabled, look for log
    lines prefixed `[Cooldown]`, `[CurioDiscount]`, `[Affinity]`, or messages
    from `MixinScrollItem`, `IronsLPHandler`, `LPDeathPrevention`.

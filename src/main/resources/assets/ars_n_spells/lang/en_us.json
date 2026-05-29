@@ -39,6 +39,8 @@
   "commands.ans.info.cursed_ring": "Cursed Ring: %s",
   "commands.ans.info.virtue_ring": "Virtue Ring: %s",
   "commands.ans.mode.current": "Current mana unification mode: %s",
+  "commands.ans.mode.set.success": "Mana unification mode set to %s (now active: %s)",
+  "commands.ans.mode.set.invalid": "Unknown mode '%s'. Valid: iss_primary, ars_primary, hybrid, separate, disabled",
 
   "message.ars_n_spells.lp.consumed": "Consumed %s LP",
   "message.ars_n_spells.lp.insufficient": "Insufficient LP - Spell Cancelled",

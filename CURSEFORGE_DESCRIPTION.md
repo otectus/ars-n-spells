@@ -144,7 +144,7 @@ Iron's Spellbooks scrolls now respect your resource costs:
 
 ## Configuration
 
-Everything is configurable via `config/ars_n_spells-common.toml`. Major options include:
+Everything is configurable via the per-world server config `<world>/serverconfig/ars_n_spells-server.toml` (changed from `config/ars_n_spells-common.toml` in 2.0.0). Major options include:
 
 - **Master toggles** for mana unification, resonance, cooldowns, progression, and affinity
 - **Mana conversion rates** and dual-cost split percentages

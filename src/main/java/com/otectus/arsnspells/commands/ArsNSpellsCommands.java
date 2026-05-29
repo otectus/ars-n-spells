@@ -2,6 +2,7 @@ package com.otectus.arsnspells.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
 import com.otectus.arsnspells.bridge.BridgeManager;
@@ -11,6 +12,7 @@ import com.otectus.arsnspells.config.ManaUnificationMode;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,6 +26,18 @@ import org.slf4j.LoggerFactory;
  */
 public class ArsNSpellsCommands {
     private static final Logger LOGGER = LoggerFactory.getLogger(ArsNSpellsCommands.class);
+
+    /** Lowercase config names of every mana mode — drives {@code /ans mode set} tab-completion and validation. */
+    private static final String[] MODE_NAMES = buildModeNames();
+
+    private static String[] buildModeNames() {
+        ManaUnificationMode[] modes = ManaUnificationMode.values();
+        String[] names = new String[modes.length];
+        for (int i = 0; i < modes.length; i++) {
+            names[i] = modes[i].getConfigName();
+        }
+        return names;
+    }
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
@@ -54,6 +68,13 @@ public class ArsNSpellsCommands {
                 )
                 .then(Commands.literal("mode")
                     .executes(ArsNSpellsCommands::showMode)
+                    .then(Commands.literal("set")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("mode", StringArgumentType.word())
+                            .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(MODE_NAMES, builder))
+                            .executes(ArsNSpellsCommands::setMode)
+                        )
+                    )
                 )
                 .then(Commands.literal("aura")
                     .executes(ArsNSpellsCommands::showOwnAura)
@@ -205,6 +226,46 @@ public class ArsNSpellsCommands {
                 .withStyle(ChatFormatting.YELLOW),
             false
         );
+        return 1;
+    }
+
+    private static int setMode(CommandContext<CommandSourceStack> context) {
+        String requested = StringArgumentType.getString(context, "mode");
+
+        // Strict match against the known config names. Unlike ManaUnificationMode.fromString,
+        // we do NOT silently fall back to ISS_PRIMARY — a typo must be reported so the op
+        // knows the mode did not change.
+        ManaUnificationMode parsed = null;
+        for (ManaUnificationMode mode : ManaUnificationMode.values()) {
+            if (mode.getConfigName().equalsIgnoreCase(requested)) {
+                parsed = mode;
+                break;
+            }
+        }
+        if (parsed == null) {
+            context.getSource().sendFailure(
+                Component.translatable("commands.ans.mode.set.invalid", requested)
+            );
+            return 0;
+        }
+
+        AnsConfig.MANA_UNIFICATION_MODE.set(parsed.getConfigName());
+        AnsConfig.safeSave();
+        // Apply live: re-read the config and re-select bridges (server thread — command
+        // handlers run there). refreshMode() may downgrade the effective mode when a
+        // mode needs Iron's and it is absent (e.g. ISS_PRIMARY -> ARS_PRIMARY), so we
+        // echo both the requested and the now-active mode.
+        BridgeManager.refreshMode();
+
+        final String requestedName = parsed.getConfigName();
+        final String effectiveName = BridgeManager.getCurrentMode().getConfigName();
+        context.getSource().sendSuccess(
+            () -> Component.translatable("commands.ans.mode.set.success", requestedName, effectiveName)
+                .withStyle(ChatFormatting.GREEN),
+            true
+        );
+        LOGGER.info("Mana unification mode set to {} (effective {}) by {}",
+            requestedName, effectiveName, context.getSource().getTextName());
         return 1;
     }
 }
