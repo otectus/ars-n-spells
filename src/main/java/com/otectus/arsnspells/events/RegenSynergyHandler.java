@@ -3,80 +3,130 @@ package com.otectus.arsnspells.events;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.bridge.IManaBridge;
-import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.config.ManaUnificationMode;
-import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Cross-system mana regen synergy. In ISS_PRIMARY and HYBRID modes the Ars
- * native regen tick is suppressed by {@code MixinManaCapability}; without
- * this handler, any Ars-side regen sources (mana_regen potion, source-jar
- * proximity, etc.) would never reach Iron's pool. Once per second this
- * handler reads Ars's regen rate (via {@link ManaRegenBridge}'s
- * Iron's-to-Ars helpers, inverted) and adds it to Iron's MagicData.
+ * Source Jar proximity regen. Standing within a fixed 9×3×9 box of an Ars
+ * Nouveau Source Jar feeds the unified mana pool once per second; the boost is
+ * {@code CONVERSION_RATE_ARS_TO_IRON × SOURCE_JAR_SYNERGY_MULTIPLIER} routed
+ * through {@link BridgeManager#getBridge()} so it lands in whichever pool the
+ * active mode owns.
  *
- * <p>The math itself lives in {@link ManaRegenBridge}. This handler is
- * just the periodic dispatcher.
+ * <p>The scan is the hot path, so results are cached per player and only
+ * re-scanned when the player moves past {@code SOURCE_JAR_CACHE_MOVE_THRESHOLD}
+ * blocks or changes dimension; the cache is evicted on logout / dimension change.
+ *
+ * <p>This restores the Forge 1.20.1 behaviour. The pre-parity NeoForge port had
+ * mistakenly rewired this handler to re-feed Iron's own {@code MANA_REGEN}
+ * attribute back into the pool every second (a double-feed on top of Iron's
+ * native regen tick) and dropped the Source-Jar feature entirely.
+ *
+ * <p>Holds no Iron's imports — it gates on {@link IronsCompat#isLoaded()} to
+ * match the canonical "synergy only in Iron's setups" scope, but is otherwise
+ * dedicated-server safe.
  */
 @EventBusSubscriber(modid = ArsNSpells.MODID)
 public final class RegenSynergyHandler {
 
+    private static final Map<UUID, SourceJarCache> sourceJarCacheMap = new ConcurrentHashMap<>();
+
     private RegenSynergyHandler() {}
 
     @SubscribeEvent
-    public static void onPlayerTickPost(net.neoforged.neoforge.event.tick.PlayerTickEvent.Post event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
-            return;
-        }
+    public static void onPlayerTickPost(PlayerTickEvent.Post event) {
         if (!IronsCompat.isLoaded()) {
             return;
         }
-        if (!BridgeManager.isUnificationEnabled()) {
+        if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
             return;
         }
-        ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        if (mode != ManaUnificationMode.ISS_PRIMARY && mode != ManaUnificationMode.HYBRID) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
-        // Once-per-second cadence — matches Ars's native regen tick.
         if (player.tickCount % 20 != 0) {
             return;
         }
 
-        // Ars regen comes from its ManaRegenCalcEvent path; reading it externally
-        // would require firing the event ourselves. Instead, sample Iron's
-        // MANA_REGEN attribute and convert the Iron's-side gear regen to an
-        // absolute mana/sec figure, then add it to the Iron's pool. Net effect:
-        // Iron's keeps its native regen AND picks up any cross-fed Ars-side
-        // bonuses that were routed into MANA_REGEN by EquipmentIntegration.
-        double ironsRegenAttr;
-        try {
-            ironsRegenAttr = player.getAttributeValue(AttributeRegistry.MANA_REGEN);
-        } catch (Throwable t) {
-            return;
+        Level level = player.level();
+        BlockPos pos = player.blockPosition();
+        UUID playerId = player.getUUID();
+
+        SourceJarCache cached = sourceJarCacheMap.get(playerId);
+        double threshold = AnsConfig.SOURCE_JAR_CACHE_MOVE_THRESHOLD.get();
+        double thresholdSq = threshold * threshold;
+
+        boolean needsScan = cached == null
+            || !cached.dimension.equals(level.dimension())
+            || pos.distSqr(cached.scanPosition) > thresholdSq;
+
+        boolean nearSource;
+        if (needsScan) {
+            nearSource = scanForSourceJar(level, pos);
+            sourceJarCacheMap.put(playerId, new SourceJarCache(pos, nearSource, level.dimension()));
+        } else {
+            nearSource = cached.nearSource;
         }
-        if (ironsRegenAttr <= 0.0) {
-            return;
+
+        if (nearSource) {
+            try {
+                float boost = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get().floatValue()
+                    * AnsConfig.SOURCE_JAR_SYNERGY_MULTIPLIER.get().floatValue();
+                IManaBridge bridge = BridgeManager.getBridge();
+                float current = bridge.getMana(player);
+                float max = bridge.getMaxMana(player);
+                bridge.setMana(player, Math.min(current + boost, max));
+            } catch (Exception ignored) {
+                // Bridge API unavailable — skip this tick.
+            }
         }
-        double synergyMul = AnsConfig.CROSS_SYSTEM_REGEN_MULTIPLIER.get();
-        if (synergyMul <= 0.0) {
-            return;
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        sourceJarCacheMap.remove(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onPlayerChangeDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        sourceJarCacheMap.remove(event.getEntity().getUUID());
+    }
+
+    private static boolean scanForSourceJar(Level level, BlockPos pos) {
+        for (BlockPos checkPos : BlockPos.betweenClosed(pos.offset(-4, -1, -4), pos.offset(4, 2, 4))) {
+            Block block = level.getBlockState(checkPos).getBlock();
+            ResourceLocation blockKey = BuiltInRegistries.BLOCK.getKey(block);
+            if (blockKey != null && blockKey.getPath().contains("source_jar")) {
+                return true;
+            }
         }
-        double absRegenPerSec = ManaRegenBridge.ironsToArsRegen(ironsRegenAttr,
-            ManaRegenBridge.getCurrentIronsMaxMana(player));
-        float add = (float) (absRegenPerSec * synergyMul);
-        if (add <= 0.0f) {
-            return;
+        return false;
+    }
+
+    private static final class SourceJarCache {
+        final BlockPos scanPosition;
+        final boolean nearSource;
+        final ResourceKey<Level> dimension;
+
+        SourceJarCache(BlockPos scanPosition, boolean nearSource, ResourceKey<Level> dimension) {
+            this.scanPosition = scanPosition.immutable();
+            this.nearSource = nearSource;
+            this.dimension = dimension;
         }
-        IManaBridge bridge = BridgeManager.getBridge();
-        if (bridge == null) {
-            return;
-        }
-        bridge.setMana(player, Math.min(bridge.getMaxMana(player), bridge.getMana(player) + add));
     }
 }

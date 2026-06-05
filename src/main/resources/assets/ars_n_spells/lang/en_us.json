@@ -36,6 +36,17 @@
   "commands.ans.info.mana": "Mana: %s / %s",
   "commands.ans.info.resonance": "Resonance: %s",
   "commands.ans.mode.current": "Current mana unification mode: %s",
+  "commands.ans.mode.set.success": "Mana unification mode set to %s (now active: %s)",
+  "commands.ans.mode.set.invalid": "Unknown mode '%s'. Valid: iss_primary, ars_primary, hybrid, separate, disabled",
 
-  "message.ars_n_spells.mana.insufficient": "Not Enough Mana: Need %s, have %s"
+  "message.ars_n_spells.mana.insufficient": "Not Enough Mana: Need %s, have %s",
+
+  "message.ars_n_spells.crosscast.invalid.index": "Cross-cast: the selected spell is out of range.",
+  "message.ars_n_spells.crosscast.invalid.empty": "Cross-cast: this item has no inscribed spell.",
+  "message.ars_n_spells.crosscast.invalid.type": "Cross-cast: unknown spell type on this inscription.",
+  "message.ars_n_spells.crosscast.invalid.ars_missing": "Cross-cast: the Ars Nouveau spell data is missing.",
+  "message.ars_n_spells.crosscast.invalid.ars_empty": "Cross-cast: the inscribed Ars Nouveau spell is empty.",
+  "message.ars_n_spells.crosscast.invalid.iron_id": "Cross-cast: the inscribed spell id is invalid.",
+  "message.ars_n_spells.crosscast.invalid.iron_level": "Cross-cast: the inscribed spell level is invalid.",
+  "message.ars_n_spells.crosscast.invalid.iron_unresolved": "Cross-cast: the inscribed Iron's Spellbooks spell is not installed."
 }

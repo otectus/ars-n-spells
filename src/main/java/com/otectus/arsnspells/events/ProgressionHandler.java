@@ -41,18 +41,29 @@ public class ProgressionHandler {
     /** Reapply transient bonuses on login from persisted data. */
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            reapplyAll(player);
+        }
+    }
+
+    /**
+     * Reapply every per-school transient attribute bonus from the player's
+     * persisted cast counts. Transient modifiers do not survive a new Player
+     * entity, so this runs on login (here) and on respawn / dimension change
+     * (via {@link CapabilityResyncHandler}). Idempotent — each apply removes
+     * then re-adds its modifier.
+     */
+    public static void reapplyAll(ServerPlayer player) {
         if (!AnsConfig.ENABLE_PROGRESSION_SYSTEM.get() || !AnsConfig.ENABLE_CROSS_MOD_PROGRESSION.get()) {
             return;
         }
-        if (event.getEntity() instanceof ServerPlayer player) {
-            ProgressionData data = player.getData(AttachmentTypes.PROGRESSION.get());
-            data.getAllCastCounts().forEach((school, count) -> {
-                double bonus = data.getBonusForSchool(school);
-                if (bonus > 0) {
-                    applyTransientBonus(player, school, bonus);
-                }
-            });
-        }
+        ProgressionData data = player.getData(AttachmentTypes.PROGRESSION.get());
+        data.getAllCastCounts().forEach((school, count) -> {
+            double bonus = data.getBonusForSchool(school);
+            if (bonus > 0) {
+                applyTransientBonus(player, school, bonus);
+            }
+        });
     }
 
     private static void applyTransientBonus(ServerPlayer player, String school, double bonus) {

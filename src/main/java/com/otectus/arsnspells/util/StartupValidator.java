@@ -68,7 +68,7 @@ public class StartupValidator {
 
     private static boolean checkFileLocks() {
         try {
-            Path configPath = FMLPaths.CONFIGDIR.get().resolve("ars_n_spells-common.toml");
+            Path configPath = FMLPaths.CONFIGDIR.get().resolve("ars_n_spells-server.toml");
             if (!Files.exists(configPath)) {
                 LOGGER.info("OK Config file doesn't exist yet (will be created)");
                 return true;

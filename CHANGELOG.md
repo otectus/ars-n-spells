@@ -2,6 +2,80 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] — NeoForge 1.21.1 parity (2026-06-04)
+
+Functional-parity implementation for the NeoForge 1.21.1 port against the Forge 1.20.1 **2.0.1**
+release (the port had been forked from the 1.9.0 snapshot). **Build- and test-verified; final
+in-game runtime validation remains recommended/pending** (the build environment runs no Minecraft
+client/server — see *Runtime validation* below). Covenant of the Seven / Sanctified Legacy features
+(Cursed Ring LP, Virtue Ring aura, Blasphemy) remain out — that mod has no NeoForge 1.21.1 build
+(Branch B); the native `#ars_n_spells:curio_spell_discount` item tag is the curio-discount replacement.
+
+### Gameplay (restored port stubs)
+- **Spell classification restored.** `SpellAnalysis` walks the Ars 5.x recipe via
+  `Spell.unsafeList()` again, so Ars casts derive a school + cooldown category instead of every
+  spell reading as `generic`. Re-enables Ars-side affinity, cross-mod progression, per-school
+  spell-power scaling, and cooldown categories. `SpellScalingUtil` re-reads Iron's
+  `*_SPELL_POWER` attributes (now `Holder<Attribute>`) × affinity × resonance.
+- **AffinityType** regained the five Iron's-only schools (HOLY, ENDER, BLOOD, EVOCATION,
+  ELDRITCH); without them Iron's-side affinity silently dropped those casts.
+- **Equipment mana scaling restored.** `EquipmentIntegration` reads the aggregate Ars 5.x
+  `PerkAttributes.MAX_MANA` / `MANA_REGEN_BONUS` and feeds them into Iron's `MAX_MANA` /
+  `MANA_REGEN` in ISS_PRIMARY/HYBRID (`ResourceLocation`-keyed transient modifiers). A 1 Hz
+  refresh also captures Ars mana potions/effects — replacing the old `MixinArsPotionEffects`
+  with no double-counting.
+- **Spell Transcription ritual works again.** `InscriptionInputs.readSource` detects Ars
+  spells via `SpellCasterRegistry.from(stack)` and Iron's via the new gated
+  `IronsInscriptionReader`, instead of treating every brazier item as a blank target.
+
+### Cross-system regen, resonance, cross-cast
+- **Source-Jar proximity regen restored.** `RegenSynergyHandler` rewritten to the 1.20.1
+  behaviour: scans a 9×3×9 box for Ars `source_jar` blocks and feeds the unified pool
+  (`CONVERSION_RATE_ARS_TO_IRON × SOURCE_JAR_SYNERGY_MULTIPLIER`) via `BridgeManager`, with a
+  move-threshold cache + logout/dimension eviction. Fixes a mis-port that had dropped the feature
+  entirely and instead double-fed Iron's own `MANA_REGEN` on top of its native regen tick.
+- **Resonance now syncs to the client** on login and once per second (`ResonanceEvents`), not
+  only on respawn/dimension. The server value stays authoritative for spell scaling.
+- **Cross-cast validation.** New `CrossCastValidator` (+ rejection lang keys) makes
+  `CrossCastingHandler` show a player-facing red message on an empty / malformed / unresolvable
+  inscription instead of silently no-casting; valid cross-casts dispatch unchanged.
+
+### State, server authority, controls
+- **Capability resync on respawn + dimension change** (`CapabilityResyncHandler`): replays
+  affinity / cooldown / resonance to the client and reapplies the transient progression +
+  equipment attribute modifiers that a new Player entity drops.
+- **Config is now SERVER-authoritative** (`<world>/serverconfig/ars_n_spells-server.toml`),
+  auto-synced to clients; the bridge initialises on config load and `getCurrentMode()` reads
+  live until then. `/ans mode set <mode>` switches the mode live via `BridgeManager.refreshMode()`.
+- Tightened config bounds to match 2.0.1 (`conversion_rate_*` ≤ 10, `mana_sync_interval`
+  default 5 / floor 2, `ritual_mana_infusion_amount` ≤ 10000).
+
+### Cleanup & tests
+- Removed dead mixins: `MixinSpellResolverPreCast` (canCast already sees bridged mana via
+  `MixinManaCapability`), `MixinArsPotionEffects`, `MixinScrollItem` (LP-only), and the inert
+  client `MixinIronsManaBarOverlay` (replaced by `ManaBarController` + `RegisterGuiLayersEvent`).
+- Removed five dead-everywhere config fields the canonical also dropped (`progression_xp_multiplier`,
+  `max_progression_level`, `affinity_bonus_multiplier`, `max_affinity_bonus`, `enable_per_cast_reagent`).
+- `AnsConfig.safeSave()` is now an async daemon `ExecutorService` (ANS-HIGH-017) instead of a
+  blocking `Thread.sleep` retry loop.
+- New Bootstrap-free unit tests: `CrossCastValidatorTest` (×7), `ManaRegenBridgeTest` (×3).
+
+### Runtime validation (pending — not runnable in the build environment)
+Static + build/test verification is complete (`./gradlew clean build` green). The following require
+an in-game session and remain **pending**, not claimed as passed: Source-Jar regen (mana rises near
+a jar, not away; no double-feed); resonance HUD on login + during play; cross-cast rejection messages
++ valid dispatch; dedicated-server startup with the full Ars + Iron's + Curios stack and safely
+without Iron's; equipment scaling, affinity/progression accrual, and persistence across
+respawn/dimension/relog.
+
+### Known limitations (non-gameplay; do not affect the parity claim)
+- Covenant LP / aura / virtue / blasphemy remain **N/A** (Branch B — no upstream NeoForge build).
+- **In-game config screen** not ported (`ConfigScreenFactory` is a no-op); config is fully usable
+  via the per-world file and `/ans` commands (incl. live `/ans mode set`).
+- The dead Covenant config keys (`*_lp_*`, `aura_*`, `blasphemy_*`, …) and the cooldown namespace
+  param (debug-log-only on a default-off system) remain as harmless clutter; removing the Covenant
+  keys would actually diverge from the canonical 2.0.1 config, which keeps them.
+
 ## [1.9.0] — NeoForge 1.21.1 port (2026-05-10, in progress)
 
 Loader, Minecraft, and language version bump from **Forge 1.20.1 / Java 17** to **NeoForge 1.21.1 / Java 21**, against Ars Nouveau 5.11.1 and Iron's Spells 'n Spellbooks 1.21.1-3.15.6. The `mod_version` stays at 1.9.0 — this is the same release, ported, not a feature bump.

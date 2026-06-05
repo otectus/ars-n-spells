@@ -86,15 +86,11 @@ public class AnsConfig {
     // ========================================
     // PROGRESSION SYSTEM
     // ========================================
-    public static final ModConfigSpec.DoubleValue PROGRESSION_XP_MULTIPLIER;
-    public static final ModConfigSpec.IntValue MAX_PROGRESSION_LEVEL;
     public static final ModConfigSpec.BooleanValue ENABLE_CROSS_MOD_PROGRESSION;
 
     // ========================================
     // AFFINITY SYSTEM
     // ========================================
-    public static final ModConfigSpec.DoubleValue AFFINITY_BONUS_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue MAX_AFFINITY_BONUS;
     public static final ModConfigSpec.BooleanValue ENABLE_AFFINITY_DECAY;
     public static final ModConfigSpec.DoubleValue AFFINITY_DECAY_RATE;
     public static final ModConfigSpec.IntValue AFFINITY_DECAY_INTERVAL_TICKS;
@@ -179,7 +175,6 @@ public class AnsConfig {
     // CROSS-CAST INSCRIPTION
     // ========================================
     public static final ModConfigSpec.DoubleValue CROSS_CAST_COST_MULTIPLIER;
-    public static final ModConfigSpec.BooleanValue ENABLE_PER_CAST_REAGENT;
 
     // ========================================
     // PERFORMANCE TUNING
@@ -248,11 +243,11 @@ public class AnsConfig {
         
         CONVERSION_RATE_ARS_TO_IRON = BUILDER
             .comment("Conversion rate from Ars mana to Iron's mana (1.0 = 1:1)")
-            .defineInRange("conversion_rate_ars_to_iron", 1.0, 0.01, 100.0);
+            .defineInRange("conversion_rate_ars_to_iron", 1.0, 0.01, 10.0);
         
         CONVERSION_RATE_IRON_TO_ARS = BUILDER
             .comment("Conversion rate from Iron's mana to Ars mana (1.0 = 1:1)")
-            .defineInRange("conversion_rate_iron_to_ars", 1.0, 0.01, 100.0);
+            .defineInRange("conversion_rate_iron_to_ars", 1.0, 0.01, 10.0);
         
         HYBRID_SYNC_RATE = BUILDER
             .comment("How often hybrid pools sync (in ticks, 20 = 1 second)")
@@ -290,7 +285,7 @@ public class AnsConfig {
         
         DEFAULT_MAX_MANA = BUILDER
             .comment("Default maximum mana fallback when the native system returns no value.",
-                     "Can be changed at runtime with /arsnspells mana setdefault <value>",
+                     "Can be changed at runtime with /ans mana setdefault <value>",
                      "Applies to both Ars Nouveau and Iron's Spellbooks bridge fallbacks.")
             .defineInRange("default_max_mana", 100.0, 1.0, 100000.0);
 
@@ -509,14 +504,6 @@ public class AnsConfig {
             "Requires ENABLE_PROGRESSION_SYSTEM master toggle."
         );
         
-        PROGRESSION_XP_MULTIPLIER = BUILDER
-            .comment("Multiplier for cross-mod XP gains")
-            .defineInRange("progression_xp_multiplier", 1.0, 0.0, 10.0);
-        
-        MAX_PROGRESSION_LEVEL = BUILDER
-            .comment("Maximum level for cross-mod progression bonuses")
-            .defineInRange("max_progression_level", 100, 1, 1000);
-        
         ENABLE_CROSS_MOD_PROGRESSION = BUILDER
             .comment("Allow Ars spells to grant ISS XP and vice versa")
             .define("enable_cross_mod_progression", true);
@@ -531,14 +518,6 @@ public class AnsConfig {
             "Affinity system tracks spell school preferences and grants bonuses.",
             "Requires ENABLE_AFFINITY_SYSTEM master toggle."
         );
-        
-        AFFINITY_BONUS_MULTIPLIER = BUILDER
-            .comment("Multiplier for affinity bonuses")
-            .defineInRange("affinity_bonus_multiplier", 1.0, 0.0, 10.0);
-        
-        MAX_AFFINITY_BONUS = BUILDER
-            .comment("Maximum bonus from affinity (0.25 = 25% max bonus)")
-            .defineInRange("max_affinity_bonus", 0.25, 0.0, 10.0);
         
         ENABLE_AFFINITY_DECAY = BUILDER
             .comment("Enable affinity decay when not using a school. Default off for fresh installs (1.9.0).")
@@ -829,7 +808,7 @@ public class AnsConfig {
 
         RITUAL_MANA_INFUSION_AMOUNT = BUILDER
             .comment("Amount of mana added by the Ritual of Mana Infusion")
-            .defineInRange("ritual_mana_infusion_amount", 500.0, 1.0, 100000.0);
+            .defineInRange("ritual_mana_infusion_amount", 500.0, 1.0, 10000.0);
 
         MANA_WELL_RANGE = BUILDER
             .comment("Radius in blocks for Mana Well ritual effect")
@@ -861,16 +840,6 @@ public class AnsConfig {
             )
             .defineInRange("cross_cast_cost_multiplier", 1.25, 0.5, 5.0);
 
-        ENABLE_PER_CAST_REAGENT = BUILDER
-            .comment(
-                "Reserved hook for a future per-cast reagent system. When enabled, inscribed",
-                "items would consume a physical reagent per cast in addition to mana. The",
-                "reagent itself, item, and consumption hook are not implemented yet -- this",
-                "flag exists only so future work can be gated without re-shuffling config",
-                "keys. Leave at the default (false)."
-            )
-            .define("enable_per_cast_reagent", false);
-
         BUILDER.pop();
 
         // ========================================
@@ -886,7 +855,7 @@ public class AnsConfig {
         
         MANA_SYNC_INTERVAL = BUILDER
             .comment("Mana synchronization interval (ticks, lower = more responsive but higher CPU)")
-            .defineInRange("mana_sync_interval", 1, 1, 100);
+            .defineInRange("mana_sync_interval", 5, 2, 100);
         
         ENABLE_CACHING = BUILDER
             .comment("Enable caching for expensive calculations")
@@ -930,38 +899,33 @@ public class AnsConfig {
         }
     }
     
+    /** Daemon executor so config writes never block the caller (render / server thread). */
+    private static final java.util.concurrent.ExecutorService SAVE_EXEC =
+        java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "ans-config-save");
+            t.setDaemon(true);
+            return t;
+        });
+
     /**
-     * Safe config save with retry logic to handle file locks
+     * Schedule an off-thread config save. Returns true once the write is queued
+     * (the log is the source of truth for completion). Async because the in-game
+     * config screen and {@code /ans} commands call this from the render / server
+     * thread, where a synchronous file write under lock contention would stall the
+     * tick — the old synchronous {@code Thread.sleep} retry loop (ANS-HIGH-017).
      */
     public static boolean safeSave() {
-        int maxRetries = 3;
-        int retryDelay = 100; // ms
-        
-        for (int i = 0; i < maxRetries; i++) {
+        SAVE_EXEC.submit(() -> {
             try {
                 SPEC.save();
                 org.slf4j.LoggerFactory.getLogger(AnsConfig.class).info("OK Config saved successfully");
-                return true;
             } catch (Exception e) {
+                // No retry: retrying on the save thread risks stalling under lock
+                // contention, and the next mutation saves again anyway.
                 org.slf4j.LoggerFactory.getLogger(AnsConfig.class).warn(
-                    "Config save attempt {} of {} failed: {}", i + 1, maxRetries, e.getMessage());
-
-                if (i < maxRetries - 1) {
-                    try {
-                        Thread.sleep(retryDelay);
-                        retryDelay *= 2; // Exponential backoff
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        org.slf4j.LoggerFactory.getLogger(AnsConfig.class).error("Config save retry interrupted");
-                        return false;
-                    }
-                } else {
-                    org.slf4j.LoggerFactory.getLogger(AnsConfig.class).error(
-                        "FAILED to save config after {} attempts", maxRetries, e);
-                }
+                    "Config save failed (not retried): {}", e.getMessage(), e);
             }
-        }
-        
-        return false;
+        });
+        return true;
     }
 }

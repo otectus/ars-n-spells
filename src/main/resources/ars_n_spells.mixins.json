@@ -7,16 +7,11 @@
   "mixins": [
     "ars.MixinManaCapability",
     "ars.MixinSpellResolverMana",
-    "ars.MixinSpellResolverPreCast",
     "ars.MixinSpellResolverContext",
-    "ars.MixinArsPotionEffects",
     "irons.MixinIronsSpellDamage",
-    "irons.MixinIronsMagicDataMana",
-    "irons.MixinScrollItem"
+    "irons.MixinIronsMagicDataMana"
   ],
-  "client": [
-    "irons.MixinIronsManaBarOverlay"
-  ],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   }

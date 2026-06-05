@@ -59,10 +59,17 @@ public class ArsNSpells {
         // ---- Mod-bus listeners ----
         modBus.addListener(this::commonSetup);
         modBus.addListener(this::onConfigLoading);
+        modBus.addListener(this::onConfigReloading);
         modBus.addListener(PacketHandler::onRegisterPayloadHandlers);
 
         // ---- Config registration via ModContainer ----
-        container.registerConfig(ModConfig.Type.COMMON, AnsConfig.SPEC, "ars_n_spells-common.toml");
+        // SERVER (was COMMON): gameplay tunables — mana mode, conversion rates, dual-cost
+        // splits, resonance — must be server-authoritative on dedicated servers and
+        // auto-synced to clients on login. A COMMON config does not sync, so the in-game
+        // config screen and HUD on a connected client would read stale local values.
+        // The live file moves to <world>/serverconfig/ars_n_spells-server.toml; the old
+        // global config/ars_n_spells-common.toml is ignored (re-apply settings once).
+        container.registerConfig(ModConfig.Type.SERVER, AnsConfig.SPEC, "ars_n_spells-server.toml");
 
         // ---- Game-bus instance handlers (NeoForge.EVENT_BUS) ----
         // NeoForge 1.21.1 rejects EVENT_BUS.register(x) when x has zero
@@ -84,8 +91,8 @@ public class ArsNSpells {
             NeoForge.EVENT_BUS.register(new ArsSpellScalingHandler());
             NeoForge.EVENT_BUS.register(new ResonanceEvents());
             NeoForge.EVENT_BUS.register(new CrossCastIronsHandler());
-            // Phase 3: restore `NeoForge.EVENT_BUS.register(new RegenSynergyHandler());`
-            // once the cross-system regen handler regains a @SubscribeEvent method.
+            // RegenSynergyHandler (Source-Jar proximity regen) auto-registers via its
+            // @EventBusSubscriber annotation and self-gates on IronsCompat.isLoaded().
         }
 
         // ArsNSpells's own lifecycle methods (commonSetup, onConfigLoading) are
@@ -117,9 +124,22 @@ public class ArsNSpells {
         if (!event.getConfig().getModId().equals(MODID)) {
             return;
         }
+        // The SERVER config is now readable — (re)build the mana bridges for the active
+        // mode. This is the real bridge-init point on a server (common setup runs before
+        // the SERVER config loads). Idempotent with BridgeManager.init().
+        BridgeManager.refreshMode();
 
         LOGGER.info("========================================");
         LOGGER.info("OK Ars 'n' Spells initialization complete");
         LOGGER.info("========================================");
+    }
+
+    private void onConfigReloading(final ModConfigEvent.Reloading event) {
+        if (!event.getConfig().getModId().equals(MODID)) {
+            return;
+        }
+        // Pick up runtime config edits (e.g. mana_unification_mode changed on disk or via
+        // the config screen) without a restart.
+        BridgeManager.refreshMode();
     }
 }

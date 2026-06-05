@@ -14,18 +14,50 @@ import org.slf4j.LoggerFactory;
  */
 public class BridgeManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(BridgeManager.class);
-    private static IManaBridge activeBridge;
-    private static IManaBridge secondaryBridge;
-    private static ManaUnificationMode currentMode;
-    private static boolean isIronsLoaded = false;
+    // volatile: refreshMode() reassigns these at runtime (server thread) while the
+    // client render thread reads them for HUD mode checks.
+    private static volatile IManaBridge activeBridge;
+    private static volatile IManaBridge secondaryBridge;
+    private static volatile ManaUnificationMode currentMode;
+    private static volatile boolean isIronsLoaded = false;
 
     public static void init(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             isIronsLoaded = ModList.get().isLoaded("irons_spellbooks");
-            currentMode = AnsConfig.getManaMode();
-            initializeBridges();
-            logInitialization();
+            try {
+                currentMode = AnsConfig.getManaMode();
+                initializeBridges();
+                logInitialization();
+            } catch (Throwable t) {
+                // The SERVER config is not loaded yet at common setup. refreshMode()
+                // runs again from ModConfigEvent.Loading once the config is available,
+                // and getCurrentMode() falls back to a live config read in the meantime.
+                LOGGER.debug("Bridge init deferred until config load: {}", t.toString());
+            }
         });
+    }
+
+    /**
+     * Re-read the configured mana mode and rebuild the active/secondary bridges.
+     *
+     * <p>Runs on config load/reload (the SERVER config loads after common setup, so
+     * this is the real init point on a server) and from {@code /ans mode set}. Bridges
+     * are stateless, so rebuilding is safe; {@code synchronized} serialises concurrent
+     * refreshes and the volatile fields publish the latest references to readers.
+     */
+    public static synchronized void refreshMode() {
+        isIronsLoaded = ModList.get().isLoaded("irons_spellbooks");
+        currentMode = AnsConfig.getManaMode();
+        initializeBridges();
+        logInitialization();
+    }
+
+    /**
+     * Test-only seam: set the cached mode without constructing bridges (bridge
+     * construction touches mod APIs absent from the unit-test classpath).
+     */
+    static void testSetMode(ManaUnificationMode mode) {
+        currentMode = mode;
     }
 
     private static void initializeBridges() {
@@ -105,8 +137,11 @@ public class BridgeManager {
         LOGGER.info("========================================");
     }
 
+    /** Cached fallback so the pre-init null path does not allocate per call. */
+    private static final IManaBridge FALLBACK_BRIDGE = new ArsNativeBridge();
+
     public static IManaBridge getBridge() {
-        return activeBridge != null ? activeBridge : new ArsNativeBridge();
+        return activeBridge != null ? activeBridge : FALLBACK_BRIDGE;
     }
 
     public static IManaBridge getSecondaryBridge() {
@@ -114,7 +149,17 @@ public class BridgeManager {
     }
 
     public static ManaUnificationMode getCurrentMode() {
-        return currentMode;
+        ManaUnificationMode cached = currentMode;
+        if (cached != null) {
+            return cached;
+        }
+        // Pre-init (early client render frames during world load, or before the SERVER
+        // config has loaded) — read live so callers never see a null mode.
+        try {
+            return AnsConfig.getManaMode();
+        } catch (Throwable t) {
+            return ManaUnificationMode.DISABLED;
+        }
     }
 
     public static boolean isIronsSpellbooksLoaded() {

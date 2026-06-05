@@ -134,6 +134,21 @@ public class CrossCastingHandler {
 
         // Non-shift right-click casts the selected entry.
         CrossModSpell entry = list.spells().get(list.normalizedIndex());
+
+        // Validate before dispatch: a malformed / empty / unresolvable inscription now
+        // tells the player why instead of silently no-casting. Runs on both sides
+        // (deterministic) to cancel the use; the message is sent server-side only.
+        CrossCastValidator.ValidationResult validation =
+            CrossCastValidator.validate(entry, list.normalizedIndex(), list.size());
+        if (!validation.ok()) {
+            if (!player.level().isClientSide()) {
+                player.displayClientMessage(
+                    Component.translatable(validation.reasonKey()).withStyle(ChatFormatting.RED), true);
+            }
+            event.setCanceled(true);
+            return;
+        }
+
         boolean cast;
         if (CrossSpellType.ARS_NOUVEAU.name().equals(entry.typeName())) {
             cast = castArsSpell(player, stack, entry);
