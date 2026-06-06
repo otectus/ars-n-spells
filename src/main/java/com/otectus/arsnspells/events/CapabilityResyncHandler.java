@@ -1,7 +1,6 @@
 package com.otectus.arsnspells.events;
 
 import com.otectus.arsnspells.ArsNSpells;
-import com.otectus.arsnspells.affinity.AffinityType;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
@@ -18,6 +17,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+
+import java.util.Map;
 
 /**
  * Single owner of per-player capability/attribute resync across the two
@@ -72,10 +73,9 @@ public final class CapabilityResyncHandler {
             return;
         }
         AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
-        for (AffinityType type : AffinityType.values()) {
-            int level = data.getLevel(type);
-            if (level > 0) {
-                PacketHandler.sendToClient(new AffinitySyncPayload(type, level), player);
+        for (Map.Entry<String, Integer> entry : data.getAllLevels().entrySet()) {
+            if (entry.getValue() != null && entry.getValue() > 0) {
+                PacketHandler.sendToClient(new AffinitySyncPayload(entry.getKey(), entry.getValue()), player);
             }
         }
     }

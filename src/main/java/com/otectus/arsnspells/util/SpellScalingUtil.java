@@ -3,7 +3,7 @@ package com.otectus.arsnspells.util;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.affinity.AffinityBonuses;
-import com.otectus.arsnspells.affinity.AffinityType;
+import com.otectus.arsnspells.affinity.SchoolKeys;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
 import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
@@ -73,14 +73,13 @@ public class SpellScalingUtil {
             }
         }
 
-        // Apply affinity bonus: 0.5% per affinity level for matching school
-        if (AnsConfig.ENABLE_AFFINITY_SYSTEM.get() && !"generic".equals(school)) {
-            try {
-                AffinityType affinityType = AffinityType.valueOf(school.toUpperCase(Locale.ROOT));
-                float affinityMultiplier = AffinityBonuses.getAttributeMultiplier(player, affinityType);
-                multiplier *= affinityMultiplier;
-            } catch (IllegalArgumentException ignored) {
-                // School doesn't map to an AffinityType — skip
+        // Apply affinity bonus: 0.5% per affinity level for the matching school.
+        // The key is the same one AffinityHandler stored under, so the lookup hits
+        // the correct track (including the aqua/geo/wind ars_n_spells:* tracks).
+        if (AnsConfig.ENABLE_AFFINITY_SYSTEM.get()) {
+            String affinityKey = SchoolKeys.fromArsSchool(school);
+            if (affinityKey != null) {
+                multiplier *= AffinityBonuses.getAttributeMultiplier(player, affinityKey);
             }
         }
 

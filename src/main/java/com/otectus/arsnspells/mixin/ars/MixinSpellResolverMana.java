@@ -33,7 +33,7 @@ public abstract class MixinSpellResolverMana {
     @Shadow public SpellContext spellContext;
     @Shadow public abstract int getResolveCost();
 
-    @Inject(method = "expendMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "expendMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$expendMana(CallbackInfo ci) {
         if (!BridgeManager.isUnificationEnabled()) {
             return;
@@ -67,7 +67,7 @@ public abstract class MixinSpellResolverMana {
         }
     }
 
-    @Inject(method = "expendMana", at = @At("TAIL"))
+    @Inject(method = "expendMana", at = @At("TAIL"), require = 0)
     private void arsnspells$consumeCrossCastSecondary(CallbackInfo ci) {
         if (!BridgeManager.isUnificationEnabled()) {
             return;

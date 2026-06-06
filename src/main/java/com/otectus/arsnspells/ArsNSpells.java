@@ -2,6 +2,10 @@ package com.otectus.arsnspells;
 
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.commands.ArsNSpellsCommands;
+import com.otectus.arsnspells.compat.CompatIds;
+import com.otectus.arsnspells.compat.ModPresence;
+import com.otectus.arsnspells.compat.curios.IronsCurioDiscountHandler;
+import com.otectus.arsnspells.compat.irons_spells.SchoolIndex;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.data.AttachmentTypes;
 import com.otectus.arsnspells.events.AffinityDecayHandler;
@@ -91,6 +95,7 @@ public class ArsNSpells {
             NeoForge.EVENT_BUS.register(new ArsSpellScalingHandler());
             NeoForge.EVENT_BUS.register(new ResonanceEvents());
             NeoForge.EVENT_BUS.register(new CrossCastIronsHandler());
+            NeoForge.EVENT_BUS.register(new IronsCurioDiscountHandler());
             // RegenSynergyHandler (Source-Jar proximity regen) auto-registers via its
             // @EventBusSubscriber annotation and self-gates on IronsCompat.isLoaded().
         }
@@ -112,6 +117,11 @@ public class ArsNSpells {
                     LOGGER.error("FAILED to register rituals", e);
                 }
             });
+            // Snapshot the Iron's school registry for /ans diagnostics, after
+            // registries freeze. Gated so SchoolIndex never classloads without Iron's.
+            if (ModPresence.isLoaded(CompatIds.IRONS_SPELLBOOKS)) {
+                event.enqueueWork(SchoolIndex::snapshot);
+            }
         } catch (Exception e) {
             LOGGER.error("========================================");
             LOGGER.error("CRITICAL: Ars 'n' Spells initialization failed");

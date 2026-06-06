@@ -4,10 +4,16 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.otectus.arsnspells.affinity.AffinityType;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.compat.CompatIds;
+import com.otectus.arsnspells.compat.ModPresence;
+import com.otectus.arsnspells.compat.irons_spells.SchoolIndex;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
+import com.otectus.arsnspells.data.AffinityData;
+import com.otectus.arsnspells.data.AttachmentTypes;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -141,6 +147,37 @@ public class ArsNSpellsCommands {
             () -> Component.translatable("commands.ans.info.resonance", String.format("%.3f", resonance)),
             false
         );
+
+        // Affinity tracks (2.5.0 dynamic schools) — only the player's non-zero tracks,
+        // sorted by school id so addon schools show under their full registry id.
+        AffinityData affinity = target.getData(AttachmentTypes.AFFINITY.get());
+        var tracks = affinity.getAllLevels().entrySet().stream()
+            .filter(e -> e.getValue() != null && e.getValue() > 0)
+            .sorted(java.util.Map.Entry.comparingByKey())
+            .toList();
+        if (tracks.isEmpty()) {
+            context.getSource().sendSuccess(
+                () -> Component.translatable("commands.ans.info.affinity.none"), false);
+        } else {
+            context.getSource().sendSuccess(
+                () -> Component.translatable("commands.ans.info.affinity.header").withStyle(ChatFormatting.AQUA),
+                false);
+            for (var entry : tracks) {
+                final String display = AffinityType.displayName(entry.getKey());
+                final String key = entry.getKey();
+                final int level = entry.getValue();
+                context.getSource().sendSuccess(
+                    () -> Component.translatable("commands.ans.info.affinity.line", display, key, level), false);
+            }
+        }
+
+        // Registered Iron's school roster (diagnostic). Guarded so SchoolIndex,
+        // which imports Iron's types, never classloads on an Iron's-absent server.
+        if (ModPresence.isLoaded(CompatIds.IRONS_SPELLBOOKS)) {
+            final int schoolCount = SchoolIndex.allSchools().size();
+            context.getSource().sendSuccess(
+                () -> Component.translatable("commands.ans.info.schools", schoolCount), false);
+        }
 
         return 1;
     }

@@ -1,7 +1,6 @@
 package com.otectus.arsnspells.network;
 
 import com.otectus.arsnspells.ArsNSpells;
-import com.otectus.arsnspells.affinity.AffinityType;
 import com.otectus.arsnspells.data.AffinityData;
 import com.otectus.arsnspells.data.AttachmentTypes;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -13,7 +12,11 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Server → client sync of one affinity school's level. */
+/**
+ * Server → client sync of one affinity school's level. {@code typeName} is the
+ * full school id (e.g. {@code "irons_spellbooks:fire"}); the client mirrors
+ * whatever key it receives, so it needs no school registry and no Iron's classes.
+ */
 public record AffinitySyncPayload(String typeName, int level) implements CustomPacketPayload {
 
     public static final Type<AffinitySyncPayload> TYPE = new Type<>(
@@ -25,10 +28,6 @@ public record AffinitySyncPayload(String typeName, int level) implements CustomP
             ByteBufCodecs.INT,         AffinitySyncPayload::level,
             AffinitySyncPayload::new
         );
-
-    public AffinitySyncPayload(AffinityType type, int level) {
-        this(type.name(), level);
-    }
 
     @Override
     public Type<? extends CustomPacketPayload> type() { return TYPE; }
@@ -43,9 +42,7 @@ public record AffinitySyncPayload(String typeName, int level) implements CustomP
             net.minecraft.world.entity.player.Player player = ctx.player();
             if (player == null) return;
             AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
-            try {
-                data.setLevel(AffinityType.valueOf(p.typeName()), p.level());
-            } catch (IllegalArgumentException ignored) {}
+            data.setLevel(p.typeName(), p.level());
         }
     }
 }

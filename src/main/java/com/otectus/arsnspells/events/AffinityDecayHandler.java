@@ -1,6 +1,5 @@
 package com.otectus.arsnspells.events;
 
-import com.otectus.arsnspells.affinity.AffinityType;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.data.AffinityData;
 import com.otectus.arsnspells.data.AttachmentTypes;
@@ -9,6 +8,8 @@ import com.otectus.arsnspells.network.PacketHandler;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+
+import java.util.Map;
 
 /**
  * Periodically decays player affinity levels when no spells of that school
@@ -52,16 +53,18 @@ public class AffinityDecayHandler {
         }
 
         AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
-        for (AffinityType type : AffinityType.values()) {
-            int level = data.getLevel(type);
+        // getAllLevels() returns a copy, so mutating the original via setLevel
+        // inside the loop is safe (no ConcurrentModificationException).
+        for (Map.Entry<String, Integer> entry : data.getAllLevels().entrySet()) {
+            int level = entry.getValue() == null ? 0 : entry.getValue();
             if (level <= 0) {
                 continue;
             }
             int decay = (int) Math.max(1, Math.floor(level * perInterval));
             int newLevel = Math.max(0, level - decay);
             if (newLevel != level) {
-                data.setLevel(type, newLevel);
-                PacketHandler.sendToClient(new AffinitySyncPayload(type, newLevel), player);
+                data.setLevel(entry.getKey(), newLevel);
+                PacketHandler.sendToClient(new AffinitySyncPayload(entry.getKey(), newLevel), player);
             }
         }
     }

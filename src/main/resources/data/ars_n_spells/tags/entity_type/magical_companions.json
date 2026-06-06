@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    { "id": "#ars_nouveau:familiar", "required": false },
+    { "id": "#irons_spellbooks:summons", "required": false }
+  ]
+}

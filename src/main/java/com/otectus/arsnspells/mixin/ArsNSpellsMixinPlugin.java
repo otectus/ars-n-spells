@@ -13,11 +13,20 @@ import java.util.Set;
  */
 public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
     private boolean ironsPresent;
+    private boolean arsManaCapPresent;
+    private boolean arsSpellResolverPresent;
 
     @Override
     public void onLoad(String mixinPackage) {
         ironsPresent = resourceExists("io/redspace/ironsspellbooks/api/spells/AbstractSpell.class")
             && resourceExists("io/redspace/ironsspellbooks/api/magic/MagicData.class");
+        // Ars is a required dependency, but its version range is wide ([5.0.0,)),
+        // so a future restructure could remove these targets. Probe them too so the
+        // Ars-side mixins fail soft (skip) instead of crashing mod load on a class
+        // rename. (require=0 on each inject covers method drift; this covers class drift.)
+        arsManaCapPresent = resourceExists("com/hollingsworth/arsnouveau/common/capability/ManaCap.class")
+            && resourceExists("com/hollingsworth/arsnouveau/common/capability/ManaData.class");
+        arsSpellResolverPresent = resourceExists("com/hollingsworth/arsnouveau/api/spell/SpellResolver.class");
     }
 
     @Override
@@ -30,6 +39,13 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("MixinIronsSpellDamage")
             || mixinClassName.endsWith("MixinIronsMagicDataMana")) {
             return ironsPresent;
+        }
+        if (mixinClassName.endsWith("MixinManaCapability")) {
+            return arsManaCapPresent;
+        }
+        if (mixinClassName.endsWith("MixinSpellResolverMana")
+            || mixinClassName.endsWith("MixinSpellResolverContext")) {
+            return arsSpellResolverPresent;
         }
         return true;
     }

@@ -2,6 +2,89 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.0] — 1.21.1 compatibility & correctness (2026-06-06)
+
+A correctness-focused compatibility release on top of the build-verified 2.0.1 core.
+The bridge / cross-casting / progression / resonance / rituals stack is unchanged; this
+release fixes the largest parity gaps, restores two silently-broken datapack features,
+and hardens optional-mod handling. Compile targets stay pinned to the build-verified
+**Ars Nouveau 5.11.1 / Iron's Spellbooks 3.15.6**; the target pack runs **AN 5.11.7 /
+ISS 3.16.0** at runtime (event- and registry-based code tolerates the delta — see
+*Known limitations*). **Build- and test-verified; in-game runtime validation remains
+pending** (the build environment runs no Minecraft).
+
+### Fixed — datapack paths (were build-green but runtime-broken)
+- **Ritual recipes are obtainable again.** The Spell Transcription / Uninscription
+  apparatus recipes shipped under the 1.20.1 plural path `data/ars_n_spells/recipes/…`,
+  which Minecraft 1.21 no longer reads (it loads `recipe/`, singular — verified against
+  the Ars Nouveau and Iron's jars). They never loaded, so the ritual tablets were
+  uncraftable in survival. Moved to `data/ars_n_spells/recipe/apparatus/`.
+- **Curio spell discount works again.** The `#ars_n_spells:curio_spell_discount` item tag
+  shipped at the plural `tags/items/` path (1.20.1) instead of 1.21's `tags/item/`, so it
+  never loaded and the discount was permanently inert. Moved to `tags/item/`, and the tag
+  now ships a sensible default (`#irons_spellbooks:school_focus`, optional).
+
+### Added / changed — affinity now covers every Iron's addon school
+- **Dynamic, addon-aware affinity.** Affinity was keyed by a hardcoded 16-value
+  `AffinityType` enum, so the ~19 addon schools in the target pack
+  (`cataclysm_spellbooks:abyssal`, `iss_magicfromtheeast:spirit`, `somakespells:aqua`, …)
+  earned no affinity at all — the Iron's handler dropped every school not in the enum.
+  Affinity is now stored as a `Map<String,Integer>` keyed by the full school id (mirroring
+  progression), so **every registered Iron's school tracks automatically**, with no
+  per-mod code. New `SchoolKeys` (the single canonical-key source shared by both handlers
+  and the damage-scaling site) and an Iron's-gated `SchoolIndex` registry snapshot for
+  `/ans` diagnostics.
+- **Fixed the mirrored Ars-side drop bug.** `aqua`/`geo`/`wind` (words the Ars glyph
+  heuristic emits but the enum lacked) threw in `AffinityType.valueOf` and were silently
+  lost; they now track under `ars_n_spells:*` keys.
+- **Safe save migration.** `AffinityData` uses a versioned codec; a 2.0.x save (bare map
+  of enum-name keys) migrates losslessly — the nine elemental tracks are renamed
+  (`FIRE` → `irons_spellbooks:fire`) with counts intact and re-stamped on first save
+  (idempotent). **Owner decision (default):** the seven legacy category/source buckets
+  (OFFENSIVE/DEFENSIVE/UTILITY/MOVEMENT/ARCANE/PRIMAL/HYBRID) are dropped on migration —
+  they were never real schools and current code never wrote them. Back up saves if you
+  want to be cautious; flip to quarantine on request.
+- `/ans info <player>` now lists the player's non-zero affinity tracks and (with Iron's)
+  the registered school count.
+
+### Added — Curios discount, both sides
+- The tagged-curio mana discount now applies to **Iron's** casts too
+  (`SpellOnCastEvent.setManaCost`), not just Ars casts. The slot scan is shared via a new
+  `compat/curios/CuriosAccess`. New `max_total_curio_discount` config (default 0.50) caps
+  the combined discount so stacked curios can't trivialise mana cost.
+
+### Hardened — optional-mod & version resilience
+- All mana/resolver mixin injects now carry `require = 0`, so an Ars/Iron's point-release
+  method-signature change fails soft (skips the inject) instead of crashing mod load. The
+  mixin plugin additionally probes the Ars target classes (`ManaCap`/`ManaData`/
+  `SpellResolver`) so a class rename also fails soft. (Shadow *field* drift remains fatal —
+  the eventual event-first migration is the real fix; see *Known limitations*.)
+- New `compat.ModPresence` (cached multi-mod presence) + `compat.CompatIds`; `IronsCompat`
+  delegates to them. Lightweight foundation; the full module framework is deferred.
+- New `#ars_n_spells:magical_companions` entity-type tag (aggregates `#ars_nouveau:familiar`
+  + `#irons_spellbooks:summons`, optional) as datapack scaffolding for future summon synergy.
+
+### Tests
+- `ResourcePresenceTest` asserts every shipped data/asset file exists, parses, and sits at
+  the correct singular 1.21 path (regression guard for the directory-flattening bug above).
+- `SchoolKeysTest` pins the Ars↔Iron's key agreement and the aqua/geo/wind fix.
+- `AffinityDataMigrationTest` covers the versioned codec round-trip and the 2.0.x → 2.5.0
+  legacy migration (rename, bucket drop, re-stamp, clamp).
+
+### Known limitations
+- **Compile vs runtime version delta.** Pinned to AN 5.11.1 / ISS 3.15.6; pack runs
+  5.11.7 / 3.16.0. A post-2.5.0 task is to validate in-game and optionally move the compile
+  classpath up. Mixin **shadow-field** drift (e.g. an AN field rename) would still crash on
+  load — `require = 0` covers method drift only; migrating the mana bridge to AN/ISS events
+  is the durable fix and is deferred.
+- **In-game validation pending** (build env has no Minecraft): cast one spell per addon
+  school → affinity increments under the correct id; load a 2.0.x save → elemental tracks
+  migrate with counts intact, buckets dropped; tagged-curio cast drops cost on both Ars and
+  Iron's within the clamp; client + dedicated-server boot with/without Iron's and Curios;
+  ritual tablets craftable at the apparatus.
+- Covenant LP / aura / virtue / blasphemy remain **N/A** (Branch B). The dead Covenant
+  config keys are intentionally retained to match the canonical 2.0.1 config.
+
 ## [2.0.1] — NeoForge 1.21.1 parity (2026-06-04)
 
 Functional-parity implementation for the NeoForge 1.21.1 port against the Forge 1.20.1 **2.0.1**

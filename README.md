@@ -1,8 +1,8 @@
-# Ars 'n' Spells (v1.9.0, NeoForge 1.21.1)
+# Ars 'n' Spells (v2.5.0, NeoForge 1.21.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.21.1 on **NeoForge**. It unifies mana, scaling, and progression while keeping each mod playable on its own.
 
-> **Port status (1.9.0 on NeoForge 1.21.1).** This release ports the Forge 1.20.1 1.9.0 codebase to NeoForge 1.21.1: loader rewrite, vanilla-payload networking, NeoForge attachments for player state, and a `DataComponent`-backed cross-cast inscription store. Several gameplay re-attach points against the new Ars Nouveau 5.11.1 / Iron's Spells 3.15.6 internals are still being worked through (see [`TODO(Phase 11)`](#known-work-in-progress) markers in the source). The previous **Covenant of the Seven / Sanctified Legacy** integration (Cursed Ring, Virtue Ring, Blasphemy curios, LP / aura systems) is **removed**: no NeoForge 1.21.1 distribution of that addon exists at the time of writing. A direct **Curios** integration is planned to replace its curio-feature footprint.
+> **Status (v2.5.0, NeoForge 1.21.1).** Mana unification, cross-cast inscription, rituals, affinity, progression, resonance, cooldowns, and equipment scaling are all live (the mana mixins were repaired against Ars 5.x / Iron's 3.x in 2.0.1). **2.5.0 is a correctness release:** affinity now tracks *every* Iron's addon school dynamically instead of a hardcoded sixteen, the Curios spell-discount applies on both the Ars and Iron's sides, and two datapack features that silently broke in the 1.20.1 → 1.21 directory flattening (the ritual apparatus recipes and the curio-discount tag) are restored to their correct singular paths. Compile targets are pinned to Ars Nouveau 5.11.1 / Iron's Spells 3.15.6; the mod runs against newer (5.11.7 / 3.16.0) at runtime. The previous **Covenant of the Seven / Sanctified Legacy** integration (Cursed Ring, Virtue Ring, Blasphemy curios, LP / aura systems) remains **removed** (no NeoForge 1.21.1 build of that addon exists); the `#ars_n_spells:curio_spell_discount` item tag is its replacement footprint.
 
 ## Requirements
 
@@ -161,18 +161,17 @@ The mana-bar overlay registration moves from Forge's `RegisterGuiOverlaysEvent` 
 | `/ans mana setdefault <value>` | Op 2 | Set the default max mana. |
 | `/ans mana getdefault` | — | View the current default max mana. |
 | `/ans debug` | Op 2 | Toggle debug mode at runtime. |
-| `/ans info <player>` | Op 2 | Show mana and resonance (ring/aura info removed in 1.21.1). |
+| `/ans info <player>` | Op 2 | Show mana, resonance, and the player's per-school affinity (plus the registered Iron's school count). |
 | `/ans mode` | — | Show current mana unification mode. |
 
-## Known work in progress
+## Roadmap (deferred past 2.5.0)
 
-The NeoForge 1.21.1 port is staged. Phase 0 (build / metadata / loader / networking / attachments / data components / Sanctified deletion / 1.9.0 stabilization NeoForge port), Phase 1 (Sanctified upstream decision), Phase 4 (recipe tag + conditions), and Phase 5 (data-component round-trip test) are complete. Pending phases:
+The 1.21.1 port is functionally complete; the items below are intentionally deferred, not broken. The mana-unification mixins disabled during the early port were repaired and re-enabled in 2.0.1, and the cross-cast / rituals / scaling re-attach work that was tracked as "Phase 3" is done.
 
-- **Mana unification interception is currently inert.** Four mixins that intercepted `ManaCap`/`SpellResolver` (Ars) and `MagicData` (Iron's) tripped `@Shadow` field-not-found errors against Ars Nouveau 5.11.4 (the first runtime test of the ported jar aborted Ars's `RegisterCapabilitiesEvent` dispatch). They have been removed from `ars_n_spells.mixins.json` pending Phase 2 verification: `ars.MixinManaCapability`, `ars.MixinSpellResolverMana`, `ars.MixinSpellResolverContext`, `irons.MixinIronsMagicDataMana`. The disabled mixin source files retain a doc-comment marker pointing at the verification work. **Practical effect:** all five mana-unification modes (`iss_primary`, `ars_primary`, `hybrid`, `separate`, `disabled`) currently behave like `disabled` — each mod uses its own mana pool, with no cross-system routing. Spell scaling, affinity, progression, cooldowns, resonance, cross-cast inscription, and rituals are **unaffected**.
-- **Phase 2** — re-verify the four disabled mixins above against the actual deobfuscated Ars Nouveau 5.11.4 and Iron's Spells 3.15.6 jars, plus a sanity pass on the five enabled mixins (`ars.MixinSpellResolverPreCast`, `ars.MixinArsPotionEffects`, `irons.MixinIronsSpellDamage`, `irons.MixinScrollItem`, `irons.MixinIronsManaBarOverlay`). The five enabled are either empty `@Pseudo` stubs or use `require = 0` injectors, so they cannot abort load — but they don't yet do anything either.
-- **Phase 3** — 22 files carry `TODO(Phase 11)` markers for gameplay re-attach: `CrossCastingHandler` (cast invocation, `SpellCostCalcEvent`, right-click intercept), bridge layer (`ArsNativeBridge`, `ManaUtil`), several event handlers (`ArsManaCalcHandler`, `ResonanceEvents`, `RegenSynergyHandler`, `CurioDiscountHandler`, `EquipmentHandler`, `CastingAuthority`), `EquipmentIntegration`, `SpellScalingUtil`, `SpellAnalysis`, client overlay handlers, and the scroll-use mixin.
-- **Phase 6** — full Curios 1.21.1 integration. Will replace the Sanctified curio-feature footprint with a generic Curios bridge gated by `ModList.isLoaded("curios")`.
-- **Phase 7** — verification gates (`./gradlew build` / `test` / `runClient` / `runServer` / `runGameTestServer`) and the V1–V10 manual scenarios from [TESTING_GUIDE.md](TESTING_GUIDE.md).
+- **Event-first mana bridge.** The bridge routes through two repaired mixins (`MixinManaCapability`, `MixinIronsMagicDataMana`) plus the Ars `SpellResolver` context/cost mixins. Every inject now uses `require = 0` and the mixin plugin probes its target classes (`ManaCap`/`ManaData`/`SpellResolver`), so a dependency point-release fails soft on **method** drift — but a **field** rename would still abort load. Migrating the bridge to Ars/Iron's public events (`MaxManaCalcEvent`, `SpellCostCalcEvent`, `ChangeManaEvent`, …) removes that fragility and is the main deferred item.
+- **Compile-target bump.** Pinned to Ars 5.11.1 / Iron's 3.15.6 (build-verified); the target pack runs 5.11.7 / 3.16.0. Moving the compile classpath up is deferred until an in-game validation pass exists.
+- **Larger optional-mod integrations** from the compatibility plan (Apotheosis affixes, Ars Elemental focus mapping, familiar/summon synergy, Iron's Restrictions gating, ISS upgrade orbs, DailyBoss) are scoped for a later release. 2.5.0 ships only the data-only scaffolding (`#ars_n_spells:magical_companions` entity tag, the curio-discount tag default) and the light `compat.ModPresence` / `compat.CompatIds` foundation.
+- **In-game runtime validation** — the build environment has no Minecraft, so the scenarios in [TESTING_GUIDE.md](TESTING_GUIDE.md) remain to be run manually.
 
 ## Building from source
 
@@ -186,7 +185,7 @@ Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMa
 
 Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`.
 
-Output jar: `build/libs/ars_n_spells-1.9.0.jar`
+Output jar: `build/libs/ars_n_spells-2.5.0.jar`
 
 ## Changelog
 

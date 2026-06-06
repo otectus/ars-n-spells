@@ -1,32 +1,19 @@
 package com.otectus.arsnspells.compat;
 
-import net.neoforged.fml.ModList;
-
 /**
  * Single source of truth for whether Iron's Spellbooks is loaded.
- * Result is cached after the first invocation to keep the check on the
- * cast hot-path cheap.
  *
- * Any common-side reference to Iron's APIs MUST be guarded by
+ * <p>Retained for source-compatibility with the many call sites that already use
+ * it; as of 2.5.0 it delegates to {@link ModPresence} so all presence checks
+ * share one cache. Any common-side reference to Iron's APIs MUST be guarded by
  * {@link #isLoaded()} or run only inside a class that this guard reaches.
  */
 public final class IronsCompat {
-    public static final String MODID = "irons_spellbooks";
-
-    private static volatile Boolean cached;
+    public static final String MODID = CompatIds.IRONS_SPELLBOOKS;
 
     private IronsCompat() {}
 
     public static boolean isLoaded() {
-        Boolean c = cached;
-        if (c != null) {
-            return c;
-        }
-        synchronized (IronsCompat.class) {
-            if (cached == null) {
-                cached = ModList.get().isLoaded(MODID);
-            }
-            return cached;
-        }
+        return ModPresence.isLoaded(MODID);
     }
 }

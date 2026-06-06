@@ -100,6 +100,7 @@ public class AnsConfig {
     // ========================================
     public static final ModConfigSpec.BooleanValue ENABLE_CURIO_DISCOUNTS;
     public static final ModConfigSpec.DoubleValue VIRTUE_RING_DISCOUNT;
+    public static final ModConfigSpec.DoubleValue MAX_TOTAL_CURIO_DISCOUNT;
     public static final ModConfigSpec.DoubleValue BLASPHEMY_DISCOUNT;
     public static final ModConfigSpec.DoubleValue BLASPHEMY_MATCHING_SCHOOL_BONUS;
     public static final ModConfigSpec.BooleanValue ALLOW_DISCOUNT_STACKING;
@@ -547,9 +548,17 @@ public class AnsConfig {
             .define("enable_curio_discounts", true);
         
         VIRTUE_RING_DISCOUNT = BUILDER
-            .comment("Mana cost discount from Ring of Virtue (0.20 = 20% reduction)")
+            .comment("Per-curio mana cost discount for items in #ars_n_spells:curio_spell_discount",
+                     "(0.20 = each tagged curio multiplies cost by 0.80). Applies to both Ars and",
+                     "Iron's Spellbooks casts.")
             .defineInRange("virtue_ring_discount", 0.20, 0.0, 1.0);
-        
+
+        MAX_TOTAL_CURIO_DISCOUNT = BUILDER
+            .comment("Hard cap on the COMBINED tagged-curio discount across all worn curios",
+                     "(0.50 = spells never cost less than 50% after curio discounts). Prevents",
+                     "stacked discount curios from trivialising mana cost.")
+            .defineInRange("max_total_curio_discount", 0.50, 0.0, 1.0);
+
         BLASPHEMY_DISCOUNT = BUILDER
             .comment("Base mana cost discount from Blasphemy curios (0.15 = 15% reduction)")
             .defineInRange("blasphemy_discount", 0.15, 0.0, 1.0);

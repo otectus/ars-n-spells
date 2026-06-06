@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinSpellResolverContext {
     @Shadow public SpellContext spellContext;
 
-    @Inject(method = "canCast", at = @At("HEAD"))
+    @Inject(method = "canCast", at = @At("HEAD"), require = 0)
     private void arsnspells$captureContext(LivingEntity entity, CallbackInfoReturnable<Boolean> cir) {
         if (entity instanceof Player player) {
             SpellResolver resolver = (SpellResolver) (Object) this;
@@ -32,7 +32,7 @@ public class MixinSpellResolverContext {
         }
     }
 
-    @Inject(method = "canCast", at = @At("RETURN"))
+    @Inject(method = "canCast", at = @At("RETURN"), require = 0)
     private void arsnspells$clearContext(LivingEntity entity, CallbackInfoReturnable<Boolean> cir) {
         CasterContext.clear();
     }

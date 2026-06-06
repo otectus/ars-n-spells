@@ -27,7 +27,7 @@ public abstract class MixinIronsMagicDataMana {
     @Shadow private float mana;
     @Shadow private ServerPlayer serverPlayer;
 
-    @Inject(method = "getMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$getMana(CallbackInfoReturnable<Float> cir) {
         ServerPlayer player = serverPlayer;
         if (player == null) {
@@ -52,7 +52,7 @@ public abstract class MixinIronsMagicDataMana {
         cir.setReturnValue(BridgeManager.getBridge().getMana(player));
     }
 
-    @Inject(method = "setMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "setMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$setMana(float amount, CallbackInfo ci) {
         ServerPlayer player = serverPlayer;
         if (player == null) {
@@ -66,7 +66,7 @@ public abstract class MixinIronsMagicDataMana {
         ci.cancel();
     }
 
-    @Inject(method = "addMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "addMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$addMana(float amount, CallbackInfo ci) {
         ServerPlayer player = serverPlayer;
         if (player == null) {

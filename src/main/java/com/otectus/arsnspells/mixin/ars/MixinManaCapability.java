@@ -48,7 +48,7 @@ public abstract class MixinManaCapability {
     @Unique
     private static final ThreadLocal<Boolean> arsnspells$inBridgeCall = ThreadLocal.withInitial(() -> false);
 
-    @Inject(method = "getCurrentMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getCurrentMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$getCurrentMana(CallbackInfoReturnable<Double> cir) {
         if (arsnspells$inBridgeCall.get()) {
             return; // Recursion guard: let native method run
@@ -84,7 +84,7 @@ public abstract class MixinManaCapability {
         }
     }
 
-    @Inject(method = "getMaxMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getMaxMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$getMaxMana(CallbackInfoReturnable<Integer> cir) {
         if (arsnspells$inBridgeCall.get()) {
             return; // Recursion guard: let native method run
@@ -129,7 +129,7 @@ public abstract class MixinManaCapability {
      * (read-only) so any direct field reads in Ars see a consistent value, then cancel
      * the original method to prevent Ars from clamping against its own stale state.
      */
-    @Inject(method = "setMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "setMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$setMana(double amount, CallbackInfoReturnable<Double> cir) {
         if (!(this.entity instanceof Player player)) {
             return;
@@ -153,7 +153,7 @@ public abstract class MixinManaCapability {
         }
     }
 
-    @Inject(method = "addMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "addMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$addMana(double amount, CallbackInfoReturnable<Double> cir) {
         if (!(this.entity instanceof Player player)) {
             return;
@@ -179,7 +179,7 @@ public abstract class MixinManaCapability {
         }
     }
 
-    @Inject(method = "removeMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "removeMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$removeMana(double amount, CallbackInfoReturnable<Double> cir) {
         if (!(this.entity instanceof Player player)) {
             return;
@@ -204,7 +204,7 @@ public abstract class MixinManaCapability {
         }
     }
 
-    @Inject(method = "setMaxMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "setMaxMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$setMaxMana(int amount, CallbackInfo ci) {
         if (!(this.entity instanceof Player player)) {
             return;

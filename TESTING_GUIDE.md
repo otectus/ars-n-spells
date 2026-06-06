@@ -1,10 +1,10 @@
-# Testing Guide — Ars 'n' Spells 1.9.0 (NeoForge 1.21.1)
+# Testing Guide — Ars 'n' Spells 2.5.0 (NeoForge 1.21.1)
 
 This guide covers manual verification scenarios for Ars 'n' Spells **on NeoForge 1.21.1**. It supersedes the pre-port Forge 1.20.1 testing notes (which documented the Sanctified Legacy / Covenant of the Seven ring systems — those integrations are removed in this release; see [README §Removed](README.md#removed-in-the-neoforge-1211-port) and the [CHANGELOG](CHANGELOG.md) for context).
 
 For an at-a-glance description of features and configuration, start with the [README](README.md). For the change history, see [CHANGELOG.md](CHANGELOG.md).
 
-> **Port status.** The NeoForge 1.21.1 port is staged. Several scenarios below are **gated on Phase 3** (the 22 `TODO(Phase 11)` gameplay re-attach markers) — they will only pass once the relevant handler / mixin is back online against Ars Nouveau 5.11.1 and Iron's Spells 1.21.1-3.15.6. Each scenario notes whether it is verifiable now or requires Phase 3 work first.
+> **Status.** The gameplay systems are live (mana unification, cross-cast, rituals, affinity, progression, resonance, cooldowns, equipment scaling). The build environment runs no Minecraft, so every scenario below is a **manual in-game** check that has not yet been run for 2.5.0. Priorities for this release: per-school affinity now covers Iron's addon schools (cast one spell from each addon school → `/ans info` shows a track under its full id); a 2.0.x save migrates its affinity (elemental tracks keep their counts, legacy category buckets are dropped); the ritual apparatus recipes are craftable again and the curio-discount tag applies on both the Ars and Iron's sides.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ For an at-a-glance description of features and configuration, start with the [RE
 
 The previous Forge 1.20.1 testing guide also referenced Covenant of the Seven (Sanctified Legacy) and Blood Magic. Both prerequisites are gone — see [CHANGELOG §Removed](CHANGELOG.md).
 
-Drop `build/libs/ars_n_spells-1.9.0.jar` into the instance's `mods/` folder alongside the dependencies. The Gradle dev environment exposes `runClient`, `runServer`, `runGameTestServer`, and `runData` tasks.
+Drop `build/libs/ars_n_spells-2.5.0.jar` into the instance's `mods/` folder alongside the dependencies. The Gradle dev environment exposes `runClient`, `runServer`, `runGameTestServer`, and `runData` tasks.
 
 To enable verbose log output during testing, set in `config/ars_n_spells-common.toml`:
 
@@ -91,7 +91,7 @@ Removed. The Cursed Ring / scroll-LP feature path is deleted as part of the Sanc
 2. `/attribute @s irons_spellbooks:spell_power get`.
 3. Confirm the value is base × resonance modifier; confirm the resonance payload syncs within ≤1 tick.
 
-Currently blocked on Phase 3 — [`ResonanceEvents`](src/main/java/com/otectus/arsnspells/events/ResonanceEvents.java) and [`RegenSynergyHandler`](src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java) carry `TODO(Phase 11)` markers for Iron's `SpellOnCastEvent` re-attach.
+[`ResonanceEvents`](src/main/java/com/otectus/arsnspells/events/ResonanceEvents.java) and [`RegenSynergyHandler`](src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java) are wired (re-attached in 2.0.1); resonance syncs on login and once per second, and Source-Jar proximity regen feeds the unified pool.
 
 ### V7 — Cooldown global-per-category — gated on Phase 3
 
@@ -162,7 +162,7 @@ If a future Curios integration in Phase 6 reintroduces curio-driven discounts, e
 - **Server crashes during boot with `NoClassDefFoundError` for an Iron's class on an Ars-only install**: a class was missed by the classload-safety pass. Grep the stack trace for `io.redspace.ironsspellbooks` and ensure the origin class is registered behind `IronsCompat.isLoaded()` or `ModList.get().isLoaded("irons_spellbooks")`.
 - **Affinity HUD shows zero after relog with non-zero attachment data**: the `AffinitySyncOnLoginHandler` didn't fire. Check that `enable_affinity_system = true` and that the player attachment is being serialized (`/data get entity @s` should show the `ars_n_spells:affinity` attachment).
 - **Cooldowns blocking spells from the "wrong" mod**: this is intentional. Cooldowns are global per category by design; see [README §Cooldowns](README.md#cooldowns).
-- **Cast nothing-happens on inscribed item**: Phase 3 work-in-progress. [`CrossCastingHandler`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) right-click intercept is stubbed pending Ars / Iron's API re-attach. See the `TODO(Phase 11)` markers in source.
+- **Cast nothing-happens on inscribed item**: confirm the item actually carries an inscription (`/data get entity @s` should show `ars_n_spells:cross_spells`), that the source mod of the inscribed spell is installed, and that you are not mid cross-cast cooldown. [`CrossCastingHandler`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) handles the right-click cast, sneak-cycle between inscriptions, and the cross-cast cost multiplier; a malformed inscription shows a red rejection message rather than silently no-casting.
 - **Recipes failing to load with `Unknown tag c:logs/archwood`**: confirm Ars Nouveau 5.11.1+ is installed — it ships the `c:` namespace common tag set. If Ars's tag still uses `forge:logs/archwood` on your specific build, fall back to `forge:logs/archwood` temporarily.
 - **Mixin apply failure for `ManaBarOverlay.render`**: expected before Phase 2. Iron's 3.15.6 likely re-targets to NeoForge's `LayeredDraw.Layer` instead of Forge's `ForgeGui` parameter. Update the mixin signature accordingly.
 
