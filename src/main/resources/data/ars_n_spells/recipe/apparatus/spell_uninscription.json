@@ -1,14 +1,9 @@
 {
   "type": "ars_nouveau:enchanting_apparatus",
   "keepNbtOfReagent": false,
-  "output": {
-    "item": "ars_n_spells:spell_uninscription"
+  "reagent": {
+    "item": "ars_nouveau:blank_parchment"
   },
-  "reagent": [
-    {
-      "item": "ars_nouveau:blank_parchment"
-    }
-  ],
   "pedestalItems": [
     {
       "item": "minecraft:water_bucket"
@@ -20,5 +15,9 @@
       "tag": "c:logs/archwood"
     }
   ],
+  "result": {
+    "id": "ars_n_spells:spell_uninscription",
+    "count": 1
+  },
   "sourceCost": 500
 }

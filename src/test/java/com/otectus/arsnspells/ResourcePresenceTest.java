@@ -1,5 +1,6 @@
 package com.otectus.arsnspells;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
@@ -7,8 +8,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -71,5 +75,38 @@ class ResourcePresenceTest {
             "stale plural recipes/ path must not ship (1.21 ignores it)");
         assertNull(res("/data/ars_n_spells/tags/items/curio_spell_discount.json"),
             "stale plural tags/items/ path must not ship (1.21 ignores it)");
+    }
+
+    @Test
+    void apparatusRecipesUseCurrent121Format() {
+        // Guards the 1.20.1 -> 1.21 enchanting_apparatus format change. AN's codec
+        // requires result{id,count} and reagent as a single object; the old
+        // output{item} / reagent-array form is valid JSON but throws
+        // "No key result" at runtime. (Existing presence test only checks JSON
+        // validity, not schema — this closes that gap.)
+        for (String path : new String[] {
+            "/data/ars_n_spells/recipe/apparatus/spell_transcription.json",
+            "/data/ars_n_spells/recipe/apparatus/spell_uninscription.json",
+        }) {
+            try (InputStream in = res(path)) {
+                assertNotNull(in, "Missing recipe on classpath: " + path);
+                JsonObject o = JsonParser.parseReader(
+                    new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
+                assertEquals("ars_nouveau:enchanting_apparatus",
+                    o.get("type").getAsString(), path + " wrong recipe type");
+                assertFalse(o.has("output"), path + " uses the obsolete 'output' key (use 'result')");
+                assertTrue(o.has("result"), path + " missing 'result'");
+                JsonObject result = o.getAsJsonObject("result");
+                assertNotNull(result.get("id"), path + " result missing 'id'");
+                assertFalse(result.has("item"),
+                    path + " result uses the obsolete 'item' key (use 'id'+'count')");
+                assertTrue(o.get("reagent").isJsonObject(),
+                    path + " 'reagent' must be a single object, not an array");
+                assertTrue(o.getAsJsonObject("reagent").has("item"),
+                    path + " reagent missing 'item'");
+            } catch (Exception e) {
+                fail("Recipe " + path + " failed schema check: " + e);
+            }
+        }
     }
 }

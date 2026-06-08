@@ -19,6 +19,12 @@ pending** (the build environment runs no Minecraft).
   which Minecraft 1.21 no longer reads (it loads `recipe/`, singular — verified against
   the Ars Nouveau and Iron's jars). They never loaded, so the ritual tablets were
   uncraftable in survival. Moved to `data/ars_n_spells/recipe/apparatus/`.
+- **Ritual recipes now parse.** Once relocated, the same apparatus recipes surfaced a
+  second carryover — the 1.20.1 recipe schema (`output`/`item`, `reagent` as an array),
+  which fails AN's current `enchanting_apparatus` codec with `No key result`. Migrated to
+  the 1.21 form (`result` with `id`+`count`, `reagent` as a single object); verified
+  against the live pack (AN 5.11.7) so the Transcription/Uninscription tablets craft at
+  the Enchanting Apparatus. A `ResourcePresenceTest` schema check now guards the format.
 - **Curio spell discount works again.** The `#ars_n_spells:curio_spell_discount` item tag
   shipped at the plural `tags/items/` path (1.20.1) instead of 1.21's `tags/item/`, so it
   never loaded and the discount was permanently inert. Moved to `tags/item/`, and the tag
