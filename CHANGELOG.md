@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.0] - 2026-06-14
+
+### Apotheosis / Apothic Curios mana bridge
+
+Affixed and socketed **curios** (rings, amulets, belts) now contribute their mana stats to the unified Ars ↔ Iron's pool. The equipment scanner already read attribute modifiers off armor and weapons — so Apotheosis affixes there always worked — but the curio path read only `IManaEquipment` and Ars enchantments, so an affixed/socketed ring's max-mana or mana-regen never reached the cross-mod bridge. A Mana Battery Ring took effect in its own system's pool but was invisible to the other.
+
+- **Curios attribute modifiers are now read and mirrored.** [EquipmentIntegration.java](src/main/java/com/otectus/arsnspells/equipment/EquipmentIntegration.java) enumerates worn curios via the Curios API (`CuriosApi.getCuriosInventory(...).findCurios(...)`) and reads each slot's aggregated attribute modifiers (`CuriosApi.getAttributeModifiers(slotContext, uuid, stack)`), summing Ars `max_mana`/`mana_regen` and Iron's `max_mana`/`mana_regen` through the **same `sumModifiers` helper and ADDITION-only rule the armor path uses**. This routes Apotheosis (with Apothic Curios) affixes & sockets — and any other curio mana gear such as Magical Jewelry or Jewelcraft — through the existing bridge. No double-counting: the curio's own pool already gets the modifier natively; the bridge only mirrors it to the other system, exactly as armor does.
+- **No hard Apotheosis dependency.** The read is generic (any mod's curio mana attributes), gated behind the new `read_curio_attribute_modifiers` config (default on) and wrapped so any API surprise degrades to "no bonus" rather than a crash.
+- **Spell power needed no change** — it is read from the player's *total* attribute, so affix spell power on armor/weapons/curios already counted. Apothic Attributes' own attributes (crit, armor pierce, fire/cold damage) are combat-only and out of scope for the mana/spell bridge.
+- **Build:** [build.gradle](build.gradle) adds a `compileOnly` Curios API dependency (`5.9.1+1.20.1`, the version Ars Nouveau bundles at runtime). Curios is always present at runtime via Ars, so this only puts the slot-aware API on the compile classpath.
+
+### Ring / aura-HUD correctness and hardening
+
+- **Aura-bar peak tracker is now lock-free.** [ClientAuraPeakTracker.java](src/main/java/com/otectus/arsnspells/client/ClientAuraPeakTracker.java) stores the personal peak in an `AtomicInteger` with a monotonic `getAndUpdate` ratchet, so the render-thread read in the HUD mixin composes cleanly with client-tick writes (and stays correct if a sync writer is ever added).
+- **Covenant version-drift probe.** [ArsNSpellsClient.java](src/main/java/com/otectus/arsnspells/client/ArsNSpellsClient.java) logs at startup whether Covenant of the Seven is at the version the aura-bar HUD mixin (`MixinResourceBarOverlay`) was bytecode-verified against (2.2.6). The mixin uses `require = 0`, so a mismatch can't crash the client; this makes the silent fallback diagnosable instead.
+- **Virtue aura system honors its toggle.** [VirtueRingHandler.java](src/main/java/com/otectus/arsnspells/events/VirtueRingHandler.java) now short-circuits its handlers when `ENABLE_VIRTUE_AURA_SYSTEM` is off.
+- **Dead alternate-resource stubs removed.** [CastingAuthority.java](src/main/java/com/otectus/arsnspells/casting/CastingAuthority.java) dropped the never-implemented `detectAlternateResourceCost`/`validateAlternateResource` path (it always returned null/true); Cursed/Virtue ring costs are owned by their dedicated event handlers.
+
+### Performance (render + tick hot paths)
+
+- **OPT-008:** [MixinArsPotionEffects.java](src/main/java/com/otectus/arsnspells/mixin/ars/MixinArsPotionEffects.java) only churns the mana attribute modifiers when the value actually changed, instead of a remove/add every server tick (which forced an attribute recompute).
+- **OPT-009:** [ManaBarController.java](src/main/java/com/otectus/arsnspells/client/ManaBarController.java) matches mana overlays on the `ResourceLocation` namespace/path directly (allocation-free `equals`) instead of `toString()` + substring scan every overlay every frame. The matchers are extracted as pure, package-private, unit-testable methods.
+- **OPT-010 / MED-019:** [OverlayDiagnostics.java](src/main/java/com/otectus/arsnspells/client/OverlayDiagnostics.java) registers its per-frame render subscriber on the Forge bus only while diagnostics are enabled (zero dispatch cost when off, the default), and uses a `TreeSet` for already-sorted iteration.
+- **IronsLP debug trace gated.** [IronsLPHandler.java](src/main/java/com/otectus/arsnspells/events/IronsLPHandler.java) builds its per-cast entry-trace strings only when `LOGGER.isDebugEnabled()`.
+
+### Tests
+
+- New unit coverage for the above: [ClientAuraPeakTrackerTest](src/test/java/com/otectus/arsnspells/client/ClientAuraPeakTrackerTest.java) (monotonic ratchet), [ManaBarControllerOverlayMatchTest](src/test/java/com/otectus/arsnspells/client/ManaBarControllerOverlayMatchTest.java) (overlay matchers), and [VirtueRingAuraToggleTest](src/test/java/com/otectus/arsnspells/config/VirtueRingAuraToggleTest.java) (toggle gating).
+
 ## [2.0.1] - 2026-05-29
 
 ### Mana unification mode is changeable in-game again

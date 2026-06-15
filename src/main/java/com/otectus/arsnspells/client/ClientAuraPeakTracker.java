@@ -10,13 +10,15 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * Tracks the local player's personal aura-peak in-memory on the client.
  *
- * <p>Covenant of the Seven's {@code AuraContainerOverlay} divides the current
+ * <p>Covenant of the Seven's {@code ResourceBarOverlay} divides the current
  * aura by a hardcoded {@code 2_000_000} when computing the bar's fill width.
  * For a player whose current peak is well below 2M, the bar will never appear
- * full. {@link com.otectus.arsnspells.mixin.covenant.MixinAuraContainerOverlay}
+ * full. {@link com.otectus.arsnspells.mixin.covenant.MixinResourceBarOverlay}
  * replaces that hardcoded divisor with the value this tracker returns, so the
  * bar fills relative to the player's <em>own</em> maximum.
  *
@@ -39,8 +41,12 @@ public final class ClientAuraPeakTracker {
     /** Floor so the mixin divisor never sees 0. The peak never decreases below this. */
     private static final int PEAK_FLOOR = 1;
 
-    /** Local-client-only state; volatile because the mixin reads it from the render thread. */
-    private static volatile int personalPeak = PEAK_FLOOR;
+    /**
+     * Local-client-only state. {@link AtomicInteger} so the render-thread reads in the
+     * mixin compose cleanly with the client-tick writes, and the monotonic ratchet stays
+     * lock-free and correct even if a second writer (e.g. a future sync packet) is added.
+     */
+    private static final AtomicInteger personalPeak = new AtomicInteger(PEAK_FLOOR);
 
     private static int tickCounter;
 
@@ -53,21 +59,19 @@ public final class ClientAuraPeakTracker {
      * so callers using it as a divisor are safe.
      */
     public static int getPeak() {
-        return Math.max(PEAK_FLOOR, personalPeak);
+        return Math.max(PEAK_FLOOR, personalPeak.get());
     }
 
     /**
      * Public ratchet entry for testing. Updates the peak iff {@code current} exceeds it.
      */
     public static void updatePeak(int current) {
-        if (current > personalPeak) {
-            personalPeak = current;
-        }
+        personalPeak.getAndUpdate(prev -> Math.max(prev, current));
     }
 
     /** Reset the peak. Called on disconnect; also useful for tests. */
     public static void reset() {
-        personalPeak = PEAK_FLOOR;
+        personalPeak.set(PEAK_FLOOR);
         tickCounter = 0;
     }
 

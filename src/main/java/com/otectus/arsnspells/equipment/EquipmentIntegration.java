@@ -3,7 +3,6 @@ package com.otectus.arsnspells.equipment;
 import com.google.common.collect.Multimap;
 import com.hollingsworth.arsnouveau.api.mana.IManaEquipment;
 import com.hollingsworth.arsnouveau.api.perk.PerkAttributes;
-import com.hollingsworth.arsnouveau.api.util.CuriosUtil;
 import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
@@ -17,12 +16,16 @@ import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import top.theillusivec4.curios.api.CuriosApi;
+import top.theillusivec4.curios.api.SlotContext;
+import top.theillusivec4.curios.api.SlotResult;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -163,21 +166,21 @@ public class EquipmentIntegration {
             ironRegenBonus += itemBonuses.ironBonus.manaRegen;
         }
 
-        // Curios (if present) - only use enchantment + IManaEquipment fallbacks
+        // Curios (if present): read IManaEquipment + Ars enchantments, and — when enabled —
+        // attribute modifiers off each curio slot. The attribute pass is what lets
+        // Apotheosis/Apothic-Curios affixes & sockets (and any other curio mana gear) reach the
+        // cross-mod bridge, mirroring the armor/weapon path in calculateItemBonuses.
         try {
-            IItemHandlerModifiable curios = CuriosUtil.getAllWornItems(player).orElse(null);
-            if (curios != null) {
-                for (int i = 0; i < curios.getSlots(); i++) {
-                    ItemStack item = curios.getStackInSlot(i);
-                    if (item.isEmpty()) {
-                        continue;
-                    }
-                    ItemBonuses itemBonuses = calculateCurioBonuses(item);
-                    arsMaxBonus += itemBonuses.arsBonus.maxMana;
-                    arsRegenBonus += itemBonuses.arsBonus.manaRegen;
-                    ironMaxBonus += itemBonuses.ironBonus.maxMana;
-                    ironRegenBonus += itemBonuses.ironBonus.manaRegen;
-                }
+            boolean readCurioAttributes = AnsConfig.READ_CURIO_ATTRIBUTE_MODIFIERS.get();
+            List<SlotResult> wornCurios = CuriosApi.getCuriosInventory(player)
+                .map(handler -> handler.findCurios(stack -> !stack.isEmpty()))
+                .orElse(Collections.emptyList());
+            for (SlotResult result : wornCurios) {
+                ItemBonuses itemBonuses = calculateCurioBonuses(result, ironsLoaded, readCurioAttributes);
+                arsMaxBonus += itemBonuses.arsBonus.maxMana;
+                arsRegenBonus += itemBonuses.arsBonus.manaRegen;
+                ironMaxBonus += itemBonuses.ironBonus.maxMana;
+                ironRegenBonus += itemBonuses.ironBonus.manaRegen;
             }
         } catch (Exception e) {
             LOGGER.debug("Curios integration unavailable: {}", e.getMessage());
@@ -246,11 +249,33 @@ public class EquipmentIntegration {
         return new ItemBonuses(new ManaBonus(arsMax, arsRegen), new ManaBonus(ironMax, ironRegen));
     }
 
-    private static ItemBonuses calculateCurioBonuses(ItemStack item) {
+    private static ItemBonuses calculateCurioBonuses(SlotResult result, boolean ironsLoaded, boolean readAttributes) {
+        ItemStack item = result.stack();
         double arsMax = 0.0;
         double arsRegen = 0.0;
         double ironMax = 0.0;
         double ironRegen = 0.0;
+
+        // Attribute modifiers on the curio slot (Apotheosis/Apothic-Curios affixes & sockets,
+        // and any other mod's curio mana attributes). CuriosApi aggregates the item's own
+        // declared curio modifiers with anything injected for the slot. ADDITION-only via
+        // sumModifiers, matching calculateItemBonuses so Ars-vs-Iron's attribution is identical.
+        if (readAttributes) {
+            try {
+                SlotContext ctx = result.slotContext();
+                UUID slotUuid = CuriosApi.getSlotUuid(ctx);
+                Multimap<Attribute, AttributeModifier> modifiers =
+                    CuriosApi.getAttributeModifiers(ctx, slotUuid, item);
+                arsMax += sumModifiers(modifiers, PerkAttributes.MAX_MANA.get());
+                arsRegen += sumModifiers(modifiers, PerkAttributes.MANA_REGEN_BONUS.get());
+                if (ironsLoaded) {
+                    ironMax += sumModifiers(modifiers, AttributeRegistry.MAX_MANA.get());
+                    ironRegen += sumModifiers(modifiers, AttributeRegistry.MANA_REGEN.get());
+                }
+            } catch (Exception e) {
+                LOGGER.debug("Failed reading curio attribute modifiers for {}", item, e);
+            }
+        }
 
         if (item.getItem() instanceof IManaEquipment manaEquipment) {
             arsMax += manaEquipment.getMaxManaBoost(item);

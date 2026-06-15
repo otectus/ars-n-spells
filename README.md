@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v2.0.1)
+# Ars 'n' Spells (v2.6.0)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -42,6 +42,8 @@ Ars and Iron's gear bonuses are routed to the active mana source:
 - **separate** -- Each mod's gear affects its own pool only.
 
 Bonuses come from attribute modifiers, `IManaEquipment` implementations, mana-related enchantments, and Curios items.
+
+Worn **curios** (rings, amulets, belts) have their attribute modifiers read the same way armor and weapons do, so mana stats applied by **Apotheosis / Apothic Curios** affixes and sockets — and by other curio mana gear like Magical Jewelry and Jewelcraft — feed the unified pool too. No hard dependency on Apotheosis is required; the read is generic and gated by the `read_curio_attribute_modifiers` config (default on). Apothic Attributes' combat stats (crit, armor pierce, fire/cold damage) are not mana or spell-power and are not bridged.
 
 ### Spell scaling
 
@@ -198,6 +200,7 @@ Config file (per-world, server-authoritative): `<world>/serverconfig/ars_n_spell
 | `blasphemy_discount` | `0.15` | Base Blasphemy discount (15%). |
 | `blasphemy_matching_school_bonus` | `0.10` | Extra discount for matching school (+10%). |
 | `allow_discount_stacking` | `true` | Allow discounts to stack with ring costs. |
+| `read_curio_attribute_modifiers` | `true` | Read mana attribute modifiers off worn curios (Apotheosis/Apothic Curios affixes & sockets, Magical Jewelry, etc.) and mirror them across the unified pool. |
 
 ### Spell scaling
 
@@ -228,6 +231,13 @@ The mod hides redundant mana bars based on mode:
 - **separate / disabled**: Both bars may show.
 
 ## Changelog
+
+### v2.6.0 — Apotheosis curio bridge + ring/HUD polish
+
+- **Apotheosis / Apothic Curios mana bridge.** Affixed and socketed curios (rings, amulets, belts) now feed the unified mana pool — the curio scanner reads attribute modifiers the same way the armor path does, via the Curios API. Generic (works for Magical Jewelry, Jewelcraft, etc. too), no hard Apotheosis dependency, gated by `read_curio_attribute_modifiers` (default on). Spell power already flowed through the player's total attribute, so it needed no change.
+- **Ring / aura-HUD correctness.** Lock-free `AtomicInteger` aura peak ratchet, a Covenant version-drift probe for the aura-bar HUD mixin, and Virtue-aura handlers that honor `ENABLE_VIRTUE_AURA_SYSTEM`. Removed dead alternate-resource stubs from `CastingAuthority`.
+- **Hot-path performance.** Per-tick mana-attribute churn avoided unless the value changed (OPT-008); allocation-free overlay matching by `ResourceLocation` namespace/path (OPT-009); opt-in overlay diagnostics subscriber + sorted `TreeSet` (MED-019/OPT-010); gated Iron's LP debug tracing.
+- New unit tests for the peak ratchet, overlay matchers, and Virtue-aura toggle. See [CHANGELOG.md](CHANGELOG.md) for the full breakdown.
 
 ### v2.0.0 — Audit-driven major release
 

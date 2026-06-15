@@ -35,6 +35,9 @@ public class ArsNSpellsClient {
             LOGGER.info("Debug mode enabled - activating overlay diagnostics");
             OverlayDiagnostics.enable();
         }
+
+        // N-4: surface silent aura-bar HUD-mixin breakage on Covenant version drift.
+        probeCovenantHudCompat();
         
         LOGGER.info("Client-side initialization complete");
     }
@@ -55,5 +58,31 @@ public class ArsNSpellsClient {
         } catch (Exception e) {
             LOGGER.error("Failed to register config screen", e);
         }
+    }
+
+    /** Covenant version the aura-bar HUD mixin was bytecode-verified against (see MixinResourceBarOverlay). */
+    private static final String TESTED_COVENANT_VERSION = "2.2.6";
+
+    /**
+     * N-4: warn if Covenant of the Seven is present at a version the aura-bar HUD mixin
+     * was not verified against. {@link com.otectus.arsnspells.mixin.covenant.MixinResourceBarOverlay}
+     * uses {@code require = 0} (so a mismatch can't crash the client) and is pinned to
+     * Covenant {@value #TESTED_COVENANT_VERSION} bytecode offsets. If upstream moves the
+     * {@code 2_000_000} divisor or renames {@code ResourceBarOverlay}, the Virtue-Ring aura
+     * bar silently falls back to Covenant's 2M divisor — this log makes that diagnosable.
+     */
+    private static void probeCovenantHudCompat() {
+        net.minecraftforge.fml.ModList.get().getModContainerById("covenant_of_the_seven").ifPresent(c -> {
+            String version = c.getModInfo().getVersion().toString();
+            if (version.contains(TESTED_COVENANT_VERSION)) {
+                LOGGER.info("Covenant of the Seven {} detected - aura-bar HUD peak-tracking active.", version);
+            } else {
+                LOGGER.warn("Covenant of the Seven {} detected, but the aura-bar HUD mixin "
+                    + "(MixinResourceBarOverlay) was bytecode-verified against {}. If the Virtue-Ring "
+                    + "aura bar fills against Covenant's 2,000,000 cap instead of your personal peak, "
+                    + "the mixin did not bind to this version - please report it.",
+                    version, TESTED_COVENANT_VERSION);
+            }
+        });
     }
 }

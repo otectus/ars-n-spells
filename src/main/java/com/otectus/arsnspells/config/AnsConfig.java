@@ -109,6 +109,7 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue BLASPHEMY_DISCOUNT;
     public static final ForgeConfigSpec.DoubleValue BLASPHEMY_MATCHING_SCHOOL_BONUS;
     public static final ForgeConfigSpec.BooleanValue ALLOW_DISCOUNT_STACKING;
+    public static final ForgeConfigSpec.BooleanValue READ_CURIO_ATTRIBUTE_MODIFIERS;
     
     // ========================================
     // CURSED RING LP SYSTEM
@@ -143,6 +144,8 @@ public class AnsConfig {
     // Covenant of the Seven owns the aura state, regen, max pool, and HUD. We only
     // need to know how to map an Ars Nouveau mana cost to an aura cost when the
     // Virtue Ring is worn — Covenant has no native getAuraCost(ArsSpell) method.
+    // Master on/off switch for the aura path; mirrors ENABLE_LP_SYSTEM for the Cursed Ring.
+    public static final ForgeConfigSpec.BooleanValue ENABLE_VIRTUE_AURA_SYSTEM;
     public static final ForgeConfigSpec.DoubleValue ARS_VIRTUE_AURA_MULTIPLIER;
 
     // ========================================
@@ -580,6 +583,14 @@ public class AnsConfig {
         ALLOW_DISCOUNT_STACKING = BUILDER
             .comment("Allow Ring of Virtue and Blasphemy discounts to stack multiplicatively")
             .define("allow_discount_stacking", true);
+
+        READ_CURIO_ATTRIBUTE_MODIFIERS = BUILDER
+            .comment("Read max-mana / mana-regen attribute modifiers from worn Curios (rings, amulets,",
+                     "belts) and mirror them across the unified mana pool, the same way armor/weapon",
+                     "modifiers are handled. This is what lets Apotheosis (Apothic Curios) affixes and",
+                     "sockets, as well as other curio mana gear (Magical Jewelry, Jewelcraft, etc.),",
+                     "feed the Ars <-> Iron's bridge. Disable if a curio affix balance proves overpowered.")
+            .define("read_curio_attribute_modifiers", true);
         
         BUILDER.pop();
 
@@ -725,6 +736,13 @@ public class AnsConfig {
             "aura cost. Iron's Spellbooks spells are handled entirely by Covenant's",
             "native integration and do not use this knob."
         );
+
+        ENABLE_VIRTUE_AURA_SYSTEM = BUILDER
+            .comment("Master toggle for the Virtue Ring (Ring of Seven Virtues) aura-cost path.",
+                     "When false, Ars Nouveau spells cast while wearing the Virtue Ring use normal",
+                     "mana instead of Covenant aura. Mirrors enable_lp_system for the Cursed Ring,",
+                     "giving server owners a way to disable the aura path entirely.")
+            .define("enable_virtue_aura_system", true);
 
         ARS_VIRTUE_AURA_MULTIPLIER = BUILDER
             .comment("Multiplier applied to Ars Nouveau mana cost to derive the Covenant-aura cost.",
@@ -901,6 +919,8 @@ public class AnsConfig {
             case "progression": return ENABLE_PROGRESSION_SYSTEM.get();
             case "affinity": return ENABLE_AFFINITY_SYSTEM.get();
             case "lp": return ENABLE_LP_SYSTEM.get();
+            case "virtue":
+            case "aura": return ENABLE_VIRTUE_AURA_SYSTEM.get();
             default: return false;
         }
     }

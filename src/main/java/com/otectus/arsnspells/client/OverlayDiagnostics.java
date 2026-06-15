@@ -1,33 +1,37 @@
 package com.otectus.arsnspells.client;
 
-import com.otectus.arsnspells.ArsNSpells;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
- * Diagnostic tool to log all overlay IDs being rendered.
- * Enable debug mode to see what overlays are active.
+ * Diagnostic tool to log all overlay IDs being rendered. Opt-in: the per-frame
+ * render subscriber is registered on the Forge event bus only while diagnostics
+ * are enabled (see {@link #enable()}), so there is zero dispatch cost when off
+ * (the default). Toggled by {@code /ans debug} and by DEBUG_MODE at client setup.
  */
-@Mod.EventBusSubscriber(modid = ArsNSpells.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class OverlayDiagnostics {
     private static final Logger LOGGER = LoggerFactory.getLogger(OverlayDiagnostics.class);
-    private static final Set<String> loggedOverlays = new HashSet<>();
+    private static final Set<String> loggedOverlays = new TreeSet<>();
     private static boolean diagnosticsEnabled = false;
     
     /**
      * Enable diagnostics mode
      */
     public static void enable() {
+        if (diagnosticsEnabled) {
+            return;
+        }
         diagnosticsEnabled = true;
         loggedOverlays.clear();
+        // MED-019: register the per-frame subscriber only while diagnostics are on.
+        MinecraftForge.EVENT_BUS.register(OverlayDiagnostics.class);
         LOGGER.info("========================================");
         LOGGER.info("Overlay Diagnostics ENABLED");
         LOGGER.info("Will log all overlay IDs...");
@@ -38,7 +42,11 @@ public class OverlayDiagnostics {
      * Disable diagnostics mode
      */
     public static void disable() {
+        if (!diagnosticsEnabled) {
+            return;
+        }
         diagnosticsEnabled = false;
+        MinecraftForge.EVENT_BUS.unregister(OverlayDiagnostics.class);
         LOGGER.info("========================================");
         LOGGER.info("Overlay Diagnostics DISABLED");
         LOGGER.info("Logged {} unique overlays", loggedOverlays.size());
@@ -83,9 +91,8 @@ public class OverlayDiagnostics {
         LOGGER.info("Total Unique Overlays: {}", loggedOverlays.size());
         LOGGER.info("");
         LOGGER.info("All Overlays:");
-        loggedOverlays.stream().sorted().forEach(overlay -> {
-            LOGGER.info("  - {}", overlay);
-        });
+        // TreeSet already iterates in sorted order (OPT-010).
+        loggedOverlays.forEach(overlay -> LOGGER.info("  - {}", overlay));
         LOGGER.info("========================================");
     }
 }

@@ -42,10 +42,15 @@ public class IronsLPHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onIronsSpellPreCast(SpellPreCastEvent event) {
         Player player = event.getEntity();
-        LOGGER.debug("[IronsLPHandler] PreCast event received from Iron's (player={}, spell={}, level={}, side={})",
-            player == null ? "null" : player.getName().getString(),
-            event.getSpellId(), event.getSpellLevel(),
-            player == null ? "?" : (player.level().isClientSide() ? "CLIENT" : "SERVER"));
+        // Guard the per-cast entry trace: this fires for EVERY Iron's cast by every
+        // player (before the ring check below), and the args (getName().getString())
+        // would allocate on the hot path even with DEBUG off.
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("[IronsLPHandler] PreCast event received from Iron's (player={}, spell={}, level={}, side={})",
+                player == null ? "null" : player.getName().getString(),
+                event.getSpellId(), event.getSpellLevel(),
+                player == null ? "?" : (player.level().isClientSide() ? "CLIENT" : "SERVER"));
+        }
 
         if (player == null || player.level().isClientSide()) {
             return;
@@ -137,9 +142,13 @@ public class IronsLPHandler {
     public void onIronsSpellCast(SpellOnCastEvent event) {
         Player player = event.getEntity();
         int manaCostBefore = event.getManaCost();
-        LOGGER.debug("[IronsLPHandler] OnCast event received from Iron's (player={}, spell={}, manaCost={})",
-            player == null ? "null" : player.getName().getString(),
-            event.getSpellId(), manaCostBefore);
+        // Hot-path entry trace (fires for every Iron's cast) — gate so the String args
+        // are only built when DEBUG is actually enabled.
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("[IronsLPHandler] OnCast event received from Iron's (player={}, spell={}, manaCost={})",
+                player == null ? "null" : player.getName().getString(),
+                event.getSpellId(), manaCostBefore);
+        }
 
         if (player == null || player.level().isClientSide()) {
             return;

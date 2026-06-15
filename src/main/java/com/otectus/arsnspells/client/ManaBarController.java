@@ -7,6 +7,7 @@ import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
@@ -32,13 +33,17 @@ public class ManaBarController {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRenderOverlay(RenderGuiOverlayEvent.Pre event) {
         try {
-            // Get the overlay being rendered
-            String overlayId = event.getOverlay().id().toString();
+            // Get the overlay being rendered. Use the ResourceLocation directly instead
+            // of .toString() — avoids a per-overlay-per-frame String allocation and lets
+            // the matchers do a namespace equals() rather than a substring scan (OPT-009).
+            ResourceLocation overlayId = event.getOverlay().id();
+            String overlayNamespace = overlayId.getNamespace();
+            String overlayPath = overlayId.getPath();
 
             // Hide mana bars when the Cursed/Virtue Ring is equipped — spells consume
             // LP or Aura in that state, so showing a mana bar is misleading. This runs
             // independently of mana unification so it still applies when unification is off.
-            if (isManaOverlay(overlayId)
+            if (isManaOverlay(overlayNamespace, overlayPath)
                 && AnsConfig.HIDE_MANA_BAR_WITH_RING.get()
                 && SanctifiedLegacyCompat.isAvailable()) {
                 LocalPlayer localPlayer = Minecraft.getInstance().player;
@@ -72,7 +77,7 @@ public class ManaBarController {
                 && "irons".equalsIgnoreCase(AnsConfig.HYBRID_MANA_BAR.get());
 
             // Handle Iron's Spellbooks mana bar
-            if (overlayId.contains("irons_spellbooks") && overlayId.contains("mana")) {
+            if (isIronsManaOverlay(overlayNamespace, overlayPath)) {
                 if (mode == ManaUnificationMode.ARS_PRIMARY ||
                     (mode == ManaUnificationMode.HYBRID && !hybridShowIrons)) {
                     event.setCanceled(true);
@@ -83,7 +88,7 @@ public class ManaBarController {
             }
 
             // Handle Ars Nouveau mana bar
-            if (overlayId.contains("ars_nouveau") && overlayId.contains("mana")) {
+            if (isArsManaOverlay(overlayNamespace, overlayPath)) {
                 if (mode == ManaUnificationMode.ISS_PRIMARY ||
                     (mode == ManaUnificationMode.HYBRID && hybridShowIrons)) {
                     event.setCanceled(true);
@@ -100,10 +105,18 @@ public class ManaBarController {
         }
     }
 
-    private static boolean isManaOverlay(String overlayId) {
-        if (!overlayId.contains("mana")) {
-            return false;
-        }
-        return overlayId.contains("irons_spellbooks") || overlayId.contains("ars_nouveau");
+    // Package-private + pure (namespace/path strings) so they're allocation-free on the
+    // render path and unit-testable without a Minecraft bootstrap (OPT-009).
+    static boolean isManaOverlay(String namespace, String path) {
+        return path.contains("mana")
+            && (namespace.equals("irons_spellbooks") || namespace.equals("ars_nouveau"));
+    }
+
+    static boolean isIronsManaOverlay(String namespace, String path) {
+        return namespace.equals("irons_spellbooks") && path.contains("mana");
+    }
+
+    static boolean isArsManaOverlay(String namespace, String path) {
+        return namespace.equals("ars_nouveau") && path.contains("mana");
     }
 }

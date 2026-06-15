@@ -54,6 +54,9 @@ public class VirtueRingHandler {
         if (!SanctifiedLegacyCompat.isAvailable()) {
             return;
         }
+        if (!AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get()) {
+            return;
+        }
 
         LivingEntity caster = event.context != null ? event.context.getUnwrappedCaster() : null;
         if (!(caster instanceof Player player)) {
@@ -145,6 +148,9 @@ public class VirtueRingHandler {
         if (!SanctifiedLegacyCompat.isAvailable()) {
             return;
         }
+        if (!AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get()) {
+            return;
+        }
         if (event.context == null) {
             return;
         }
@@ -179,6 +185,9 @@ public class VirtueRingHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onSpellResolvePost(SpellResolveEvent.Post event) {
         if (!SanctifiedLegacyCompat.isAvailable()) {
+            return;
+        }
+        if (!AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get()) {
             return;
         }
         if (event.context == null) {

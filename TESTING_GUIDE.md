@@ -1,4 +1,4 @@
-# Testing Guide — Ars 'n' Spells 2.0.0
+# Testing Guide — Ars 'n' Spells 2.6.0
 
 This guide covers manual verification scenarios for the systems shipped in
 2.0.0 (the audit-driven major release). It supersedes the pre-1.8 testing
@@ -18,9 +18,12 @@ For an at-a-glance description of features and configuration, start with the
 | Covenant of the Seven (Sanctified Legacy) | Any | Cursed/Virtue Ring tests |
 | Blood Magic | Any | LP source `BLOOD_MAGIC_*` tests |
 
-Drop `build/libs/ars_n_spells-2.0.1.jar` into the instance's `mods/` folder
+Drop `build/libs/ars_n_spells-2.6.0.jar` into the instance's `mods/` folder
 alongside the dependencies. **2.0.0 introduces a new C2S packet ID; clients
 and servers must run matching versions.**
+
+Apotheosis + Apothic Curios are optional — install them only for the
+"Curio attribute bridge" scenario below.
 
 To enable verbose log output during testing, set in `<world>/serverconfig/ars_n_spells-server.toml`:
 
@@ -274,6 +277,28 @@ Pass: both casts get the base 15% mana discount (`blasphemy_discount`); the
 fire cast gets an additional 10% from the matching-school bonus
 (`blasphemy_matching_school_bonus`). With `allow_discount_stacking = true`
 discounts compose with ring conversions.
+
+### S15 — Curio attribute bridge (Apotheosis / Apothic Curios) — 2.6.0
+
+Requires Apotheosis + Apothic Curios installed, plus Iron's Spellbooks.
+
+1. Obtain a ring (or other curio) with a mana affix or a socketed mana gem —
+   one that rolls Ars `max_mana` or Iron's `max_mana`. (`/apoth gem ...` /
+   `/apoth affix ...`, or roll one from loot.)
+2. With `read_curio_attribute_modifiers = true` (default), note your max mana,
+   then equip the ring. Check `/ans info` or the mana bar.
+
+Pass:
+- In `iss_primary` / `hybrid`, an **Ars** `max_mana` curio affix raises the
+  **Iron's** max mana via the bridge (not only Ars's pool).
+- In `ars_primary`, an **Iron's** `max_mana` curio affix raises the **Ars**
+  max mana.
+- Total with the ring on = base + affix counted **once per pool** (no
+  double-count).
+- Set `read_curio_attribute_modifiers = false` and relog: the cross-mirror
+  disappears; native single-system behavior remains.
+- Launch without Apotheosis: no errors; `IManaEquipment` / Ars-enchantment
+  curio mana still works as before.
 
 ## Inscription / cross-cast scenarios
 

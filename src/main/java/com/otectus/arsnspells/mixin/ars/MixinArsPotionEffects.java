@@ -74,9 +74,6 @@ public abstract class MixinArsPotionEffects {
             if (regenAttr == null) return;
 
             if (arsRegenBonus > 0) {
-                // Remove old modifier
-                regenAttr.removeModifier(POTION_MANA_REGEN_ID);
-
                 // arsRegenBonus is absolute mana/sec; Iron's MANA_REGEN is a percentage-of-pool
                 // multiplier. Going through ManaRegenBridge converts units; the pool conversion
                 // rate is then layered on top.
@@ -84,15 +81,22 @@ public abstract class MixinArsPotionEffects {
                 double absRegenPerSec = arsRegenBonus * conversionRate;
                 double ironRegenBonus = ManaRegenBridge.convertArsToIrons(absRegenPerSec, player);
 
-                AttributeModifier modifier = new AttributeModifier(
-                    POTION_MANA_REGEN_ID,
-                    "Ars Potion Mana Regen",
-                    ironRegenBonus,
-                    AttributeModifier.Operation.ADDITION
-                );
-                regenAttr.addTransientModifier(modifier);
-            } else {
-                // Remove modifier if no longer active
+                // OPT-008: this runs every server tick; only churn the attribute (which
+                // dirties the attribute map and forces a recompute) when the value changed.
+                // The existing modifier carries the last-applied value, so no extra state
+                // is needed — and nothing leaks for disconnected players.
+                AttributeModifier existing = regenAttr.getModifier(POTION_MANA_REGEN_ID);
+                if (existing == null || existing.getAmount() != ironRegenBonus) {
+                    regenAttr.removeModifier(POTION_MANA_REGEN_ID);
+                    regenAttr.addTransientModifier(new AttributeModifier(
+                        POTION_MANA_REGEN_ID,
+                        "Ars Potion Mana Regen",
+                        ironRegenBonus,
+                        AttributeModifier.Operation.ADDITION
+                    ));
+                }
+            } else if (regenAttr.getModifier(POTION_MANA_REGEN_ID) != null) {
+                // Remove the modifier only when one is actually present.
                 regenAttr.removeModifier(POTION_MANA_REGEN_ID);
             }
         } catch (Exception e) {
@@ -112,19 +116,21 @@ public abstract class MixinArsPotionEffects {
             if (maxManaAttr == null) return;
 
             if (arsMaxManaBonus > 0) {
-                maxManaAttr.removeModifier(POTION_MAX_MANA_ID);
-
                 double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
                 double ironMaxManaBonus = arsMaxManaBonus * conversionRate;
 
-                AttributeModifier modifier = new AttributeModifier(
-                    POTION_MAX_MANA_ID,
-                    "Ars Potion Max Mana",
-                    ironMaxManaBonus,
-                    AttributeModifier.Operation.ADDITION
-                );
-                maxManaAttr.addTransientModifier(modifier);
-            } else {
+                // OPT-008: skip the per-tick remove/add when the value is unchanged.
+                AttributeModifier existing = maxManaAttr.getModifier(POTION_MAX_MANA_ID);
+                if (existing == null || existing.getAmount() != ironMaxManaBonus) {
+                    maxManaAttr.removeModifier(POTION_MAX_MANA_ID);
+                    maxManaAttr.addTransientModifier(new AttributeModifier(
+                        POTION_MAX_MANA_ID,
+                        "Ars Potion Max Mana",
+                        ironMaxManaBonus,
+                        AttributeModifier.Operation.ADDITION
+                    ));
+                }
+            } else if (maxManaAttr.getModifier(POTION_MAX_MANA_ID) != null) {
                 maxManaAttr.removeModifier(POTION_MAX_MANA_ID);
             }
         } catch (Exception e) {

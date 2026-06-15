@@ -67,12 +67,8 @@ public class CastingAuthority {
         // (mana cost zeroed at SpellCostCalcEvent; aura consumed at SpellResolveEvent.Post).
         // The aura sufficiency check happens in MixinSpellResolverPreCast.
 
-        // Check for alternate resource costs (health, aura, etc.)
-        AlternateResourceCost altCost = detectAlternateResourceCost(player, manaCost);
-        if (altCost != null) {
-            return validateAlternateResource(player, altCost);
-        }
-
+        // Alternate-resource rings (Cursed/Virtue) are handled by their dedicated event
+        // handlers (CursedRingHandler / VirtueRingHandler), not here.
         // Standard mana validation
         logDebug("canCastArsSpell: Using standard mana validation");
         return validateManaResource(player, manaCost, true);
@@ -197,44 +193,6 @@ public class CastingAuthority {
     }
 
     /**
-     * Detect if a spell is using alternate resource costs (health, aura, etc.).
-     * This handles rings like Seven Curses/Virtues.
-     * 
-     * @param player The player
-     * @param baseCost The base mana cost
-     * @return AlternateResourceCost if detected, null otherwise
-     */
-    private static AlternateResourceCost detectAlternateResourceCost(Player player, int baseCost) {
-        // Check for health-based cost (Ring of Seven Curses)
-        // This is detected by checking if the player has specific curios equipped
-        // For now, we'll use a simple heuristic: if mana cost is 0 but spell has effects,
-        // it's likely using alternate resources
-        
-        // TODO: Implement proper curio detection for rings
-        // For now, return null to use standard mana validation
-        return null;
-    }
-
-    /**
-     * Validate alternate resource availability (health, aura, etc.).
-     * 
-     * @param player The player
-     * @param cost The alternate resource cost
-     * @return true if player has sufficient resources
-     */
-    private static boolean validateAlternateResource(Player player, AlternateResourceCost cost) {
-        switch (cost.type) {
-            case HEALTH:
-                return player.getHealth() > cost.amount;
-            case AURA:
-                // TODO: Implement aura checking
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    /**
      * Send a denial message to the player.
      * 
      * @param player The player
@@ -255,25 +213,4 @@ public class CastingAuthority {
         }
     }
 
-    /**
-     * Represents an alternate resource cost.
-     */
-    private static class AlternateResourceCost {
-        final ResourceType type;
-        final float amount;
-
-        AlternateResourceCost(ResourceType type, float amount) {
-            this.type = type;
-            this.amount = amount;
-        }
-    }
-
-    /**
-     * Types of resources that can be used for spell casting.
-     */
-    private enum ResourceType {
-        MANA,
-        HEALTH,
-        AURA
-    }
 }

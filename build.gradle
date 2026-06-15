@@ -45,12 +45,21 @@ repositories {
         name = 'CurseMaven'
         url = 'https://cursemaven.com'
     }
+    // Curios API — compile-only. Curios is always present at runtime (Ars Nouveau
+    // hard-depends on it); this only puts the slot-aware API on the compile classpath
+    // so EquipmentIntegration can read per-curio attribute modifiers (Apotheosis affixes).
+    maven {
+        name = 'Illusive Soulworks'
+        url = 'https://maven.theillusivec4.top/'
+    }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf("curse.maven:${ars_nouveau_project}:${ars_nouveau_file}")
     compileOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${irons_spellbooks_file}")
+    // Curios API only (matches the version Ars Nouveau bundles at runtime).
+    compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}:api")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
