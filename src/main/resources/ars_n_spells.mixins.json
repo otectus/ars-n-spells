@@ -8,6 +8,7 @@
     "ars.MixinManaCapability",
     "ars.MixinSpellResolverMana",
     "ars.MixinSpellResolverContext",
+    "ars.MixinArsPotionEffects",
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana"
   ],

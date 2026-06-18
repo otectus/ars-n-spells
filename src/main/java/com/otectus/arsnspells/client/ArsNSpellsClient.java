@@ -2,10 +2,13 @@ package com.otectus.arsnspells.client;
 
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.config.ConfigScreenFactory;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +40,14 @@ public class ArsNSpellsClient {
             LOGGER.info("Debug mode enabled - activating overlay diagnostics");
             OverlayDiagnostics.enable();
         }
+
+        // Register the in-game config screen (accessible from the Mods menu).
+        // Registered here (CLIENT/MOD bus) so the client-only Screen never
+        // classloads on a dedicated server.
+        ModList.get().getModContainerById(ArsNSpells.MODID).ifPresent(container ->
+            container.registerExtensionPoint(IConfigScreenFactory.class,
+                (IConfigScreenFactory) (mc, modListScreen) ->
+                    ConfigScreenFactory.createConfigScreen(modListScreen)));
 
         LOGGER.info("Client-side initialization complete");
     }

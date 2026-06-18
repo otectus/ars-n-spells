@@ -1,10 +1,10 @@
-# Testing Guide — Ars 'n' Spells 2.5.0 (NeoForge 1.21.1)
+# Testing Guide — Ars 'n' Spells 2.6.1 (NeoForge 1.21.1)
 
 This guide covers manual verification scenarios for Ars 'n' Spells **on NeoForge 1.21.1**. It supersedes the pre-port Forge 1.20.1 testing notes (which documented the Sanctified Legacy / Covenant of the Seven ring systems — those integrations are removed in this release; see [README §Removed](README.md#removed-in-the-neoforge-1211-port) and the [CHANGELOG](CHANGELOG.md) for context).
 
 For an at-a-glance description of features and configuration, start with the [README](README.md). For the change history, see [CHANGELOG.md](CHANGELOG.md).
 
-> **Status.** The gameplay systems are live (mana unification, cross-cast, rituals, affinity, progression, resonance, cooldowns, equipment scaling). The build environment runs no Minecraft, so every scenario below is a **manual in-game** check that has not yet been run for 2.5.0. Priorities for this release: per-school affinity now covers Iron's addon schools (cast one spell from each addon school → `/ans info` shows a track under its full id); a 2.0.x save migrates its affinity (elemental tracks keep their counts, legacy category buckets are dropped); the ritual apparatus recipes are craftable again and the curio-discount tag applies on both the Ars and Iron's sides.
+> **Status.** The gameplay systems are live (mana unification, cross-cast, rituals, affinity, progression, resonance, cooldowns, equipment scaling). The build environment runs no Minecraft, so every scenario below is a **manual in-game** check that has not yet been run for 2.6.1. **2.6.1 priorities:** the restored config screen (V11), Ars mana-potion mirroring (V12), the mana-only pre-cast check (V13), and the debug overlay (V14). Carried-over priorities: per-school affinity now covers Iron's addon schools (cast one spell from each addon school → `/ans info` shows a track under its full id); a 2.0.x save migrates its affinity (elemental tracks keep their counts, legacy category buckets are dropped); the ritual apparatus recipes are craftable again and the curio-discount tag applies on both the Ars and Iron's sides.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ For an at-a-glance description of features and configuration, start with the [RE
 
 The previous Forge 1.20.1 testing guide also referenced Covenant of the Seven (Sanctified Legacy) and Blood Magic. Both prerequisites are gone — see [CHANGELOG §Removed](CHANGELOG.md).
 
-Drop `build/libs/ars_n_spells-2.5.0.jar` into the instance's `mods/` folder alongside the dependencies. The Gradle dev environment exposes `runClient`, `runServer`, `runGameTestServer`, and `runData` tasks.
+Drop `build/libs/ars_n_spells-2.6.1.jar` into the instance's `mods/` folder alongside the dependencies. The Gradle dev environment exposes `runClient`, `runServer`, `runGameTestServer`, and `runData` tasks.
 
 To enable verbose log output during testing, set in `config/ars_n_spells-common.toml`:
 
@@ -36,12 +36,12 @@ Run these gradle tasks against the worktree before any manual scenario. Each gat
 | **G1 — Build** | `./gradlew --refresh-dependencies clean build` | `BUILD SUCCESSFUL`, 0 compile errors, no `mods.toml` references. |
 | **G2 — JUnit** | `./gradlew test` | All test classes pass. `CrossModSpellListRoundTripTest` is in place; `InscriptionInputsPredicateTest` is deferred to Phase 3. |
 | **G3 — Datagen** | `./gradlew runData` | Task exits 0; `src/generated/resources/` exists. |
-| **G4 — Mixin apply (Ars only)** | `./gradlew runClient` without Iron's | 5 Ars mixins apply (after Phase 2 verification); Iron's mixins skip silently; no `Mixin apply failed`. |
-| **G5 — Mixin apply (Ars + Iron's)** | `./gradlew runClient` with both pinned | All 9 active mixins apply. |
+| **G4 — Mixin apply (Ars only)** | `./gradlew runClient` without Iron's | The 3 Ars-only mixins apply (`MixinManaCapability`, `MixinSpellResolverMana`, `MixinSpellResolverContext`); `MixinArsPotionEffects` and the Iron's mixins skip silently (they need Iron's); no `Mixin apply failed`. |
+| **G5 — Mixin apply (Ars + Iron's)** | `./gradlew runClient` with both pinned | All 6 active mixins apply (the 3 Ars mixins + `MixinArsPotionEffects` + `MixinIronsSpellDamage` + `MixinIronsMagicDataMana`). |
 | **G6 — Dedicated server (Ars only)** | `./gradlew runServer` without Iron's | Server reaches `Done (…)! For help, type 'help'`, 0 stack traces, 0 `NoClassDefFoundError` for `io.redspace.*`. |
 | **G7 — Dedicated server (Ars + Iron's)** | `./gradlew runServer` with Iron's pinned | Same; payload registration log line visible for `affinity_sync`, `cooldown_sync`, `resonance_sync`. |
 
-Gates G4 / G5 are blocked on Phase 2 (mixin re-verification) and may fail until that pass lands.
+Gates G4 / G5 exercise the live mixin set; a failure means a target drifted in the pinned Ars/Iron's build (all injects use `require = 0`, so drift skips rather than crashes).
 
 ## V1 — V10 manual scenarios
 
@@ -125,6 +125,39 @@ Pass: no server crash; the new config value takes effect without restart.
 
 Pass: affinity and progression persist; the chest item's `CrossModSpellList` data component is intact and right-clicking the item still casts (Phase 3 dependency for the cast itself; the component persistence should already work).
 
+## V11 – V14 — 2.6.1 feature checks
+
+### V11 — In-game config screen — should pass now
+
+1. In singleplayer, open **Mods → Ars 'n' Spells → Config**.
+2. Toggle a master switch and click the **Mana Mode** row to cycle it; click **Done**.
+3. Run `/ans mode` and inspect `serverconfig/ars_n_spells-server.toml`.
+
+Pass: the screen opens, the Mana Mode row cycles through the five modes, and on **Done** the value is saved and applied live (`BridgeManager.refreshMode`) so `/ans mode` reflects the change. In multiplayer the Save/Reset controls are disabled and the button reads **Close**. Registered via `IConfigScreenFactory` in [`ArsNSpellsClient`](src/main/java/com/otectus/arsnspells/client/ArsNSpellsClient.java); screen body in [`ConfigScreenFactory`](src/main/java/com/otectus/arsnspells/config/ConfigScreenFactory.java).
+
+### V12 — Ars mana potions feed the unified pool — should pass now (Iron's required)
+
+1. Set `iss_primary`. Note Iron's attributes: `/attribute @s irons_spellbooks:max_mana base get` (and `irons_spellbooks:mana_regen`).
+2. `/effect give @s ars_nouveau:mana_boost 999 1` (and/or `ars_nouveau:mana_regen`).
+3. Re-read the attributes; then `/effect clear @s` and read again.
+
+Pass: the Iron's `MAX_MANA` (from `mana_boost`) and `MANA_REGEN` (from `mana_regen`) values rise while the effect is active and revert when cleared — the Ars potion now raises the pool you cast from. [`MixinArsPotionEffects`](src/main/java/com/otectus/arsnspells/mixin/ars/MixinArsPotionEffects.java) targets `ManaCapEvents.playerOnTick(PlayerTickEvent.Pre)`; watch the log for **no** "mixin apply failed" on that target.
+
+### V13 — Pre-cast mana validation — should pass now
+
+1. Set `iss_primary`. Drain the unified mana below a spell's cost.
+2. Attempt to cast an Ars spell whose cost exceeds the remaining pool.
+3. Refill mana and cast again.
+
+Pass: the under-funded cast is denied with a "Not Enough Mana" action-bar message; the refilled cast succeeds. Validation reads the bridged pool ([`CastingAuthority`](src/main/java/com/otectus/arsnspells/casting/CastingAuthority.java) + `MixinManaCapability`), not the per-mod native check. Creative mode and zero-cost spells always pass.
+
+### V14 — Debug overlay diagnostics — client check
+
+1. Set `debug_mode = true` and (re)launch the client; join a world.
+2. Watch `logs/latest.log`.
+
+Pass: [`OverlayDiagnostics`](src/main/java/com/otectus/arsnspells/client/OverlayDiagnostics.java) logs each GUI layer id once as `[OVERLAY] <id>`, flagging mana-related layers; `ars_nouveau:mana_bar` and `irons_spellbooks:mana_bar` appear (also confirms `ManaBarController`'s layer-id assumptions). With `debug_mode = false` there is no per-frame overlay logging. The client reads `debug_mode` at startup, so toggling needs a client relaunch.
+
 ## Inscription / cross-cast scenarios
 
 ### S15 — Strict disambiguation on the brazier — gated on Phase 3
@@ -164,7 +197,7 @@ If a future Curios integration in Phase 6 reintroduces curio-driven discounts, e
 - **Cooldowns blocking spells from the "wrong" mod**: this is intentional. Cooldowns are global per category by design; see [README §Cooldowns](README.md#cooldowns).
 - **Cast nothing-happens on inscribed item**: confirm the item actually carries an inscription (`/data get entity @s` should show `ars_n_spells:cross_spells`), that the source mod of the inscribed spell is installed, and that you are not mid cross-cast cooldown. [`CrossCastingHandler`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) handles the right-click cast, sneak-cycle between inscriptions, and the cross-cast cost multiplier; a malformed inscription shows a red rejection message rather than silently no-casting.
 - **Recipes failing to load with `Unknown tag c:logs/archwood`**: confirm Ars Nouveau 5.11.1+ is installed — it ships the `c:` namespace common tag set. If Ars's tag still uses `forge:logs/archwood` on your specific build, fall back to `forge:logs/archwood` temporarily.
-- **Mixin apply failure for `ManaBarOverlay.render`**: expected before Phase 2. Iron's 3.15.6 likely re-targets to NeoForge's `LayeredDraw.Layer` instead of Forge's `ForgeGui` parameter. Update the mixin signature accordingly.
+- **Two mana bars showing**: bar hiding is done natively by [`ManaBarController`](src/main/java/com/otectus/arsnspells/client/ManaBarController.java) (it cancels `RenderGuiLayerEvent.Pre` per mode), not by a mixin on Iron's overlay. In `separate` / `disabled` both bars show by design; otherwise confirm the layer ids `ars_nouveau:mana_bar` / `irons_spellbooks:mana_bar` are what render (enable `debug_mode` and read the `[OVERLAY]` log lines from V14).
 
 ## Reporting issues
 

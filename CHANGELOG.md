@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.1] — core feature parity with 1.20.1 (2026-06-18)
+
+Restores four features that were stubbed or unported in the 2.5.0 NeoForge port, closing the
+core parity gap with the Forge 1.20.1 build. Compile targets are unchanged (**Ars Nouveau 5.11.1 /
+Iron's Spellbooks 3.15.6**, runs against 5.11.7 / 3.16.0 at runtime). **Build- and test-verified;
+in-game runtime validation remains pending** (the build environment runs no Minecraft). Every new
+API substitution was checked against the pinned dependency jars before writing.
+
+### Added — in-game config screen
+- **`ConfigScreenFactory` is functional again.** The Forge `ConfigScreenHandler` extension point was
+  replaced with NeoForge's `IConfigScreenFactory`, registered from `ArsNSpellsClient.onClientSetup`
+  (client/MOD bus, so the `Screen` never classloads on a dedicated server). Reachable from **Mods →
+  Ars 'n' Spells → Config**: master toggles, a click-to-cycle Mana Mode row, and the gear/debug
+  switches. Save/Reset are gated to singleplayer (the gameplay config is a SERVER config). The
+  `Screen.render` / `mouseScrolled` overrides were updated to the 1.21 signatures.
+
+### Added — Ars mana potions feed the unified pool
+- **`MixinArsPotionEffects` ported.** In `iss_primary`, the Ars `mana_regen` and `mana_boost` effects
+  are mirrored onto Iron's `MANA_REGEN` / `MAX_MANA` attributes, so Ars mana potions raise the pool
+  you actually cast from. Targets Ars's `ManaCapEvents.playerOnTick`, whose signature changed to
+  `PlayerTickEvent.Pre`; rewritten to the 1.21 attribute API (`ResourceLocation`-keyed modifiers,
+  `Operation.ADD_VALUE`) and `BuiltInRegistries.MOB_EFFECT` lookup. Gated on both Ars `ManaCapEvents`
+  and Iron's being present (`require = 0`).
+
+### Added — pre-cast mana validation
+- **`CastingAuthority` un-stubbed (mana-only).** Validates a cast against the mode-correct bridged
+  pool and denies with an action-bar message when it can't be afforded; creative and zero-cost casts
+  pass. The 1.20.1 Cursed-Ring (LP) and Virtue-Ring (aura) branches were stripped with those systems.
+
+### Added — debug overlay diagnostics
+- **`OverlayDiagnostics` rebuilt on NeoForge.** Forge's `RenderGuiOverlayEvent` tap moved to
+  `RenderGuiLayerEvent.Pre`; with `debug_mode` it logs every GUI layer id once, highlighting
+  mana-related layers. Opt-in (registers no per-frame work when off).
+
+### Unchanged — already native, no port needed
+- The mana-bar hiding (`ManaBarController`) and the Ars/Iron's cast resource checks
+  (`MixinManaCapability` + `MixinIronsMagicDataMana` route native checks through the bridged pool)
+  already covered their 1.20.1 mixin counterparts, so `MixinIronsManaBarOverlay`,
+  `MixinSpellResolverPreCast`, and `MixinIronsCastValidation` were intentionally **not** ported.
+
+### Deferred
+- LP/Cursed-Ring (Sanctified Legacy + Blood Magic) and Aura/Virtue-Ring (Covenant of the Seven)
+  systems — no NeoForge 1.21.1 build of those addons exists yet. GameTests are also still deferred.
+
 ## [2.5.0] — 1.21.1 compatibility & correctness (2026-06-06)
 
 A correctness-focused compatibility release on top of the build-verified 2.0.1 core.

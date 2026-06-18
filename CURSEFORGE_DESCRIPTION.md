@@ -4,7 +4,7 @@
 
 Works with **Minecraft 1.21.1** on **NeoForge**.
 
-> **Version note (2.5.0, NeoForge 1.21.1).** Mana unification, cross-cast invocation, rituals, cooldowns, progression, resonance, and equipment scaling are all live. 2.5.0 is a correctness release: per-school affinity now covers every Iron's addon school (Cataclysm, Magic From The East, Somake, and friends), the Curios spell-discount applies to both Ars and Iron's casts, and the ritual recipes and curio-discount tag — which had silently broken on the 1.20.1 → 1.21 datapack path change — are restored. The previous **Covenant of the Seven** (Sanctified Legacy) integration — Ring of Seven Curses, Ring of Seven Virtues, Blasphemy curios, LP and aura systems — remains **removed** because Covenant of the Seven has no NeoForge 1.21.1 build. Compile targets are pinned to Ars Nouveau 5.11.1 / Iron's Spells 3.15.6 and run against newer at runtime.
+> **Version note (2.6.1, NeoForge 1.21.1).** Mana unification, cross-cast invocation, rituals, cooldowns, progression, resonance, and equipment scaling are all live. **2.6.1 restores core parity with the Forge 1.20.1 build:** an in-game config screen (Mods → Ars 'n' Spells → Config), Ars mana potions that feed the unified Iron's pool in ISS Primary, a mana-only pre-cast check, and a debug overlay are all functional again (each was stubbed in 2.5.0). 2.5.0 was a correctness release: per-school affinity now covers every Iron's addon school (Cataclysm, Magic From The East, Somake, and friends), the Curios spell-discount applies to both Ars and Iron's casts, and the ritual recipes and curio-discount tag — which had silently broken on the 1.20.1 → 1.21 datapack path change — are restored. The previous **Covenant of the Seven** (Sanctified Legacy) integration — Ring of Seven Curses, Ring of Seven Virtues, Blasphemy curios, LP and aura systems — remains **removed** because Covenant of the Seven has no NeoForge 1.21.1 build. Compile targets are pinned to Ars Nouveau 5.11.1 / Iron's Spells 3.15.6 and run against newer at runtime.
 
 ---
 
@@ -44,6 +44,7 @@ The mod hides the redundant mana bar so your HUD stays clean.
 - **Gear perks cross over** — Ars armor bonuses apply to Iron's mana pool (and vice versa), depending on your active mode.
 - **Spell scaling** — Ars spell potency scales with Iron's spell power attributes using additive stacking (not multiplicative). Elemental bonuses are applied based on your first glyph. A configurable `spell_power_cap` (default 3.0) prevents extreme values.
 - **Enchantments** — Mana-related enchantments from both mods are respected regardless of which pool is active.
+- **Mana potions feed the unified pool** — in ISS Primary, Ars's `mana_regen` and `mana_boost` effects are mirrored onto Iron's mana-regen / max-mana attributes, so Ars mana potions raise the pool you actually cast from.
 
 ---
 
@@ -105,7 +106,7 @@ An optional system that groups similar spells across both mods into shared coold
 
 ## Configuration
 
-Everything is configurable via `config/ars_n_spells-common.toml`. Major options include:
+An **in-game config screen** is available from the mod list (**Mods → Ars 'n' Spells → Config**) for the master toggles, the mana mode (click to cycle), and the gear/debug switches — Save/Reset apply in singleplayer; on a server, edit the `.toml` or use `/ans`. Everything is also configurable via `config/ars_n_spells-common.toml`. Major options include:
 
 - **Master toggles** for mana unification, resonance, cooldowns, progression, and affinity
 - **Mana conversion rates** and dual-cost split percentages
@@ -151,10 +152,10 @@ If Covenant of the Seven ships a NeoForge 1.21.1 build, the integration can be r
 A: Make sure Iron's Spells 'n Spellbooks (1.21.1-3.15.6+) is installed. Check logs for mixin load failures.
 
 **Q: I see two mana bars.**
-A: Verify your mana mode is set correctly. Check for overlay conflicts from other UI mods. (The mana-bar overlay re-targeting against NeoForge's `LayeredDraw` is on the work-in-progress list for the next 1.9.x release; until then both bars may show in some configurations.)
+A: Verify your mana mode is set correctly, and check for overlay conflicts from other UI mods. Ars 'n' Spells hides the redundant bar per mode via NeoForge's `RenderGuiLayerEvent`; in `separate` and `disabled` modes both bars are shown by design.
 
 **Q: Cross-casting an inscribed item does nothing.**
-A: Cross-cast invocation against Ars Nouveau 5.x is currently being re-attached as part of the port. Expect this to land in an upcoming 1.9.x release. Inscription itself works (you can inscribe and uninscribe), but the cast path is the open work.
+A: Cross-cast invocation is live — right-click an inscribed item to cast, sneak-right-click to cycle inscriptions. If nothing happens, confirm the item actually carries an inscription (re-run the Transcription ritual) and that the spell's mana cost can be paid from the active pool.
 
 **Q: The mod requires Sanctified Legacy and I had a setup using LP.**
 A: The Sanctified Legacy integration is gone for this version because Sanctified Legacy itself hasn't shipped on NeoForge 1.21.1. Stay on the Forge 1.20.1 1.9.0 release if you need that feature.

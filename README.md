@@ -1,8 +1,8 @@
-# Ars 'n' Spells (v2.5.0, NeoForge 1.21.1)
+# Ars 'n' Spells (v2.6.1, NeoForge 1.21.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.21.1 on **NeoForge**. It unifies mana, scaling, and progression while keeping each mod playable on its own.
 
-> **Status (v2.5.0, NeoForge 1.21.1).** Mana unification, cross-cast inscription, rituals, affinity, progression, resonance, cooldowns, and equipment scaling are all live (the mana mixins were repaired against Ars 5.x / Iron's 3.x in 2.0.1). **2.5.0 is a correctness release:** affinity now tracks *every* Iron's addon school dynamically instead of a hardcoded sixteen, the Curios spell-discount applies on both the Ars and Iron's sides, and two datapack features that silently broke in the 1.20.1 → 1.21 directory flattening (the ritual apparatus recipes and the curio-discount tag) are restored to their correct singular paths. Compile targets are pinned to Ars Nouveau 5.11.1 / Iron's Spells 3.15.6; the mod runs against newer (5.11.7 / 3.16.0) at runtime. The previous **Covenant of the Seven / Sanctified Legacy** integration (Cursed Ring, Virtue Ring, Blasphemy curios, LP / aura systems) remains **removed** (no NeoForge 1.21.1 build of that addon exists); the `#ars_n_spells:curio_spell_discount` item tag is its replacement footprint.
+> **Status (v2.6.1, NeoForge 1.21.1).** Mana unification, cross-cast inscription, rituals, affinity, progression, resonance, cooldowns, and equipment scaling are all live (the mana mixins were repaired against Ars 5.x / Iron's 3.x in 2.0.1). **2.6.1 restores core parity with the Forge 1.20.1 build:** the in-game config screen, Ars mana-potion mirroring into the unified pool, a mana-only pre-cast validator, and the debug overlay are all functional again (each was stubbed or unported in 2.5.0). **2.5.0** was a correctness release: affinity now tracks *every* Iron's addon school dynamically instead of a hardcoded sixteen, the Curios spell-discount applies on both the Ars and Iron's sides, and two datapack features that silently broke in the 1.20.1 → 1.21 directory flattening (the ritual apparatus recipes and the curio-discount tag) are restored to their correct singular paths. Compile targets are pinned to Ars Nouveau 5.11.1 / Iron's Spells 3.15.6; the mod runs against newer (5.11.7 / 3.16.0) at runtime. The previous **Covenant of the Seven / Sanctified Legacy** integration (Cursed Ring, Virtue Ring, Blasphemy curios, LP / aura systems) remains **removed** (no NeoForge 1.21.1 build of that addon exists); the `#ars_n_spells:curio_spell_discount` item tag is its replacement footprint.
 
 ## Requirements
 
@@ -38,6 +38,14 @@ Ars and Iron's gear bonuses are routed to the active mana source:
 - **iss_primary / hybrid** — Ars gear perks apply to Iron's attributes.
 - **ars_primary** — Iron's gear perks apply to Ars calculations.
 - **separate** — Each mod's gear affects its own pool only.
+
+### Mana potions
+
+When Iron's is the primary pool (`iss_primary`), Ars mana potions feed the unified pool instead of the now-unread Ars pool: the `ars_nouveau:mana_regen` and `ars_nouveau:mana_boost` effects are mirrored onto Iron's `MANA_REGEN` and `MAX_MANA` attributes (`MixinArsPotionEffects`), so drinking a Potion of Mana actually raises the pool you cast from. Removing the effect reverts the bonus. Requires Iron's installed; no-op in the other modes (Ars handles its own pool natively there).
+
+### Pre-cast validation
+
+`CastingAuthority` performs a mana-only pre-cast check against the mode-correct (bridged) pool, denying a cast with an action-bar message when the unified pool can't afford it — the native per-mod "enough mana?" checks read the wrong pool in primary modes. Creative and zero-cost casts always pass. (The 1.20.1 LP/aura ring branches are deferred along with those systems.)
 
 ### Spell scaling
 
@@ -97,6 +105,8 @@ Affinity, cooldown, and progression are stored as NeoForge entity attachments ([
 
 Config file: `config/ars_n_spells-common.toml`
 
+An **in-game config screen** is available from the mod list (**Mods → Ars 'n' Spells → Config**), registered via NeoForge's `IConfigScreenFactory`. It exposes the master toggles, the mana-unification mode (click the row to cycle), and the gear/debug switches. Because the gameplay config is a SERVER config, the Save / Reset controls are active only in singleplayer; on a dedicated server, edit the server `.toml` or use `/ans`.
+
 ### Master toggles
 
 | Option | Default | Description |
@@ -152,7 +162,11 @@ The mod hides redundant mana bars based on mode:
 - **hybrid**: Shows the bar selected by `hybrid_mana_bar`.
 - **separate / disabled**: Both bars may show.
 
-The mana-bar overlay registration moves from Forge's `RegisterGuiOverlaysEvent` to NeoForge's `RegisterGuiLayersEvent`. The mixin and overlay code is currently stubbed pending Phase 3 (Ars 5.x / Iron's 3.15.6 overlay re-targeting).
+Hiding is handled natively on NeoForge by `ManaBarController`, which cancels the redundant `RenderGuiLayerEvent.Pre` for `ars_nouveau:mana_bar` / `irons_spellbooks:mana_bar` per mode — the Forge-style overlay mixin is not needed.
+
+## Debug overlay
+
+With `debug_mode` enabled, `OverlayDiagnostics` logs every rendered GUI layer id once (via `RenderGuiLayerEvent.Pre`), highlighting mana-related layers — a quick way to discover overlay ids when tuning `ManaBarController`. It is opt-in and registers no per-frame work when off; the client reads `debug_mode` at startup, so toggling it takes effect on the next client launch.
 
 ## Commands
 
@@ -164,9 +178,9 @@ The mana-bar overlay registration moves from Forge's `RegisterGuiOverlaysEvent` 
 | `/ans info <player>` | Op 2 | Show mana, resonance, and the player's per-school affinity (plus the registered Iron's school count). |
 | `/ans mode` | — | Show current mana unification mode. |
 
-## Roadmap (deferred past 2.5.0)
+## Roadmap (deferred past 2.6.1)
 
-The 1.21.1 port is functionally complete; the items below are intentionally deferred, not broken. The mana-unification mixins disabled during the early port were repaired and re-enabled in 2.0.1, and the cross-cast / rituals / scaling re-attach work that was tracked as "Phase 3" is done.
+The 1.21.1 port is functionally complete; the items below are intentionally deferred, not broken. The mana-unification mixins disabled during the early port were repaired and re-enabled in 2.0.1; the cross-cast / rituals / scaling re-attach work tracked as "Phase 3" is done; and 2.6.1 restored the last stubbed pieces (in-game config screen, Ars mana-potion mirroring, mana-only pre-cast validation, debug overlay). The remaining deferral is the **LP/Cursed-Ring and Aura/Virtue-Ring** systems, which depend on Sanctified Legacy / Covenant of the Seven — no NeoForge 1.21.1 build of those exists yet.
 
 - **Event-first mana bridge.** The bridge routes through two repaired mixins (`MixinManaCapability`, `MixinIronsMagicDataMana`) plus the Ars `SpellResolver` context/cost mixins. Every inject now uses `require = 0` and the mixin plugin probes its target classes (`ManaCap`/`ManaData`/`SpellResolver`), so a dependency point-release fails soft on **method** drift — but a **field** rename would still abort load. Migrating the bridge to Ars/Iron's public events (`MaxManaCalcEvent`, `SpellCostCalcEvent`, `ChangeManaEvent`, …) removes that fragility and is the main deferred item.
 - **Compile-target bump.** Pinned to Ars 5.11.1 / Iron's 3.15.6 (build-verified); the target pack runs 5.11.7 / 3.16.0. Moving the compile classpath up is deferred until an in-game validation pass exists.
@@ -185,7 +199,7 @@ Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMa
 
 Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`.
 
-Output jar: `build/libs/ars_n_spells-2.5.0.jar`
+Output jar: `build/libs/ars_n_spells-2.6.1.jar`
 
 ## Changelog
 
