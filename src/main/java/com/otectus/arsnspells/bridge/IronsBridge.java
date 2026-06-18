@@ -31,7 +31,7 @@ public class IronsBridge implements IManaBridge {
 
     @Override
     public void setMana(Player player, float amount) {
-        if (player.level().isClientSide()) return;
+        if (player == null || player.level().isClientSide()) return;
         try {
             MagicData data = MagicData.getPlayerMagicData(player);
             if (data == null) return;
@@ -43,7 +43,7 @@ public class IronsBridge implements IManaBridge {
 
     @Override
     public boolean consumeMana(Player player, float amount) {
-        if (player.level().isClientSide()) return false;
+        if (player == null || player.level().isClientSide()) return false;
         try {
             MagicData data = MagicData.getPlayerMagicData(player);
             if (data == null) {

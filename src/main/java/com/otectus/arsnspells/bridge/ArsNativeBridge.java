@@ -14,13 +14,13 @@ public class ArsNativeBridge implements IManaBridge {
 
     @Override
     public void setMana(Player player, float amount) {
-        if (player.level().isClientSide()) return;
+        if (player == null || player.level().isClientSide()) return;
         ManaUtil.getNativeMana(player).ifPresent(cap -> cap.setMana((double)amount));
     }
 
     @Override
     public boolean consumeMana(Player player, float amount) {
-        if (player.level().isClientSide()) return false;
+        if (player == null || player.level().isClientSide()) return false;
         return ManaUtil.getNativeMana(player).map(cap -> {
             if (cap.getCurrentMana() >= (double)amount) {
                 cap.removeMana((double)amount);

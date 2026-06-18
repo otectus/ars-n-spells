@@ -105,4 +105,46 @@ class BridgeManagerRollbackContractTest {
         bridge.addMana(null, 20.0f);
         assertEquals(50.0f, bridge.pool, "consume + addMana should be net-zero");
     }
+
+    /**
+     * Mirrors the SEPARATE-mode split normalization in
+     * {@code BridgeManager.consumeManaForMode}. Kept bootstrap-free (no AnsConfig) by
+     * replicating the formula; asserts the invariant the fix guarantees: the two halves
+     * always sum to the base cost regardless of how the configured percentages are scaled.
+     */
+    private static float[] splitDualCost(float amount, double arsPct, double issPct) {
+        double total = arsPct + issPct;
+        if (total <= 0.0) {
+            return new float[]{amount, 0.0f};
+        }
+        return new float[]{
+            (float) (amount * (arsPct / total)),
+            (float) (amount * (issPct / total))
+        };
+    }
+
+    @Test
+    void dualCostSplit_sumsToBaseCost_whenPercentagesOverOne() {
+        // Misconfigured split summing to 1.2 must NOT overcharge — shares still sum to 100.
+        float[] split = splitDualCost(100.0f, 0.6, 0.6);
+        assertEquals(50.0f, split[0], 1.0e-4f, "Ars half");
+        assertEquals(50.0f, split[1], 1.0e-4f, "Iron's half");
+        assertEquals(100.0f, split[0] + split[1], 1.0e-3f, "halves must sum to base cost");
+    }
+
+    @Test
+    void dualCostSplit_sumsToBaseCost_whenPercentagesUnderOne() {
+        // Sum 0.8 must NOT undercharge — shares still sum to 100, ratio preserved.
+        float[] split = splitDualCost(100.0f, 0.6, 0.2);
+        assertEquals(75.0f, split[0], 1.0e-4f, "Ars half (0.6/0.8)");
+        assertEquals(25.0f, split[1], 1.0e-4f, "Iron's half (0.2/0.8)");
+        assertEquals(100.0f, split[0] + split[1], 1.0e-3f, "halves must sum to base cost");
+    }
+
+    @Test
+    void dualCostSplit_degenerateZeroTotal_chargesArsOnly() {
+        float[] split = splitDualCost(100.0f, 0.0, 0.0);
+        assertEquals(100.0f, split[0], "whole cost falls to the Ars side");
+        assertEquals(0.0f, split[1], "Iron's side charged nothing");
+    }
 }

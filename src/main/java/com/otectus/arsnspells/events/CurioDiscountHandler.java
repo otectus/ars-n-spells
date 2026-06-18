@@ -96,8 +96,10 @@ public class CurioDiscountHandler {
         if (blasphemyResult.hasBlasphemy) {
             multiplier *= (1.0 - blasphemyResult.totalDiscount);
 
-            logDebug("Blasphemy discount applied: {:.1f}% (school: {}, matching: {})",
-                blasphemyResult.totalDiscount * 100, spellSchool, blasphemyResult.isMatching);
+            // ANS-MED-026: SLF4J does not accept `{:.1f}` — format the percent with
+            // String.format and pass plain `{}` args (mirrors the onSpellCostCalc log).
+            logDebug("Blasphemy discount applied: {} (school: {}, matching: {})",
+                String.format("%.1f%%", blasphemyResult.totalDiscount * 100), spellSchool, blasphemyResult.isMatching);
         }
 
         return multiplier;

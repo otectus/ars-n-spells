@@ -1,4 +1,4 @@
-# Testing Guide — Ars 'n' Spells 2.6.0
+# Testing Guide — Ars 'n' Spells 2.6.1
 
 This guide covers manual verification scenarios for the systems shipped in
 2.0.0 (the audit-driven major release). It supersedes the pre-1.8 testing
@@ -18,7 +18,7 @@ For an at-a-glance description of features and configuration, start with the
 | Covenant of the Seven (Sanctified Legacy) | Any | Cursed/Virtue Ring tests |
 | Blood Magic | Any | LP source `BLOOD_MAGIC_*` tests |
 
-Drop `build/libs/ars_n_spells-2.6.0.jar` into the instance's `mods/` folder
+Drop `build/libs/ars_n_spells-2.6.1.jar` into the instance's `mods/` folder
 alongside the dependencies. **2.0.0 introduces a new C2S packet ID; clients
 and servers must run matching versions.**
 

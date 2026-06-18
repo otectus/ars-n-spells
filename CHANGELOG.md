@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.1] - 2026-06-18
+
+### Mana-bridge correctness fixes
+
+A full-codebase review (reconciled against the historical [AUDIT.md](AUDIT.md)) confirmed most prior findings were already resolved; this release closes the remaining genuine issues.
+
+- **Concurrent regen no longer lost in ARS_PRIMARY mode.** [MixinIronsMagicDataMana.java](src/main/java/com/otectus/arsnspells/mixin/irons/MixinIronsMagicDataMana.java)'s `addMana` redirect did a non-atomic `getMana()` + `setMana(current + amount)`, clobbering any regen/buff that landed between the read and the write. It now delegates to the bridge's atomic `addMana`, matching `ArsNativeBridge`/`IronsBridge`.
+- **SEPARATE-mode dual cost is normalized.** [BridgeManager.java](src/main/java/com/otectus/arsnspells/bridge/BridgeManager.java) now scales the configured `dual_cost_ars_percentage` / `dual_cost_iss_percentage` so the two halves always sum to the spell's base cost. Previously a split summing to ≠1.0 silently over- or under-charged every cast (the sum check was an init-time warning only). New contract tests cover the over-one, under-one, and degenerate-zero cases.
+- **Stale messaging fixed.** Removed the "changing the mode requires a game restart" log line and `getCurrentMode` javadoc — the mode has been live-changeable via `/ans mode set` and the config screen since 2.0.1.
+- **Debug log fix.** [CurioDiscountHandler.java](src/main/java/com/otectus/arsnspells/events/CurioDiscountHandler.java) used an invalid `{:.1f}` SLF4J placeholder in the Blasphemy-discount trace (the twin of the already-fixed cost-calc log), which dropped the percentage argument. Now formatted correctly.
+
+### Hardening / consistency
+
+- [SanctifiedLegacyCompat.java](src/main/java/com/otectus/arsnspells/compat/SanctifiedLegacyCompat.java)'s curio-state cache now stamps with server-global `gameTime` (`long`) instead of per-player `tickCount`, consistent with the ring handlers' ANS-HIGH-011 migration.
+- Added missing `player == null` guards to `setMana`/`consumeMana` in [ArsNativeBridge.java](src/main/java/com/otectus/arsnspells/bridge/ArsNativeBridge.java) and [IronsBridge.java](src/main/java/com/otectus/arsnspells/bridge/IronsBridge.java) (their `addMana`/`getMaxMana` siblings already had them).
+- Added the missing null-context guard to [CrossCastRequestPacket.java](src/main/java/com/otectus/arsnspells/network/CrossCastRequestPacket.java)'s `handle`, matching its sibling packets.
+
 ## [2.6.0] - 2026-06-14
 
 ### Apotheosis / Apothic Curios mana bridge

@@ -65,8 +65,10 @@ public abstract class MixinIronsMagicDataMana {
         if (!shouldRedirectToArs()) {
             return;
         }
-        float current = BridgeManager.getBridge().getMana(player);
-        BridgeManager.getBridge().setMana(player, current + amount);
+        // Delegate to the bridge's atomic add — do NOT get+set here or we lose any
+        // concurrent regen/buff landing between the read and the write (the exact race
+        // ArsNativeBridge/IronsBridge.addMana were written to avoid).
+        BridgeManager.getBridge().addMana(player, amount);
         this.mana = BridgeManager.getBridge().getMana(player);
         ci.cancel();
     }

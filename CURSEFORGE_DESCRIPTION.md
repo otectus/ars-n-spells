@@ -14,6 +14,9 @@ Works with **Minecraft 1.20.1** on **Forge**.
 | **Iron's Spells 'n Spellbooks** (3.15.x) | No — falls back to native Ars behavior if absent |
 | **Covenant of the Seven** (Sanctified Legacy) | No — enables LP and aura ring systems |
 | **Blood Magic** | No — optional LP source for Ring of Seven Curses |
+| **Apotheosis** + **Apothic Curios** | No — lets affix/socket mana stats on curios feed the unified pool |
+
+*(Curios is required by Ars Nouveau, so it is always present.)*
 
 ---
 
@@ -32,6 +35,8 @@ The core of Ars 'n' Spells: **five configurable modes** that control how the two
 Conversion rates between the two mana systems are fully configurable.
 
 The mod automatically hides the redundant mana bar so your HUD stays clean.
+
+**Changing the mode** (as of 2.0.1, applied live, no restart): in singleplayer, open Mods → Ars 'n' Spells → Config and click the **Mana Mode** row to cycle it; server operators can run `/ans mode set <mode>`; or edit the config file directly. Confirm the active mode with `/ans mode`.
 
 ---
 
@@ -174,6 +179,8 @@ All options ship with balanced defaults — install and play, or fine-tune to yo
 | `/ans debug` | Op 2 | Toggle debug mode at runtime |
 | `/ans info <player>` | Op 2 | Show mana, aura, resonance, and ring status |
 | `/ans mode` | -- | Show current mana unification mode |
+| `/ans mode set <mode>` | Op 2 | Switch the mana unification mode live (no restart) |
+| `/ans aura` | -- | Show your own current aura |
 
 ---
 

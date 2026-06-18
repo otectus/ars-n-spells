@@ -141,7 +141,7 @@ public class BridgeManager {
             LOGGER.info("Secondary Bridge: {}", secondaryBridge.getBridgeType());
         }
         LOGGER.info("Mana Unification Enabled: {}", AnsConfig.ENABLE_MANA_UNIFICATION.get());
-        LOGGER.info("NOTE: Changing mana_unification_mode requires a game restart.");
+        LOGGER.info("NOTE: mana_unification_mode can be changed live via '/ans mode set' or the in-game config screen (applied by refreshMode()).");
         if (currentMode == ManaUnificationMode.SEPARATE) {
             double arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get();
             double issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get();
@@ -172,7 +172,8 @@ public class BridgeManager {
 
     /**
      * Get the current mana unification mode.
-     * Cached at init time — changing mana_unification_mode requires a restart.
+     * Cached at init time and refreshed live by {@link #refreshMode()} when the mode is
+     * changed via {@code /ans mode set} or the in-game config screen.
      *
      * <p>ANS-MED-018: if called before {@link #init} runs (e.g. early client render
      * frames during world load), fall back to reading the config directly so callers
@@ -272,9 +273,24 @@ public class BridgeManager {
                 return activeBridge.consumeMana(player, amount);
                 
             case SEPARATE:
-                // Dual-cost mode - consume from both pools
-                float arsCost = amount * AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
-                float issCost = amount * AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
+                // Dual-cost mode - consume from both pools.
+                // ANS: normalize the configured split so the two halves always sum to the
+                // base cost. The init-time sum check (logInitialization) only WARNs; without
+                // normalizing here a split summing to e.g. 1.2 would silently overcharge the
+                // player by 20% on every cast (and an under-1.0 split would undercharge).
+                double arsPct = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get();
+                double issPct = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get();
+                double pctTotal = arsPct + issPct;
+                float arsCost;
+                float issCost;
+                if (pctTotal <= 0.0) {
+                    // Degenerate config — treat the whole cost as Ars-side.
+                    arsCost = amount;
+                    issCost = 0.0f;
+                } else {
+                    arsCost = (float) (amount * (arsPct / pctTotal));
+                    issCost = (float) (amount * (issPct / pctTotal));
+                }
                 IManaBridge arsBridge = activeBridge;
                 IManaBridge issBridge = secondaryBridge;
 

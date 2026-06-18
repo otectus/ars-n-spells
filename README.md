@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v2.6.0)
+# Ars 'n' Spells (v2.6.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -231,6 +231,12 @@ The mod hides redundant mana bars based on mode:
 - **separate / disabled**: Both bars may show.
 
 ## Changelog
+
+### v2.6.1 — Mana-bridge correctness fixes
+
+- **Concurrent regen preserved in ARS_PRIMARY mode.** The Iron's `addMana` redirect no longer does a non-atomic get-then-set that could clobber regen/buffs landing mid-update; it delegates to the bridge's atomic add.
+- **SEPARATE-mode dual cost normalized.** The `dual_cost_ars_percentage` / `dual_cost_iss_percentage` split is scaled so the two halves always sum to the spell's base cost — a misconfigured split no longer silently over- or under-charges.
+- **Smaller fixes:** removed the stale "requires a restart" mode messaging; fixed an invalid SLF4J placeholder in the Blasphemy-discount debug log; curio cache now uses server-global `gameTime`; added missing null guards to the bridge setters/consumers and the cross-cast packet handler. See [CHANGELOG.md](CHANGELOG.md) and [AUDIT.md](AUDIT.md) for the full breakdown.
 
 ### v2.6.0 — Apotheosis curio bridge + ring/HUD polish
 

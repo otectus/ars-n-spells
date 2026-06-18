@@ -71,6 +71,9 @@ public class CrossCastRequestPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
         NetworkEvent.Context ctx = ctxSupplier.get();
+        if (ctx == null) {
+            return;
+        }
         ctx.enqueueWork(() -> {
             ServerPlayer sender = ctx.getSender();
             if (sender == null) {

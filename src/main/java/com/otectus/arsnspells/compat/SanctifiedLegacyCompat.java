@@ -73,15 +73,15 @@ public class SanctifiedLegacyCompat {
 
     /**
      * Snapshot of the Covenant-of-the-Seven / Enigmatic Legacy curio state for
-     * a single player. Populated by {@link #scanCurios(Player, int)}.
+     * a single player. Populated by {@link #scanCurios(Player, long)}.
      */
     private static final class CurioState {
         final boolean cursedRing;
         final boolean virtueRing;
         final Set<ResourceLocation> blasphemies; // immutable
-        final int cachedAtTick;
+        final long cachedAtTick;
 
-        CurioState(boolean cursedRing, boolean virtueRing, Set<ResourceLocation> blasphemies, int cachedAtTick) {
+        CurioState(boolean cursedRing, boolean virtueRing, Set<ResourceLocation> blasphemies, long cachedAtTick) {
             this.cursedRing = cursedRing;
             this.virtueRing = virtueRing;
             this.blasphemies = blasphemies;
@@ -89,7 +89,7 @@ public class SanctifiedLegacyCompat {
         }
     }
 
-    private static final CurioState EMPTY_STATE = new CurioState(false, false, Collections.emptySet(), Integer.MIN_VALUE);
+    private static final CurioState EMPTY_STATE = new CurioState(false, false, Collections.emptySet(), Long.MIN_VALUE);
 
     // Blood Magic reflection cache
     private static Class<?> bloodMagicNetworkClass = null;
@@ -564,7 +564,10 @@ public class SanctifiedLegacyCompat {
             return EMPTY_STATE;
         }
         UUID id = player.getUUID();
-        int now = player.tickCount;
+        // ANS-HIGH-011: server-global gameTime (monotonic per world) instead of the
+        // per-player tickCount, for consistency with the ring handlers. The now >=
+        // cachedAtTick guard still cheaply rejects any non-monotonic edge (e.g. /time set).
+        long now = player.level().getGameTime();
         CurioState cached = CURIO_STATE_CACHE.get(id);
         if (cached != null && now - cached.cachedAtTick < CURIO_CACHE_TTL_TICKS && now >= cached.cachedAtTick) {
             return cached;
@@ -578,7 +581,7 @@ public class SanctifiedLegacyCompat {
      * Single-pass scan of the player's curio inventory. Populates ring presence and
      * collects every equipped Blasphemy curio ID in one traversal.
      */
-    private static CurioState scanCurios(Player player, int tick) {
+    private static CurioState scanCurios(Player player, long tick) {
         boolean[] cursed = {false};
         boolean[] virtue = {false};
         @SuppressWarnings("unchecked")
