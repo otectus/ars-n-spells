@@ -80,4 +80,12 @@ public final class CrossCastGameTests {
     public static void crit004_crossCastMultiplierAppliesBeforeRing(GameTestHelper helper) {
         helper.succeed();
     }
+
+    // 3.0.0 — the Iron-less ItemStack behavior for the Ars→scroll→spellbook export layer
+    // (real-stack append/dedup/clear, classloading safety, classifier safety) is covered by
+    // executable tests in ArsIronsExportGameTests. The Iron-LOADED round-trip (real scroll →
+    // real spellbook → cast/cycle through ANS, coexisting with a real ISB_Spells) is a
+    // deferred Phase-2 integration scenario that needs Iron's + its runtime dependency graph
+    // in the run; it is intentionally NOT represented here as a fake-passing helper.succeed()
+    // stub so that nothing implies cross-mod coverage that does not yet exist.
 }

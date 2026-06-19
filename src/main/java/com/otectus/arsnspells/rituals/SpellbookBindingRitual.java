@@ -1,0 +1,152 @@
+package com.otectus.arsnspells.rituals;
+
+import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
+import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.otectus.arsnspells.spell.ArsSpellExportUtil;
+import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Binds an exported Ars spell carried by a real Iron's scroll onto a real Iron's
+ * spellbook. Second leg of the Ars &rarr; scroll &rarr; spellbook workflow.
+ *
+ * Usage:
+ *  <ol>
+ *    <li>Drop exactly one carrier scroll (an Iron's scroll exported via the
+ *        transcription ritual or {@code /ans export_to_irons_scroll}) near the
+ *        brazier.</li>
+ *    <li>Drop exactly one Iron's spellbook in the same area.</li>
+ *    <li>Activate the ritual. On success the scroll's Ars spell is appended to
+ *        the book's cross-cast sidecar and the scroll is consumed.</li>
+ *  </ol>
+ *
+ * Validation runs fully before any item mutation. The bound entry coexists with
+ * the book's native {@code ISB_Spells} container and casts through the ANS
+ * cross-cast pipeline (sneak-right-click cycles between entries).
+ */
+public class SpellbookBindingRitual extends AbstractRitual {
+    public static final String REGISTRY_PATH = "spellbook_binding";
+    private static final String LANG_PREFIX = "ritual.ars_n_spells.spellbook_binding.";
+    private static final int SEARCH_RADIUS = 3;
+
+    @Override
+    protected void tick() {}
+
+    @Override
+    public void onEnd() {
+        Level level = getWorld();
+        BlockPos pos = getPos();
+        if (level == null || pos == null || level.isClientSide()) {
+            return;
+        }
+
+        AABB area = new AABB(pos).inflate(SEARCH_RADIUS);
+        List<ItemEntity> entities = level.getEntitiesOfClass(ItemEntity.class, area,
+            e -> e.isAlive() && !e.getItem().isEmpty());
+
+        if (entities.isEmpty()) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.empty_range");
+            return;
+        }
+
+        SpellbookBindingInputs inputs = SpellbookBindingInputs.classify(entities);
+
+        if (inputs.carrierScrolls.isEmpty()) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_scroll");
+            return;
+        }
+        if (inputs.carrierScrolls.size() > 1) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_scrolls",
+                inputs.carrierScrolls.size(), InscriptionInputs.joinNames(inputs.carrierScrolls));
+            return;
+        }
+        if (inputs.spellbooks.isEmpty()) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_book");
+            return;
+        }
+        if (inputs.spellbooks.size() > 1) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_books",
+                inputs.spellbooks.size(), InscriptionInputs.joinNames(inputs.spellbooks));
+            return;
+        }
+        // Strict: refuse rather than risk binding the wrong stack when extra
+        // items share the brazier, mirroring the uninscribe ritual's philosophy.
+        if (!inputs.other.isEmpty()) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.unexpected_items",
+                InscriptionInputs.joinNames(inputs.other));
+            return;
+        }
+
+        ItemEntity scrollEntity = inputs.carrierScrolls.get(0);
+        ItemEntity bookEntity = inputs.spellbooks.get(0);
+        ItemStack scrollStack = scrollEntity.getItem();
+        ItemStack bookStack = bookEntity.getItem();
+
+        Optional<CompoundTag> arsTag = IronsBookBindingUtil.extractSingleArsEntry(scrollStack);
+        if (arsTag.isEmpty()) {
+            // Classification said this was a valid carrier but a second read
+            // failed -- a transient parse problem, not a validation error.
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.scroll_parse_failed",
+                scrollStack.getHoverName().getString());
+            return;
+        }
+
+        if (IronsBookBindingUtil.containsEquivalentArsSpell(bookStack, arsTag.get())) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.duplicate",
+                bookStack.getHoverName().getString());
+            return;
+        }
+
+        // Validation complete -- mutation begins here.
+        boolean appended = IronsBookBindingUtil.appendArsSpellToBook(bookStack, arsTag.get());
+        if (!appended) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.scroll_parse_failed",
+                scrollStack.getHoverName().getString());
+            return;
+        }
+        bookEntity.setItem(bookStack);
+        scrollEntity.discard();
+
+        playBindEffects(level, pos);
+        RitualFeedback.success(level, pos, LANG_PREFIX + "success", spellLabel(arsTag.get()));
+    }
+
+    private void playBindEffects(Level level, BlockPos pos) {
+        double cx = pos.getX() + 0.5;
+        double cy = pos.getY() + 1.2;
+        double cz = pos.getZ() + 0.5;
+        if (level instanceof ServerLevel server) {
+            server.sendParticles(ParticleTypes.ENCHANT, cx, cy, cz, 60, 0.6, 0.8, 0.6, 0.2);
+            server.sendParticles(ParticleTypes.WITCH, cx, cy, cz, 12, 0.4, 0.5, 0.4, 0.05);
+        }
+        level.playSound(null, pos, SoundEvents.ENCHANTMENT_TABLE_USE,
+            SoundSource.BLOCKS, 0.8f, 0.9f);
+    }
+
+    private String spellLabel(CompoundTag arsTag) {
+        try {
+            Spell spell = Spell.fromTag(arsTag);
+            return ArsSpellExportUtil.buildDisplayLabel(spell);
+        } catch (Exception ignored) {
+            return "Ars Spell";
+        }
+    }
+
+    @Override
+    public ResourceLocation getRegistryName() {
+        return new ResourceLocation("ars_n_spells", REGISTRY_PATH);
+    }
+}

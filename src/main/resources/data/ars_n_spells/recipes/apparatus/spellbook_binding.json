@@ -1,0 +1,30 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "irons_spellbooks"
+        }
+      ],
+      "recipe": {
+        "type": "ars_nouveau:enchanting_apparatus",
+        "keepNbtOfReagent": false,
+        "output": {
+          "item": "ars_n_spells:spellbook_binding"
+        },
+        "reagent": [
+          {"item": "ars_nouveau:novice_spell_book"}
+        ],
+        "pedestalItems": [
+          {"item": "irons_spellbooks:spell_book"},
+          {"item": "irons_spellbooks:scroll"},
+          {"item": "ars_nouveau:source_gem_block"},
+          {"tag": "forge:logs/archwood"}
+        ],
+        "sourceCost": 2500
+      }
+    }
+  ]
+}

@@ -16,6 +16,7 @@ import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import org.slf4j.Logger;
@@ -78,6 +79,14 @@ public class ArsNSpellsCommands {
                 )
                 .then(Commands.literal("aura")
                     .executes(ArsNSpellsCommands::showOwnAura)
+                )
+                .then(Commands.literal("export_to_irons_scroll")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ArsNSpellsCommands::exportToIronsScroll)
+                )
+                .then(Commands.literal("bind_scroll_to_irons_book")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ArsNSpellsCommands::bindScrollToIronsBook)
                 )
         );
 
@@ -217,6 +226,104 @@ public class ArsNSpellsCommands {
             context.getSource().sendFailure(Component.literal("This command must be run by a player."));
             return 0;
         }
+    }
+
+    /**
+     * Exports the Ars spell held in the player's main hand onto a real Iron's
+     * scroll carrier and places it in their inventory. Admin/test counterpart to
+     * the transcription ritual. Routes through ANS util classes so this file
+     * stays free of Iron's imports (it loads on Iron's-less servers too).
+     */
+    private static int exportToIronsScroll(CommandContext<CommandSourceStack> context) {
+        ServerPlayer player;
+        try {
+            player = context.getSource().getPlayerOrException();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.not_player"));
+            return 0;
+        }
+        if (!com.otectus.arsnspells.compat.IronsCompat.isLoaded()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.irons_required"));
+            return 0;
+        }
+
+        ItemStack source = player.getMainHandItem();
+        java.util.Optional<com.hollingsworth.arsnouveau.api.spell.Spell> spell =
+            com.otectus.arsnspells.spell.ArsSpellExportUtil.extractArsSpell(source);
+        if (spell.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.no_ars_spell"));
+            return 0;
+        }
+
+        ItemStack carrier =
+            com.otectus.arsnspells.spell.ArsSpellExportUtil.createIronsScrollCarrier(spell.get());
+        if (carrier.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.scroll_unavailable"));
+            return 0;
+        }
+
+        player.getInventory().placeItemBackInInventory(carrier);
+        context.getSource().sendSuccess(
+            () -> Component.translatable("commands.ans.export.success").withStyle(ChatFormatting.GREEN),
+            true);
+        return 1;
+    }
+
+    /**
+     * Binds the carrier scroll and Iron's spellbook the player is holding (one in
+     * each hand, either order). The scroll's Ars spell is appended to the book's
+     * cross-cast sidecar and one scroll is consumed.
+     */
+    private static int bindScrollToIronsBook(CommandContext<CommandSourceStack> context) {
+        ServerPlayer player;
+        try {
+            player = context.getSource().getPlayerOrException();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.not_player"));
+            return 0;
+        }
+        if (!com.otectus.arsnspells.compat.IronsCompat.isLoaded()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.irons_required"));
+            return 0;
+        }
+
+        ItemStack main = player.getMainHandItem();
+        ItemStack off = player.getOffhandItem();
+        ItemStack scroll;
+        ItemStack book;
+        if (com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsScroll(main)
+            && com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsSpellBook(off)) {
+            scroll = main;
+            book = off;
+        } else if (com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsScroll(off)
+            && com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsSpellBook(main)) {
+            scroll = off;
+            book = main;
+        } else {
+            context.getSource().sendFailure(Component.translatable("commands.ans.bind.need_scroll_and_book"));
+            return 0;
+        }
+
+        java.util.Optional<net.minecraft.nbt.CompoundTag> arsTag =
+            com.otectus.arsnspells.spell.IronsBookBindingUtil.extractSingleArsEntry(scroll);
+        if (arsTag.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.bind.scroll_not_carrier"));
+            return 0;
+        }
+        if (com.otectus.arsnspells.spell.IronsBookBindingUtil.containsEquivalentArsSpell(book, arsTag.get())) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.bind.duplicate"));
+            return 0;
+        }
+
+        if (!com.otectus.arsnspells.spell.IronsBookBindingUtil.appendArsSpellToBook(book, arsTag.get())) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.bind.failed"));
+            return 0;
+        }
+        scroll.shrink(1);
+        context.getSource().sendSuccess(
+            () -> Component.translatable("commands.ans.bind.success").withStyle(ChatFormatting.GREEN),
+            true);
+        return 1;
     }
 
     private static int showMode(CommandContext<CommandSourceStack> context) {
