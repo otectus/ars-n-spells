@@ -63,7 +63,7 @@ public final class ArsSpellExportUtil {
      * item cannot be resolved, or the spell is null.
      */
     public static ItemStack createIronsScrollCarrier(Spell arsSpell) {
-        return createIronsScrollCarrier(arsSpell, null, null, null, 0);
+        return createIronsScrollCarrier(arsSpell, null, null, null);
     }
 
     /**
@@ -75,7 +75,7 @@ public final class ArsSpellExportUtil {
      * scroll is bound onto an actual spellbook.
      */
     public static ItemStack createIronsScrollCarrier(Spell arsSpell, String customName,
-                                                     String nature, String iconSymbol, int iconColor) {
+                                                     String nature, String iconSymbol) {
         if (arsSpell == null || !IronsCompat.isLoaded()) {
             return ItemStack.EMPTY;
         }
@@ -88,7 +88,7 @@ public final class ArsSpellExportUtil {
         // Same schema every inscribed item uses -- keeps storage and casting aligned.
         CrossCastNbt.addArsEntryWithMetaToTag(out.getOrCreateTag(),
             IronsBookBindingUtil.ARS_PLACEHOLDER_ID, 1, arsSpell.serialize(),
-            CrossCastNbt.NO_PROXY_POOL_ID, customName, nature, iconSymbol, iconColor);
+            CrossCastNbt.NO_PROXY_POOL_ID, customName, nature, iconSymbol);
 
         // Cosmetic only; casting still keys off the cross-cast sidecar NBT.
         String label = (customName != null && !customName.isEmpty())

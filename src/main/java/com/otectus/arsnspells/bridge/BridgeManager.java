@@ -26,15 +26,32 @@ public class BridgeManager {
         event.enqueueWork(() -> {
             // Check if Iron's Spellbooks is loaded
             isIronsLoaded = ModList.get().isLoaded("irons_spellbooks");
-            
-            // Get configured mode
-            currentMode = AnsConfig.getManaMode();
-            
+
+            // ANS-HIGH-029: the config is SERVER-type and is NOT loaded yet at
+            // common setup — in production a read returns defaults; in dev Forge
+            // throws IllegalStateException. Treat init as provisional: fall back
+            // to DISABLED (fallback bridges, never null) and rely on the
+            // ModConfigEvent Loading/Reloading listeners in ArsNSpells to call
+            // refreshMode() once real values exist. logInitialization() also
+            // reads config values, so it is skipped until then.
+            boolean configReadable = true;
+            try {
+                currentMode = AnsConfig.getManaMode();
+            } catch (Exception e) {
+                configReadable = false;
+                LOGGER.info("Config not loaded at common setup (expected for SERVER configs); "
+                    + "starting in DISABLED mode until config load refreshes it");
+                currentMode = ManaUnificationMode.DISABLED;
+            }
+
             // Initialize bridges based on mode
             initializeBridges();
-            
-            // Log initialization
-            logInitialization();
+
+            // Log initialization (only when real config values were available;
+            // refreshMode() logs the definitive state at config load).
+            if (configReadable) {
+                logInitialization();
+            }
         });
     }
 

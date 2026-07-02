@@ -16,18 +16,18 @@ import net.minecraft.world.entity.player.Inventory;
  * GUI texture) so the workstation needs only JSON + vanilla block textures.
  */
 public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
-    // Nature keys mirror the ars_n_spells.nature.* lang entries; each maps to an
-    // ARGB tint used for the rudimentary icon.
-    private static final String[] NATURES = {
-        "arcane", "fire", "ice", "lightning", "nature", "holy", "blood", "ender"
-    };
+    // Canonical nature keys live in CrossCastNbt (the export packet whitelists
+    // against them); each maps to an ARGB tint used for the preview swatch.
+    private static final String[] NATURES =
+        com.otectus.arsnspells.spell.CrossCastNbt.NATURE_KEYS.toArray(new String[0]);
     private static final int[] NATURE_COLORS = {
         0xFFB060FF, 0xFFFF6030, 0xFF60D0FF, 0xFFFFE040, 0xFF40C040,
         0xFFFFF0A0, 0xFFD03030, 0xFF9040E0
     };
-    private static final String[] ICONS = {
-        "spark", "flame", "leaf", "bolt", "star", "eye", "drop", "moon"
-    };
+    // Canonical symbol list lives in CrossCastNbt so the wheel-icon mixin, the
+    // shipped icon_<key>.png textures, and this cycle button can never drift.
+    private static final String[] ICONS =
+        com.otectus.arsnspells.spell.CrossCastNbt.ICON_SYMBOLS.toArray(new String[0]);
 
     private EditBox nameField;
     private int natureIndex = 0;
@@ -74,13 +74,14 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
     }
 
     private Component iconLabel() {
-        return Component.literal("Icon: " + ICONS[iconIndex]);
+        return Component.translatable("ars_n_spells.spell_loom.icon",
+            Component.translatable("ars_n_spells.icon." + ICONS[iconIndex]));
     }
 
     private void sendExport() {
         String name = nameField.getValue() == null ? "" : nameField.getValue().trim();
         PacketHandler.sendToServer(new SpellLoomExportPacket(
-            name, NATURES[natureIndex], ICONS[iconIndex], NATURE_COLORS[natureIndex]));
+            name, NATURES[natureIndex], ICONS[iconIndex]));
     }
 
     @Override

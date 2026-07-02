@@ -40,10 +40,29 @@ public final class CrossCastNbt {
     public static final String TAG_CUSTOM_NAME = "custom_name";
     /** Chosen nature (string key); cosmetic tint plus optional affinity tie-in. */
     public static final String TAG_NATURE = "nature";
-    /** Rudimentary icon: a shipped symbol key. */
+    /** Rudimentary icon: a shipped symbol key; must be one of {@link #ICON_SYMBOLS}. */
     public static final String TAG_ICON_SYMBOL = "icon_symbol";
-    /** Rudimentary icon: packed ARGB tint applied to the symbol/background. */
-    public static final String TAG_ICON_COLOR = "icon_color";
+    // TAG_ICON_COLOR removed pre-release: getSpellIconResource returns a plain
+    // ResourceLocation, so Iron's wheel rendering offers no tint hook — the
+    // color was written end-to-end but could never be displayed.
+
+    /**
+     * Canonical symbol keys the Spell Loom can stamp into {@link #TAG_ICON_SYMBOL}.
+     * Each maps to a shipped {@code textures/gui/icons/spell/icon_<key>.png}; the
+     * wheel-icon mixin only honors keys in this set so unknown NBT can never
+     * resolve to a missing texture.
+     */
+    public static final java.util.List<String> ICON_SYMBOLS = java.util.List.of(
+        "spark", "flame", "leaf", "bolt", "star", "eye", "drop", "moon");
+
+    /**
+     * Canonical nature keys ({@code textures/gui/icons/spell/nature_<key>.png} +
+     * {@code ars_n_spells.nature.<key>} lang entries). The loom screen cycles
+     * these; the export packet rejects anything else so hand-crafted packets
+     * cannot stamp NBT that resolves to a missing texture.
+     */
+    public static final java.util.List<String> NATURE_KEYS = java.util.List.of(
+        "arcane", "fire", "ice", "lightning", "nature", "holy", "blood", "ender");
 
     /** Sentinel meaning "no proxy pool slot allocated for this entry". */
     public static final int NO_PROXY_POOL_ID = -1;
@@ -105,8 +124,7 @@ public final class CrossCastNbt {
                                                int proxyPoolId,
                                                String customName,
                                                String nature,
-                                               String iconSymbol,
-                                               int iconColor) {
+                                               String iconSymbol) {
         ListTag spellList;
         if (stackTag.contains(TAG_CROSS_MOD_SPELLS, Tag.TAG_LIST)) {
             spellList = stackTag.getList(TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
@@ -134,9 +152,6 @@ public final class CrossCastNbt {
         }
         if (iconSymbol != null && !iconSymbol.isEmpty()) {
             spellData.putString(TAG_ICON_SYMBOL, iconSymbol);
-        }
-        if (iconColor != 0) {
-            spellData.putInt(TAG_ICON_COLOR, iconColor);
         }
 
         spellList.add(spellData);

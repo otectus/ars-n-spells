@@ -130,12 +130,17 @@ public class MixinScrollItem {
             return;
         }
 
-        // "full" mode: validate mana like a normal spell cast
+        // "full" mode: validate mana like a normal spell cast, and stage the
+        // consume for RETURN. ANS-MED-043: validation alone charged nothing —
+        // Iron's scrolls never deduct mana natively, so "full" mode was
+        // documented as costing mana but was actually free.
         if (manaCost > 0) {
             boolean canAfford = com.otectus.arsnspells.casting.CastingAuthority.canCastIronsSpell(player, manaCost);
             if (!canAfford) {
                 cir.setReturnValue(InteractionResultHolder.fail(stack));
+                return;
             }
+            ScrollLPTracker.stage(player.getUUID(), 0, false, manaCost);
         }
     }
 
@@ -165,6 +170,19 @@ public class MixinScrollItem {
             // Scroll didn't actually cast (cooldown, target invalid, etc.). Don't pay anything.
             LOGGER.debug("Scroll cast did not consume action; skipping LP commit for {}",
                 player.getName().getString());
+            return;
+        }
+
+        // ANS-MED-043: mana entry staged by "full" scroll cost mode. Distinct from
+        // the LP entries (those carry manaCost == 0); commit via the same authority
+        // that validated it at HEAD.
+        if (pending.manaCost > 0.0f) {
+            boolean consumed = com.otectus.arsnspells.casting.CastingAuthority
+                .consumeIronsSpellMana(player, Math.round(pending.manaCost));
+            if (!consumed) {
+                LOGGER.warn("Scroll mana commit failed for {} despite successful validation; spell already cast",
+                    player.getName().getString());
+            }
             return;
         }
 

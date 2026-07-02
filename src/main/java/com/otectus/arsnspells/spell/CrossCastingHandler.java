@@ -232,7 +232,24 @@ public class CrossCastingHandler {
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
                 CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "ARS", "success", success);
             if (!success) {
-                CrossCastContext.clear(player);
+                // ANS-HIGH-030: SEPARATE mode pre-pays the Iron's share during
+                // cost-calc. If the Ars leg then failed, compensate — matching the
+                // BridgeManager rollback contract (ANS-CRIT-003). take() drains the
+                // entry atomically; blocked paths that already cleared it consumed
+                // nothing, so a missing entry means nothing to refund.
+                CrossCastContext.Entry entry = CrossCastContext.take(player);
+                if (entry != null && entry.issPaid > 0.0f) {
+                    IManaBridge issBridge = BridgeManager.getSecondaryBridge();
+                    if (issBridge != null) {
+                        issBridge.addMana(player, entry.issPaid);
+                        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                            CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "ARS",
+                            "refundIss", entry.issPaid);
+                    } else {
+                        LOGGER.warn("Cross-cast failed after Iron's mana was consumed but no "
+                            + "secondary bridge is available to refund {} mana", entry.issPaid);
+                    }
+                }
             }
         }
     }
@@ -417,6 +434,11 @@ public class CrossCastingHandler {
                     logDebug("Iron mana consume failed for cross-cast: need {}, have {}", issCost, issMana);
                     return;
                 }
+                // ANS-HIGH-030: remember what was pre-paid so castArsSpell can
+                // refund it if the Ars leg fails (insufficient Ars mana or a
+                // downstream cancel). issCost must still go to 0 for the TAIL
+                // mixin's already-paid contract (ANS-CRIT-002).
+                entry.issPaid = issCost;
                 entry.issCost = 0.0f;
             }
 

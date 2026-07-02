@@ -174,7 +174,7 @@ public final class IronsBookBindingUtil {
      * Returns true only when a new entry was added.
      */
     public static boolean appendArsSpellToBook(ItemStack book, CompoundTag arsTag) {
-        return appendArsSpellToBook(book, arsTag, null, null, null, 0, -1).wasAdded();
+        return appendArsSpellToBook(book, arsTag, null, null, null, -1).wasAdded();
     }
 
     /**
@@ -190,7 +190,7 @@ public final class IronsBookBindingUtil {
      */
     public static AppendResult appendArsSpellToBook(ItemStack book, CompoundTag arsTag,
                                                     String customName, String nature,
-                                                    String iconSymbol, int iconColor, int maxCap) {
+                                                    String iconSymbol, int maxCap) {
         if (book == null || book.isEmpty() || arsTag == null || arsTag.isEmpty()) {
             return AppendResult.FAILED;
         }
@@ -204,7 +204,7 @@ public final class IronsBookBindingUtil {
             return AppendResult.BOOK_FULL;
         }
         CrossCastNbt.addArsEntryWithMetaToTag(bookTag, ARS_PLACEHOLDER_ID, 1, arsTag.copy(),
-            poolId, customName, nature, iconSymbol, iconColor);
+            poolId, customName, nature, iconSymbol);
         // Mirror into Iron's native container so the entry shows in the wheel.
         // Gated + referenced by FQN so IronsProxySlotWriter (which imports Iron's
         // API) only classloads when Iron's is present.

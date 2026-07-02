@@ -50,10 +50,19 @@ public abstract class MixinAbstractSpellArsIcon {
         }
         Player player = Minecraft.getInstance().player;
         CompoundTag entry = player == null ? null : arsnspells$entry(player, proxy.getPoolId());
+        // Player-chosen icon symbol wins; nature is the fallback. The symbol is
+        // whitelisted against ICON_SYMBOLS so unknown NBT can't resolve to a
+        // missing texture (purple checkerboard in the wheel).
+        String symbol = entry == null ? "" : entry.getString(CrossCastNbt.TAG_ICON_SYMBOL);
         String nature = entry == null ? "" : entry.getString(CrossCastNbt.TAG_NATURE);
-        String path = (nature != null && nature.matches("[a-z_]{1,32}"))
-            ? "textures/gui/icons/spell/nature_" + nature + ".png"
-            : "textures/gui/icons/spell/ars_cross_default.png";
+        String path;
+        if (symbol != null && CrossCastNbt.ICON_SYMBOLS.contains(symbol)) {
+            path = "textures/gui/icons/spell/icon_" + symbol + ".png";
+        } else if (nature != null && nature.matches("[a-z_]{1,32}")) {
+            path = "textures/gui/icons/spell/nature_" + nature + ".png";
+        } else {
+            path = "textures/gui/icons/spell/ars_cross_default.png";
+        }
         cir.setReturnValue(new ResourceLocation("ars_n_spells", path));
     }
 

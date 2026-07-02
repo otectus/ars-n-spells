@@ -11,7 +11,7 @@ Works with **Minecraft 1.20.1** on **Forge**.
 | Mod | Required? |
 |-----|-----------|
 | **Ars Nouveau** (4.12.7+) | Yes |
-| **Iron's Spells 'n Spellbooks** (3.15.x) | No — falls back to native Ars behavior if absent |
+| **Iron's Spells 'n Spellbooks** (3.15.x+) | No — falls back to native Ars behavior if absent |
 | **Covenant of the Seven** (Sanctified Legacy) | No — enables LP and aura ring systems |
 | **Blood Magic** | No — optional LP source for Ring of Seven Curses |
 | **Apotheosis** + **Apothic Curios** | No — lets affix/socket mana stats on curios feed the unified pool |
@@ -199,7 +199,7 @@ All options ship with balanced defaults — install and play, or fine-tune to yo
 ## FAQ / Troubleshooting
 
 **Q: Ars mana isn't changing in ISS Primary mode.**
-A: Make sure Iron's Spells 'n Spellbooks (3.15.x) is installed. Check logs for mixin load failures.
+A: Make sure Iron's Spells 'n Spellbooks (3.15.x+) is installed. Check logs for mixin load failures.
 
 **Q: I see two mana bars.**
 A: Verify your mana mode is set correctly. Check for overlay conflicts from other UI mods.

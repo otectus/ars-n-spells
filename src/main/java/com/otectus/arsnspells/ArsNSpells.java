@@ -50,6 +50,7 @@ public class ArsNSpells {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerCaps);
         modEventBus.addListener(this::onConfigLoading);
+        modEventBus.addListener(this::onConfigReloading);
 
         // Common items (uninscribe tablet) are registered unconditionally so
         // they remain available for cleanup if Iron's Spellbooks is later
@@ -165,6 +166,24 @@ public class ArsNSpells {
             return;
         }
 
+        // ANS-HIGH-029: the config is SERVER-type (loaded at world/server start),
+        // but BridgeManager.init runs at common setup and caches the mana mode from
+        // an unloaded spec — i.e. from defaults. Without this refresh, the mode a
+        // server owner set in ars_n_spells-server.toml was silently ignored until
+        // someone ran /ans mode set. Re-select bridges now that real values exist.
+        try {
+            com.otectus.arsnspells.bridge.BridgeManager.refreshMode();
+        } catch (Exception e) {
+            LOGGER.error("FAILED to refresh mana bridge mode from loaded config", e);
+        }
+
+        // SERVER configs load on every world/server start (single-player included);
+        // the compat init, self-check, and banner only need to happen once per game
+        // session. The bridge refresh above intentionally runs every time.
+        if (!initBannerLogged.compareAndSet(false, true)) {
+            return;
+        }
+
         try {
             SanctifiedLegacyCompat.init();
             if (SanctifiedLegacyCompat.isAvailable()) {
@@ -185,6 +204,24 @@ public class ArsNSpells {
         LOGGER.info("========================================");
         LOGGER.info("OK Ars 'n' Spells initialization complete");
         LOGGER.info("========================================");
+    }
+
+    private static final java.util.concurrent.atomic.AtomicBoolean initBannerLogged =
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    /**
+     * ANS-HIGH-029: file edits/`/reload` fire Reloading, not Loading — the bridge
+     * mode must follow those too, matching what /ans mode set already does.
+     */
+    private void onConfigReloading(final ModConfigEvent.Reloading event) {
+        if (!event.getConfig().getModId().equals(MODID)) {
+            return;
+        }
+        try {
+            com.otectus.arsnspells.bridge.BridgeManager.refreshMode();
+        } catch (Exception e) {
+            LOGGER.error("FAILED to refresh mana bridge mode after config reload", e);
+        }
     }
 
     /**

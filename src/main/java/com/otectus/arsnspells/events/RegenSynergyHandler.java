@@ -24,6 +24,8 @@ public class RegenSynergyHandler {
     // ResonanceManager.resonanceCache.
     private static final Map<UUID, SourceJarCache> sourceJarCacheMap = new ConcurrentHashMap<>();
 
+    private static final int SCAN_RADIUS = 4;
+
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
         if (!ModList.get().isLoaded("irons_spellbooks")) {
@@ -50,8 +52,19 @@ public class RegenSynergyHandler {
 
             boolean nearSource;
             if (needsScan) {
-                nearSource = scanForSourceJar(level, pos);
-                sourceJarCacheMap.put(playerId, new SourceJarCache(pos, nearSource, level.dimension()));
+                // ANS-CRIT-005: never scan while the covered chunks are still loading.
+                // getBlockState on an unloaded chunk forces a synchronous chunk load on
+                // the server thread (ServerChunkCache.getChunkBlocking), which deadlocked
+                // 2.6.1 during login/teleport chunk streaming. Skip the cycle and leave
+                // the cache untouched so the scan retries next second once chunks arrive;
+                // caching a result now would pin a false negative for the whole move
+                // threshold.
+                if (areScanChunksLoaded(level, pos)) {
+                    nearSource = scanForSourceJar(level, pos);
+                    sourceJarCacheMap.put(playerId, new SourceJarCache(pos, nearSource, level.dimension()));
+                } else {
+                    nearSource = false;
+                }
             } else {
                 nearSource = cached.nearSource;
             }
@@ -82,8 +95,30 @@ public class RegenSynergyHandler {
         sourceJarCacheMap.remove(event.getEntity().getUUID());
     }
 
+    // The scan volume is pos ± 4 horizontally, so it spans at most 4 chunks.
+    // Checking those once is far cheaper than per-position isLoaded calls over
+    // all 324 blocks, and guarantees scanForSourceJar cannot trigger a load.
+    private static boolean areScanChunksLoaded(Level level, BlockPos pos) {
+        int minCX = (pos.getX() - SCAN_RADIUS) >> 4;
+        int maxCX = (pos.getX() + SCAN_RADIUS) >> 4;
+        int minCZ = (pos.getZ() - SCAN_RADIUS) >> 4;
+        int maxCZ = (pos.getZ() + SCAN_RADIUS) >> 4;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                if (!level.hasChunk(cx, cz)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private static boolean scanForSourceJar(Level level, BlockPos pos) {
-        for (BlockPos checkPos : BlockPos.betweenClosed(pos.offset(-4, -1, -4), pos.offset(4, 2, 4))) {
+        int minY = Math.max(pos.getY() - 1, level.getMinBuildHeight());
+        int maxY = Math.min(pos.getY() + 2, level.getMaxBuildHeight() - 1);
+        BlockPos min = new BlockPos(pos.getX() - SCAN_RADIUS, minY, pos.getZ() - SCAN_RADIUS);
+        BlockPos max = new BlockPos(pos.getX() + SCAN_RADIUS, maxY, pos.getZ() + SCAN_RADIUS);
+        for (BlockPos checkPos : BlockPos.betweenClosed(min, max)) {
             Block block = level.getBlockState(checkPos).getBlock();
             var blockKey = ForgeRegistries.BLOCKS.getKey(block);
             if (blockKey != null && blockKey.getPath().contains("source_jar")) {

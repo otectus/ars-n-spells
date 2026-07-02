@@ -149,6 +149,27 @@ public class CastingAuthority {
     }
 
     /**
+     * ANS-MED-043: consume the mana previously validated by
+     * {@link #canCastIronsSpell}. Iron's scrolls never deduct mana natively, so
+     * "full" scroll cost mode validated the cost and then charged nothing. The
+     * conversion here mirrors {@link #validateManaResource} exactly so the
+     * amount deducted equals the amount validated.
+     */
+    public static boolean consumeIronsSpellMana(Player player, int manaCost) {
+        if (player == null) {
+            return false;
+        }
+        if (player.isCreative() || manaCost <= 0) {
+            return true;
+        }
+        float effectiveCost = manaCost;
+        if (BridgeManager.isUnificationEnabled()) {
+            effectiveCost = (float) (manaCost * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
+        }
+        return BridgeManager.consumeManaForMode(player, effectiveCost, false);
+    }
+
+    /**
      * Validate mana resource availability.
      *
      * @param player The player

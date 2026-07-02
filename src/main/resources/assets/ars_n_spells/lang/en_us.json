@@ -113,6 +113,7 @@
   "ars_n_spells.spell_loom.output_slot": "Inscribed scroll",
   "ars_n_spells.spell_loom.name_hint": "Spell name",
   "ars_n_spells.spell_loom.nature": "Nature: %1$s",
+  "ars_n_spells.spell_loom.icon": "Icon: %1$s",
   "ars_n_spells.spell_loom.export": "Inscribe",
   "ars_n_spells.spell_loom.error.no_source": "Place an Ars spell source (parchment, focus, or spellbook).",
   "ars_n_spells.spell_loom.error.no_scroll": "Place a blank Iron's scroll.",
@@ -125,5 +126,13 @@
   "ars_n_spells.nature.nature": "Nature",
   "ars_n_spells.nature.holy": "Holy",
   "ars_n_spells.nature.blood": "Blood",
-  "ars_n_spells.nature.ender": "Ender"
+  "ars_n_spells.nature.ender": "Ender",
+  "ars_n_spells.icon.spark": "Spark",
+  "ars_n_spells.icon.flame": "Flame",
+  "ars_n_spells.icon.leaf": "Leaf",
+  "ars_n_spells.icon.bolt": "Bolt",
+  "ars_n_spells.icon.star": "Star",
+  "ars_n_spells.icon.eye": "Eye",
+  "ars_n_spells.icon.drop": "Drop",
+  "ars_n_spells.icon.moon": "Moon"
 }

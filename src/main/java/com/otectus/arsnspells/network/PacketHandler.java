@@ -6,7 +6,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
-import net.minecraftforge.fml.ModList;
 
 public class PacketHandler {
     // PROTOCOL_VERSION bumped 1 -> 2 in the aura-subsystem deletion: AuraSyncPacket
@@ -27,12 +26,16 @@ public class PacketHandler {
         // rejects mis-directed client→server payloads at the channel layer (no enqueueWork,
         // no static-field writes on the server side). Previously these four packets had
         // no direction guard, giving a hostile client a free DoS amplification path.
+        // All messages register unconditionally with fixed ids. ResonanceSyncPacket
+        // used to register only when Iron's was loaded, which shifted every later
+        // id — if the two sides ever disagreed on Iron's presence, packets
+        // mis-routed. The packet touches no Iron's classes (its payload feeds our
+        // own ResonanceManager), so registering it Iron's-less is harmless; the
+        // server just never sends it.
         int id = 0;
-        if (ModList.get().isLoaded("irons_spellbooks")) {
-            INSTANCE.registerMessage(id++, ResonanceSyncPacket.class,
-                ResonanceSyncPacket::toBytes, ResonanceSyncPacket::new, ResonanceSyncPacket::handle,
-                java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
-        }
+        INSTANCE.registerMessage(id++, ResonanceSyncPacket.class,
+            ResonanceSyncPacket::toBytes, ResonanceSyncPacket::new, ResonanceSyncPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         INSTANCE.registerMessage(id++, AffinitySyncPacket.class,
             AffinitySyncPacket::toBytes, AffinitySyncPacket::new, AffinitySyncPacket::handle,
             java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));

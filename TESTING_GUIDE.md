@@ -323,8 +323,10 @@ action-bar message per `show_aura_messages`.
 
 Pass: both casts get the base 15% mana discount (`blasphemy_discount`); the
 fire cast gets an additional 10% from the matching-school bonus
-(`blasphemy_matching_school_bonus`). With `allow_discount_stacking = true`
-discounts compose with ring conversions.
+(`blasphemy_matching_school_bonus`). Ring wearers do not also receive the
+Blasphemy discount: the Cursed/Virtue rings convert the cost to LP/aura
+before the discount handler runs. (The old `allow_discount_stacking` option
+was removed in 3.0.0 — it was never read by the code.)
 
 ### S15 — Curio attribute bridge (Apotheosis / Apothic Curios) — 2.6.0
 

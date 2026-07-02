@@ -121,7 +121,6 @@ public class SpellbookBindingRitual extends AbstractRitual {
                 entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_CUSTOM_NAME),
                 entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_NATURE),
                 entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ICON_SYMBOL),
-                entry.getInt(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ICON_COLOR),
                 maxCap);
         switch (result) {
             case ADDED:
@@ -142,7 +141,14 @@ public class SpellbookBindingRitual extends AbstractRitual {
                 return;
         }
         bookEntity.setItem(bookStack);
-        scrollEntity.discard();
+        // Consume ONE scroll, not the whole entity — Iron's scrolls stack to 16,
+        // and discarding a stacked carrier destroyed the extras.
+        scrollStack.shrink(1);
+        if (scrollStack.isEmpty()) {
+            scrollEntity.discard();
+        } else {
+            scrollEntity.setItem(scrollStack);
+        }
 
         playBindEffects(level, pos);
         RitualFeedback.success(level, pos, LANG_PREFIX + "success", spellLabel(arsTag));

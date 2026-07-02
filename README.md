@@ -6,9 +6,9 @@ Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for M
 
 | Mod | Version | Required |
 | --- | --- | --- |
-| Minecraft (Forge) | 1.20.1 / 47.2.0+ | Yes |
+| Minecraft (Forge) | 1.20.1 / 47.4.0+ | Yes |
 | Ars Nouveau | 4.12.7 | Yes |
-| Iron's Spells 'n Spellbooks | 3.15.x | No |
+| Iron's Spells 'n Spellbooks | 3.15.x+ | No |
 | Covenant of the Seven | Any | No |
 | Blood Magic | Any | No |
 | Curios API | Any | Included via Ars |
@@ -214,7 +214,6 @@ Config file (per-world, server-authoritative): `<world>/serverconfig/ars_n_spell
 | `enable_curio_discounts` | `true` | Enable Blasphemy curio discounts. |
 | `blasphemy_discount` | `0.15` | Base Blasphemy discount (15%). |
 | `blasphemy_matching_school_bonus` | `0.10` | Extra discount for matching school (+10%). |
-| `allow_discount_stacking` | `true` | Allow discounts to stack with ring costs. |
 | `read_curio_attribute_modifiers` | `true` | Read mana attribute modifiers off worn curios (Apotheosis/Apothic Curios affixes & sockets, Magical Jewelry, etc.) and mirror them across the unified pool. |
 
 ### Spell scaling
@@ -321,7 +320,7 @@ Addresses the comprehensive audit at [ars-n-spells-2.0.0.md](ars-n-spells-2.0.0.
 
 ## Troubleshooting
 
-- **Ars mana not changing in iss_primary**: Ensure Iron's is installed (3.15.x). Check logs for mixin failures.
+- **Ars mana not changing in iss_primary**: Ensure Iron's is installed (3.15.x+). Check logs for mixin failures.
 - **Gear perks not affecting mana**: Confirm `respect_armor_bonuses=true` and the correct mode. In `separate`, perks are not cross-applied.
 - **Double mana bars**: Verify your mode and check for overlay conflicts from other UI mods.
 - **"Insufficient LP" despite enough hearts**: Ensure `lp_source_mode` is not `BLOOD_MAGIC_ONLY` without Blood Magic installed. Default is `BLOOD_MAGIC_PRIORITY`.

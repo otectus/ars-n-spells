@@ -7,6 +7,7 @@ import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -143,41 +144,62 @@ public abstract class MixinArsPotionEffects {
     @Unique
     private static final ResourceLocation ARS_MANA_BOOST_EFFECT = new ResourceLocation("ars_nouveau", "mana_boost");
 
+    // OPT-019: the two target MobEffect instances are resolved from the registry
+    // once and cached. The previous implementation iterated getActiveEffects()
+    // twice per player tick with a reverse registry lookup per active effect —
+    // pure per-tick churn for players stacked with effects (common in modpacks).
+    // Registry objects are stable after registry load, and this mixin can only
+    // run with Ars present (it targets an Ars class), so a one-shot resolve is safe.
+    @Unique
+    private static MobEffect arsnspells$manaRegenEffect;
+    @Unique
+    private static MobEffect arsnspells$manaBoostEffect;
+    @Unique
+    private static volatile boolean arsnspells$effectsResolved;
+
+    @Unique
+    private static void arsnspells$resolveEffects() {
+        if (!arsnspells$effectsResolved) {
+            arsnspells$manaRegenEffect = ForgeRegistries.MOB_EFFECTS.getValue(ARS_MANA_REGEN_EFFECT);
+            arsnspells$manaBoostEffect = ForgeRegistries.MOB_EFFECTS.getValue(ARS_MANA_BOOST_EFFECT);
+            arsnspells$effectsResolved = true;
+        }
+    }
+
     /**
      * Calculate total mana regen bonus from Ars potion effects.
-     * Uses registry-based detection instead of string matching on description keys.
+     * Semantics unchanged from the scan-based version: both mana_regen and
+     * mana_boost contribute 0.5/level to regen.
      */
     @Unique
     private static double arsnspells$calculateArsRegenBonus(Player player) {
+        arsnspells$resolveEffects();
         double bonus = 0.0;
-
-        for (MobEffectInstance effect : player.getActiveEffects()) {
-            ResourceLocation effectId = ForgeRegistries.MOB_EFFECTS.getKey(effect.getEffect());
-            if (effectId == null) continue;
-            if (effectId.equals(ARS_MANA_REGEN_EFFECT) || effectId.equals(ARS_MANA_BOOST_EFFECT)) {
-                bonus += (effect.getAmplifier() + 1) * 0.5;
+        if (arsnspells$manaRegenEffect != null) {
+            MobEffectInstance regen = player.getEffect(arsnspells$manaRegenEffect);
+            if (regen != null) {
+                bonus += (regen.getAmplifier() + 1) * 0.5;
             }
         }
-
+        if (arsnspells$manaBoostEffect != null) {
+            MobEffectInstance boost = player.getEffect(arsnspells$manaBoostEffect);
+            if (boost != null) {
+                bonus += (boost.getAmplifier() + 1) * 0.5;
+            }
+        }
         return bonus;
     }
 
     /**
      * Calculate total max mana bonus from Ars potion effects.
-     * Uses registry-based detection instead of string matching on description keys.
      */
     @Unique
     private static double arsnspells$calculateArsMaxManaBonus(Player player) {
-        double bonus = 0.0;
-
-        for (MobEffectInstance effect : player.getActiveEffects()) {
-            ResourceLocation effectId = ForgeRegistries.MOB_EFFECTS.getKey(effect.getEffect());
-            if (effectId == null) continue;
-            if (effectId.equals(ARS_MANA_BOOST_EFFECT)) {
-                bonus += (effect.getAmplifier() + 1) * 10.0;
-            }
+        arsnspells$resolveEffects();
+        if (arsnspells$manaBoostEffect == null) {
+            return 0.0;
         }
-
-        return bonus;
+        MobEffectInstance boost = player.getEffect(arsnspells$manaBoostEffect);
+        return boost == null ? 0.0 : (boost.getAmplifier() + 1) * 10.0;
     }
 }

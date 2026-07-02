@@ -78,7 +78,10 @@ public final class CrossCastGameTests {
 
     /**
      * Sanity test: confirms the gameTestServer run target is wired and the test class is
-     * discovered. Uses the empty vanilla {@code platform} template.
+     * discovered. Uses the {@code platform} template staged by the
+     * {@code stageGameTestStructures} gradle task from
+     * {@code src/test/resources/gameteststructures/platform.snbt} — vanilla and
+     * Forge ship no gametest structures, so the run dir must supply it.
      */
     @GameTest(template = "platform")
     public static void scaffoldIsWired(GameTestHelper helper) {
@@ -216,9 +219,9 @@ public final class CrossCastGameTests {
 
         // Two distinct Ars spells -> two distinct proxy pool ids (1 then 2).
         IronsBookBindingUtil.AppendResult first = IronsBookBindingUtil.appendArsSpellToBook(
-            book, arsPayload("glyph_touch"), "Alpha", "fire", "flame", 0xFF112233, -1);
+            book, arsPayload("glyph_touch"), "Alpha", "fire", "flame", -1);
         IronsBookBindingUtil.AppendResult second = IronsBookBindingUtil.appendArsSpellToBook(
-            book, arsPayload("glyph_break"), "Beta", "ice", "spark", 0xFF445566, -1);
+            book, arsPayload("glyph_break"), "Beta", "ice", "spark", -1);
         if (first != IronsBookBindingUtil.AppendResult.ADDED
             || second != IronsBookBindingUtil.AppendResult.ADDED) {
             helper.fail("binding two distinct Ars spells onto a real book must both ADD");

@@ -35,29 +35,13 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue CROSS_SYSTEM_REGEN_MULTIPLIER;
     public static final ForgeConfigSpec.DoubleValue CROSS_SYSTEM_REGEN_REFERENCE_POOL;
 
-    // ========================================
-    // ARS GLYPH BONUSES
-    // ========================================
-    public static final ForgeConfigSpec.DoubleValue AMPLIFY_DAMAGE_BONUS;
-    public static final ForgeConfigSpec.DoubleValue EXTEND_TIME_DURATION_BONUS;
-    public static final ForgeConfigSpec.IntValue SPLIT_PROJECTILE_COUNT;
-    public static final ForgeConfigSpec.DoubleValue PIERCE_ARMOR_PENETRATION;
-    public static final ForgeConfigSpec.DoubleValue SENSITIVE_CRIT_BONUS;
-
-    // ========================================
-    // IRON'S SPELLBOOKS SCHOOL BONUSES
-    // ========================================
-    public static final ForgeConfigSpec.BooleanValue ENABLE_SCHOOL_BONUSES;
-    public static final ForgeConfigSpec.DoubleValue SCHOOL_BONUS_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue FIRE_SCHOOL_DAMAGE_PER_LEVEL;
-    public static final ForgeConfigSpec.DoubleValue ICE_SCHOOL_DURATION_PER_LEVEL;
-    public static final ForgeConfigSpec.DoubleValue LIGHTNING_SCHOOL_CHAIN_PER_LEVEL;
-    public static final ForgeConfigSpec.DoubleValue EVOCATION_SCHOOL_SPEED_PER_LEVEL;
-    public static final ForgeConfigSpec.DoubleValue HOLY_SCHOOL_HEALING_PER_LEVEL;
-    public static final ForgeConfigSpec.DoubleValue ENDER_SCHOOL_TELEPORT_RANGE_PER_LEVEL;
-    public static final ForgeConfigSpec.DoubleValue BLOOD_SCHOOL_LIFESTEAL_PER_LEVEL;
-    public static final ForgeConfigSpec.DoubleValue NATURE_SCHOOL_GROWTH_PER_LEVEL;
-    public static final ForgeConfigSpec.DoubleValue ELDRITCH_SCHOOL_DEBUFF_PER_LEVEL;
+    // ANS-MED-044: the ARS GLYPH BONUSES section (AMPLIFY_DAMAGE_BONUS,
+    // EXTEND_TIME_DURATION_BONUS, SPLIT_PROJECTILE_COUNT, PIERCE_ARMOR_PENETRATION,
+    // SENSITIVE_CRIT_BONUS) and the IRON'S SPELLBOOKS SCHOOL BONUSES section
+    // (ENABLE_SCHOOL_BONUSES, SCHOOL_BONUS_MULTIPLIER, and the ten
+    // *_SCHOOL_*_PER_LEVEL values) were removed — zero readers in the production
+    // source; users tuning them saw no effect. Re-add alongside a real
+    // implementation, same policy as ANS-HIGH-027.
 
     // ========================================
     // RESONANCE SYSTEM
@@ -68,20 +52,20 @@ public class AnsConfig {
     public static final ForgeConfigSpec.DoubleValue RESONANCE_THRESHOLD;
     public static final ForgeConfigSpec.IntValue RESONANCE_DURATION;
     public static final ForgeConfigSpec.DoubleValue MAX_DAMAGE_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue MAX_DURATION_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue MAX_PROJECTILE_SPLIT;
-    public static final ForgeConfigSpec.DoubleValue MAX_CHAIN_CHANCE;
-    public static final ForgeConfigSpec.DoubleValue MAX_AREA_MULTIPLIER;
+    // ANS-MED-044: MAX_DURATION_MULTIPLIER, MAX_PROJECTILE_SPLIT, MAX_CHAIN_CHANCE,
+    // and MAX_AREA_MULTIPLIER removed — only MAX_DAMAGE_MULTIPLIER is enforced
+    // (ResonanceManager); the other four caps were never read.
 
     // ========================================
     // COOLDOWN SYSTEM
     // ========================================
     public static final ForgeConfigSpec.BooleanValue ENABLE_UNIFIED_COOLDOWNS;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_CATEGORY_COOLDOWNS;
     public static final ForgeConfigSpec.BooleanValue ENABLE_CROSS_MOD_COOLDOWNS;
     public static final ForgeConfigSpec.IntValue COOLDOWN_CATEGORY_DURATION;
     public static final ForgeConfigSpec.DoubleValue CROSS_MOD_COOLDOWN_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue COOLDOWN_REDUCTION_CAP;
+    // ANS-MED-044: ENABLE_CATEGORY_COOLDOWNS and COOLDOWN_REDUCTION_CAP removed —
+    // never read; the unified cooldown path only honors ENABLE_UNIFIED_COOLDOWNS,
+    // ENABLE_CROSS_MOD_COOLDOWNS, COOLDOWN_CATEGORY_DURATION, and the multiplier.
 
     // ========================================
     // PROGRESSION SYSTEM
@@ -108,7 +92,9 @@ public class AnsConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_CURIO_DISCOUNTS;
     public static final ForgeConfigSpec.DoubleValue BLASPHEMY_DISCOUNT;
     public static final ForgeConfigSpec.DoubleValue BLASPHEMY_MATCHING_SCHOOL_BONUS;
-    public static final ForgeConfigSpec.BooleanValue ALLOW_DISCOUNT_STACKING;
+    // ANS-MED-044: ALLOW_DISCOUNT_STACKING removed — never read. The Virtue Ring
+    // moved to aura conversion (zeroes cost before CurioDiscountHandler runs), so
+    // there is no second discount left to stack with Blasphemy's.
     public static final ForgeConfigSpec.BooleanValue READ_CURIO_ATTRIBUTE_MODIFIERS;
     
     // ========================================
@@ -189,9 +175,9 @@ public class AnsConfig {
     // PERFORMANCE TUNING
     // ========================================
     public static final ForgeConfigSpec.DoubleValue SOURCE_JAR_CACHE_MOVE_THRESHOLD;
-    public static final ForgeConfigSpec.IntValue MANA_SYNC_INTERVAL;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_CACHING;
-    public static final ForgeConfigSpec.IntValue CACHE_DURATION;
+    // ANS-MED-044: MANA_SYNC_INTERVAL, ENABLE_CACHING, and CACHE_DURATION removed —
+    // never read. Sync cadence and the equipment/curio caches use fixed internal
+    // constants (e.g. EquipmentIntegration.CACHE_DURATION_MS).
 
     static {
         // ========================================
@@ -342,85 +328,8 @@ public class AnsConfig {
 
         BUILDER.pop();
 
-        // ========================================
-        // ARS GLYPH BONUSES
-        // ========================================
-        BUILDER.push("Ars Glyph Bonuses");
-        BUILDER.comment("Bonuses applied by Ars Nouveau augment glyphs");
-        
-        AMPLIFY_DAMAGE_BONUS = BUILDER
-            .comment("Damage multiplier per Amplify glyph")
-            .defineInRange("amplify_damage_bonus", 0.2, 0.0, 10.0);
-        
-        EXTEND_TIME_DURATION_BONUS = BUILDER
-            .comment("Duration multiplier per Extend Time glyph")
-            .defineInRange("extend_time_duration_bonus", 1.5, 0.0, 10.0);
-        
-        SPLIT_PROJECTILE_COUNT = BUILDER
-            .comment("Additional projectiles per Split glyph")
-            .defineInRange("split_projectile_count", 1, 0, 10);
-        
-        PIERCE_ARMOR_PENETRATION = BUILDER
-            .comment("Armor penetration per Pierce glyph")
-            .defineInRange("pierce_armor_penetration", 0.1, 0.0, 1.0);
-        
-        SENSITIVE_CRIT_BONUS = BUILDER
-            .comment("Critical damage multiplier per Sensitive glyph")
-            .defineInRange("sensitive_crit_bonus", 0.25, 0.0, 10.0);
-        
-        BUILDER.pop();
-
-        // ========================================
-        // IRON'S SPELLBOOKS SCHOOL BONUSES
-        // ========================================
-        BUILDER.push("Iron's School Bonuses");
-        BUILDER.comment("Bonuses from Iron's Spellbooks school levels");
-        
-        ENABLE_SCHOOL_BONUSES = BUILDER
-            .comment("Enable school level bonuses for Ars spells")
-            .define("enable_school_bonuses", true);
-        
-        SCHOOL_BONUS_MULTIPLIER = BUILDER
-            .comment("Global multiplier for all school bonuses")
-            .defineInRange("school_bonus_multiplier", 1.0, 0.0, 10.0);
-        
-        FIRE_SCHOOL_DAMAGE_PER_LEVEL = BUILDER
-            .comment("Fire damage bonus per school level")
-            .defineInRange("fire_school_damage", 0.02, 0.0, 1.0);
-        
-        ICE_SCHOOL_DURATION_PER_LEVEL = BUILDER
-            .comment("Ice effect duration bonus per school level")
-            .defineInRange("ice_school_duration", 0.02, 0.0, 1.0);
-        
-        LIGHTNING_SCHOOL_CHAIN_PER_LEVEL = BUILDER
-            .comment("Lightning chain chance bonus per school level")
-            .defineInRange("lightning_school_chain", 0.02, 0.0, 1.0);
-        
-        EVOCATION_SCHOOL_SPEED_PER_LEVEL = BUILDER
-            .comment("Evocation projectile speed bonus per school level")
-            .defineInRange("evocation_school_speed", 0.02, 0.0, 1.0);
-        
-        HOLY_SCHOOL_HEALING_PER_LEVEL = BUILDER
-            .comment("Holy healing bonus per school level")
-            .defineInRange("holy_school_healing", 0.02, 0.0, 1.0);
-        
-        ENDER_SCHOOL_TELEPORT_RANGE_PER_LEVEL = BUILDER
-            .comment("Ender teleport range bonus per school level")
-            .defineInRange("ender_school_range", 0.02, 0.0, 1.0);
-        
-        BLOOD_SCHOOL_LIFESTEAL_PER_LEVEL = BUILDER
-            .comment("Blood lifesteal bonus per school level")
-            .defineInRange("blood_school_lifesteal", 0.02, 0.0, 1.0);
-        
-        NATURE_SCHOOL_GROWTH_PER_LEVEL = BUILDER
-            .comment("Nature growth effect bonus per school level")
-            .defineInRange("nature_school_growth", 0.02, 0.0, 1.0);
-        
-        ELDRITCH_SCHOOL_DEBUFF_PER_LEVEL = BUILDER
-            .comment("Eldritch debuff strength bonus per school level")
-            .defineInRange("eldritch_school_debuff", 0.02, 0.0, 1.0);
-        
-        BUILDER.pop();
+        // ANS-MED-044: "Ars Glyph Bonuses" and "Iron's School Bonuses" sections
+        // removed — see the field-declaration note above.
 
         // ========================================
         // RESONANCE SYSTEM
@@ -454,23 +363,10 @@ public class AnsConfig {
         MAX_DAMAGE_MULTIPLIER = BUILDER
             .comment("Maximum damage multiplier from resonance")
             .defineInRange("max_damage_multiplier", 5.0, 1.0, 100.0);
-        
-        MAX_DURATION_MULTIPLIER = BUILDER
-            .comment("Maximum duration multiplier from resonance")
-            .defineInRange("max_duration_multiplier", 5.0, 1.0, 100.0);
-        
-        MAX_PROJECTILE_SPLIT = BUILDER
-            .comment("Maximum projectile split from resonance")
-            .defineInRange("max_projectile_split", 5.0, 1.0, 100.0);
-        
-        MAX_CHAIN_CHANCE = BUILDER
-            .comment("Maximum chain chance from resonance (1.0 = 100%)")
-            .defineInRange("max_chain_chance", 1.0, 0.0, 1.0);
-        
-        MAX_AREA_MULTIPLIER = BUILDER
-            .comment("Maximum area of effect multiplier from resonance")
-            .defineInRange("max_area_multiplier", 5.0, 1.0, 100.0);
-        
+
+        // ANS-MED-044: max_duration_multiplier, max_projectile_split,
+        // max_chain_chance, max_area_multiplier removed — never enforced.
+
         BUILDER.pop();
 
         // ========================================
@@ -486,10 +382,8 @@ public class AnsConfig {
             .comment("Enable cross-mod cooldown sharing")
             .define("enable_unified_cooldowns", false);
         
-        ENABLE_CATEGORY_COOLDOWNS = BUILDER
-            .comment("Enable category-based cooldowns (offensive, defensive, etc.)")
-            .define("enable_category_cooldowns", false);
-        
+        // ANS-MED-044: enable_category_cooldowns removed — never read.
+
         ENABLE_CROSS_MOD_COOLDOWNS = BUILDER
             .comment("CRITICAL: Enable cross-mod cooldown interference (false = each mod has independent cooldowns)")
             .define("enable_cross_mod_cooldowns", false);
@@ -502,10 +396,8 @@ public class AnsConfig {
             .comment("Multiplier for cross-mod cooldowns (0.5 = 50% of normal)")
             .defineInRange("cross_mod_cooldown_multiplier", 0.5, 0.0, 10.0);
         
-        COOLDOWN_REDUCTION_CAP = BUILDER
-            .comment("Maximum cooldown reduction from all sources (0.8 = 80% max reduction)")
-            .defineInRange("cooldown_reduction_cap", 0.8, 0.0, 1.0);
-        
+        // ANS-MED-044: cooldown_reduction_cap removed — never enforced.
+
         BUILDER.pop();
 
         // ========================================
@@ -582,9 +474,8 @@ public class AnsConfig {
             .comment("Additional discount when Blasphemy school matches spell school (0.10 = 10% extra)")
             .defineInRange("blasphemy_matching_school_bonus", 0.10, 0.0, 1.0);
         
-        ALLOW_DISCOUNT_STACKING = BUILDER
-            .comment("Allow Ring of Virtue and Blasphemy discounts to stack multiplicatively")
-            .define("allow_discount_stacking", true);
+        // ANS-MED-044: allow_discount_stacking removed — never read (the Virtue
+        // Ring's aura conversion leaves no second discount to stack).
 
         READ_CURIO_ATTRIBUTE_MODIFIERS = BUILDER
             .comment("Read max-mana / mana-regen attribute modifiers from worn Curios (rings, amulets,",
@@ -894,21 +785,10 @@ public class AnsConfig {
                      "Higher values = less scanning but slower detection of jar changes.")
             .defineInRange("source_jar_cache_move_threshold", 4.0, 1.0, 32.0);
         
-        MANA_SYNC_INTERVAL = BUILDER
-            .comment("Mana / aura synchronization interval (ticks, lower = more responsive but higher CPU).",
-                "On dedicated servers with many players, keep this >= 5 to avoid per-tick",
-                "MagicData scans across the player roster.")
-            // ANS-MED-035: default raised 1 -> 5, floor raised 1 -> 2.
-            .defineInRange("mana_sync_interval", 5, 2, 100);
-        
-        ENABLE_CACHING = BUILDER
-            .comment("Enable caching for expensive calculations")
-            .define("enable_caching", true);
-        
-        CACHE_DURATION = BUILDER
-            .comment("Cache duration (ticks)")
-            .defineInRange("cache_duration", 20, 1, 200);
-        
+        // ANS-MED-044: mana_sync_interval, enable_caching, and cache_duration
+        // removed — never read; sync cadence and cache TTLs are fixed internal
+        // constants.
+
         BUILDER.pop();
 
         SPEC = BUILDER.build();

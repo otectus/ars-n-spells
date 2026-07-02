@@ -262,8 +262,10 @@ public class ConfigScreenFactory {
         }
         
         private void saveConfig() {
-            // Use safe save method with retry logic
-            boolean success = AnsConfig.safeSave();
+            // ANS-HIGH-017: safeSave() only SCHEDULES an async write and always
+            // returns true — the real outcome lands in the log. The message below
+            // is worded accordingly instead of claiming the file was written.
+            AnsConfig.safeSave();
 
             // ANS 2.0.1: apply config changes (notably a Mana Mode cycle) live. This
             // screen runs on the render thread; BridgeManager.refreshMode() mutates
@@ -274,15 +276,10 @@ public class ConfigScreenFactory {
 
             // Show message to player
             if (minecraft != null && minecraft.player != null) {
-                if (success) {
-                    minecraft.player.sendSystemMessage(
-                        Component.literal("Ars 'n' Spells config saved!").withStyle(ChatFormatting.GREEN)
-                    );
-                } else {
-                    minecraft.player.sendSystemMessage(
-                        Component.literal("Failed to save config. Check logs for details.").withStyle(ChatFormatting.RED)
-                    );
-                }
+                minecraft.player.sendSystemMessage(
+                    Component.literal("Ars 'n' Spells config applied (saving to disk in background).")
+                        .withStyle(ChatFormatting.GREEN)
+                );
             }
         }
         

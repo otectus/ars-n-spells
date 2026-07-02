@@ -32,27 +32,23 @@ public class SpellLoomExportPacket {
     private final String name;
     private final String nature;
     private final String iconSymbol;
-    private final int iconColor;
 
-    public SpellLoomExportPacket(String name, String nature, String iconSymbol, int iconColor) {
+    public SpellLoomExportPacket(String name, String nature, String iconSymbol) {
         this.name = name == null ? "" : name;
         this.nature = nature == null ? "" : nature;
         this.iconSymbol = iconSymbol == null ? "" : iconSymbol;
-        this.iconColor = iconColor;
     }
 
     public SpellLoomExportPacket(FriendlyByteBuf buf) {
         this.name = buf.readUtf(MAX_NAME);
         this.nature = buf.readUtf(64);
         this.iconSymbol = buf.readUtf(64);
-        this.iconColor = buf.readInt();
     }
 
     public void toBytes(FriendlyByteBuf buf) {
         buf.writeUtf(name, MAX_NAME);
         buf.writeUtf(nature, 64);
         buf.writeUtf(iconSymbol, 64);
-        buf.writeInt(iconColor);
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
@@ -99,8 +95,15 @@ public class SpellLoomExportPacket {
             if (cleanName.length() > MAX_NAME) {
                 cleanName = cleanName.substring(0, MAX_NAME);
             }
+            // Whitelist the cosmetic keys: anything outside the shipped sets is
+            // dropped (empty = "use defaults"), so a hand-crafted packet cannot
+            // stamp NBT that later resolves to a missing wheel texture.
+            String cleanNature = com.otectus.arsnspells.spell.CrossCastNbt.NATURE_KEYS
+                .contains(nature) ? nature : "";
+            String cleanIcon = com.otectus.arsnspells.spell.CrossCastNbt.ICON_SYMBOLS
+                .contains(iconSymbol) ? iconSymbol : "";
             ItemStack carrier = ArsSpellExportUtil.createIronsScrollCarrier(
-                spell.get(), cleanName, nature, iconSymbol, iconColor);
+                spell.get(), cleanName, cleanNature, cleanIcon);
             if (carrier.isEmpty()) {
                 sender.displayClientMessage(
                     Component.translatable("ars_n_spells.spell_loom.error.failed"), true);

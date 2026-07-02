@@ -3,6 +3,8 @@ package com.otectus.arsnspells.network;
 import com.otectus.arsnspells.cooldown.CooldownCategory;
 import com.otectus.arsnspells.cooldown.UnifiedCooldownManager;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
@@ -37,11 +39,17 @@ public class CooldownSyncPacket {
             return;
         }
         context.enqueueWork(() -> {
-            try {
-                CooldownCategory cat = CooldownCategory.valueOf(categoryName);
-                UnifiedCooldownManager.setClientCooldownEnd(cat, timestamp);
-            } catch (IllegalArgumentException ignored) {
-            }
+            // Client-mirror write wrapped in a Dist guard, matching
+            // AffinitySyncPacket/ResonanceSyncPacket. PLAY_TO_CLIENT registration
+            // already blocks server-side delivery; this keeps the sibling packets
+            // structurally identical so none of them can regress alone.
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
+                try {
+                    CooldownCategory cat = CooldownCategory.valueOf(categoryName);
+                    UnifiedCooldownManager.setClientCooldownEnd(cat, timestamp);
+                } catch (IllegalArgumentException ignored) {
+                }
+            });
         });
         context.setPacketHandled(true);
     }

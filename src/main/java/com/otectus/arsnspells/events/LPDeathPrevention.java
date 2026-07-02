@@ -124,6 +124,13 @@ public class LPDeathPrevention {
 
     /**
      * Safety net: intercept death events if damage interception somehow fails.
+     *
+     * <p>ANS-HIGH-028: scoped to the cast tick, like {@link #onPlayerHurt}. The
+     * immune flag is not cleared on successful casts (only the 1s TTL sweep or
+     * logout removes it), so gating on {@code isLPImmune} alone cancelled ANY
+     * lethal magic/sacrifice damage for up to ~3s after every Cursed-Ring cast —
+     * a repeatable post-cast invulnerability exploit in safe mode. The same-tick
+     * check restricts the net to deaths actually caused by the intercepted cast.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onPlayerDeath(LivingDeathEvent event) {
@@ -139,7 +146,8 @@ public class LPDeathPrevention {
             return;
         }
 
-        if (!isLPImmune(player)) {
+        CastTransaction transaction = activeTransactions.get(player.getUUID());
+        if (transaction == null || player.tickCount != transaction.playerTickCount) {
             return;
         }
 

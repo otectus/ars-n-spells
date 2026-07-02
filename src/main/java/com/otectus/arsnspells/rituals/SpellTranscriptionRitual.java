@@ -123,7 +123,14 @@ public class SpellTranscriptionRitual extends AbstractRitual {
                 break;
         }
         targetEntity.setItem(targetStack);
-        sourceEntity.discard();
+        // Consume ONE source item, not the whole entity — Iron's scrolls stack to
+        // 16, and discarding a stacked source destroyed the extras.
+        sourceStack.shrink(1);
+        if (sourceStack.isEmpty()) {
+            sourceEntity.discard();
+        } else {
+            sourceEntity.setItem(sourceStack);
+        }
 
         playInscribeEffects(level, pos);
         RitualFeedback.success(level, pos, LANG_PREFIX + "success", sourceLabel(source));

@@ -142,6 +142,14 @@ public final class CrossCastContext {
         public volatile boolean blocked;
         public volatile String spellId;
         /**
+         * ANS-HIGH-030: Iron's mana already consumed for this attempt (SEPARATE
+         * mode pre-pays the Iron's share during cost-calc). Recorded so the cast
+         * entry point can refund it if the Ars leg subsequently fails — zeroing
+         * {@link #issCost} alone erased the only record of the payment and made
+         * a failed cross-cast a one-way Iron's-mana drain.
+         */
+        public volatile float issPaid;
+        /**
          * ANS-HIGH-004: one-shot guard via AtomicBoolean. The Ars cost-calc event can
          * fire more than once during a resolve (preview vs. actual deduction). The
          * previous boolean read-then-write was racy under overlapping cross-casts;

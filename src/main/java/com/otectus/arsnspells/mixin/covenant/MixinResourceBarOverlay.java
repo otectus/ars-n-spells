@@ -71,14 +71,18 @@ public abstract class MixinResourceBarOverlay {
 
     /**
      * Rewrite the bar's label from just the current aura to
-     * {@code "current / peak"}. Only the Virtue-Ring branch reaches this
-     * {@code String.valueOf(int)} call — the other branches format their
-     * labels through {@code invokedynamic makeConcatWithConstants} — so the
-     * redirect is scoped to the aura path even without an ordinal pin.
+     * {@code "current / peak"}. Only the Virtue-Ring branch reaches a
+     * {@code String.valueOf(int)} call in the current Covenant build — the
+     * other branches format their labels through {@code invokedynamic
+     * makeConcatWithConstants} — but that is an assumption about third-party
+     * bytecode, so the redirect is additionally pinned to {@code ordinal = 0}:
+     * if a future Covenant build introduces more {@code String.valueOf(int)}
+     * call sites in {@code render}, at most the first one is touched instead
+     * of every bar label silently gaining a " / peak" suffix.
      */
     @Redirect(
         method = "render",
-        at = @At(value = "INVOKE", target = "Ljava/lang/String;valueOf(I)Ljava/lang/String;"),
+        at = @At(value = "INVOKE", target = "Ljava/lang/String;valueOf(I)Ljava/lang/String;", ordinal = 0),
         require = 0
     )
     private String arsnspells$labelWithPeak(int currentAura) {

@@ -52,6 +52,16 @@ repositories {
         name = 'Illusive Soulworks'
         url = 'https://maven.theillusivec4.top/'
     }
+    // GeckoLib — runtime dependency of Ars Nouveau (and Iron's).
+    maven {
+        name = 'GeckoLib'
+        url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+    }
+    // PlayerAnimator — runtime dependency of Iron's Spellbooks.
+    maven {
+        name = 'KosmX'
+        url = 'https://maven.kosmx.dev/'
+    }
 }
 
 dependencies {
@@ -63,14 +73,18 @@ dependencies {
     // Iron-loaded gametests self-skip on IronsCompat.isLoaded()==false. Pass
     // -PwithIronsRuntimeGameTests to also put Iron's on the run classpath so the
     // Iron-loaded cross-cast/export integration scenarios actually execute.
-    // NOTE: Iron's pulls a runtime graph (Geckolib, PlayerAnimator) that CurseMaven does
-    // not resolve transitively; add those as `runtimeOnly` here if the profile fails to
-    // boot in your dev environment.
+    // Iron's pulls a runtime graph that CurseMaven does not resolve transitively;
+    // its extra pieces (PlayerAnimator) ride the same profile flag.
     if (project.hasProperty('withIronsRuntimeGameTests')) {
         runtimeOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${irons_spellbooks_file}")
+        runtimeOnly fg.deobf("dev.kosmx.player-anim:player-animation-lib-forge:${playeranimator_version}")
     }
     // Curios API only (matches the version Ars Nouveau bundles at runtime).
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}:api")
+    // Ars Nouveau's own runtime graph (Curios full jar + GeckoLib) so
+    // runClient/runGameTestServer can boot without hand-copied jars.
+    runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}")
+    runtimeOnly fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
@@ -79,6 +93,17 @@ dependencies {
 
 test {
     useJUnitPlatform()
+}
+
+// The GameTest harness resolves unprefixed templates (e.g. "platform") against
+// <run dir>/gameteststructures/*.snbt. Neither vanilla nor Forge ship any, so
+// stage the committed ones into the run dir before any game run.
+tasks.register('stageGameTestStructures', Copy) {
+    from 'src/test/resources/gameteststructures'
+    into 'run/gameteststructures'
+}
+tasks.matching { it.name in ['runGameTestServer', 'runClient', 'runServer'] }.configureEach {
+    dependsOn 'stageGameTestStructures'
 }
 
 processResources {
