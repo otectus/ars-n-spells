@@ -81,6 +81,17 @@ public class CrossCastingHandler {
             return;
         }
 
+        // 3.0.0: an Iron's spellbook surfaces its Ars entries as registered
+        // proxy spells in Iron's *native* spell wheel and casts them through
+        // Iron's own right-click flow. Hijacking right-click here would suppress
+        // native Iron's casting entirely, so we defer to the native flow. Only
+        // generic inscribed items (which have no native cast UI) use this path.
+        // isIronsSpellBook is registry-id based and returns false when Iron's is
+        // absent, so this gate is safe on Iron's-less installs.
+        if (IronsBookBindingUtil.isIronsSpellBook(stack)) {
+            return;
+        }
+
         if (player.level().isClientSide()) {
             // Client: announce intent via packet, then cancel local use
             // prediction so vanilla item-use animations and side-effects
@@ -180,7 +191,16 @@ public class CrossCastingHandler {
         return idx;
     }
 
-    private static boolean castArsSpell(Player player, ItemStack item, InteractionHand hand,
+    /**
+     * Casts the Ars spell serialized in {@code spellData}'s {@code ars_spell}
+     * sub-tag using {@code item} as the casting stack. Public so the Iron's
+     * native-proxy spell ({@code spell.irons.ArsCrossProxySpell}) can delegate
+     * here from its {@code onCast}, reusing the exact same cross-cast cost,
+     * multiplier, scaling and cooldown path as the sidecar right-click cast — no
+     * parallel pipeline. Opens a {@link CrossCastContext} so {@code onArsSpellCost}
+     * applies the multiplier exactly once.
+     */
+    public static boolean castArsSpell(Player player, ItemStack item, InteractionHand hand,
         CompoundTag spellData, UUID attemptId) {
         CompoundTag arsSpellTag = spellData.getCompound(TAG_ARS_SPELL);
         if (arsSpellTag.isEmpty()) {

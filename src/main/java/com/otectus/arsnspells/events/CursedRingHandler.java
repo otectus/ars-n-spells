@@ -19,9 +19,11 @@ import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Deque;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Handles Cursed Ring LP consumption for Ars Nouveau spells.
@@ -41,9 +43,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CursedRingHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CursedRingHandler.class);
 
-    // Track which spells have had LP consumed (to prevent double-consumption).
-    // ConcurrentHashMap because event handlers can fire from network/tick threads.
-    private static final Map<UUID, PendingLPCost> pendingCosts = new ConcurrentHashMap<>();
+    // ANS-3.0.0: a per-player FIFO deque (not a single slot). Back-to-back casts of
+    // delayed-resolution spells (e.g. Ars projectiles whose SpellResolveEvent.Post fires
+    // on impact) used to overwrite each other's staged LP, so the first cast paid the
+    // second's price and the second went free. Enqueue at cost-calc, poll FIFO at resolve.
+    // ConcurrentHashMap + ConcurrentLinkedDeque because handlers can fire from
+    // network/tick threads.
+    private static final Map<UUID, Deque<PendingLPCost>> pendingCosts = new ConcurrentHashMap<>();
     private static final java.util.Set<UUID> ringConflictNotified = ConcurrentHashMap.newKeySet();
 
     /**
@@ -112,8 +118,9 @@ public class CursedRingHandler {
         // ANS-HIGH-011: stamp with level.getGameTime() (server-global) instead of
         // player.tickCount (per-player), so the periodic sweep can compare ALL
         // entries against a single now-value without mixing player tickCounts.
-        pendingCosts.put(player.getUUID(),
-            new PendingLPCost(lpCost, player.level().getGameTime()));
+        // ANS-3.0.0: enqueue (addLast) rather than overwrite.
+        pendingCosts.computeIfAbsent(player.getUUID(), k -> new ConcurrentLinkedDeque<>())
+            .addLast(new PendingLPCost(lpCost, player.level().getGameTime()));
 
         // Set mana cost to 0 so Ars Nouveau doesn't consume mana
         event.currentCost = 0;
@@ -130,13 +137,18 @@ public class CursedRingHandler {
             return -1;
         }
 
-        PendingLPCost pending = pendingCosts.get(player.getUUID());
+        Deque<PendingLPCost> queue = pendingCosts.get(player.getUUID());
+        if (queue == null) {
+            return -1;
+        }
+        PendingLPCost pending = queue.peekFirst();
         if (pending == null) {
             return -1;
         }
 
         if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
-            pendingCosts.remove(player.getUUID());
+            // Stale front — drop it so callers see the next valid entry (or none).
+            queue.pollFirst();
             return -1;
         }
 
@@ -186,18 +198,16 @@ public class CursedRingHandler {
             return;
         }
 
-        PendingLPCost pending = pendingCosts.get(player.getUUID());
-        if (pending == null) {
-            return;
-        }
-
-        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
-            pendingCosts.remove(player.getUUID());
+        Deque<PendingLPCost> queue = pendingCosts.get(player.getUUID());
+        if (queue == null || queue.isEmpty()) {
             return;
         }
 
         if (!SanctifiedLegacyCompat.isWearingCursedRing(player)) {
-            LOGGER.debug("Cursed Ring no longer equipped on {} between cost calc and resolve - dropping pending cost",
+            // Ring came off between cost calc and resolve — drop ALL staged costs for this
+            // player so no Post handler can consume them. cost-calc only stages while the
+            // ring is worn, so every queued entry predates the removal.
+            LOGGER.debug("Cursed Ring no longer equipped on {} between cost calc and resolve - dropping pending costs",
                 player.getName().getString());
             pendingCosts.remove(player.getUUID());
         }
@@ -228,13 +238,26 @@ public class CursedRingHandler {
             return;
         }
 
-        PendingLPCost pending = pendingCosts.remove(player.getUUID());
-        if (pending == null) {
+        // FIFO: pull the oldest still-valid staged cost, discarding any expired heads
+        // (e.g. a projectile whose Post never fired). An emptied deque is left in place
+        // for the periodic sweep to evict — removing it here would race a concurrent
+        // cost-calc that re-uses the same deque object and silently drop its entry.
+        Deque<PendingLPCost> queue = pendingCosts.get(player.getUUID());
+        if (queue == null) {
             return;
         }
-
-        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
-            LOGGER.warn("Pending LP cost expired for {}", player.getName().getString());
+        long now = player.level().getGameTime();
+        PendingLPCost pending = null;
+        PendingLPCost candidate;
+        while ((candidate = queue.pollFirst()) != null) {
+            if (now - candidate.gameTimeStamp > PENDING_COST_TTL_TICKS) {
+                LOGGER.warn("Pending LP cost expired for {}", player.getName().getString());
+                continue;
+            }
+            pending = candidate;
+            break;
+        }
+        if (pending == null) {
             return;
         }
 
@@ -321,8 +344,12 @@ public class CursedRingHandler {
             // ANS-HIGH-011: sweep against server-global gameTime so a long-uptime player A's
             // sweep does not evict a freshly-joined player B's pending cost (which was stamped
             // from B's own tickCount, which is much lower than A's).
+            // ANS-3.0.0: prune expired entries within each deque, then drop empty keys.
             long now = event.player.level().getGameTime();
-            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().gameTimeStamp > PENDING_COST_TTL_TICKS);
+            pendingCosts.entrySet().removeIf(entry -> {
+                entry.getValue().removeIf(c -> now - c.gameTimeStamp > PENDING_COST_TTL_TICKS);
+                return entry.getValue().isEmpty();
+            });
 
             // Ring conflict notification
             if (SanctifiedLegacyCompat.isAvailable() && !event.player.level().isClientSide()) {

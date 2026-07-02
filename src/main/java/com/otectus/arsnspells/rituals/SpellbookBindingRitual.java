@@ -2,6 +2,7 @@ package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import net.minecraft.core.BlockPos;
@@ -95,33 +96,56 @@ public class SpellbookBindingRitual extends AbstractRitual {
         ItemStack scrollStack = scrollEntity.getItem();
         ItemStack bookStack = bookEntity.getItem();
 
-        Optional<CompoundTag> arsTag = IronsBookBindingUtil.extractSingleArsEntry(scrollStack);
-        if (arsTag.isEmpty()) {
+        Optional<CompoundTag> entryOpt = IronsBookBindingUtil.extractSingleEntry(scrollStack);
+        if (entryOpt.isEmpty()) {
             // Classification said this was a valid carrier but a second read
             // failed -- a transient parse problem, not a validation error.
             RitualFeedback.error(level, pos, LANG_PREFIX + "error.scroll_parse_failed",
                 scrollStack.getHoverName().getString());
             return;
         }
+        CompoundTag entry = entryOpt.get();
+        CompoundTag arsTag = entry.getCompound(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ARS_SPELL);
 
-        if (IronsBookBindingUtil.containsEquivalentArsSpell(bookStack, arsTag.get())) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.duplicate",
-                bookStack.getHoverName().getString());
+        if (!AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.get()) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.disabled");
             return;
         }
 
-        // Validation complete -- mutation begins here.
-        boolean appended = IronsBookBindingUtil.appendArsSpellToBook(bookStack, arsTag.get());
-        if (!appended) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.scroll_parse_failed",
-                scrollStack.getHoverName().getString());
-            return;
+        // Validation complete -- mutation begins here. The util allocates a
+        // native-wheel proxy slot and mirrors the entry (with the scroll's chosen
+        // display name/nature/icon) into Iron's container.
+        int maxCap = AnsConfig.MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK.get();
+        IronsBookBindingUtil.AppendResult result =
+            IronsBookBindingUtil.appendArsSpellToBook(bookStack, arsTag,
+                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_CUSTOM_NAME),
+                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_NATURE),
+                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ICON_SYMBOL),
+                entry.getInt(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ICON_COLOR),
+                maxCap);
+        switch (result) {
+            case ADDED:
+                break;
+            case DUPLICATE:
+                RitualFeedback.error(level, pos, LANG_PREFIX + "error.duplicate",
+                    bookStack.getHoverName().getString());
+                return;
+            case BOOK_FULL:
+                RitualFeedback.error(level, pos, LANG_PREFIX + "error.book_full",
+                    bookStack.getHoverName().getString(),
+                    IronsBookBindingUtil.effectiveProxyCeiling(maxCap));
+                return;
+            case FAILED:
+            default:
+                RitualFeedback.error(level, pos, LANG_PREFIX + "error.scroll_parse_failed",
+                    scrollStack.getHoverName().getString());
+                return;
         }
         bookEntity.setItem(bookStack);
         scrollEntity.discard();
 
         playBindEffects(level, pos);
-        RitualFeedback.success(level, pos, LANG_PREFIX + "success", spellLabel(arsTag.get()));
+        RitualFeedback.success(level, pos, LANG_PREFIX + "success", spellLabel(arsTag));
     }
 
     private void playBindEffects(Level level, BlockPos pos) {

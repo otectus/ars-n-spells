@@ -179,6 +179,8 @@ public class AnsConfig {
     // CROSS-CAST INSCRIPTION
     // ========================================
     public static final ForgeConfigSpec.DoubleValue CROSS_CAST_COST_MULTIPLIER;
+    public static final ForgeConfigSpec.BooleanValue ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS;
+    public static final ForgeConfigSpec.IntValue MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK;
     // ANS-HIGH-027: ENABLE_PER_CAST_REAGENT removed — was a reserved hook with zero
     // readers; setting it had no effect. If the per-cast reagent feature ever lands,
     // re-add the key alongside the implementation.
@@ -857,6 +859,24 @@ public class AnsConfig {
                 "active mana unification mode and SEPARATE-mode dual-cost splitting."
             )
             .defineInRange("cross_cast_cost_multiplier", 1.25, 0.5, 5.0);
+
+        ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS = BUILDER
+            .comment(
+                "Allow Ars Nouveau spells to be bound onto Iron's Spellbooks spellbooks, where",
+                "they appear as their own entries in Iron's native spell wheel and cast through",
+                "Ars 'n Spells' cross-cast pipeline. Disabling rejects new binds with a clear",
+                "message; spells already bound keep working. No effect without Iron's installed."
+            )
+            .define("allow_ars_spells_in_irons_spellbooks", true);
+
+        MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK = BUILDER
+            .comment(
+                "Maximum number of Ars spells that may be bound onto a single Iron's spellbook.",
+                "-1 = no cap (default). Whatever the value, it is bounded at runtime by the",
+                "native-wheel proxy pool size (" + com.otectus.arsnspells.spell.CrossCastNbt.PROXY_POOL_SIZE + "): only that many",
+                "Ars entries can be shown as distinct entries in Iron's spell wheel per book."
+            )
+            .defineInRange("max_ars_cross_spells_per_irons_spellbook", -1, -1, 64);
 
         // ANS-HIGH-027: ENABLE_PER_CAST_REAGENT registration removed — had no readers,
         // setting it had zero effect. Re-add alongside an implementation if/when shipped.

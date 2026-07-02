@@ -63,6 +63,19 @@ public final class ArsSpellExportUtil {
      * item cannot be resolved, or the spell is null.
      */
     public static ItemStack createIronsScrollCarrier(Spell arsSpell) {
+        return createIronsScrollCarrier(arsSpell, null, null, null, 0);
+    }
+
+    /**
+     * Builds an Iron's scroll carrier that also records the Spell Loom display
+     * metadata (custom name, nature, icon) on its single Ars entry, so the later
+     * book-binding step can surface it in Iron's native spell wheel. Passing null
+     * metadata yields a carrier byte-identical to {@link #createIronsScrollCarrier(Spell)}.
+     * The proxy pool id stays unallocated here — it is assigned only when the
+     * scroll is bound onto an actual spellbook.
+     */
+    public static ItemStack createIronsScrollCarrier(Spell arsSpell, String customName,
+                                                     String nature, String iconSymbol, int iconColor) {
         if (arsSpell == null || !IronsCompat.isLoaded()) {
             return ItemStack.EMPTY;
         }
@@ -72,12 +85,15 @@ public final class ArsSpellExportUtil {
         }
 
         ItemStack out = new ItemStack(item);
-        // Same primitive every inscribed item uses -- keeps storage and casting aligned.
-        CrossCastingHandler.addCrossModSpell(out, arsSpell);
+        // Same schema every inscribed item uses -- keeps storage and casting aligned.
+        CrossCastNbt.addArsEntryWithMetaToTag(out.getOrCreateTag(),
+            IronsBookBindingUtil.ARS_PLACEHOLDER_ID, 1, arsSpell.serialize(),
+            CrossCastNbt.NO_PROXY_POOL_ID, customName, nature, iconSymbol, iconColor);
 
         // Cosmetic only; casting still keys off the cross-cast sidecar NBT.
-        out.setHoverName(Component.translatable("item.ars_n_spells.transcribed_ars_scroll",
-            buildDisplayLabel(arsSpell)));
+        String label = (customName != null && !customName.isEmpty())
+            ? customName : buildDisplayLabel(arsSpell);
+        out.setHoverName(Component.translatable("item.ars_n_spells.transcribed_ars_scroll", label));
         out.getOrCreateTag().putString(TAG_EXPORT_MODE, EXPORT_MODE_SCROLL_CARRIER);
         return out;
     }

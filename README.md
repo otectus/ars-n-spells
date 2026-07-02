@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v2.6.1)
+# Ars 'n' Spells (v3.0.0)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -88,6 +88,21 @@ Cross-cast spells pay an overhead set by `cross_cast_cost_multiplier` (default `
 
 **4. Strip an inscription.**
 Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank parchment (reagent), a water bucket, a source gem, and an archwood log -- 500 source. Drop one inscribed item within three blocks of the brazier with no other items in range. Ash and smoke particles plus a fire-extinguish sound mark the strip; the result is bit-identical to a fresh blank target so the same item can be re-inscribed cleanly. The uninscribe ritual is Iron's-independent and remains useful for cleanup even if Iron's Spellbooks is later removed.
+
+---
+
+## Export Ars spells onto Iron's scrolls and spellbooks (3.0.0)
+
+New in 3.0.0: design an Ars Nouveau spell at the **Spell Loom**, export it onto a real **Iron's scroll**, bind it into a real **Iron's spellbook**, and then **select and cast it from Iron's own native spell wheel** — while it still runs through Ars 'n' Spells' cross-cast pipeline (mana, multiplier, scaling, cooldown). The Ars spell's data rides as an Ars 'n' Spells sidecar (`arsnspells:cross_spells`) on the real Iron item — Iron's per-slot format has no room for it — and a registered proxy spell slot is added to the book's native container so the entry shows in the wheel. The book's own Iron's spells are never overwritten. This leg requires Iron's Spellbooks to be installed.
+
+**1. Export an Ars spell to an Iron's scroll — at the Spell Loom or by command.**
+Build the spell with Ars Nouveau's normal tools (Scribe's Table / spellbook), then craft a **Spell Loom** (`G` gold / `L` lapis / `B` book / `O` obsidian on a crafting table). Right-click it, drop the Ars source (spell parchment, focus, or Ars spellbook) into the source slot and a **blank Iron's scroll** into the scroll slot, type a **name**, pick a **nature**, choose a rudimentary **icon**, and press **Inscribe** — the inscribed scroll appears in the output slot. (The op-only `/ans export_to_irons_scroll` still works for a quick, metadata-free export.)
+
+**2. Bind the scroll into an Iron's spellbook.**
+Hold the exported scroll and an Iron's spellbook and run `/ans bind_scroll_to_irons_book`, or run the **Spellbook Binding** ritual (its tablet is crafted on the Enchanting Apparatus and only registers when Iron's is loaded; recipe at [data/ars_n_spells/recipes/apparatus/spellbook_binding.json](src/main/resources/data/ars_n_spells/recipes/apparatus/spellbook_binding.json)) with the scroll and spellbook in range of the brazier. The scroll is consumed and the Ars entry is appended to the book — including any name/nature/icon chosen at the Spell Loom. Binding deduplicates by the serialized spell payload, so re-binding the same spell is rejected. Set `allow_ars_spells_in_irons_spellbooks=false` to disable binding, or `max_ars_cross_spells_per_irons_spellbook` to cap how many Ars spells a book may hold (`-1` = no cap, bounded by the native-wheel pool size of 8).
+
+**3. Cast from the spellbook — through Iron's native spell wheel.**
+Each bound Ars spell appears as its **own entry in Iron's native spell-selection wheel**, with the name and icon you chose. Select it like any Iron's spell and right-click the spellbook to cast — it runs the real Ars spell through Ars 'n' Spells' server-authoritative cross-cast pipeline (mana, the `cross_cast_cost_multiplier`, scaling, cooldown). Your book's native Iron's spells are untouched and cast exactly as before. Under the hood, each entry occupies one of a small pool of registered proxy spells (`ars_cross_1..8`); the real Ars data lives in the book's `arsnspells:cross_spells` sidecar, since Iron's own per-slot data has no room for it. Up to **8** Ars spells per book show in the wheel. (Generic inscribed items that aren't Iron's spellbooks still cast via right-click / sneak-cycle as before.)
 
 ---
 
@@ -231,6 +246,12 @@ The mod hides redundant mana bars based on mode:
 - **separate / disabled**: Both bars may show.
 
 ## Changelog
+
+### v3.0.0 — Ars → scroll → spellbook export, pending-cost race fix
+
+- **Export Ars spells onto Iron's scrolls and bind them into spellbooks.** A new ritual (Spellbook Binding) and the `/ans export_to_irons_scroll` + `/ans bind_scroll_to_irons_book` commands carry an Ars spell onto a real Iron item; it casts through the existing cross-cast pipeline and coexists with Iron's native `ISB_Spells` container. Cross-spell tooltips surface the embedded spell since it isn't in Iron's slot UI. Dedup keys off the spell payload. See [§Export Ars spells onto Iron's scrolls and spellbooks](#export-ars-spells-onto-irons-scrolls-and-spellbooks-300).
+- **Pending-cost race fixed.** The Virtue/Cursed/Iron's-LP handlers now stage costs in a per-player FIFO queue instead of a single slot, so rapid back-to-back casts of delayed-resolution spells can no longer overwrite each other's cost (the old "first cast pays double, second casts free" bug).
+- **Iron-loaded GameTests.** Real CYCLE and export→bind→coexist round-trip tests replace the previous placeholder stubs; the Iron-loaded scenarios run under the opt-in `-PwithIronsRuntimeGameTests` profile. See [CHANGELOG.md](CHANGELOG.md) for the full breakdown.
 
 ### v2.6.1 — Mana-bridge correctness fixes
 

@@ -93,6 +93,16 @@ If you change your mind, the **Spell Uninscription** ritual returns an inscribed
 
 The uninscribe ritual works without Iron's Spellbooks loaded, so legacy inscribed items can still be cleaned up after Iron's is removed.
 
+### Export to Iron's scrolls & spellbooks — *new in 3.0.0*
+
+Take an Ars Nouveau spell out onto a **real Iron's scroll**, then bind it into a **real Iron's spellbook** — and still cast it through the cross-cast pipeline. The Ars spell rides along as an Ars 'n' Spells sidecar on the real Iron item, coexisting with Iron's own spell container instead of being forced into Iron's registry-slot model, so nothing about the spell is lost.
+
+1. **Export.** Hold an Ars spell source (parchment, focus, or spellbook) and run `/ans export_to_irons_scroll`. You get a real Iron's scroll carrying the spell, with a tooltip showing what's embedded.
+2. **Bind.** Hold the scroll and an Iron's spellbook and run `/ans bind_scroll_to_irons_book`, or use the **Spellbook Binding** ritual (its apparatus tablet appears only when Iron's is installed). The scroll is consumed and the spell is appended to the book; re-binding the same spell is rejected (dedup by spell payload).
+3. **Cast.** Because the bound spell isn't in Iron's native spell wheel, the spellbook tooltip shows the embedded spell(s), the active index, and cast/cycle hints. Right-click to cast, sneak-right-click to cycle.
+
+This leg requires Iron's Spellbooks. Any existing Iron's spells on the book are left untouched.
+
 ---
 
 ## Unified Cooldowns
@@ -180,6 +190,8 @@ All options ship with balanced defaults — install and play, or fine-tune to yo
 | `/ans info <player>` | Op 2 | Show mana, aura, resonance, and ring status |
 | `/ans mode` | -- | Show current mana unification mode |
 | `/ans mode set <mode>` | Op 2 | Switch the mana unification mode live (no restart) |
+| `/ans export_to_irons_scroll` | Op 2 | Export the held Ars spell onto a real Iron's scroll (3.0.0) |
+| `/ans bind_scroll_to_irons_book` | Op 2 | Bind a held exported scroll into a held Iron's spellbook (3.0.0) |
 | `/ans aura` | -- | Show your own current aura |
 
 ---

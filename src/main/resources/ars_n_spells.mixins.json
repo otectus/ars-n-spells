@@ -19,6 +19,7 @@
   ],
   "client": [
     "irons.MixinIronsManaBarOverlay",
+    "irons.MixinAbstractSpellArsIcon",
     "covenant.MixinResourceBarOverlay"
   ],
   "injectors": {

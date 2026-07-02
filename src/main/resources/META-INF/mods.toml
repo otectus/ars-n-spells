@@ -10,9 +10,10 @@ description='''
 Bridges Ars Nouveau and Iron's Spells 'n Spellbooks: unified mana with five
 modes, cross-mod spell scaling, school affinity and progression, resonance
 bonuses, optional unified cooldowns, custom rituals (Mana Infusion, Mana Well),
-and cross-cast inscription via the Spell Transcription ritual. Optional
-Covenant of the Seven integration adds LP and aura casting via the Ring of
-Seven Curses/Virtues. Graceful fallback if Iron's is uninstalled.
+and cross-cast inscription via the Spell Transcription ritual. Export Ars
+spells onto Iron's scrolls and bind them into Iron's spellbooks (3.0.0).
+Optional Covenant of the Seven integration adds LP and aura casting via the
+Ring of Seven Curses/Virtues. Graceful fallback if Iron's is uninstalled.
 '''
 authors="otectus"
 

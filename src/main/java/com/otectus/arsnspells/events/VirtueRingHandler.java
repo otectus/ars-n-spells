@@ -15,9 +15,11 @@ import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Deque;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Handles Virtue Ring aura consumption for Ars Nouveau spells.
@@ -42,8 +44,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class VirtueRingHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(VirtueRingHandler.class);
 
-    // ConcurrentHashMap because event handlers can fire from network/tick threads.
-    private static final Map<UUID, PendingAuraCost> pendingCosts = new ConcurrentHashMap<>();
+    // ANS-3.0.0: a per-player FIFO deque (not a single slot) so back-to-back casts of
+    // delayed-resolution spells (e.g. Ars projectiles whose SpellResolveEvent.Post fires
+    // on impact) cannot overwrite each other's pending aura. A single-entry map let a
+    // second cast clobber the first's staged cost, so the first cast paid the second's
+    // price and the second cast went free. Enqueue at cost-calc, poll FIFO at resolve.
+    // ConcurrentHashMap + ConcurrentLinkedDeque because handlers can fire from
+    // network/tick threads.
+    private static final Map<UUID, Deque<PendingAuraCost>> pendingCosts = new ConcurrentHashMap<>();
 
     /**
      * Calculate aura cost and replace mana cost when Virtue Ring is equipped.
@@ -92,8 +100,10 @@ public class VirtueRingHandler {
 
         // ANS-HIGH-011: stamp with level.getGameTime() (server-global) instead of
         // player.tickCount (per-player) — see CursedRingHandler for rationale.
-        pendingCosts.put(player.getUUID(),
-            new PendingAuraCost(auraCost, player.level().getGameTime()));
+        // ANS-3.0.0: enqueue (addLast) rather than overwrite, so a concurrent in-flight
+        // cast's pending cost survives until its own resolve.
+        pendingCosts.computeIfAbsent(player.getUUID(), k -> new ConcurrentLinkedDeque<>())
+            .addLast(new PendingAuraCost(auraCost, player.level().getGameTime()));
 
         // Set mana cost to 0 so Ars Nouveau doesn't consume mana
         event.currentCost = 0;
@@ -106,12 +116,17 @@ public class VirtueRingHandler {
         if (player == null) {
             return -1;
         }
-        PendingAuraCost pending = pendingCosts.get(player.getUUID());
+        Deque<PendingAuraCost> queue = pendingCosts.get(player.getUUID());
+        if (queue == null) {
+            return -1;
+        }
+        PendingAuraCost pending = queue.peekFirst();
         if (pending == null) {
             return -1;
         }
         if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
-            pendingCosts.remove(player.getUUID());
+            // Stale front — drop it so callers see the next valid entry (or none).
+            queue.pollFirst();
             return -1;
         }
         return pending.auraCost;
@@ -160,18 +175,16 @@ public class VirtueRingHandler {
             return;
         }
 
-        PendingAuraCost pending = pendingCosts.get(player.getUUID());
-        if (pending == null) {
-            return;
-        }
-
-        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
-            pendingCosts.remove(player.getUUID());
+        Deque<PendingAuraCost> queue = pendingCosts.get(player.getUUID());
+        if (queue == null || queue.isEmpty()) {
             return;
         }
 
         if (!SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
-            LOGGER.debug("Virtue Ring no longer equipped on {} between cost calc and resolve - dropping pending cost",
+            // Ring came off between cost calc and resolve — drop ALL staged costs for this
+            // player so no Post handler can consume them. cost-calc only stages while the
+            // ring is worn, so every queued entry predates the removal.
+            LOGGER.debug("Virtue Ring no longer equipped on {} between cost calc and resolve - dropping pending costs",
                 player.getName().getString());
             pendingCosts.remove(player.getUUID());
         }
@@ -199,13 +212,26 @@ public class VirtueRingHandler {
             return;
         }
 
-        PendingAuraCost pending = pendingCosts.remove(player.getUUID());
-        if (pending == null) {
+        // FIFO: pull the oldest still-valid staged cost, discarding any expired heads
+        // (e.g. a projectile whose Post never fired). An emptied deque is left in place
+        // for the periodic sweep to evict — removing it here would race a concurrent
+        // cost-calc that re-uses the same deque object and silently drop its entry.
+        Deque<PendingAuraCost> queue = pendingCosts.get(player.getUUID());
+        if (queue == null) {
             return;
         }
-
-        if (player.level().getGameTime() - pending.gameTimeStamp > PENDING_COST_TTL_TICKS) {
-            LOGGER.warn("Pending aura cost expired for {}", player.getName().getString());
+        long now = player.level().getGameTime();
+        PendingAuraCost pending = null;
+        PendingAuraCost candidate;
+        while ((candidate = queue.pollFirst()) != null) {
+            if (now - candidate.gameTimeStamp > PENDING_COST_TTL_TICKS) {
+                LOGGER.warn("Pending aura cost expired for {}", player.getName().getString());
+                continue;
+            }
+            pending = candidate;
+            break;
+        }
+        if (pending == null) {
             return;
         }
 
@@ -255,8 +281,13 @@ public class VirtueRingHandler {
         }
         if (event.player.tickCount % 100 == 0) {
             // ANS-HIGH-011: server-global gameTime; see CursedRingHandler for rationale.
+            // ANS-3.0.0: prune expired entries within each player's deque, then drop the
+            // key once its deque empties so the map doesn't accumulate idle UUIDs.
             long now = event.player.level().getGameTime();
-            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().gameTimeStamp > PENDING_COST_TTL_TICKS);
+            pendingCosts.entrySet().removeIf(entry -> {
+                entry.getValue().removeIf(c -> now - c.gameTimeStamp > PENDING_COST_TTL_TICKS);
+                return entry.getValue().isEmpty();
+            });
         }
     }
 

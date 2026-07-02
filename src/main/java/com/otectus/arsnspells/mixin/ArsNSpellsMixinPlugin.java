@@ -67,7 +67,8 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
             || mixinClassName.endsWith("MixinIronsCastValidation")
             || mixinClassName.endsWith("MagicDataAccessor")
-            || mixinClassName.endsWith("MixinScrollItem")) {
+            || mixinClassName.endsWith("MixinScrollItem")
+            || mixinClassName.endsWith("MixinAbstractSpellArsIcon")) {
             return ironsPresent;
         }
         return true;

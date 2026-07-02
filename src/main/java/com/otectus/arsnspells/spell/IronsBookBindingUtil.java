@@ -97,6 +97,39 @@ public final class IronsBookBindingUtil {
     }
 
     /**
+     * Like {@link #extractSingleArsEntry(ItemStack)} but returns the <em>whole</em>
+     * cross-spell entry compound (including any Spell Loom display metadata —
+     * custom name, nature, icon), not just the {@code ars_spell} sub-tag. Used by
+     * the binding step so a scroll's chosen name/nature/icon ride onto the book.
+     */
+    public static Optional<CompoundTag> extractSingleEntry(ItemStack carrierScroll) {
+        if (carrierScroll == null || !carrierScroll.hasTag()) {
+            return Optional.empty();
+        }
+        return extractSingleEntryFromTag(carrierScroll.getTag());
+    }
+
+    /** CompoundTag-level companion to {@link #extractSingleEntry(ItemStack)}. */
+    public static Optional<CompoundTag> extractSingleEntryFromTag(CompoundTag tag) {
+        if (tag == null || !tag.contains(CrossCastNbt.TAG_CROSS_MOD_SPELLS, Tag.TAG_LIST)) {
+            return Optional.empty();
+        }
+        ListTag list = tag.getList(CrossCastNbt.TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
+        if (list.size() != 1) {
+            return Optional.empty();
+        }
+        CompoundTag entry = list.getCompound(0);
+        if (CrossCastValidator.resolveType(entry) != CrossSpellType.ARS_NOUVEAU) {
+            return Optional.empty();
+        }
+        if (!entry.contains(CrossCastNbt.TAG_ARS_SPELL, Tag.TAG_COMPOUND)
+            || entry.getCompound(CrossCastNbt.TAG_ARS_SPELL).isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(entry.copy());
+    }
+
+    /**
      * True when {@code book} already carries an Ars entry whose {@code ars_spell}
      * payload equals {@code arsTag}. Dedup keys off the serialized payload, not
      * the shared placeholder id.
@@ -127,19 +160,69 @@ public final class IronsBookBindingUtil {
         return false;
     }
 
+    /** Outcome of a bind attempt, so callers can surface a precise message. */
+    public enum AppendResult {
+        ADDED, DUPLICATE, BOOK_FULL, FAILED;
+
+        public boolean wasAdded() {
+            return this == ADDED;
+        }
+    }
+
     /**
-     * Appends {@code arsTag} as a new Ars entry on {@code book}. Returns false
-     * without mutating when the payload is missing or already present (dedup).
+     * Backward-compatible append: binds with default (no) metadata and no cap.
+     * Returns true only when a new entry was added.
      */
     public static boolean appendArsSpellToBook(ItemStack book, CompoundTag arsTag) {
+        return appendArsSpellToBook(book, arsTag, null, null, null, 0, -1).wasAdded();
+    }
+
+    /**
+     * Appends {@code arsTag} as a new Ars entry on {@code book}, allocates a
+     * native-wheel proxy pool id, writes the optional display metadata
+     * (name/nature/icon), and — when Iron's is loaded — mirrors the entry into the
+     * book's native spell container so it appears in Iron's spell wheel.
+     *
+     * <p>{@code maxCap < 0} means "no cap" (still bounded by the proxy pool size).
+     * Returns {@link AppendResult#DUPLICATE} for an already-present payload and
+     * {@link AppendResult#BOOK_FULL} when every proxy slot is taken; neither
+     * mutates the book.
+     */
+    public static AppendResult appendArsSpellToBook(ItemStack book, CompoundTag arsTag,
+                                                    String customName, String nature,
+                                                    String iconSymbol, int iconColor, int maxCap) {
         if (book == null || book.isEmpty() || arsTag == null || arsTag.isEmpty()) {
-            return false;
+            return AppendResult.FAILED;
         }
         if (containsEquivalentArsSpell(book, arsTag)) {
-            return false;
+            return AppendResult.DUPLICATE;
         }
-        CrossCastNbt.addCrossModSpellToTag(book.getOrCreateTag(), ARS_PLACEHOLDER_ID, 1,
-            CrossSpellType.ARS_NOUVEAU, arsTag.copy());
-        return true;
+        CompoundTag bookTag = book.getOrCreateTag();
+        int ceiling = effectiveProxyCeiling(maxCap);
+        int poolId = CrossCastNbt.allocateProxyPoolId(bookTag, ceiling);
+        if (poolId == CrossCastNbt.NO_PROXY_POOL_ID) {
+            return AppendResult.BOOK_FULL;
+        }
+        CrossCastNbt.addArsEntryWithMetaToTag(bookTag, ARS_PLACEHOLDER_ID, 1, arsTag.copy(),
+            poolId, customName, nature, iconSymbol, iconColor);
+        // Mirror into Iron's native container so the entry shows in the wheel.
+        // Gated + referenced by FQN so IronsProxySlotWriter (which imports Iron's
+        // API) only classloads when Iron's is present.
+        if (IronsCompat.isLoaded()) {
+            com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.addProxySlot(book, poolId, 1);
+        }
+        return AppendResult.ADDED;
+    }
+
+    /**
+     * The effective per-book Ars ceiling: a negative {@code maxCap} means
+     * "no cap" (still bounded by {@link CrossCastNbt#PROXY_POOL_SIZE}, the number
+     * of distinct native-wheel slots that can exist).
+     */
+    public static int effectiveProxyCeiling(int maxCap) {
+        if (maxCap < 0) {
+            return CrossCastNbt.PROXY_POOL_SIZE;
+        }
+        return Math.min(maxCap, CrossCastNbt.PROXY_POOL_SIZE);
     }
 }

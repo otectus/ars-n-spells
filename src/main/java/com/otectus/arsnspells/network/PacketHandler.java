@@ -12,7 +12,9 @@ public class PacketHandler {
     // PROTOCOL_VERSION bumped 1 -> 2 in the aura-subsystem deletion: AuraSyncPacket
     // was removed, which shifts all subsequent packet IDs down by one slot. A client
     // running the old jar would mis-parse our packets — hard-fail at connect instead.
-    private static final String PROTOCOL_VERSION = "2";
+    // Bumped 2 -> 3 in 3.0.0: added SpellLoomExportPacket (C2S). New packet id,
+    // so an old client would mis-parse the channel — hard-fail at connect.
+    private static final String PROTOCOL_VERSION = "3";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ArsNSpells.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -43,6 +45,9 @@ public class PacketHandler {
         // to force a hard-fail at connect for clients on the old jar.
         INSTANCE.registerMessage(id++, CrossCastRequestPacket.class,
             CrossCastRequestPacket::toBytes, CrossCastRequestPacket::new, CrossCastRequestPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        INSTANCE.registerMessage(id++, SpellLoomExportPacket.class,
+            SpellLoomExportPacket::toBytes, SpellLoomExportPacket::new, SpellLoomExportPacket::handle,
             java.util.Optional.of(NetworkDirection.PLAY_TO_SERVER));
     }
 

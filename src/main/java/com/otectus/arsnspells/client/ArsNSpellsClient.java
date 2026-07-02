@@ -30,6 +30,11 @@ public class ArsNSpellsClient {
         // Register config screen
         registerConfigScreen();
 
+        // 3.0.0: bind the Spell Loom menu to its screen.
+        event.enqueueWork(() -> net.minecraft.client.gui.screens.MenuScreens.register(
+            com.otectus.arsnspells.registry.ModMenus.SPELL_LOOM.get(),
+            com.otectus.arsnspells.client.screen.SpellLoomScreen::new));
+
         // Enable overlay diagnostics if debug mode is on
         if (AnsConfig.DEBUG_MODE.get()) {
             LOGGER.info("Debug mode enabled - activating overlay diagnostics");

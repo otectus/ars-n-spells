@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.0] - 2026-07-02
+
+### Export Ars spells onto Iron's scrolls and bind them into spellbooks
+
+The Ars → scroll → spellbook workflow is the headline 3.0.0 feature. An Ars Nouveau spell can now be exported onto a real `irons_spellbooks:scroll` and then bound into a real Iron's spellbook, where it casts through Ars 'n' Spells' existing server-authoritative cross-cast pipeline. The Ars spell is preserved as an opaque ANS sidecar payload (`arsnspells:cross_spells`) on the real Iron item, coexisting untouched with Iron's own `ISB_Spells` container — no lossy translation into Iron's registry slot model.
+
+- **New binding ritual + tablet.** [SpellbookBindingRitual.java](src/main/java/com/otectus/arsnspells/rituals/SpellbookBindingRitual.java) consumes a carrier scroll and appends its Ars entry onto a spellbook in range, with full pre-mutation validation and translated feedback. The tablet is registered in [ModItemsRegistry.java](src/main/java/com/otectus/arsnspells/registry/ModItemsRegistry.java) only when Iron's is loaded; the [recipe](src/main/resources/data/ars_n_spells/recipes/apparatus/spellbook_binding.json) is wrapped in `forge:conditional`.
+- **New export/bind utilities.** [ArsSpellExportUtil.java](src/main/java/com/otectus/arsnspells/spell/ArsSpellExportUtil.java) and [IronsBookBindingUtil.java](src/main/java/com/otectus/arsnspells/spell/IronsBookBindingUtil.java) recognize Iron items by registry id (no top-level Iron's imports) and dedup bound spells by their serialized `ars_spell` payload, not the shared placeholder id.
+- **New commands.** `/ans export_to_irons_scroll` and `/ans bind_scroll_to_irons_book` (permission level 2) provide a developer/admin path. [ArsNSpellsCommands.java](src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java).
+- **Cross-spell tooltips.** [CrossSpellTooltipHandler.java](src/main/java/com/otectus/arsnspells/events/CrossSpellTooltipHandler.java) surfaces embedded Ars spells, the active index, and cast/cycle hints on Iron scrolls and spellbooks (still used for generic non-spellbook carriers).
+
+### Ars spells in Iron's native spell wheel + the Spell Loom workstation
+
+Bound Ars spells now appear as their own entries in **Iron's native spell-selection wheel** and cast through Iron's native right-click flow (instead of the ANS sidecar right-click), and are authored at a new **Spell Loom** block.
+
+- **Registered proxy-spell pool.** [ArsCrossProxySpell](src/main/java/com/otectus/arsnspells/spell/irons/ArsCrossProxySpell.java) + [ArsCrossProxyRegistry](src/main/java/com/otectus/arsnspells/spell/irons/ArsCrossProxyRegistry.java) register a finite pool (`ars_cross_1..8`) of real Iron's `AbstractSpell`s into `SpellRegistry`. Each occupies one wheel slot; its `onCast` reads the casting book's sidecar entry (matched by pool id) and delegates to `CrossCastingHandler.castArsSpell`, so cost flows once through `onArsSpellCost`/`BridgeManager` (proxy `getManaCost` is 0; no double-charge). Iron's-gated; never classloads without Iron's. These are **real registered spells, not forged ids** — avoiding the lookup/UI-crash risks of fake Iron's spell ids.
+- **Native container write.** [IronsProxySlotWriter](src/main/java/com/otectus/arsnspells/spell/irons/IronsProxySlotWriter.java) adds each proxy into *grown* container capacity, so a player's existing Iron's spells are never evicted. [IronsBookBindingUtil.appendArsSpellToBook](src/main/java/com/otectus/arsnspells/spell/IronsBookBindingUtil.java) allocates a distinct pool id (the wheel de-dupes by spell id) and enforces the per-book cap; it returns a typed `AppendResult` (`ADDED`/`DUPLICATE`/`BOOK_FULL`/`FAILED`).
+- **Custom name + icon in the wheel.** Client-only [MixinAbstractSpellArsIcon](src/main/java/com/otectus/arsnspells/mixin/irons/MixinAbstractSpellArsIcon.java) substitutes the per-spell name and nature-themed icon for proxy entries (`require = 0`, so a future Iron's change degrades to a static fallback rather than crashing).
+- **Native right-click preserved.** [CrossCastingHandler.onRightClickItem](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) now defers to Iron's native flow for Iron's spellbooks (no more hijack); the ANS right-click/sneak-cycle path remains for generic inscribed items.
+- **Spell Loom workstation.** New block + block entity + menu + screen ([block/](src/main/java/com/otectus/arsnspells/block/), [SpellLoomMenu.java](src/main/java/com/otectus/arsnspells/menu/SpellLoomMenu.java), [SpellLoomScreen.java](src/main/java/com/otectus/arsnspells/client/screen/SpellLoomScreen.java)): drop an Ars source + a blank Iron's scroll, set a name/nature/icon, and inscribe a carrier scroll via the server-authoritative [SpellLoomExportPacket](src/main/java/com/otectus/arsnspells/network/SpellLoomExportPacket.java). Craftable; appears in the Functional Blocks creative tab.
+- **New config.** `allow_ars_spells_in_irons_spellbooks` (default `true`) and `max_ars_cross_spells_per_irons_spellbook` (default `-1` = no cap, bounded by the pool size 8) under Cross-Cast Inscription.
+- **Localised diagnostics.** The previously-raw `arsnspells.crosscast.invalid.*` validator messages are now translated.
+- **Limitation / compat.** At most 8 Ars spells per book show in the native wheel (Iron's `SpellData` stores only id/level/locked and the wheel merges by id). Network protocol version bumped `2 → 3`.
+
+### Pending-cost race fix (free-cast / mischarge on rapid casts)
+
+The Virtue Ring (aura), Cursed Ring (LP), and Iron's-LP handlers staged a pending resource cost at cost-calc and consumed it at the deferred resolve. They each used a **single-entry** `Map<UUID, PendingX>`, so back-to-back casts of delayed-resolution spells (e.g. Ars projectiles whose `SpellResolveEvent.Post` fires on impact) overwrote each other's staged cost — the first cast paid the second's price and the second cast went free.
+
+- **Per-player FIFO queue.** [VirtueRingHandler.java](src/main/java/com/otectus/arsnspells/events/VirtueRingHandler.java), [CursedRingHandler.java](src/main/java/com/otectus/arsnspells/events/CursedRingHandler.java), and [IronsLPHandler.java](src/main/java/com/otectus/arsnspells/events/IronsLPHandler.java) now store a `Deque<PendingX>` per player: enqueue at cost-calc, poll FIFO (skipping expired heads) at resolve. No cast goes free and no staged cost is dropped. Empty deques are evicted by the periodic sweep and on logout, not in the hot consume path (which would race a concurrent cost-calc reusing the same deque).
+
+### Tests
+
+- **Iron-loaded GameTests.** [CrossCastGameTests.java](src/main/java/com/otectus/arsnspells/gametest/CrossCastGameTests.java) replaces the previous unconditional `helper.succeed()` placeholders with a real CYCLE test driven through `CrossCastingHandler.serverHandleCast` and an Iron-loaded export→bind→coexist round-trip on real `irons_spellbooks` items. The round-trip self-skips when Iron's is absent and runs under the new opt-in `-PwithIronsRuntimeGameTests` profile ([build.gradle](build.gradle)).
+
 ## [2.6.1] - 2026-06-18
 
 ### Mana-bridge correctness fixes

@@ -75,6 +75,21 @@ class AnsConfigStructureTest {
     }
 
     @Test
+    void ironsSpellbookCrossCastConfigKeys_exist() {
+        // 3.0.0: pack-author knobs for binding Ars spells into Iron's spellbooks.
+        for (String name : new String[] {
+            "ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS",
+            "MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK"
+        }) {
+            try {
+                assertNotNull(AnsConfig.class.getDeclaredField(name), name + " must exist");
+            } catch (NoSuchFieldException e) {
+                fail("AnsConfig." + name + " must exist for the Iron's-spellbook binding feature");
+            }
+        }
+    }
+
+    @Test
     void safeSave_doesNotBlockCallerThread() throws IOException {
         // Source-text assertion: safeSave body must not contain Thread.sleep (ANS-HIGH-017).
         String source = Files.readString(Paths.get(

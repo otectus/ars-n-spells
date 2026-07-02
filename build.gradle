@@ -58,6 +58,17 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf("curse.maven:${ars_nouveau_project}:${ars_nouveau_file}")
     compileOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${irons_spellbooks_file}")
+    // ANS-3.0.0: opt-in Iron's-loaded GameTest profile. By default Iron's stays
+    // compileOnly, so `runGameTestServer` exercises the Iron-LESS fallback path and the
+    // Iron-loaded gametests self-skip on IronsCompat.isLoaded()==false. Pass
+    // -PwithIronsRuntimeGameTests to also put Iron's on the run classpath so the
+    // Iron-loaded cross-cast/export integration scenarios actually execute.
+    // NOTE: Iron's pulls a runtime graph (Geckolib, PlayerAnimator) that CurseMaven does
+    // not resolve transitively; add those as `runtimeOnly` here if the profile fails to
+    // boot in your dev environment.
+    if (project.hasProperty('withIronsRuntimeGameTests')) {
+        runtimeOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${irons_spellbooks_file}")
+    }
     // Curios API only (matches the version Ars Nouveau bundles at runtime).
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}:api")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'

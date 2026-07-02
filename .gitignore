@@ -7,6 +7,7 @@
 
 # Build output
 build/
+bin/
 out/
 logs/
 run/
@@ -14,6 +15,7 @@ run/
 # Dependencies & local copies
 dependencies/
 mods/
+covenant_extract/
 io/
 /com/
 gradle-8.4/

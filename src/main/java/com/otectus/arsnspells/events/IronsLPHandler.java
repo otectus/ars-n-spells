@@ -16,9 +16,11 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Deque;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Handles Cursed Ring LP consumption for Iron's Spellbooks spells.
@@ -32,8 +34,18 @@ public class IronsLPHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(IronsLPHandler.class);
 
     // Track LP costs for message display and post-cast consumption.
-    // ConcurrentHashMap because event handlers can fire from network/tick threads.
-    private static final Map<UUID, PendingIronsLP> pendingCosts = new ConcurrentHashMap<>();
+    // ANS-3.0.0: a per-player FIFO deque (not a single slot) so a second PreCast cannot
+    // overwrite a first cast's staged LP before its OnCast consumes it. Enqueue at
+    // PreCast/scroll-stage, poll FIFO at OnCast. ConcurrentHashMap + ConcurrentLinkedDeque
+    // because handlers can fire from network/tick threads.
+    private static final Map<UUID, Deque<PendingIronsLP>> pendingCosts = new ConcurrentHashMap<>();
+
+    private static final long PENDING_TTL_MILLIS = 5000L;
+
+    /** Enqueue a staged LP cost for the player (FIFO). */
+    private static void stage(UUID id, PendingIronsLP cost) {
+        pendingCosts.computeIfAbsent(id, k -> new ConcurrentLinkedDeque<>()).addLast(cost);
+    }
 
     /**
      * Validate LP cost for Iron's spells.
@@ -106,7 +118,7 @@ public class IronsLPHandler {
         if (!hasEnough) {
             if (AnsConfig.DEATH_ON_INSUFFICIENT_LP.get()) {
                 // Allow cast; death penalty handled on cast
-                pendingCosts.put(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
+                stage(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
                 LPDeathPrevention.markSpellCast(player);
                 return;
             }
@@ -115,7 +127,7 @@ public class IronsLPHandler {
             LPDeathPrevention.setLPImmune(player);
             LOGGER.warn("Insufficient LP - cancelling spell");
             event.setCanceled(true);
-            pendingCosts.remove(player.getUUID());
+            pendingCosts.remove(player.getUUID());  // drop all staged costs; this cast is cancelled
 
             // Apply minor health penalty silently (bypasses damage events entirely)
             SanctifiedLegacyCompat.applySilentHealthLoss(player, 2.0f);
@@ -131,7 +143,7 @@ public class IronsLPHandler {
             return;
         }
 
-        pendingCosts.put(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
+        stage(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
         LPDeathPrevention.markSpellCast(player);
     }
 
@@ -166,15 +178,29 @@ public class IronsLPHandler {
             return;
         }
 
-        PendingIronsLP pending = pendingCosts.remove(player.getUUID());
-        if (pending == null) {
+        // FIFO: pull the oldest still-valid staged cost, discarding any expired heads.
+        // An emptied deque is left for the periodic sweep to evict — removing it here
+        // would race a concurrent PreCast that re-uses the same deque object.
+        Deque<PendingIronsLP> queue = pendingCosts.get(player.getUUID());
+        if (queue == null) {
             LOGGER.debug("[IronsLPHandler] OnCast: no pending LP cost staged for {} (PreCast may have skipped)",
                 player.getName().getString());
             return;
         }
-
-        if (System.currentTimeMillis() - pending.timestamp > 5000) {
-            LOGGER.warn("Pending LP cost expired for {}", player.getName().getString());
+        long now = System.currentTimeMillis();
+        PendingIronsLP pending = null;
+        PendingIronsLP candidate;
+        while ((candidate = queue.pollFirst()) != null) {
+            if (now - candidate.timestamp > PENDING_TTL_MILLIS) {
+                LOGGER.warn("Pending LP cost expired for {}", player.getName().getString());
+                continue;
+            }
+            pending = candidate;
+            break;
+        }
+        if (pending == null) {
+            LOGGER.debug("[IronsLPHandler] OnCast: no valid pending LP cost staged for {} (PreCast may have skipped)",
+                player.getName().getString());
             return;
         }
 
@@ -237,8 +263,12 @@ public class IronsLPHandler {
         }
 
         if (event.player.tickCount % 100 == 0) { // Every 5 seconds
+            // ANS-3.0.0: prune expired entries within each deque, then drop empty keys.
             long now = System.currentTimeMillis();
-            pendingCosts.entrySet().removeIf(entry -> now - entry.getValue().timestamp > 5000);
+            pendingCosts.entrySet().removeIf(entry -> {
+                entry.getValue().removeIf(c -> now - c.timestamp > PENDING_TTL_MILLIS);
+                return entry.getValue().isEmpty();
+            });
         }
     }
 
@@ -264,7 +294,7 @@ public class IronsLPHandler {
                 lpCost, manaCost, player.getName().getString());
             return;
         }
-        pendingCosts.put(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
+        stage(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
     }
 
     /**

@@ -1,4 +1,4 @@
-# Testing Guide — Ars 'n' Spells 2.6.1
+# Testing Guide — Ars 'n' Spells 3.0.0
 
 This guide covers manual verification scenarios for the systems shipped in
 2.0.0 (the audit-driven major release). It supersedes the pre-1.8 testing
@@ -18,7 +18,7 @@ For an at-a-glance description of features and configuration, start with the
 | Covenant of the Seven (Sanctified Legacy) | Any | Cursed/Virtue Ring tests |
 | Blood Magic | Any | LP source `BLOOD_MAGIC_*` tests |
 
-Drop `build/libs/ars_n_spells-2.6.1.jar` into the instance's `mods/` folder
+Drop `build/libs/ars_n_spells-3.0.0.jar` into the instance's `mods/` folder
 alongside the dependencies. **2.0.0 introduces a new C2S packet ID; clients
 and servers must run matching versions.**
 
@@ -89,6 +89,54 @@ correlation across sides is one grep.
 6. Manually corrupt the NBT (edit `arsnspells:cross_spells[0].spell_id` to
    `irons_spellbooks:phantom_spell`). Right-click. Confirm an action-bar chat
    message in red and a single `descriptor_rejected` trace line.
+
+## 3.0.0 — Ars spells in Iron's spellbooks (native wheel + Spell Loom)
+
+Requires Ars Nouveau + Iron's Spellbooks + Ars 'n' Spells. Run on a **dedicated
+server** for the authority checks.
+
+### W1 — Spell Loom export → bind → native-wheel cast
+1. Author an Ars spell (Scribe's Table) onto a spell parchment.
+2. Craft and place a **Spell Loom** (`/give` `ars_n_spells:spell_loom` or the
+   recipe: gold / lapis / book / obsidian). Right-click it.
+3. Put the parchment in the source slot and a **blank `irons_spellbooks:scroll`**
+   in the scroll slot. Type a name, cycle a nature and an icon, press **Inscribe**.
+   Pass: an inscribed scroll appears in the output; source + one scroll consumed.
+4. Bind the scroll onto an Iron's spellbook that already holds a native Iron's
+   spell — drop both near a Spellbook Binding ritual brazier, or
+   `/ans bind_scroll_to_irons_book` holding scroll + book.
+   Pass: success message; the scroll is consumed.
+5. Hold the spellbook, open Iron's **spell wheel**.
+   Pass: the Ars spell shows as its own entry with your name + nature icon,
+   **alongside** the book's native Iron's spell (which is unchanged).
+6. Select the Ars entry, right-click to cast.
+   Pass: the Ars spell resolves; with `debug_mode=true` a single
+   `upstream_cast_enter runtime=ARS_PROXY` trace appears and mana is deducted once.
+7. Select the native Iron's spell, right-click.
+   Pass: native Iron's spell casts normally — no ANS interference.
+
+### W2 — Mana-mode matrix for a wheel-cast Ars spell
+Repeat W1 step 6 under each `mana_unification_mode`: `iss_primary`,
+`ars_primary`, `hybrid`, `separate`, `disabled`. In every mode the cost is taken
+**once** and the `cross_cast_cost_multiplier` is applied **once** (compare the
+deducted amount to the same Ars spell cast from an Ars focus × the multiplier).
+In `separate`, confirm the dual-cost split with no double-drain and no free cast.
+With insufficient mana, the cast fails and the **wrong** resource is not consumed.
+
+### W3 — Cap, dedup, and disable
+- Bind 8 distinct Ars spells to one book → all show in the wheel. A 9th fails
+  with the `book_full` message. Set `max_ars_cross_spells_per_irons_spellbook=3`
+  → the 4th fails.
+- Re-binding an identical spell payload is rejected as a duplicate.
+- Set `allow_ars_spells_in_irons_spellbooks=false` → binding is rejected with the
+  `disabled` message; spells already bound keep working.
+
+### W4 — Iron's absent (no crash)
+With Iron's **not** installed: the server boots clean, the Spell Loom still
+places/opens, and pressing Inscribe shows the `irons_missing` message instead of
+crashing. (Automated: `CrossCastGameTests` / `ArsIronsExportGameTests` self-skip
+the Iron-loaded paths; run `./gradlew runGameTestServer` with and without
+`-PwithIronsRuntimeGameTests`.)
 
 ## P0 regression scenarios (1.9.0 stabilization pass)
 
@@ -323,6 +371,35 @@ either silently pick one or corrupt an item.
 
 Pass: NBT is bit-identical (no residual root tags). The same item can be
 re-inscribed cleanly.
+
+### S17 — Ars → scroll → spellbook export/bind (3.0.0, requires Iron's)
+
+1. Hold an item carrying an Ars spell (filled spell parchment, inscribed
+   focus, or Ars spellbook) and run `/ans export_to_irons_scroll`.
+
+   Pass: a real `irons_spellbooks:scroll` appears carrying the Ars spell. Its
+   tooltip lists the embedded Ars spell (cross-spell tooltip), and it is a
+   genuine Iron item (stacks/behaves like one).
+
+2. With the exported scroll in one hand and a real Iron's spellbook in the
+   other, run `/ans bind_scroll_to_irons_book` (or run the **Spellbook Binding**
+   ritual with the scroll + spellbook in range of the brazier).
+
+   Pass: the scroll is consumed and the Ars entry is appended to the spellbook.
+   The spellbook tooltip now shows the embedded Ars spell, active index, and
+   cast/cycle hints. Any pre-existing Iron's spells on the book (`ISB_Spells`)
+   are untouched.
+
+3. Right-click the spellbook to cast the bound Ars spell; sneak-right-click to
+   cycle if more than one is bound.
+
+   Pass: the Ars spell casts through ANS. Re-binding the same Ars spell is
+   rejected as a duplicate (dedup keys off the spell payload, not the shared
+   placeholder id).
+
+These map to the automated coverage in `CrossCastGameTests` (run
+`./gradlew runGameTestServer -PwithIronsRuntimeGameTests` with Iron's on the
+GameTest classpath) and `ArsIronsExportGameTests` (Iron-less default run).
 
 ## Troubleshooting
 

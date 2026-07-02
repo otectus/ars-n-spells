@@ -10,7 +10,10 @@ import com.otectus.arsnspells.data.CooldownData;
 import com.otectus.arsnspells.data.ProgressionData;
 import com.otectus.arsnspells.events.*;
 import com.otectus.arsnspells.network.PacketHandler;
+import com.otectus.arsnspells.registry.ModBlockEntities;
+import com.otectus.arsnspells.registry.ModBlocksRegistry;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
+import com.otectus.arsnspells.registry.ModMenus;
 import com.otectus.arsnspells.rituals.RitualRegistryHandler;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.CrossCastIronsHandler;
@@ -59,6 +62,22 @@ public class ArsNSpells {
             ModItemsRegistry.registerIronsDependentItems();
         }
         ModItemsRegistry.register(modEventBus);
+
+        // 3.0.0: Spell Loom workstation — block, block entity, and menu. Not
+        // Iron's-gated: the block registers everywhere; its export action no-ops
+        // with a clear message when Iron's is absent (no Iron's scroll item).
+        ModBlocksRegistry.register(modEventBus);
+        ModBlockEntities.register(modEventBus);
+        ModMenus.register(modEventBus);
+
+        // 3.0.0: register the Ars cross-cast proxy-spell pool (ars_cross_1..N)
+        // into Iron's spell registry so Ars spells can appear as native entries
+        // in Iron's spell wheel. Gated — ArsCrossProxyRegistry references Iron's
+        // API (SpellRegistry.SPELL_REGISTRY_KEY) and must not classload without
+        // Iron's present. Referenced by FQN inside the gate for the same reason.
+        if (ModList.get().isLoaded("irons_spellbooks")) {
+            com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry.register(modEventBus);
+        }
 
         // ANS-HIGH-016: register as SERVER (was COMMON). Gameplay tunables — resonance,
         // conversion rates, dual-cost percentages, ring toggles — must be server-authoritative
