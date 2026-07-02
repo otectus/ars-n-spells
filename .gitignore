@@ -21,6 +21,7 @@ io/
 gradle-8.4/
 gradle-8.4-bin.zip
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 
 # Root META-INF (build artifact, not src/main/resources one)
 /META-INF/
