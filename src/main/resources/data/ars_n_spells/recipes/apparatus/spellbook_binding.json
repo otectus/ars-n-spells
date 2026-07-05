@@ -18,7 +18,7 @@
           {"item": "ars_nouveau:novice_spell_book"}
         ],
         "pedestalItems": [
-          {"item": "irons_spellbooks:spell_book"},
+          {"tag": "ars_n_spells:irons_spell_books"},
           {"item": "irons_spellbooks:scroll"},
           {"item": "ars_nouveau:source_gem_block"},
           {"tag": "forge:logs/archwood"}
