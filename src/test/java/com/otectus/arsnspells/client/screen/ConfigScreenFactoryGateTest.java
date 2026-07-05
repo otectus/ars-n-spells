@@ -1,4 +1,4 @@
-package com.otectus.arsnspells.config;
+package com.otectus.arsnspells.client.screen;
 
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +22,7 @@ class ConfigScreenFactoryGateTest {
     @Test
     void source_gatesOnHasSingleplayerServer() throws IOException {
         String src = Files.readString(Paths.get(
-            "src/main/java/com/otectus/arsnspells/config/ConfigScreenFactory.java"));
+            "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java"));
         assertTrue(src.contains("hasSingleplayerServer()"),
             "ConfigScreenFactory must check minecraft.hasSingleplayerServer() (ANS-HIGH-016 part 2)");
         assertTrue(src.contains("canMutate"),

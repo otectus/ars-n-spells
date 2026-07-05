@@ -2,7 +2,7 @@ package com.otectus.arsnspells.client;
 
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.config.ConfigScreenFactory;
+import com.otectus.arsnspells.client.screen.ConfigScreenFactory;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.eventbus.api.SubscribeEvent;

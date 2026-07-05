@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ANS 2.0.1 — pins the wiring that makes {@code mana_unification_mode} changeable
  * in-game: the {@code /ans mode set} command and the config-screen "Mana Mode" cycle
  * row. Source-level assertions in the style of
- * {@link com.otectus.arsnspells.config.ConfigScreenFactoryGateTest} — bootstrap-free,
+ * {@link com.otectus.arsnspells.client.screen.ConfigScreenFactoryGateTest} — bootstrap-free,
  * no Brigadier/Minecraft runtime required.
  */
 class AnsModeCommandTest {
@@ -35,7 +35,7 @@ class AnsModeCommandTest {
     @Test
     void configScreen_manaModeRowCyclesInsteadOfBeingAStub() throws IOException {
         String src = Files.readString(Paths.get(
-            "src/main/java/com/otectus/arsnspells/config/ConfigScreenFactory.java"));
+            "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java"));
         assertTrue(src.contains("MANA_UNIFICATION_MODE.set"),
             "the Mana Mode row must write the mode (it used to be a no-op setter)");
         assertTrue(src.contains("isCycle"),

@@ -1,4 +1,4 @@
-package com.otectus.arsnspells.config;
+package com.otectus.arsnspells.client.screen;
 
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +26,7 @@ class ConfigScreenFactoryLegibilityTest {
 
     private static String source() throws IOException {
         return Files.readString(Paths.get(
-            "src/main/java/com/otectus/arsnspells/config/ConfigScreenFactory.java"));
+            "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java"));
     }
 
     @Test

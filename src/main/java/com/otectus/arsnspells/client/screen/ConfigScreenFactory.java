@@ -1,6 +1,8 @@
-package com.otectus.arsnspells.config;
+package com.otectus.arsnspells.client.screen;
 
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.config.ManaUnificationMode;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
