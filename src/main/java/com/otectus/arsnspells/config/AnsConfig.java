@@ -70,18 +70,19 @@ public class AnsConfig {
     // ========================================
     // PROGRESSION SYSTEM
     // ========================================
-    // ANS-MED-031 (NEEDS VERIFY): PROGRESSION_XP_MULTIPLIER and MAX_PROGRESSION_LEVEL
-    // removed — no readers in the production source. If a third-party mod or KubeJS
-    // script reflects these keys, that integration silently breaks. Verify in dev
-    // before pushing.
+    // ANS-MED-031 (verified, 3.0.1 audit): PROGRESSION_XP_MULTIPLIER and
+    // MAX_PROGRESSION_LEVEL removed — zero readers; full JUnit + gametest suites
+    // pass post-removal. The progression curve lives in
+    // ProgressionData.getBonusForSchool (min(0.25, casts * 0.001)); making it
+    // configurable again is deliberate feature work, not remediation.
     public static final ForgeConfigSpec.BooleanValue ENABLE_CROSS_MOD_PROGRESSION;
 
     // ========================================
     // AFFINITY SYSTEM
     // ========================================
-    // ANS-MED-031 (NEEDS VERIFY): AFFINITY_BONUS_MULTIPLIER and MAX_AFFINITY_BONUS
-    // removed — no readers in the production source. Same NEEDS-VERIFY caveat as
-    // the progression keys.
+    // ANS-MED-031 (verified, 3.0.1 audit): AFFINITY_BONUS_MULTIPLIER and
+    // MAX_AFFINITY_BONUS removed — zero readers; suites pass post-removal. The
+    // affinity curve lives in AffinityCalculator (0.5% per level).
     public static final ForgeConfigSpec.BooleanValue ENABLE_AFFINITY_DECAY;
     public static final ForgeConfigSpec.DoubleValue AFFINITY_DECAY_RATE;
     public static final ForgeConfigSpec.IntValue AFFINITY_DECAY_INTERVAL_TICKS;
@@ -412,7 +413,7 @@ public class AnsConfig {
             "Requires ENABLE_PROGRESSION_SYSTEM master toggle."
         );
         
-        // ANS-MED-031 (NEEDS VERIFY): PROGRESSION_XP_MULTIPLIER and MAX_PROGRESSION_LEVEL
+        // ANS-MED-031 (verified): PROGRESSION_XP_MULTIPLIER and MAX_PROGRESSION_LEVEL
         // registrations removed — see field-declaration comment above.
 
 
@@ -431,7 +432,7 @@ public class AnsConfig {
             "Requires ENABLE_AFFINITY_SYSTEM master toggle."
         );
         
-        // ANS-MED-031 (NEEDS VERIFY): AFFINITY_BONUS_MULTIPLIER and MAX_AFFINITY_BONUS
+        // ANS-MED-031 (verified): AFFINITY_BONUS_MULTIPLIER and MAX_AFFINITY_BONUS
         // registrations removed — see field-declaration comment above.
 
 
