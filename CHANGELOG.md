@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+Remediation from the 3.0.1 full-codebase audit (see [AUDIT_FINDINGS.md](AUDIT_FINDINGS.md), [AUDIT_ARCHITECTURE.md](AUDIT_ARCHITECTURE.md)).
+
+### Fixed: transcription/binding ritual tablets were uncraftable when Iron's is loaded
+
+- Both apparatus recipes used pedestal ingredient `irons_spellbooks:spell_book`, which is **not a registered item** — Iron's registers only tiered books (`copper_spell_book`, …, `legendary_spell_book`). With Iron's installed, both recipes failed to parse (`JsonSyntaxException: Unknown item`) and the Spell Transcription / Spellbook Binding tablets could not be crafted. The recipes now accept any tiered Iron's spell book via a new shipped item tag [`ars_n_spells:irons_spell_books`](src/main/resources/data/ars_n_spells/tags/items/irons_spell_books.json) (all entries optional, so the tag also loads cleanly on Iron's-less installs). Pack makers can override the tag to restrict tiers.
+- `pack.mcmeta` now declares the correct 1.20.1 data-pack format (15; was 12).
+
+### Fixed: LP cost participants gated on inconsistent config toggles
+
+- `MixinSanctifiedAbstractSpell` bypassed Covenant of the Seven's native LP/death check based on `enable_mana_unification` instead of the LP system's own `enable_lp_system` master toggle: with unification off + LP on, both ANS and Covenant processed the cost (the double-penalty/instant-death interaction the bypass exists to prevent); with unification on + LP off, Covenant was bypassed with nobody charging LP. The scroll LP path in `MixinScrollItem` had no LP-system gate at all, so scrolls kept charging LP with the system disabled. Both now key off `enable_lp_system` (default unchanged: `true`).
+
+### Changed
+
+- Mode-dependent features (equipment mana bridging, Source Jar synergy, mana-bar hiding) now consistently respect `mana_unification_mode = "disabled"` even when the `enable_mana_unification` master toggle is still `true` — previously each site re-implemented the precedence check and this state behaved inconsistently. `BridgeManager.isUnificationEnabled()` is the documented single source of truth.
+- The three scroll LP action-bar messages are now translatable (`message.ars_n_spells.lp.*`); English text unchanged.
+- `ConfigScreenFactory` moved from the common `config` package to `client/screen` (it is a client `Screen`; the old location risked dedicated-server classloading if ever referenced from common code).
+- Removed the redundant `MixinIronsManaBarOverlay` — `ManaBarController` already cancels Iron's mana-bar overlay via `RenderGuiOverlayEvent.Pre` before the mixin's injection point could ever run. Visual behavior unchanged.
+- Removed the dead `IronsLPHandler.storePendingScrollLP` (no callers; scroll costs stage through `ScrollLPTracker`). If any pack invoked it reflectively, that call will now fail to resolve.
+
 ## [3.0.1] - 2026-07-05
 
 ### Fixed config screen readability/blur issue
@@ -167,7 +188,7 @@ Affixed and socketed **curios** (rings, amulets, belts) now contribute their man
 
 ### Audit-driven major release
 
-2.0.0 addresses the comprehensive technical audit at [ars-n-spells-2.0.0.md](ars-n-spells-2.0.0.md). Every High and Medium-High hypothesis in the audit's "Ranked Root-Cause Hypotheses" maps to a closed fix below. The major-version bump reflects two breaking changes (new C2S packet ID; clients older than 2.0.0 cannot cross-cast against a 2.0.0 server) plus the architectural reorganization of the cross-cast pipeline.
+2.0.0 addresses the comprehensive technical audit (planning doc retired; see AUDIT.md). Every High and Medium-High hypothesis in the audit's "Ranked Root-Cause Hypotheses" maps to a closed fix below. The major-version bump reflects two breaking changes (new C2S packet ID; clients older than 2.0.0 cannot cross-cast against a 2.0.0 server) plus the architectural reorganization of the cross-cast pipeline.
 
 ### Phase 1 — Hotfix (cross-cast actually works again)
 

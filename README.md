@@ -273,7 +273,7 @@ The mod hides redundant mana bars based on mode:
 
 ### v2.0.0 — Audit-driven major release
 
-Addresses the comprehensive audit at [ars-n-spells-2.0.0.md](ars-n-spells-2.0.0.md). Every High and Medium-High audit hypothesis maps to a closed fix.
+Addresses the comprehensive 2.0.0 technical audit (planning doc retired; see AUDIT.md and AUDIT_FINDINGS.md). Every High and Medium-High audit hypothesis maps to a closed fix.
 
 - **Cross-cast actually works on dedicated servers again.** Client used to claim success and cancel the use event before the server received any cast trigger, producing silent "input detected, nothing happens" failures. The client now sends a dedicated [`CrossCastRequestPacket`](src/main/java/com/otectus/arsnspells/network/CrossCastRequestPacket.java) (C2S, appended at the tail of `PacketHandler.register()` so existing IDs do not shift). The server is the sole cast authority via the new [`CrossCastingHandler.serverHandleCast`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) entry point.
 - **Cross-cast decoupled from mana unification.** `mana_mode=disabled` (and `enable_mana_unification=false`) used to make inscribed items inert. They now cast normally with native upstream pool costs — only mana *sharing* between systems is suppressed in those settings. The `cross_cast_cost_multiplier` still applies in all modes.

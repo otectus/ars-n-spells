@@ -1,9 +1,8 @@
-# Testing Guide — Ars 'n' Spells 3.0.0
+# Testing Guide — Ars 'n' Spells 3.0.1
 
-This guide covers manual verification scenarios for the systems shipped in
-2.0.0 (the audit-driven major release). It supersedes the pre-1.8 testing
-notes and adds the cross-cast pipeline validation matrix from the audit at
-[ars-n-spells-2.0.0.md](ars-n-spells-2.0.0.md).
+This guide covers manual verification scenarios for the cross-cast pipeline
+(introduced in 2.0.0), the native-wheel/Spell Loom export systems (3.0.0),
+and the 3.0.x hardening fixes. It supersedes the pre-1.8 testing notes.
 
 For an at-a-glance description of features and configuration, start with the
 [README](README.md). For the change history, see [CHANGELOG.md](CHANGELOG.md).
@@ -12,15 +11,15 @@ For an at-a-glance description of features and configuration, start with the
 
 | Mod | Version | Required for tests below |
 | --- | --- | --- |
-| Minecraft (Forge) | 1.20.1 / 47.2.0+ | All tests |
+| Minecraft (Forge) | 1.20.1 / 47.4.0+ | All tests |
 | Ars Nouveau | 4.12.7 | All tests |
 | Iron's Spells 'n Spellbooks | 3.15.x | "Ars + Iron's" tests, scaling, progression, scrolls, cross-cast |
 | Covenant of the Seven (Sanctified Legacy) | Any | Cursed/Virtue Ring tests |
 | Blood Magic | Any | LP source `BLOOD_MAGIC_*` tests |
 
-Drop `build/libs/ars_n_spells-3.0.0.jar` into the instance's `mods/` folder
-alongside the dependencies. **2.0.0 introduces a new C2S packet ID; clients
-and servers must run matching versions.**
+Drop the built jar (`build/libs/ars_n_spells-<version>.jar`) into the
+instance's `mods/` folder alongside the dependencies. **The network protocol
+version is strict; clients and servers must run matching mod versions.**
 
 Apotheosis + Apothic Curios are optional — install them only for the
 "Curio attribute bridge" scenario below.
@@ -36,8 +35,8 @@ prefixes to most event paths.
 
 ## 2.0.0 cross-cast pipeline matrix
 
-This matrix mirrors the audit's "Testing and Validation Strategy" table.
-Every cell here must pass before a 2.0.0 release candidate is signed off.
+This matrix mirrors the 2.0.0 audit's "Testing and Validation Strategy"
+table. Every cell here must pass before a release candidate is signed off.
 
 To follow a single cast end-to-end, set `debug_mode=true` and grep
 `logs/latest.log` for `attempt=<uuid>` — the trace utility emits one line per
@@ -137,11 +136,6 @@ places/opens, and pressing Inscribe shows the `irons_missing` message instead of
 crashing. (Automated: `CrossCastGameTests` / `ArsIronsExportGameTests` self-skip
 the Iron-loaded paths; run `./gradlew runGameTestServer` with and without
 `-PwithIronsRuntimeGameTests`.)
-
-## P0 regression scenarios (1.9.0 stabilization pass)
-
-These scenarios exercise the five critical fixes called out in the 1.9.0
-changelog. If any of them fails, do not ship.
 
 ## P0 regression scenarios (1.9.0 stabilization pass)
 
@@ -355,7 +349,7 @@ Pass:
 These haven't changed in 1.9.0 but are still load-bearing for survival
 gameplay. See [README §Cross-mod spell casting](README.md) for the full flow.
 
-### S15 — Strict disambiguation on the brazier
+### S20 — Strict disambiguation on the brazier
 
 1. Drop two filled Ars spell parchments (two sources) within three blocks of
    the Spell Transcription brazier.
@@ -365,7 +359,7 @@ Pass: ritual fails with a chat message naming both items and explaining that
 exactly one source + one blank target are required. Pre-1.8.9 this would
 either silently pick one or corrupt an item.
 
-### S16 — Spell Uninscription returns a bit-identical blank
+### S21 — Spell Uninscription returns a bit-identical blank
 
 1. Inscribe a cross-cast spell onto a target item. Note its NBT.
 2. Run the Spell Uninscription ritual on the inscribed item.
@@ -374,7 +368,7 @@ either silently pick one or corrupt an item.
 Pass: NBT is bit-identical (no residual root tags). The same item can be
 re-inscribed cleanly.
 
-### S17 — Ars → scroll → spellbook export/bind (3.0.0, requires Iron's)
+### S22 — Ars → scroll → spellbook export/bind (3.0.0, requires Iron's)
 
 1. Hold an item carrying an Ars spell (filled spell parchment, inscribed
    focus, or Ars spellbook) and run `/ans export_to_irons_scroll`.
@@ -473,8 +467,9 @@ cached).
 - **Ars spell damage not scaling with Iron's spell power**: ensure Iron's is
   installed (the scaling handler is gated on Iron's), `enable_resonance_system`
   and `enable_affinity_system` are at their default values, and the spell's
-  damage source contains "magic", "ars_nouveau", "onFire", or "inFire" — the
-  filter rejects melee/environmental damage from the same player.
+  damage source contains "magic" or "ars_nouveau" — the onFire/inFire match
+  was removed in 3.0.x (it let lava ticks inherit the spell-power multiplier);
+  the filter rejects melee/environmental damage from the same player.
 
 ## Reporting issues
 
