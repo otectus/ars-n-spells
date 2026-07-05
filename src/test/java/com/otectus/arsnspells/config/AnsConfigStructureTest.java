@@ -90,6 +90,24 @@ class AnsConfigStructureTest {
     }
 
     @Test
+    void sourceJarSynergyKeys_exist() {
+        // 3.0.1 (ANS-CRIT-005 follow-up): kill switch + scan tuning so server
+        // owners can disable or throttle the Source Jar scan without turning
+        // off mana unification.
+        for (String name : new String[] {
+            "ENABLE_SOURCE_JAR_SYNERGY",
+            "SOURCE_JAR_SCAN_INTERVAL_TICKS",
+            "SOURCE_JAR_SCAN_RADIUS"
+        }) {
+            try {
+                assertNotNull(AnsConfig.class.getDeclaredField(name), name + " must exist");
+            } catch (NoSuchFieldException e) {
+                fail("AnsConfig." + name + " must exist (Source Jar synergy kill switch / tuning)");
+            }
+        }
+    }
+
+    @Test
     void safeSave_doesNotBlockCallerThread() throws IOException {
         // Source-text assertion: safeSave body must not contain Thread.sleep (ANS-HIGH-017).
         String source = Files.readString(Paths.get(

@@ -59,6 +59,15 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("MixinResourceBarOverlay")) {
             return sanctifiedPresent;
         }
+        // ANS 3.0.1: MixinArsPotionEffects targets an Ars class (so it isn't caught
+        // by the Irons* gate below) but its bytecode references Iron's
+        // AttributeRegistry — on an Iron's-less install the mixin pre-processor
+        // dies with ClassMetadataNotFoundException and Ars Nouveau fails to load.
+        // The inject is also only meaningful when Iron's is primary, so gating on
+        // ironsPresent loses nothing.
+        if (mixinClassName.endsWith("MixinArsPotionEffects")) {
+            return ironsPresent;
+        }
         // ANS-CRIT-001: MixinIronsCastValidation and MagicDataAccessor were missing
         // from this gated list — both directly target Iron's classes, so on an
         // Iron's-less server the mixin loader was crashing with NoClassDefFoundError.

@@ -403,6 +403,59 @@ These map to the automated coverage in `CrossCastGameTests` (run
 `./gradlew runGameTestServer -PwithIronsRuntimeGameTests` with Iron's on the
 GameTest classpath) and `ArsIronsExportGameTests` (Iron-less default run).
 
+## 3.0.1 scenarios
+
+### S18 — Config screen readability & read-only mode
+
+Steps: open Mods → Ars 'n Spells → Config (a) from the title screen, (b) from
+the in-world pause menu in singleplayer, (c) while connected to a dedicated
+server. Repeat at GUI scales 1, 2, 3, and Auto. Optionally install a client
+blur mod (e.g. "Blur") for (b).
+
+Pass:
+- The screen draws its own near-opaque dark background and a bordered content
+  panel — text is crisp on light and busy backgrounds alike, and blur mods
+  have no effect on legibility (the old "frosted glass" report).
+- Rows have background stripes with hover highlight; ON/OFF and Mana Mode
+  render as bordered buttons, and only clicks inside the drawn button react.
+- Long descriptions truncate with "..." and show the full text as a tooltip
+  on hover.
+- Singleplayer: toggles flip, Done saves, and changes apply live.
+- Dedicated server: all controls render greyed with no hover feedback, a
+  "Read-only: server-managed config" note is shown, clicking ON/OFF and Mana
+  Mode does nothing, Reset Toggles is disabled, and the footer button reads
+  "Close". (Regression: boolean rows used to toggle the client's config
+  mirror ungated.)
+
+### S19 — Source Jar synergy must not force-load chunks (+ kill switch/tuning)
+
+Steps: Iron's installed, mana unification on, mana partially drained, standing
+next to a filled Source Jar.
+
+1. Defaults: the regen bonus ticks about once per second.
+2. Set `enable_source_jar_synergy = false` (server TOML) and rejoin: no bonus,
+   and no scan activity in the debug summary. This is the recommended
+   workaround for servers affected by the pre-2.6.2 chunk-load deadlock.
+3. Set `source_jar_scan_interval_ticks = 100`: bonus cadence drops to ~5 s.
+4. Set `source_jar_scan_radius = 1` and stand 3+ blocks away: no bonus.
+5. Set `debug_mode = true`: a rate-limited
+   `[ANS] SourceJar synergy: N scans, M skipped (unloaded chunks), K jar hits`
+   summary appears at most once per minute — never per-block spam.
+
+### Dedicated server chunk-border stress test (ANS-CRIT-005 regression)
+
+On a dedicated server with several players if possible: teleport repeatedly to
+ungenerated coordinates (`/tp @s 100000 ~ 100000`, then further), fly at high
+speed across fresh chunk borders (Elytra + speed or `/effect`), relog at an
+ungenerated border, and cross dimensions — all while mana unification and
+Source Jar synergy are enabled.
+
+Pass: the server never deadlocks, hangs, or logs watchdog stalls while chunks
+stream in; with `debug_mode = true` the "skipped (unloaded chunks)" counter
+increments during the stress instead. Synergy resumes within a second once the
+chunks around the player finish loading (skipped scans are retried, never
+cached).
+
 ## Troubleshooting
 
 - **Server crashes during boot with `NoClassDefFoundError` for an Iron's class

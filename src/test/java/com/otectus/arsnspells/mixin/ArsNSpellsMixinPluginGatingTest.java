@@ -84,12 +84,34 @@ class ArsNSpellsMixinPluginGatingTest {
             "com.otectus.arsnspells.mixin.ars.MixinSpellResolverMana",
             "com.otectus.arsnspells.mixin.ars.MixinSpellResolverPreCast",
             "com.otectus.arsnspells.mixin.ars.MixinSpellResolverContext",
-            "com.otectus.arsnspells.mixin.ars.MixinArsPotionEffects",
         };
         for (String fqn : arsMixins) {
             assertTrue(plugin.shouldApplyMixin("any.target", fqn),
                 fqn + " must apply unconditionally (Ars is a hard dependency)");
         }
+    }
+
+    @Test
+    void mixinArsPotionEffects_isGatedOnIronsAbsence() throws Exception {
+        // ANS 3.0.1: targets an Ars class but its bytecode references Iron's
+        // AttributeRegistry — un-gated it crashed Iron's-less servers at boot
+        // (ClassMetadataNotFoundException while transforming ManaCapEvents,
+        // taking Ars Nouveau down with it). The inject is only meaningful when
+        // Iron's is primary, so nothing is lost by gating.
+        ArsNSpellsMixinPlugin plugin = newPluginWithIronsPresent(false);
+        assertFalse(plugin.shouldApplyMixin(
+                "com.hollingsworth.arsnouveau.common.event.ManaCapEvents",
+                "com.otectus.arsnspells.mixin.ars.MixinArsPotionEffects"),
+            "MixinArsPotionEffects must NOT apply when Iron's is absent");
+    }
+
+    @Test
+    void mixinArsPotionEffects_appliesWhenIronsPresent() throws Exception {
+        ArsNSpellsMixinPlugin plugin = newPluginWithIronsPresent(true);
+        assertTrue(plugin.shouldApplyMixin(
+                "com.hollingsworth.arsnouveau.common.event.ManaCapEvents",
+                "com.otectus.arsnspells.mixin.ars.MixinArsPotionEffects"),
+            "MixinArsPotionEffects must apply when Iron's is present");
     }
 
     @Test

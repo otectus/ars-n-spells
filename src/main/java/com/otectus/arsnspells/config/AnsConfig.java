@@ -152,6 +152,9 @@ public class AnsConfig {
     // ========================================
     // SOURCE JAR SYNERGY
     // ========================================
+    public static final ForgeConfigSpec.BooleanValue ENABLE_SOURCE_JAR_SYNERGY;
+    public static final ForgeConfigSpec.IntValue SOURCE_JAR_SCAN_INTERVAL_TICKS;
+    public static final ForgeConfigSpec.IntValue SOURCE_JAR_SCAN_RADIUS;
     public static final ForgeConfigSpec.DoubleValue SOURCE_JAR_SYNERGY_MULTIPLIER;
 
     // ========================================
@@ -701,10 +704,29 @@ public class AnsConfig {
         BUILDER.push("Source Jar Synergy");
         BUILDER.comment("Controls the passive mana regen bonus when near Ars Nouveau Source Jars.");
 
+        ENABLE_SOURCE_JAR_SYNERGY = BUILDER
+            .comment("Master kill switch for the Source Jar proximity regen synergy.",
+                     "Set false to disable the periodic block scan entirely (zero per-tick cost).",
+                     "This is the supported way to turn the feature off;",
+                     "source_jar_synergy_multiplier keeps its 0.1 minimum. (ANS-CRIT-005 follow-up)")
+            .define("enable_source_jar_synergy", true);
+
+        SOURCE_JAR_SCAN_INTERVAL_TICKS = BUILDER
+            .comment("Ticks between Source Jar proximity checks per player (20 = once per second).",
+                     "Raise on busy servers to reduce scan cost.")
+            .defineInRange("source_jar_scan_interval_ticks", 20, 1, 200);
+
+        SOURCE_JAR_SCAN_RADIUS = BUILDER
+            .comment("Horizontal scan radius in blocks around the player.",
+                     "Any value up to the hard cap of 8 covers at most a 2x2 chunk area.",
+                     "The scan never loads chunks - cycles near unloaded chunks are skipped and retried.")
+            .defineInRange("source_jar_scan_radius", 4, 1, 8);
+
         SOURCE_JAR_SYNERGY_MULTIPLIER = BUILDER
             .comment("Multiplier for Source Jar proximity regen bonus.",
                      "Higher values = stronger regen when standing near Source Jars.",
-                     "Final bonus = CONVERSION_RATE_ARS_TO_IRON * this value per second.")
+                     "Final bonus = CONVERSION_RATE_ARS_TO_IRON * this value per second.",
+                     "To disable the feature use enable_source_jar_synergy = false, not a zero multiplier.")
             .defineInRange("source_jar_synergy_multiplier", 5.0, 0.1, 100.0);
 
         BUILDER.pop();

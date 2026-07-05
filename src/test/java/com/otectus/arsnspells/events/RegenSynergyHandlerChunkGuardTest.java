@@ -31,8 +31,10 @@ class RegenSynergyHandlerChunkGuardTest {
         // poison the cache (a cached false negative would persist for the whole
         // move threshold).
         int tickIdx = src.indexOf("public void onPlayerTick");
-        int scanCallIdx = src.indexOf("scanForSourceJar(level, pos)", tickIdx);
-        int guardIdx = src.indexOf("areScanChunksLoaded(level, pos)", tickIdx);
+        // Prefix match (no closing paren) so the assertions tolerate the
+        // configurable radius parameter added in 3.0.1.
+        int scanCallIdx = src.indexOf("scanForSourceJar(level, pos", tickIdx);
+        int guardIdx = src.indexOf("areScanChunksLoaded(level, pos", tickIdx);
         assertTrue(guardIdx >= 0 && scanCallIdx > guardIdx,
             "onPlayerTick must evaluate areScanChunksLoaded before invoking scanForSourceJar");
     }

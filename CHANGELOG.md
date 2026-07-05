@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.1] - Unreleased
+
+### Fixed config screen readability/blur issue
+
+- The in-game config screen now paints its own near-opaque background and a bordered content panel instead of relying on the vanilla translucent dim — client blur mods/shaders (the "frosted glass" look) can no longer make it unreadable. Rows have background stripes with hover highlight, high-contrast shadowed text, and the ON/OFF and Mana Mode controls are drawn as real bordered buttons whose hitboxes exactly match the drawn rect (previously a 20px hitbox floated over a 35px row). Long descriptions truncate with a hover tooltip instead of overflowing. ([ConfigScreenFactory.java](src/main/java/com/otectus/arsnspells/config/ConfigScreenFactory.java))
+- **Fixed: boolean toggles were clickable in multiplayer read-only mode** — the click silently mutated only the client's SERVER-config mirror (cycle rows were already gated). All row controls are now gated on `canMutate`, render disabled on dedicated-server clients, and the screen shows "Read-only: server-managed config. Edit the server TOML or use /ans commands."
+- "Reset Toggles" now resets `enable_cooldown_system` to its actual TOML default (`false`); it previously set it to `true`.
+
+### Source Jar synergy: kill switch + tuning (follow-up to the ANS-CRIT-005 chunk-load deadlock fix)
+
+- Fixed in 2.6.2/3.0.0 and hardened here: the Source Jar synergy scan could touch (and synchronously load) chunks during player tick in ≤2.6.1, which could contribute to chunk-load deadlocks. The scan now remains guarded by a non-loading `hasChunk` check, and this release adds server-owner controls around it.
+- New keys under `Source Jar Synergy`: `enable_source_jar_synergy` (default `true` — the supported off switch; when `false` the periodic scan is skipped entirely), `source_jar_scan_interval_ticks` (default 20, range 1–200), and `source_jar_scan_radius` (default 4, hard cap 8 — at most a 2×2 chunk area). Existing TOMLs are auto-upgraded with defaults; no keys renamed. The multiplier keeps its 0.1 minimum — use the kill switch to disable, not a zero multiplier. The kill switch is also exposed as a toggle in the config screen.
+- The chunk-coverage math behind the scan guard moved to [ChunkScanUtil.java](src/main/java/com/otectus/arsnspells/util/ChunkScanUtil.java) with direct unit coverage; skipped scans are still retried and never cached.
+- With `debug_mode = true`, a rate-limited counter summary (scans run / skipped due to unloaded chunks / jar hits, plus a slow-scan warning) is logged at most once per minute — counters only, never per-block.
+
+### Fixed: crash at boot on installs without Iron's Spellbooks
+
+- `MixinArsPotionEffects` targets an Ars Nouveau class but its bytecode references Iron's `AttributeRegistry`; on an Iron's-less install the mixin processor failed with `ClassMetadataNotFoundException` while transforming `ManaCapEvents`, which made Ars Nouveau itself fail to load and killed the server during startup. The mixin is now gated on Iron's presence in [ArsNSpellsMixinPlugin.java](src/main/java/com/otectus/arsnspells/mixin/ArsNSpellsMixinPlugin.java) — it only has an effect when Iron's is the primary mana system, so nothing is lost. (Found because the Iron-less GameTest profile could not boot.)
+
 ## [3.0.0] - 2026-07-02
 
 ### Export Ars spells onto Iron's scrolls and bind them into spellbooks
