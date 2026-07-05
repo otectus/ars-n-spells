@@ -72,7 +72,6 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // from this gated list — both directly target Iron's classes, so on an
         // Iron's-less server the mixin loader was crashing with NoClassDefFoundError.
         if (mixinClassName.endsWith("MixinIronsSpellDamage")
-            || mixinClassName.endsWith("MixinIronsManaBarOverlay")
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
             || mixinClassName.endsWith("MixinIronsCastValidation")
             || mixinClassName.endsWith("MagicDataAccessor")

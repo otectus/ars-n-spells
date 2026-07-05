@@ -64,7 +64,6 @@ class ArsNSpellsMixinPluginGatingTest {
         ArsNSpellsMixinPlugin plugin = newPluginWithIronsPresent(false);
         String[] gatedSuffixes = {
             "MixinIronsSpellDamage",
-            "MixinIronsManaBarOverlay",
             "MixinIronsMagicDataMana",
             "MixinScrollItem",
             "MixinSanctifiedAbstractSpell",

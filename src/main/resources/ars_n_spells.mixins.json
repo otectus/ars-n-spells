@@ -18,7 +18,6 @@
     "sanctified.MixinSanctifiedAbstractSpell"
   ],
   "client": [
-    "irons.MixinIronsManaBarOverlay",
     "irons.MixinAbstractSpellArsIcon",
     "covenant.MixinResourceBarOverlay"
   ],
