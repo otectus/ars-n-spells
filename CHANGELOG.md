@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.0.1] - Unreleased
+## [3.0.1] - 2026-07-05
 
 ### Fixed config screen readability/blur issue
 

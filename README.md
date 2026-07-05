@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v3.0.0)
+# Ars 'n' Spells (v3.0.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It unifies mana, scaling, and progression while keeping each mod playable on its own. Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -245,6 +245,12 @@ The mod hides redundant mana bars based on mode:
 - **separate / disabled**: Both bars may show.
 
 ## Changelog
+
+### v3.0.1 — Config screen readability, Source Jar synergy controls, Iron-less boot fix
+
+- **Fixed config screen readability/blur issue.** The config screen paints its own near-opaque background and bordered panel instead of the vanilla translucent dim, so client blur mods can no longer turn it into frosted glass. Rows get real bordered ON/OFF buttons with matching hitboxes, hover highlights, and tooltips for long descriptions. Multiplayer clients now see a proper read-only mode ("Read-only: server-managed config") — boolean toggles no longer silently flip the client-side mirror.
+- **Source Jar synergy kill switch + tuning.** Follow-up to the ANS-CRIT-005 chunk-load deadlock fix (shipped in 2.6.2/3.0.0): new `enable_source_jar_synergy` (the supported off switch), `source_jar_scan_interval_ticks`, and `source_jar_scan_radius` keys, plus `debug_mode`-gated scan counters. The scan still never loads or waits for chunks.
+- **Fixed a startup crash on installs without Iron's Spellbooks.** `MixinArsPotionEffects` referenced an Iron's class while transforming an Ars Nouveau class; it is now gated on Iron's presence. See [CHANGELOG.md](CHANGELOG.md) for the full breakdown.
 
 ### v3.0.0 — Ars → scroll → spellbook export, pending-cost race fix
 
