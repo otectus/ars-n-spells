@@ -58,8 +58,9 @@ public class ManaBarController {
                 }
             }
 
-            // Only process if mana unification is enabled
-            if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
+            // Only process if mana unification is enabled (master toggle + mode;
+            // BridgeManager.isUnificationEnabled() is the precedence source of truth)
+            if (!BridgeManager.isUnificationEnabled()) {
                 return;
             }
 

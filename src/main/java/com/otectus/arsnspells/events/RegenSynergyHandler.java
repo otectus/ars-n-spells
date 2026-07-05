@@ -1,5 +1,6 @@
 package com.otectus.arsnspells.events;
 
+import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.util.ChunkScanUtil;
 import net.minecraft.core.BlockPos;
@@ -43,7 +44,7 @@ public class RegenSynergyHandler {
         if (!ModList.get().isLoaded("irons_spellbooks")) {
             return;
         }
-        if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
+        if (!BridgeManager.isUnificationEnabled()) {
             return;
         }
         // ANS-CRIT-005 follow-up: server-owner kill switch for this feature only.

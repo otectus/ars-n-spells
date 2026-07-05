@@ -82,7 +82,12 @@ public class MixinScrollItem {
         int manaCost = spell.getManaCost(spellLevel);
 
         // --- Cursed Ring LP path (always applies regardless of scroll_cost_mode) ---
-        if (SanctifiedLegacyCompat.isAvailable() && SanctifiedLegacyCompat.isWearingCursedRing(player)) {
+        // Audit F13: honor the LP system's master toggle. Every other LP participant
+        // (CursedRingHandler, IronsLPHandler, MixinSpellResolverMana) gates on
+        // ENABLE_LP_SYSTEM ("When disabled, spells use normal mana even with Cursed
+        // Ring equipped"); scrolls must not keep charging LP when it is off.
+        if (AnsConfig.ENABLE_LP_SYSTEM.get()
+            && SanctifiedLegacyCompat.isAvailable() && SanctifiedLegacyCompat.isWearingCursedRing(player)) {
             if (manaCost > 0) {
                 SpellRarity rarity = spell.getRarity(spellLevel);
                 if (rarity == null) {

@@ -214,7 +214,14 @@ public class BridgeManager {
     }
 
     /**
-     * Check if mana unification is enabled
+     * Check if mana unification is enabled.
+     *
+     * <p><b>Precedence source of truth</b> (audit F5): the master toggle
+     * {@code enable_mana_unification} wins over {@code mana_unification_mode} —
+     * toggle off forces DISABLED regardless of mode (mirrored in
+     * {@link AnsConfig#getManaMode()}). Mode-dependent call sites must use this
+     * helper instead of reading {@code ENABLE_MANA_UNIFICATION} directly so the
+     * rule lives in exactly one place.
      */
     public static boolean isUnificationEnabled() {
         if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {

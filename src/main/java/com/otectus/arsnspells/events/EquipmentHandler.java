@@ -28,7 +28,7 @@ public class EquipmentHandler {
             return;
         }
         
-        if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
+        if (!BridgeManager.isUnificationEnabled()) {
             return;
         }
         
@@ -48,7 +48,7 @@ public class EquipmentHandler {
      */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
+        if (!BridgeManager.isUnificationEnabled()) {
             return;
         }
         
@@ -65,7 +65,7 @@ public class EquipmentHandler {
      */
     @SubscribeEvent
     public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
-        if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
+        if (!BridgeManager.isUnificationEnabled()) {
             return;
         }
         

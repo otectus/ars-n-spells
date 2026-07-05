@@ -3,6 +3,7 @@ package com.otectus.arsnspells.equipment;
 import com.google.common.collect.Multimap;
 import com.hollingsworth.arsnouveau.api.mana.IManaEquipment;
 import com.hollingsworth.arsnouveau.api.perk.PerkAttributes;
+import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
@@ -136,7 +137,7 @@ public class EquipmentIntegration {
     }
     
     private static CachedEquipmentData calculateBonuses(Player player) {
-        if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
+        if (!BridgeManager.isUnificationEnabled()) {
             return CachedEquipmentData.EMPTY;
         }
 

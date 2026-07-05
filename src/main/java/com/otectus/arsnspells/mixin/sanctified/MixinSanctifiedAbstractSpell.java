@@ -47,7 +47,14 @@ public abstract class MixinSanctifiedAbstractSpell {
             return;
         }
         
-        if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
+        // Audit F13: this bypass must track the LP system's own master toggle, not
+        // mana unification — CursedRingHandler / IronsLPHandler are gated on
+        // ENABLE_LP_SYSTEM. Guarding on the unification toggle meant that with
+        // unification off + LP on, ANS charged LP while Covenant's native check
+        // still ran (the double-penalty this mixin exists to prevent), and with
+        // unification on + LP off, Covenant's native handling was bypassed with
+        // nobody charging LP at all.
+        if (!AnsConfig.ENABLE_LP_SYSTEM.get()) {
             return;
         }
         
