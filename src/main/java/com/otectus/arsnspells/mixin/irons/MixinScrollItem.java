@@ -108,7 +108,8 @@ public class MixinScrollItem {
                     SanctifiedLegacyCompat.applySilentHealthLoss(player, 2.0f);
                     if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
                         player.displayClientMessage(
-                            Component.literal(ChatFormatting.RED + "Insufficient LP - Scroll Cancelled"),
+                            Component.translatable("message.ars_n_spells.lp.scroll_cancelled")
+                                .withStyle(ChatFormatting.RED),
                             true);
                     }
                     return;
@@ -192,9 +193,8 @@ public class MixinScrollItem {
                 pending.lpCost, player.getName().getString());
             if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
                 player.displayClientMessage(
-                    Component.literal(
-                        ChatFormatting.DARK_RED.toString() + ChatFormatting.BOLD
-                            + "DEATH: Insufficient LP (" + pending.lpCost + " LP required)"),
+                    Component.translatable("message.ars_n_spells.lp.death", pending.lpCost)
+                        .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD),
                     true);
             }
             player.hurt(player.damageSources().magic(), Float.MAX_VALUE);
@@ -210,7 +210,8 @@ public class MixinScrollItem {
         }
         if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
             player.displayClientMessage(
-                Component.literal(ChatFormatting.GOLD + "Consumed " + pending.lpCost + " LP"),
+                Component.translatable("message.ars_n_spells.lp.consumed", pending.lpCost)
+                    .withStyle(ChatFormatting.GOLD),
                 true);
         }
     }
