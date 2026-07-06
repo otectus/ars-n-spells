@@ -246,7 +246,7 @@ The mod hides redundant mana bars based on mode:
 
 ## Changelog
 
-### Unreleased — 3.0.1 full-codebase audit remediation
+### v3.0.1 addendum — full-codebase audit remediation
 
 - **Fixed: the Spell Transcription and Spellbook Binding tablets were uncraftable whenever Iron's was installed.** Both apparatus recipes referenced `irons_spellbooks:spell_book`, which is not a registered item (Iron's only registers tiered books). They now accept any tiered Iron's spell book via the new [`ars_n_spells:irons_spell_books`](src/main/resources/data/ars_n_spells/tags/items/irons_spell_books.json) item tag (pack-overridable, loads safely without Iron's).
 - **Fixed: LP cost handling keyed off inconsistent config toggles.** The Covenant-bypass mixin and the scroll LP path now honor the `enable_lp_system` master toggle like every other LP participant — closing a double-penalty/instant-death interaction (unification off + LP on) and a scrolls-still-charge-LP-when-disabled inconsistency.
