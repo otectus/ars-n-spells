@@ -246,6 +246,13 @@ The mod hides redundant mana bars based on mode:
 
 ## Changelog
 
+### Unreleased — 3.0.1 full-codebase audit remediation
+
+- **Fixed: the Spell Transcription and Spellbook Binding tablets were uncraftable whenever Iron's was installed.** Both apparatus recipes referenced `irons_spellbooks:spell_book`, which is not a registered item (Iron's only registers tiered books). They now accept any tiered Iron's spell book via the new [`ars_n_spells:irons_spell_books`](src/main/resources/data/ars_n_spells/tags/items/irons_spell_books.json) item tag (pack-overridable, loads safely without Iron's).
+- **Fixed: LP cost handling keyed off inconsistent config toggles.** The Covenant-bypass mixin and the scroll LP path now honor the `enable_lp_system` master toggle like every other LP participant — closing a double-penalty/instant-death interaction (unification off + LP on) and a scrolls-still-charge-LP-when-disabled inconsistency.
+- **Consistent `mana_unification_mode = "disabled"` behavior.** Equipment mana bridging, Source Jar synergy, and mana-bar hiding now all respect the mode even when the master toggle is still on; `BridgeManager.isUnificationEnabled()` is the single precedence source of truth.
+- **Cleanup**: redundant Iron's mana-bar mixin removed (the overlay controller already handles it), config screen class relocated to the client package, scroll LP messages localized, dead code removed. Full details in [CHANGELOG.md](CHANGELOG.md) and [AUDIT_FINDINGS.md](AUDIT_FINDINGS.md).
+
 ### v3.0.1 — Config screen readability, Source Jar synergy controls, Iron-less boot fix
 
 - **Fixed config screen readability/blur issue.** The config screen paints its own near-opaque background and bordered panel instead of the vanilla translucent dim, so client blur mods can no longer turn it into frosted glass. Rows get real bordered ON/OFF buttons with matching hitboxes, hover highlights, and tooltips for long descriptions. Multiplayer clients now see a proper read-only mode ("Read-only: server-managed config") — boolean toggles no longer silently flip the client-side mirror.
