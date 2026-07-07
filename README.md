@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v3.0.1)
+# Ars 'n' Spells (v3.0.2)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It rests on three pillars: **mana unification** (five configurable modes for how the two pools interact), **cross-mod scaling and progression** (Iron's spell-power attributes scale Ars spells; both mods feed shared school progression and affinity), and **cross-casting** (inscribe spells from either mod onto arbitrary items, or export Ars spells onto real Iron's scrolls and spellbooks and cast them from Iron's native spell wheel). Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -357,6 +357,7 @@ While a Cursed or Virtue Ring is equipped, both mana bars are hidden (`hide_mana
 
 Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 
+- **3.0.2 — Second audit pass: decay fix, pack-maker tags, advancements.** Affinity decay now follows its documented proportional curve (it previously drained a flat point per interval, ~20x too fast); ring/Blasphemy/Source Jar detection moved to datapack-extensible tags (`ars_n_spells:cursed_rings`, `virtue_rings`, `blasphemy_curios`, `source_jars`); a four-step advancement chain guides the Spell Loom workflow; new `aura_failure_mode` lets servers block (instead of free-allow) Virtue Ring casts when the Covenant bridge is degraded, and untested Covenant versions now announce themselves in chat; the progression bonus curve is config-driven (`progression_bonus_per_cast`/`progression_bonus_cap`); spell-school classification uses an explicit glyph map (Firework is no longer "fire school"); the Spell Loom screen got the high-contrast readability treatment with region tooltips; `mods.toml` gained issue-tracker/homepage/update-checker metadata. See [CHANGELOG.md](CHANGELOG.md).
 - **3.0.1 — Full-codebase audit remediation.** The Spell Transcription and Spellbook Binding tablets are craftable again when Iron's is installed (recipes now use the pack-overridable [`ars_n_spells:irons_spell_books`](src/main/resources/data/ars_n_spells/tags/items/irons_spell_books.json) tag instead of a nonexistent item id); `enable_lp_system` is honored by every LP path (closing a double-penalty and a scrolls-charge-LP-when-disabled inconsistency); `mana_unification_mode = "disabled"` is respected consistently by equipment bridging, Source Jar synergy, and mana-bar hiding; config screen readability rewrite with a proper multiplayer read-only mode; Source Jar synergy kill switch and scan tuning; fixed a startup crash on installs without Iron's; pruned zero-reader config keys; assorted dead-code cleanup. See [AUDIT_FINDINGS.md](AUDIT_FINDINGS.md).
 - **3.0.0 — Ars → scroll → spellbook export.** The Spell Loom workstation, Spellbook Binding ritual, and `/ans export_to_irons_scroll` / `/ans bind_scroll_to_irons_book` commands carry an Ars spell onto real Iron's items, cast through Iron's native spell wheel via a registered proxy-spell pool. Also fixed the pending-cost race (per-player FIFO queues) and added Iron-loaded GameTests.
 - **2.6.x — Apotheosis curio mana bridge, mana-bridge correctness fixes, ring/HUD polish, and the Source Jar chunk-load deadlock fix.**
@@ -383,7 +384,7 @@ Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 
 Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven; no manual jar placement required.
 
-Output jar: `build/libs/ars_n_spells-3.0.1.jar` (version tracks `mod_version` in `gradle.properties`).
+Output jar: `build/libs/ars_n_spells-3.0.2.jar` (version tracks `mod_version` in `gradle.properties`).
 
 To run the Iron-loaded GameTest scenarios (CYCLE, export→bind→coexist round-trips), use the opt-in profile: `./gradlew runGameTestServer -PwithIronsRuntimeGameTests`.
 

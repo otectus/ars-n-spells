@@ -11,6 +11,7 @@ Works with **Minecraft 1.20.1** on **Forge**.
 - **The Spell Loom** — a new workstation that exports any Ars Nouveau spell onto a real Iron's scroll, with a name, nature, and icon of your choosing.
 - **Spellbook Binding** — bind exported scrolls into real Iron's spellbooks; the Ars spell appears as its **own entry in Iron's native spell-selection wheel** (up to 8 per book).
 - **3.0.1 hardening** — the Spell Transcription and Spellbook Binding tablets are craftable again with Iron's installed, LP toggles are honored consistently everywhere, the config screen got a full readability rework (with a proper read-only mode on servers), and a startup crash on Iron's-less installs is fixed.
+- **3.0.2 polish** — affinity decay now follows its documented gentle curve (it drained ~20x too fast when enabled); an **advancement chain** guides you from crafting the Spell Loom to your first cross-cast; the Loom screen got the high-contrast readability treatment with hover tooltips on every slot; **pack makers** get datapack tags for custom cursed/virtue rings, Blasphemy curios, and Source Jar blocks, plus a new `aura_failure_mode` option to block (instead of free-allow) ring casts if the Covenant integration ever degrades; the mod now announces untested Covenant versions in chat and supports the Forge update checker.
 
 ---
 

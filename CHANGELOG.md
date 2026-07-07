@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.0.2] - 2026-07-07
 
 ### Fixed: affinity decay ran ~20x faster than documented (audit D1)
 
