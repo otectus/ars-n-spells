@@ -39,6 +39,10 @@ public class RegenSynergyHandler {
     private static final long SLOW_SCAN_WARN_NANOS = 5_000_000L; // 5 ms
     private static long lastDebugLogGameTime = Long.MIN_VALUE;
 
+    /** Audit D4: log the first boost failure per session so a broken bridge isn't invisible. */
+    private static final java.util.concurrent.atomic.AtomicBoolean loggedBoostFailure =
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
         if (!ModList.get().isLoaded("irons_spellbooks")) {
@@ -116,7 +120,15 @@ public class RegenSynergyHandler {
                     float max = bridge.getMaxMana(player);
                     bridge.setMana(player, Math.min(current + boost, max));
                 } catch (Exception e) {
-                    // Silently fail if bridge API is unavailable
+                    // Degrade to no synergy boost if the bridge is unavailable, but say so
+                    // once: a silent catch here masked "synergy does nothing" regressions
+                    // (audit D4).
+                    if (loggedBoostFailure.compareAndSet(false, true)) {
+                        LOGGER.warn("[ANS] Source Jar synergy mana boost failed; synergy is "
+                            + "inactive until the cause is fixed (further failures logged at debug)", e);
+                    } else {
+                        LOGGER.debug("[ANS] Source Jar synergy mana boost failed", e);
+                    }
                 }
             }
         }

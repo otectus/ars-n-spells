@@ -869,7 +869,7 @@ public class AnsConfig {
             return t;
         });
 
-    public static boolean safeSave() {
+    public static void safeSave() {
         SAVE_EXEC.submit(() -> {
             try {
                 SPEC.save();
@@ -880,10 +880,9 @@ public class AnsConfig {
                     e.getMessage(), e);
             }
         });
-        // Returns true to mean "save scheduled successfully" (the executor's submit
-        // never rejects a daemon task). Callers that previously branched on the
-        // boolean to display feedback may show "saved" optimistically; the async log
-        // is the source of truth for whether the file write actually succeeded.
-        return true;
+        // Audit D5: void, not boolean. A prior version returned true unconditionally
+        // ("save scheduled"), which read as "save succeeded" at call sites. The async
+        // WARN above is the only source of truth for whether the file write landed;
+        // the in-memory config value is already live either way.
     }
 }

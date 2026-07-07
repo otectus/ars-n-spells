@@ -112,8 +112,10 @@ class AnsConfigStructureTest {
         // Source-text assertion: safeSave body must not contain Thread.sleep (ANS-HIGH-017).
         String source = Files.readString(Paths.get(
             "src/main/java/com/otectus/arsnspells/config/AnsConfig.java"));
-        int methodIdx = source.indexOf("public static boolean safeSave()");
-        assertTrue(methodIdx > 0, "safeSave method must exist");
+        // Audit D5: void — a prior boolean return was unconditionally true and read
+        // as "save succeeded" at call sites.
+        int methodIdx = source.indexOf("public static void safeSave()");
+        assertTrue(methodIdx > 0, "safeSave method must exist and return void (audit D5)");
         // Find the body bounds: from the method declaration to the next top-level "}" at column 0.
         int bodyStart = source.indexOf('{', methodIdx);
         int bodyEnd = source.indexOf("\n    }", bodyStart);

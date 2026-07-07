@@ -395,9 +395,9 @@ public class ConfigScreenFactory {
         }
         
         private void saveConfig() {
-            // ANS-HIGH-017: safeSave() only SCHEDULES an async write and always
-            // returns true — the real outcome lands in the log. The message below
-            // is worded accordingly instead of claiming the file was written.
+            // ANS-HIGH-017 / audit D5: safeSave() only SCHEDULES an async write —
+            // the real outcome lands in the log. The message below is worded
+            // accordingly instead of claiming the file was written.
             AnsConfig.safeSave();
 
             // ANS 2.0.1: apply config changes (notably a Mana Mode cycle) live. This

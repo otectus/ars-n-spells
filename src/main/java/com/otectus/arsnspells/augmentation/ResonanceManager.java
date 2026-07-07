@@ -6,14 +6,20 @@ import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.fml.ModList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class ResonanceManager {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ResonanceManager.class);
+    /** Audit D4: log the first compute failure per session so a broken Iron's API surface isn't invisible. */
+    private static final AtomicBoolean loggedComputeFailure = new AtomicBoolean(false);
     // Fixed: Use UUID instead of Player to prevent garbage collection issues
     private static final Map<UUID, Double> resonanceCache = new ConcurrentHashMap<>();
     /** ANS-HIGH-007 / E-MED-06: volatile so the network-thread write is visible to the render thread. */
@@ -65,7 +71,14 @@ public class ResonanceManager {
             if (!Double.isFinite(resonance)) resonance = 1.0;
             resonanceCache.put(player.getUUID(), resonance);
         } catch (Exception e) {
-            // Silently fail if Iron's API is unavailable
+            // Degrade to no resonance if Iron's API is unavailable, but say so once:
+            // a silent catch here masked "resonance does nothing" regressions (audit D4).
+            if (loggedComputeFailure.compareAndSet(false, true)) {
+                LOGGER.warn("[ANS] Resonance computation failed; resonance will stay at 1.0 "
+                    + "until the cause is fixed (further failures logged at debug)", e);
+            } else {
+                LOGGER.debug("[ANS] Resonance computation failed", e);
+            }
         }
     }
 

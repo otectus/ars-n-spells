@@ -1,11 +1,14 @@
 modLoader="javafml"
 loaderVersion="[47,)"
 license="GNU GPLv3"
+issueTrackerURL="https://github.com/otectus/ars-n-spells/issues"
 
 [[mods]]
 modId="ars_n_spells"
 version="${version}"
 displayName="Ars 'n' Spells"
+displayURL="https://github.com/otectus/ars-n-spells"
+updateJSONURL="https://raw.githubusercontent.com/otectus/ars-n-spells/main/update.json"
 description='''
 Bridges Ars Nouveau and Iron's Spells 'n Spellbooks: unified mana with five
 modes, cross-mod spell scaling, school affinity and progression, resonance
