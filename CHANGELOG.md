@@ -2,7 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.0.1] - 2026-07-05
+## [Unreleased]
+
+### Spell Loom screen readability + usability rework
+
+- The Spell Loom screen now uses the same high-contrast treatment as the config screen: opaque bordered panel with bevels, shadowed labels, and per-slot chrome, so blur mods/shaders can no longer wash it out. The GUI grew to 176×208 and all slot/widget coordinates now derive from named layout constants in [SpellLoomMenu.java](src/main/java/com/otectus/arsnspells/menu/SpellLoomMenu.java) — a single source of truth shared by menu and screen (the recipe row moved from y=35 to y=40).
+- New localized hover tooltips explain each region: source slot, scroll slot, output slot, spell preview, nature picker, icon picker, and the Inscribe button (`screen.ars_n_spells.spell_loom.tooltip.*`). The Inscribe button now mirrors the server-side validation client-side and reports the first blocking problem (including a new "output slot is full" message) instead of failing silently — the server checks remain authoritative and unchanged.
+- The spell-name box now ticks properly (cursor blink) and survives window resizes without losing typed text.
+- README and CurseForge description updated to match (Spell Loom workflow, Iron's "any tiered spellbook" wording from the 3.0.1 tag fix, requirements table).
 
 ### Fixed config screen readability/blur issue
 

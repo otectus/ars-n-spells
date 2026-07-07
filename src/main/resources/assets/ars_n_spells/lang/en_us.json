@@ -4,7 +4,6 @@
   "ritual.ars_n_spells.mana_well": "Ritual of the Mana Well",
   "ritual.ars_n_spells.mana_infusion": "Ritual of Mana Infusion",
   "ritual.ars_n_spells.spell_transcription": "Ritual of Spell Transcription",
-
   "ritual.ars_n_spells.spell_transcription.error.empty_range": "Spell Transcription: drop a source and a blank target item within three blocks of the brazier.",
   "ritual.ars_n_spells.spell_transcription.error.inscribed_items": "Spell Transcription: already-inscribed item(s) in range (%1$s). Uninscribe first, or remove them before re-running the ritual.",
   "ritual.ars_n_spells.spell_transcription.error.no_source": "Spell Transcription: no spell source found. Drop a filled Ars Nouveau spell parchment, focus, or spellbook, or an Iron's Spellbooks scroll.",
@@ -16,7 +15,6 @@
   "ritual.ars_n_spells.spell_transcription.success": "Spell inscribed: %1$s",
   "ritual.ars_n_spells.spell_transcription.source.ars": "Ars Nouveau spell",
   "ritual.ars_n_spells.spell_transcription.source.irons": "%1$s (level %2$s)",
-
   "item.ars_n_spells.spellbook_binding": "Spellbook Binding",
   "item.ars_n_spells.transcribed_ars_scroll": "Ars Scroll: %1$s",
   "ars_n_spells.ritual_desc.spellbook_binding": "Binds an exported Ars spell carried by a real Iron's Spellbooks scroll onto a real Iron's spell book. Drop exactly one carrier scroll (made with Spell Transcription or /ans export_to_irons_scroll) and exactly one spell book within three blocks of the brazier. The book then carries the Ars spell alongside its native spells; right-click to cast and sneak-right-click to cycle.",
@@ -32,7 +30,6 @@
   "ritual.ars_n_spells.spellbook_binding.error.disabled": "Spellbook Binding: binding Ars spells onto Iron's spell books is disabled in the server config.",
   "ritual.ars_n_spells.spellbook_binding.error.book_full": "Spellbook Binding: %1$s already holds the maximum of %2$s Ars spells.",
   "ritual.ars_n_spells.spellbook_binding.success": "Ars spell bound to spell book: %1$s",
-
   "item.ars_n_spells.spell_uninscription": "Spell Uninscription",
   "ars_n_spells.ritual_desc.spell_uninscription": "Strips the cross-cast inscription from a single inscribed item, leaving it bit-identical to a fresh blank target. Drop exactly one inscribed item within three blocks of the brazier; sources or other blank items in range will cause the ritual to refuse rather than risk stripping the wrong stack.",
   "ritual.ars_n_spells.spell_uninscription": "Ritual of Spell Uninscription",
@@ -43,7 +40,6 @@
   "ritual.ars_n_spells.spell_uninscription.error.multiple_inscribed": "Spell Uninscription found %1$s inscribed items (%2$s). Place exactly one inscribed item.",
   "ritual.ars_n_spells.spell_uninscription.success": "Spell uninscribed: %1$s",
   "config.ars_n_spells.title": "Ars 'n' Spells Configuration",
-
   "commands.ans.mana.setdefault.success": "Default max mana set to %s",
   "commands.ans.mana.getdefault": "Current default max mana: %s",
   "commands.ans.debug.enabled": "Debug mode enabled",
@@ -57,7 +53,6 @@
   "commands.ans.mode.current": "Current mana unification mode: %s",
   "commands.ans.mode.set.success": "Mana unification mode set to %s (now active: %s)",
   "commands.ans.mode.set.invalid": "Unknown mode '%s'. Valid: iss_primary, ars_primary, hybrid, separate, disabled",
-
   "commands.ans.irons_required": "This command requires Iron's Spellbooks to be installed.",
   "commands.ans.export.not_player": "This command must be run by a player.",
   "commands.ans.export.no_ars_spell": "Hold a filled Ars Nouveau spell (parchment, focus, or spellbook) in your main hand.",
@@ -68,26 +63,20 @@
   "commands.ans.bind.duplicate": "That spell book already carries this Ars spell.",
   "commands.ans.bind.failed": "Could not bind the Ars spell onto the spell book.",
   "commands.ans.bind.success": "Bound the Ars spell onto the spell book.",
-
   "tooltip.ars_n_spells.cross_spell.header": "Inscribed Spells",
   "tooltip.ars_n_spells.cross_spell.entry": "%1$s/%2$s: %3$s",
   "tooltip.ars_n_spells.cross_spell.ars_generic": "Ars Nouveau spell",
   "tooltip.ars_n_spells.cross_spell.cycle_hint": "Sneak-right-click to cycle",
   "tooltip.ars_n_spells.cross_spell.cast_hint": "Right-click to cast",
-
   "message.ars_n_spells.lp.consumed": "Consumed %s LP",
   "message.ars_n_spells.lp.insufficient": "Insufficient LP - Spell Cancelled",
   "message.ars_n_spells.lp.death": "DEATH: Insufficient LP (%s LP required)",
   "message.ars_n_spells.lp.scroll_cancelled": "Insufficient LP - Scroll Cancelled",
-
   "message.ars_n_spells.aura.consumed": "Consumed %s Aura (%s remaining)",
   "message.ars_n_spells.aura.insufficient": "Insufficient Aura: Need %s, have %s",
-
   "message.ars_n_spells.mana.insufficient": "Not Enough Mana: Need %s, have %s",
   "message.ars_n_spells.lp.insufficient_need": "Insufficient Life Points: Need %s LP",
-
   "message.ars_n_spells.ring_conflict": "Ring conflict: Cursed Ring and Virtue Ring cancel each other - using normal mana",
-
   "arsnspells.crosscast.invalid.index_out_of_range": "Cross-cast failed: selected spell index is out of range.",
   "arsnspells.crosscast.invalid.empty_payload": "Cross-cast failed: this item carries no inscribed spells.",
   "arsnspells.crosscast.invalid.spell_type": "Cross-cast failed: the inscribed spell's type could not be resolved.",
@@ -96,7 +85,6 @@
   "arsnspells.crosscast.invalid.iron_id": "Cross-cast failed: the Iron's spell id is missing or malformed.",
   "arsnspells.crosscast.invalid.iron_level": "Cross-cast failed: the Iron's spell level is invalid.",
   "arsnspells.crosscast.invalid.iron_unresolved": "Cross-cast failed: that Iron's spell is not installed.",
-
   "spell.ars_n_spells.ars_cross_1": "Ars Spell",
   "spell.ars_n_spells.ars_cross_2": "Ars Spell",
   "spell.ars_n_spells.ars_cross_3": "Ars Spell",
@@ -105,7 +93,6 @@
   "spell.ars_n_spells.ars_cross_6": "Ars Spell",
   "spell.ars_n_spells.ars_cross_7": "Ars Spell",
   "spell.ars_n_spells.ars_cross_8": "Ars Spell",
-
   "block.ars_n_spells.spell_loom": "Spell Loom",
   "container.ars_n_spells.spell_loom": "Spell Loom",
   "ars_n_spells.spell_loom.source_slot": "Ars spell source",
@@ -119,6 +106,14 @@
   "ars_n_spells.spell_loom.error.no_scroll": "Place a blank Iron's scroll.",
   "ars_n_spells.spell_loom.error.irons_missing": "Iron's Spellbooks is not installed; cannot make an Iron's scroll.",
   "ars_n_spells.spell_loom.error.failed": "Could not inscribe this spell onto the scroll.",
+  "ars_n_spells.spell_loom.tooltip.source_slot": "Ars spell source: a filled spell parchment, caster focus, or Ars spellbook",
+  "ars_n_spells.spell_loom.tooltip.scroll_slot": "Blank Iron's Spellbooks scroll (not yet inscribed)",
+  "ars_n_spells.spell_loom.tooltip.output_slot": "The inscribed carrier scroll appears here",
+  "ars_n_spells.spell_loom.tooltip.preview": "Spell wheel preview — Nature: %1$s, Icon: %2$s",
+  "ars_n_spells.spell_loom.tooltip.nature": "Cycle the nature: tints the wheel entry and its fallback icon",
+  "ars_n_spells.spell_loom.tooltip.icon": "Cycle the icon symbol shown in Iron's spell wheel",
+  "ars_n_spells.spell_loom.tooltip.inscribe": "Inscribe the Ars spell onto the blank scroll",
+  "ars_n_spells.spell_loom.error.output_full": "Clear the output slot first.",
   "ars_n_spells.nature.arcane": "Arcane",
   "ars_n_spells.nature.fire": "Fire",
   "ars_n_spells.nature.ice": "Ice",

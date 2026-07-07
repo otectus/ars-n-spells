@@ -1,8 +1,16 @@
 # Ars 'n' Spells
 
-**Ars 'n' Spells** bridges [Ars Nouveau](https://www.curseforge.com/minecraft/mc-mods/ars-nouveau) and [Iron's Spells 'n Spellbooks](https://www.curseforge.com/minecraft/mc-mods/irons-spells-n-spellbooks) into one seamless magic experience. Unify your mana, share progression between spell systems, and scale your power across both mods — all fully configurable.
+**Ars 'n' Spells** bridges [Ars Nouveau](https://www.curseforge.com/minecraft/mc-mods/ars-nouveau) and [Iron's Spells 'n Spellbooks](https://www.curseforge.com/minecraft/mc-mods/irons-spells-n-spellbooks) into one seamless magic experience. Unify your mana, share progression between spell systems, scale your power across both mods — and even weave Ars spells into real Iron's spellbooks, cast straight from Iron's native spell wheel. All fully configurable.
 
 Works with **Minecraft 1.20.1** on **Forge**.
+
+---
+
+## What's new in 3.0.x
+
+- **The Spell Loom** — a new workstation that exports any Ars Nouveau spell onto a real Iron's scroll, with a name, nature, and icon of your choosing.
+- **Spellbook Binding** — bind exported scrolls into real Iron's spellbooks; the Ars spell appears as its **own entry in Iron's native spell-selection wheel** (up to 8 per book).
+- **3.0.1 hardening** — the Spell Transcription and Spellbook Binding tablets are craftable again with Iron's installed, LP toggles are honored consistently everywhere, the config screen got a full readability rework (with a proper read-only mode on servers), and a startup crash on Iron's-less installs is fixed.
 
 ---
 
@@ -11,8 +19,8 @@ Works with **Minecraft 1.20.1** on **Forge**.
 | Mod | Required? |
 |-----|-----------|
 | **Ars Nouveau** (4.12.7+) | Yes |
-| **Iron's Spells 'n Spellbooks** (3.15.x+) | No — falls back to native Ars behavior if absent |
-| **Covenant of the Seven** (Sanctified Legacy) | No — enables LP and aura ring systems |
+| **Iron's Spells 'n Spellbooks** (3.15.0 – 3.x) | No — falls back to native Ars behavior if absent |
+| **Covenant of the Seven** (Sanctified Legacy) | No — enables LP and aura ring systems (2.2.6 recommended for the aura HUD) |
 | **Blood Magic** | No — optional LP source for Ring of Seven Curses |
 | **Apotheosis** + **Apothic Curios** | No — lets affix/socket mana stats on curios feed the unified pool |
 
@@ -32,11 +40,11 @@ The core of Ars 'n' Spells: **five configurable modes** that control how the two
 | **Separate** | Independent pools. Cross-mod casts split costs between both (configurable split). |
 | **Disabled** | No integration — each mod uses its own pool. |
 
-Conversion rates between the two mana systems are fully configurable.
+Conversion rates between the two mana systems are fully configurable, and cross-system mana **regen** is unit-converted properly (Iron's percentage regen vs Ars flat regen) so stacked regen gear never spirals out of control.
 
 The mod automatically hides the redundant mana bar so your HUD stays clean.
 
-**Changing the mode** (as of 2.0.1, applied live, no restart): in singleplayer, open Mods → Ars 'n' Spells → Config and click the **Mana Mode** row to cycle it; server operators can run `/ans mode set <mode>`; or edit the config file directly. Confirm the active mode with `/ans mode`.
+**Changing the mode** (applied live, no restart): in singleplayer, open Mods → Ars 'n' Spells → Config and click the **Mana Mode** row to cycle it; server operators can run `/ans mode set <mode>`; or edit the config file directly. Confirm the active mode with `/ans mode`.
 
 ---
 
@@ -51,13 +59,13 @@ The mod automatically hides the redundant mana bar so your HUD stays clean.
 
 ## Resonance
 
-When your mana is nearly full (above 95% by default), you gain a **Resonance bonus** that boosts Iron's spell damage. A reward for mana-efficient play.
+When your mana is nearly full (above 95% by default), you gain a **Resonance bonus** that boosts spell damage. A reward for mana-efficient play. Configurable per mod, with adjustable strength, linger duration, and a damage cap.
 
 ---
 
 ## Source Jar Synergy
 
-Standing near Ars Nouveau Source Jars passively boosts Iron's mana regeneration. The bonus is configurable via `source_jar_synergy_multiplier` (default 5.0). The scan is position-cached for performance — it only re-scans when you move.
+Standing near Ars Nouveau Source Jars passively boosts your mana regeneration. The bonus is configurable via `source_jar_synergy_multiplier` (default 5.0), with tunable scan interval and radius plus a dedicated off switch (`enable_source_jar_synergy`). The scan is position-cached for performance and never force-loads chunks.
 
 ---
 
@@ -74,7 +82,7 @@ Cast spells from *either* mod using items from the *other* mod through a tablet-
 
 ### Spell Transcription — bind a foreign spell onto an item
 
-1. **Craft the Spell Transcription tablet.** Reagent: a novice Ars Nouveau spellbook. Pedestals: an Iron's Spellbooks spellbook, an archwood log, and a source gem block. Costs 2000 source.
+1. **Craft the Spell Transcription tablet.** Reagent: a novice Ars Nouveau spellbook. Pedestals: any tiered Iron's spellbook, an archwood log, and a source gem block. Costs 2000 source.
 2. **Set up the brazier.** Place the tablet on a Ritual Brazier and drop two items within ~3 blocks:
    - exactly one **source** — a filled Ars Nouveau spell parchment, focus, or spellbook, or an Iron's Spellbooks scroll
    - exactly one blank **target** item to receive the inscription
@@ -93,15 +101,19 @@ If you change your mind, the **Spell Uninscription** ritual returns an inscribed
 
 The uninscribe ritual works without Iron's Spellbooks loaded, so legacy inscribed items can still be cleaned up after Iron's is removed.
 
-### Export to Iron's scrolls & spellbooks — *new in 3.0.0*
+---
 
-Take an Ars Nouveau spell out onto a **real Iron's scroll**, then bind it into a **real Iron's spellbook** — and still cast it through the cross-cast pipeline. The Ars spell rides along as an Ars 'n' Spells sidecar on the real Iron item, coexisting with Iron's own spell container instead of being forced into Iron's registry-slot model, so nothing about the spell is lost.
+## The Spell Loom — Export Ars Spells into Iron's Spellbooks *(3.0.0)*
 
-1. **Export.** Hold an Ars spell source (parchment, focus, or spellbook) and run `/ans export_to_irons_scroll`. You get a real Iron's scroll carrying the spell, with a tooltip showing what's embedded.
-2. **Bind.** Hold the scroll and an Iron's spellbook and run `/ans bind_scroll_to_irons_book`, or use the **Spellbook Binding** ritual (its apparatus tablet appears only when Iron's is installed). The scroll is consumed and the spell is appended to the book; re-binding the same spell is rejected (dedup by spell payload).
-3. **Cast.** Because the bound spell isn't in Iron's native spell wheel, the spellbook tooltip shows the embedded spell(s), the active index, and cast/cycle hints. Right-click to cast, sneak-right-click to cycle.
+Design a spell with Ars Nouveau's tools, weave it onto a **real Iron's scroll** at the Spell Loom, bind it into a **real Iron's spellbook** — and cast it from **Iron's own native spell wheel**, right alongside your Iron's spells. The Ars spell rides as an Ars 'n' Spells sidecar on the real Iron item, so the book's own Iron's spells are never touched. This leg requires Iron's Spellbooks.
 
-This leg requires Iron's Spellbooks. Any existing Iron's spells on the book are left untouched.
+1. **Weave.** Craft the **Spell Loom** (gold ingot, 2× lapis, a book, and 3× obsidian on a crafting table) and right-click it. Drop your Ars spell source (parchment, focus, or spellbook) and a **blank Iron's scroll** into the slots, then give your spell a **name**, pick a **nature**, choose an **icon**, and press **Inscribe**. Out comes a real Iron's scroll carrying your spell. *(Ops can also use `/ans export_to_irons_scroll` for a quick, metadata-free export.)*
+2. **Bind.** Run the **Spellbook Binding** ritual (its apparatus tablet appears only when Iron's is installed — 2500 source) with the scroll and an Iron's spellbook near the brazier, or hold both and run `/ans bind_scroll_to_irons_book`. The scroll is consumed and the spell is appended to the book with your chosen name and icon; re-binding the same spell is rejected (dedup by spell payload).
+3. **Cast.** Your Ars spell shows up as its **own entry in Iron's native spell-selection wheel**. Select it and right-click like any Iron's spell — it casts the real Ars spell through the full cross-cast pipeline (mana mode, cost multiplier, scaling, cooldowns). Up to **8** Ars spells per book, and your native Iron's spells cast exactly as before.
+
+Pack authors: gate the whole feature with `allow_ars_spells_in_irons_spellbooks`, or cap spells per book with `max_ars_cross_spells_per_irons_spellbook`.
+
+*(Generic inscribed items that aren't Iron's spellbooks still cast via right-click, with sneak-right-click to cycle.)*
 
 ---
 
@@ -127,11 +139,11 @@ If you run out of LP:
 - **Safe Mode** *(default)* — Spell is cancelled, you take minor damage (you will never die from this).
 - **Death Mode** — The spell casts... but it kills you.
 
-LP costs scale with configurable base multipliers and per-tier scaling. Blasphemy LP discounts are independently configurable via `blasphemy_lp_discount` (default 85%).
+LP costs scale with configurable base multipliers, per-tier scaling for Ars glyphs, and per-level plus rarity scaling for Iron's spells. The whole system has a master toggle (`enable_lp_system`) that every LP path honors — scrolls included.
 
 ### Ring of Seven Virtues — Aura Casting
 
-Wearing the Virtue Ring converts mana costs into **Aura**, a custom resource that regenerates over time (default: 10/sec, 1000 max pool). Aura persists through death and dimension changes. If you run dry, the spell simply fails. Blasphemy aura discounts are independently configurable via `blasphemy_aura_discount` (default 85%).
+Wearing the Virtue Ring converts your **Ars** mana costs into **Aura** — Covenant of the Seven's own regenerating resource, complete with its own HUD bar. Covenant owns the pool, regen, and persistence; Ars 'n' Spells simply maps the mana cost onto it, scaled by `ars_virtue_aura_multiplier`. Iron's spells under the ring are handled natively by Covenant. If you run dry, the spell simply fails.
 
 **Ring Conflict:** Wearing both rings at the same time cancels both effects — you'll use normal mana instead, and receive a warning notification.
 
@@ -142,13 +154,13 @@ Thirteen Blasphemy curio variants (Fire, Ice, Lightning, Holy, Ender, Blood, Evo
 - **15% base mana discount** on all spells
 - **+10% bonus** when the spell's school matches the curio's element (25% total)
 
-Discounts stack multiplicatively with ring costs. A fully kitted setup can reach up to **40% off**.
+Discounts stack multiplicatively with ring costs, and a matching Blasphemy also deeply discounts LP costs (`blasphemy_lp_discount`, default 85% off).
 
 ---
 
 ## Scroll Cost Enforcement
 
-Iron's Spellbooks scrolls now respect your resource costs:
+Iron's Spellbooks scrolls respect your resource costs:
 
 | Mode | Behavior |
 |------|----------|
@@ -160,21 +172,19 @@ Iron's Spellbooks scrolls now respect your resource costs:
 
 ## Configuration
 
-Everything is configurable via the per-world server config `<world>/serverconfig/ars_n_spells-server.toml` (changed from `config/ars_n_spells-common.toml` in 2.0.0). Major options include:
+Everything is configurable via the per-world server config `<world>/serverconfig/ars_n_spells-server.toml` (server-authoritative and auto-synced — on multiplayer the in-game config screen is read-only). Major options include:
 
-- **Master toggles** for mana unification, resonance, cooldowns, progression, and affinity
-- **Mana conversion rates** and dual-cost split percentages
-- **LP system** — source mode, death penalty, base/tier multipliers, minimum costs
-- **Aura system** — max pool, regen rate, tier multipliers
-- **Curio discounts** — base discount, matching bonus, stacking behavior
+- **Master toggles** for mana unification, resonance, cooldowns, progression, affinity, LP, and aura
+- **Mana conversion rates**, dual-cost split percentages, and cross-system regen conversion
+- **LP system** — source mode, death penalty, base/tier/rarity multipliers, minimum costs
+- **Aura system** — master toggle and mana→aura cost multiplier (the pool itself belongs to Covenant)
+- **Curio discounts** — base discount, matching-school bonus, Blasphemy LP discount
 - **Curio attribute bridge** — `read_curio_attribute_modifiers` (default on): mirror Apotheosis/Apothic Curios affix & socket mana stats across the unified pool
-- **Blasphemy ring discounts** — separate LP and aura discount rates
 - **Spell scaling** — power cap for Iron's attribute stacking
-- **Source Jar synergy** — proximity regen multiplier
-- **Rituals** — configurable Mana Infusion amount
+- **Source Jar synergy** — off switch, regen multiplier, scan interval and radius
+- **Cross-casting** — cost multiplier, spellbook-binding toggle, and per-book spell cap
 - **Scroll cost mode**
-- **Performance** — Source Jar cache move threshold
-- **Debug mode** for troubleshooting
+- **Debug mode** with end-to-end cross-cast tracing for troubleshooting
 
 All options ship with balanced defaults — install and play, or fine-tune to your liking.
 
@@ -184,22 +194,25 @@ All options ship with balanced defaults — install and play, or fine-tune to yo
 
 | Command | Permission | Description |
 |---------|------------|-------------|
-| `/ans mana setdefault <value>` | Op 2 | Set the default max mana |
-| `/ans mana getdefault` | -- | View the current default max mana |
-| `/ans debug` | Op 2 | Toggle debug mode at runtime |
-| `/ans info <player>` | Op 2 | Show mana, aura, resonance, and ring status |
 | `/ans mode` | -- | Show current mana unification mode |
 | `/ans mode set <mode>` | Op 2 | Switch the mana unification mode live (no restart) |
-| `/ans export_to_irons_scroll` | Op 2 | Export the held Ars spell onto a real Iron's scroll (3.0.0) |
-| `/ans bind_scroll_to_irons_book` | Op 2 | Bind a held exported scroll into a held Iron's spellbook (3.0.0) |
+| `/ans mana getdefault` | -- | View the current default max mana |
+| `/ans mana setdefault <value>` | Op 2 | Set the default max mana |
+| `/ans info <player>` | Op 2 | Show mana, aura, resonance, and ring status |
+| `/ans debug` | Op 2 | Toggle debug mode at runtime |
 | `/ans aura` | -- | Show your own current aura |
+| `/ans export_to_irons_scroll` | Op 2 | Export the held Ars spell onto a real Iron's scroll — the **Spell Loom** is the survival route |
+| `/ans bind_scroll_to_irons_book` | Op 2 | Bind a held exported scroll into a held Iron's spellbook |
 
 ---
 
 ## FAQ / Troubleshooting
 
 **Q: Ars mana isn't changing in ISS Primary mode.**
-A: Make sure Iron's Spells 'n Spellbooks (3.15.x+) is installed. Check logs for mixin load failures.
+A: Make sure Iron's Spells 'n Spellbooks (3.15.0+) is installed. Check logs for mixin load failures.
+
+**Q: I can't craft the Spell Transcription or Spellbook Binding tablet.**
+A: Fixed in 3.0.1 — update the mod. The recipes accept any tiered Iron's spellbook.
 
 **Q: I see two mana bars.**
 A: Verify your mana mode is set correctly. Check for overlay conflicts from other UI mods.

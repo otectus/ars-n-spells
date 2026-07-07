@@ -20,6 +20,24 @@ import net.minecraftforge.items.SlotItemHandler;
  * exposes the slots and validates reach.
  */
 public class SpellLoomMenu extends AbstractContainerMenu {
+    // ---- Layout constants (single source of truth for slot geometry; the
+    // screen derives every dependent coordinate from these). The GUI is
+    // 176x208: taller than a vanilla chest so the name field, recipe row, and
+    // two button rows fit above the player inventory without overlap.
+    public static final int GUI_WIDTH = 176;
+    public static final int GUI_HEIGHT = 208;
+    public static final int SLOT_SIZE = 18;
+    /** Working-slot columns (16px inner boxes at these x positions). */
+    public static final int SLOT_SOURCE_X = 44;
+    public static final int SLOT_SCROLL_X = 80;
+    public static final int SLOT_OUTPUT_X = 134;
+    /** Working-slot row. */
+    public static final int RECIPE_ROW_Y = 40;
+    /** Player inventory: vanilla formulas for a 208-tall container. */
+    public static final int INV_LEFT = 8;
+    public static final int INV_TOP = GUI_HEIGHT - 82;   // 126
+    public static final int HOTBAR_Y = GUI_HEIGHT - 24;  // 184
+
     private final SpellLoomBlockEntity blockEntity;
     private final ContainerLevelAccess access;
 
@@ -35,9 +53,12 @@ public class SpellLoomMenu extends AbstractContainerMenu {
             : ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
 
         if (be != null) {
-            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SOURCE, 44, 35));
-            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SCROLL, 80, 35));
-            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_OUTPUT, 134, 35) {
+            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SOURCE,
+                SLOT_SOURCE_X, RECIPE_ROW_Y));
+            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SCROLL,
+                SLOT_SCROLL_X, RECIPE_ROW_Y));
+            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_OUTPUT,
+                SLOT_OUTPUT_X, RECIPE_ROW_Y) {
                 @Override
                 public boolean mayPlace(ItemStack stack) {
                     return false;
@@ -62,11 +83,12 @@ public class SpellLoomMenu extends AbstractContainerMenu {
     private void addPlayerInventory(Inventory inv) {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inv, col + row * 9 + 9, 8 + col * 18, 84 + row * 18));
+                addSlot(new Slot(inv, col + row * 9 + 9,
+                    INV_LEFT + col * SLOT_SIZE, INV_TOP + row * SLOT_SIZE));
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inv, col, 8 + col * 18, 142));
+            addSlot(new Slot(inv, col, INV_LEFT + col * SLOT_SIZE, HOTBAR_Y));
         }
     }
 
