@@ -18,6 +18,9 @@ public class AffinityData {
      */
     private final Map<AffinityType, Integer> levels = new HashMap<>();
 
+    /** Fractional decay carried between decay intervals; see {@link DecayAccumulator}. */
+    private final DecayAccumulator decayRemainders = new DecayAccumulator();
+
     public int getLevel(AffinityType type) {
         return levels.getOrDefault(type, 0);
     }
@@ -30,10 +33,25 @@ public class AffinityData {
         setLevel(type, getLevel(type) + amount);
     }
 
+    /**
+     * Accumulates fractional decay for a school and returns the whole number of
+     * points that should be removed now (0 on most intervals). See
+     * {@link DecayAccumulator#accrue}.
+     */
+    public int accrueDecay(AffinityType type, double amount) {
+        return decayRemainders.accrue(type, amount);
+    }
+
+    /** Drops any carried fractional decay, e.g. once a school reaches level 0. */
+    public void clearDecayRemainder(AffinityType type) {
+        decayRemainders.clear(type);
+    }
+
     public void saveToNBT(CompoundTag nbt) {
         CompoundTag tag = new CompoundTag();
         levels.forEach((type, level) -> tag.putInt(type.name(), level));
         nbt.put("AffinityLevels", tag);
+        decayRemainders.saveToNBT(nbt, "AffinityDecayRemainders");
     }
 
     public void loadFromNBT(CompoundTag nbt) {
@@ -47,5 +65,6 @@ public class AffinityData {
                 }
             }
         }
+        decayRemainders.loadFromNBT(nbt, "AffinityDecayRemainders");
     }
 }

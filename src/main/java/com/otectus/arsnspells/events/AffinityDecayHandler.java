@@ -15,10 +15,17 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
  * to 1.9.0, was promised by config but never actually implemented.
  *
  * <p>Decay math: at each interval (default 60s = 1200 ticks), every non-zero
- * affinity loses {@code level * AFFINITY_DECAY_RATE * (interval / 24000)}.
- * With defaults (rate=0.01, interval=1200), each tick window strips ~0.05% of
- * the current level — so a maxed-out (level 100) school takes roughly 100
- * in-game days of pure inactivity to fully decay.
+ * affinity accrues {@code level * AFFINITY_DECAY_RATE * (interval / 24000)}
+ * fractional decay, and loses a point only once a whole point has accumulated
+ * (the sub-1.0 remainder persists in {@link AffinityData} NBT). With defaults
+ * (rate=0.01, interval=1200) a level-100 school accrues 0.05/interval — one
+ * point per ~20 real minutes — and the rate slows proportionally as the level
+ * drops, so low levels linger for a long tail rather than draining flat.
+ *
+ * <p>Pre-3.0.2 bug: the old integer math floored the per-interval amount and
+ * then clamped it to a minimum of 1, silently turning the documented
+ * proportional curve into a flat 1 point/interval (~20x faster; a maxed
+ * school emptied in ~5 in-game days).
  *
  * <p>Iron's-independent: registered unconditionally.
  */
@@ -59,12 +66,16 @@ public class AffinityDecayHandler {
                 if (level <= 0) {
                     continue;
                 }
-                int decay = (int) Math.max(1, Math.floor(level * perInterval));
-                int newLevel = Math.max(0, level - decay);
-                if (newLevel != level) {
-                    data.setLevel(type, newLevel);
-                    PacketHandler.sendToClient(new AffinitySyncPacket(type, newLevel), player);
+                int decay = data.accrueDecay(type, level * perInterval);
+                if (decay <= 0) {
+                    continue;
                 }
+                int newLevel = Math.max(0, level - decay);
+                data.setLevel(type, newLevel);
+                if (newLevel <= 0) {
+                    data.clearDecayRemainder(type);
+                }
+                PacketHandler.sendToClient(new AffinitySyncPacket(type, newLevel), player);
             }
         });
     }
