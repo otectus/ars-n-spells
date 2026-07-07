@@ -27,11 +27,21 @@ public class ProgressionData {
 
     /**
      * Calculate the transient attribute bonus for a school.
-     * Growth: 0.1% per cast, capped at 25%.
+     * Growth and cap are config-driven (audit F4): defaults 0.1% per cast,
+     * capped at 25%. The bonus is derived, never stored, so config changes
+     * rescale existing players immediately.
      */
     public double getBonusForSchool(String school) {
         int casts = getCastCount(school);
-        return Math.min(0.25, casts * 0.001);
+        double perCast = 0.001;
+        double cap = 0.25;
+        try {
+            perCast = com.otectus.arsnspells.config.AnsConfig.PROGRESSION_BONUS_PER_CAST.get();
+            cap = com.otectus.arsnspells.config.AnsConfig.PROGRESSION_BONUS_CAP.get();
+        } catch (IllegalStateException configNotReady) {
+            // Config not loaded yet (very early tick) — use the historical defaults.
+        }
+        return Math.min(cap, casts * perCast);
     }
 
     public Map<String, Integer> getAllCastCounts() {

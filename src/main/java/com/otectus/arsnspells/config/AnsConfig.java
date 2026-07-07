@@ -76,6 +76,8 @@ public class AnsConfig {
     // ProgressionData.getBonusForSchool (min(0.25, casts * 0.001)); making it
     // configurable again is deliberate feature work, not remediation.
     public static final ForgeConfigSpec.BooleanValue ENABLE_CROSS_MOD_PROGRESSION;
+    public static final ForgeConfigSpec.DoubleValue PROGRESSION_BONUS_PER_CAST;
+    public static final ForgeConfigSpec.DoubleValue PROGRESSION_BONUS_CAP;
 
     // ========================================
     // AFFINITY SYSTEM
@@ -134,6 +136,7 @@ public class AnsConfig {
     // Master on/off switch for the aura path; mirrors ENABLE_LP_SYSTEM for the Cursed Ring.
     public static final ForgeConfigSpec.BooleanValue ENABLE_VIRTUE_AURA_SYSTEM;
     public static final ForgeConfigSpec.DoubleValue ARS_VIRTUE_AURA_MULTIPLIER;
+    public static final ForgeConfigSpec.ConfigValue<String> AURA_FAILURE_MODE;
 
     // ========================================
     // SCROLL COST SYSTEM
@@ -420,7 +423,19 @@ public class AnsConfig {
         ENABLE_CROSS_MOD_PROGRESSION = BUILDER
             .comment("Allow Ars spells to grant ISS XP and vice versa")
             .define("enable_cross_mod_progression", true);
-        
+
+        PROGRESSION_BONUS_PER_CAST = BUILDER
+            .comment("Attribute bonus gained per cast in a school (audit F4 — was hardcoded 0.001).",
+                     "0.001 = +0.1% per cast. The bonus is transient (derived from the persistent",
+                     "cast count), so changing this immediately rescales every player's bonus.")
+            .defineInRange("progression_bonus_per_cast", 0.001, 0.0, 0.1);
+
+        PROGRESSION_BONUS_CAP = BUILDER
+            .comment("Cap on the per-school progression attribute bonus (audit F4 — was hardcoded 0.25).",
+                     "0.25 = +25% maximum, reached after bonus_cap / bonus_per_cast casts",
+                     "(250 casts at defaults).")
+            .defineInRange("progression_bonus_cap", 0.25, 0.0, 2.0);
+
         BUILDER.pop();
 
         // ========================================
@@ -646,6 +661,18 @@ public class AnsConfig {
                      "1.0 = aura cost equals mana cost. Tune up to make the Virtue Ring path more",
                      "expensive than vanilla casting, or down to make it cheaper.")
             .defineInRange("ars_virtue_aura_multiplier", 1.0, 0.1, 10.0);
+
+        AURA_FAILURE_MODE = BUILDER
+            .comment("What happens to Virtue Ring aura-cost checks when the Covenant/Nature's Aura",
+                     "reflection bridge is unavailable (e.g. an untested Covenant update changed",
+                     "its internals):",
+                     "  open   - allow the cast without an aura check (availability over economy;",
+                     "           casts are effectively free while degraded — pre-3.0.2 behavior)",
+                     "  closed - block Virtue Ring casts until the bridge works again",
+                     "Either way the first degraded decision per session is logged at WARN.")
+            .define("aura_failure_mode", "open",
+                o -> o instanceof String s
+                    && (s.equalsIgnoreCase("open") || s.equalsIgnoreCase("closed")));
 
         BUILDER.pop();
 

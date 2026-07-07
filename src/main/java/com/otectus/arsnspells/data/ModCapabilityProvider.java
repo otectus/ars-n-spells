@@ -14,6 +14,17 @@ import org.jetbrains.annotations.Nullable;
 
 @Mod.EventBusSubscriber(modid = "ars_n_spells")
 public class ModCapabilityProvider implements ICapabilitySerializable<CompoundTag> {
+
+    /**
+     * Audit E3: schema version stamped into every serialized capability tag.
+     * Readers currently accept anything (all shipped schemas are version <= 1
+     * and absence means "pre-3.0.2"); the field exists so a future format change
+     * has something to branch on instead of silently misreading old keys.
+     * Bump this ONLY together with explicit migration logic in deserializeNBT.
+     */
+    public static final int DATA_VERSION = 1;
+    private static final String DATA_VERSION_KEY = "AnsDataVersion";
+
     private final AffinityData affinityData = new AffinityData();
     private final CooldownData cooldownData = new CooldownData();
     private final ProgressionData progressionData = new ProgressionData();
@@ -33,6 +44,7 @@ public class ModCapabilityProvider implements ICapabilitySerializable<CompoundTa
     @Override
     public CompoundTag serializeNBT() {
         CompoundTag nbt = new CompoundTag();
+        nbt.putInt(DATA_VERSION_KEY, DATA_VERSION);
         affinityData.saveToNBT(nbt);
         cooldownData.save(nbt);
         progressionData.saveToNBT(nbt);
@@ -41,6 +53,9 @@ public class ModCapabilityProvider implements ICapabilitySerializable<CompoundTa
 
     @Override
     public void deserializeNBT(CompoundTag nbt) {
+        // Version 0 (key absent, pre-3.0.2) and 1 share the same layout — no
+        // migration needed yet. When DATA_VERSION is bumped, branch here on
+        // nbt.getInt(DATA_VERSION_KEY) BEFORE handing the tag to the data classes.
         affinityData.loadFromNBT(nbt);
         cooldownData.load(nbt);
         progressionData.loadFromNBT(nbt);

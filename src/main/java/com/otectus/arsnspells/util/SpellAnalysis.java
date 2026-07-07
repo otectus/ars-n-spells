@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Central spell analysis utility. Correctly identifies the first effect glyph
@@ -114,13 +115,55 @@ public final class SpellAnalysis {
     }
 
     /**
-     * Derive the spell school from the first effect glyph using keyword analysis
-     * of the registry path. Consolidates logic formerly duplicated in
-     * SanctifiedLegacyCompat.determineSpellSchool and SpellScalingUtil.
+     * Audit F8: explicit school classification for every Ars Nouveau 1.20.1
+     * (4.12.7) effect glyph that has one, keyed by full registry name. Verified
+     * against the pinned jar's GlyphLib. Consulted BEFORE the substring
+     * heuristic so known glyphs classify deterministically; the heuristic
+     * remains only as a fallback for unknown glyphs (other mods, future Ars).
+     *
+     * <p>{@code glyph_firework -> generic} is a deliberate correction: the
+     * substring heuristic matched "fire" inside "firework" and classified a
+     * decorative glyph as fire school. Glyphs absent from this map fall
+     * through to the heuristic and (for current Ars content) resolve to
+     * "generic", matching pre-map behavior.
+     */
+    private static final Map<String, String> KNOWN_GLYPH_SCHOOLS = Map.ofEntries(
+            Map.entry("ars_nouveau:glyph_ignite", "fire"),
+            Map.entry("ars_nouveau:glyph_flare", "fire"),
+            Map.entry("ars_nouveau:glyph_freeze", "ice"),
+            Map.entry("ars_nouveau:glyph_cold_snap", "ice"),
+            Map.entry("ars_nouveau:glyph_lightning", "lightning"),
+            Map.entry("ars_nouveau:glyph_heal", "holy"),
+            Map.entry("ars_nouveau:glyph_light", "holy"),
+            Map.entry("ars_nouveau:glyph_blink", "ender"),
+            Map.entry("ars_nouveau:glyph_ender_inventory", "ender"),
+            Map.entry("ars_nouveau:glyph_fangs", "evocation"),
+            Map.entry("ars_nouveau:glyph_grow", "nature"),
+            Map.entry("ars_nouveau:glyph_harvest", "nature"),
+            Map.entry("ars_nouveau:glyph_wither", "eldritch"),
+            Map.entry("ars_nouveau:glyph_hex", "eldritch"),
+            Map.entry("ars_nouveau:glyph_conjure_water", "aqua"),
+            Map.entry("ars_nouveau:glyph_crush", "geo"),
+            Map.entry("ars_nouveau:glyph_earthshake", "geo"),
+            Map.entry("ars_nouveau:glyph_gust", "wind"),
+            Map.entry("ars_nouveau:glyph_wind_shear", "wind"),
+            Map.entry("ars_nouveau:glyph_firework", "generic"));
+
+    /**
+     * Derive the spell school from the first effect glyph: exact lookup in
+     * {@link #KNOWN_GLYPH_SCHOOLS} first (audit F8), then keyword analysis of
+     * the registry path for unknown glyphs. Consolidates logic formerly
+     * duplicated in SanctifiedLegacyCompat.determineSpellSchool and
+     * SpellScalingUtil.
      */
     public static String deriveSchool(@Nullable AbstractSpellPart effect) {
         if (effect == null || effect.getRegistryName() == null) {
             return "generic";
+        }
+
+        String known = KNOWN_GLYPH_SCHOOLS.get(effect.getRegistryName().toString());
+        if (known != null) {
+            return known;
         }
 
         String path = effect.getRegistryName().getPath().toLowerCase(Locale.ROOT);

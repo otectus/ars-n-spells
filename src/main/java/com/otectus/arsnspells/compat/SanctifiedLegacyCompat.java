@@ -356,12 +356,42 @@ public class SanctifiedLegacyCompat {
         }
     }
 
+    /** Audit D2: log the first degraded aura decision per session so fail-open free casts aren't invisible. */
+    private static final java.util.concurrent.atomic.AtomicBoolean loggedAuraDegraded =
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    /**
+     * Audit D2: the answer {@link #hasEnoughCovenantAura} gives when the reflection
+     * bridge is unavailable. {@code aura_failure_mode = "open"} (default) allows the
+     * cast — availability over economy, casts are effectively free while degraded;
+     * {@code "closed"} blocks Virtue Ring casts until the bridge works again. The
+     * first degraded decision per session logs at WARN so pack makers can see it.
+     */
+    private static boolean degradedAuraAnswer(String reason) {
+        boolean failOpen = true;
+        try {
+            failOpen = !"closed".equalsIgnoreCase(com.otectus.arsnspells.config.AnsConfig.AURA_FAILURE_MODE.get());
+        } catch (Exception ignored) {
+            // Config not loaded yet — keep the historical fail-open default.
+        }
+        if (loggedAuraDegraded.compareAndSet(false, true)) {
+            LOGGER.warn("[ANS] Covenant aura bridge is degraded ({}); aura_failure_mode={} so Virtue Ring "
+                    + "casts are {} until the bridge works again (further occurrences logged at debug)",
+                reason, failOpen ? "open" : "closed", failOpen ? "FREE (no aura check)" : "BLOCKED");
+        } else {
+            LOGGER.debug("[ANS] Covenant aura bridge degraded ({}), fail-{}", reason, failOpen ? "open" : "closed");
+        }
+        return failOpen;
+    }
+
     /**
      * Return true if the player has at least {@code cost} Covenant aura.
      *
-     * <p>Degraded behaviour: when reflection didn't resolve, returns {@code true}
-     * so the cast isn't blocked on an internal failure of ours. The companion
-     * {@link #consumeCovenantAura(Player, int)} then returns false (no payment),
+     * <p>Degraded behaviour: when reflection didn't resolve, the answer comes from
+     * {@code aura_failure_mode} via {@link #degradedAuraAnswer} — {@code "open"}
+     * (default) allows the cast so it isn't blocked on an internal failure of ours;
+     * {@code "closed"} blocks it. When open, the companion
+     * {@link #consumeCovenantAura(Player, int)} returns false (no payment),
      * which is visible because the green HUD doesn't move.
      */
     public static boolean hasEnoughCovenantAura(Player player, int cost) {
@@ -382,7 +412,9 @@ public class SanctifiedLegacyCompat {
         } catch (Throwable t) {
             LOGGER.debug("hasEnoughCovenantAura: triangulate failed", t);
         }
-        if (!covenantAuraReflectionResolved) return true; // degraded: allow
+        if (!covenantAuraReflectionResolved) {
+            return degradedAuraAnswer("aura reflection unresolved");
+        }
 
         try {
             if (clientResourceDataGetCurrentAuraMethod != null) {
@@ -409,7 +441,7 @@ public class SanctifiedLegacyCompat {
         } catch (Throwable t) {
             LOGGER.debug("hasEnoughCovenantAura reflection failed", t);
         }
-        return true; // degraded: don't block on reflection bugs
+        return degradedAuraAnswer("aura reflection call failed");
     }
 
     /**
