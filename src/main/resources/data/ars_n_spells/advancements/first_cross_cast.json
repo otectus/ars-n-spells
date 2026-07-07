@@ -1,0 +1,16 @@
+{
+  "parent": "ars_n_spells:bind_spell",
+  "display": {
+    "icon": { "item": "ars_nouveau:archmage_spell_book" },
+    "title": { "translate": "advancements.ars_n_spells.first_cross_cast.title" },
+    "description": { "translate": "advancements.ars_n_spells.first_cross_cast.description" },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "cross_cast": { "trigger": "minecraft:impossible" }
+  },
+  "requirements": [["cross_cast"]]
+}

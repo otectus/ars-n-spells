@@ -1,0 +1,16 @@
+{
+  "parent": "ars_n_spells:transcribe_spell",
+  "display": {
+    "icon": { "item": "ars_nouveau:novice_spell_book" },
+    "title": { "translate": "advancements.ars_n_spells.bind_spell.title" },
+    "description": { "translate": "advancements.ars_n_spells.bind_spell.description" },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "bound": { "trigger": "minecraft:impossible" }
+  },
+  "requirements": [["bound"]]
+}

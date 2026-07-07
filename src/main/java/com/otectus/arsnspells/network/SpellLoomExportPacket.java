@@ -114,6 +114,7 @@ public class SpellLoomExportPacket {
             items.extractItem(SpellLoomBlockEntity.SLOT_SCROLL, 1, false);
             items.setStackInSlot(SpellLoomBlockEntity.SLOT_OUTPUT, carrier);
             be.setChanged();
+            com.otectus.arsnspells.util.AdvancementUtil.grant(sender, "transcribe_spell");
         });
         ctx.setPacketHandled(true);
     }

@@ -61,15 +61,17 @@ jobs:
             build/test-results/test
 
   # GameTests run as a separate job because they are slower and require the
-  # full ForgeGradle environment. Failures here are advisory in 2.0.0 — the
-  # scaffold lands in this release; the full 7-scenario suite is tracked for
-  # 2.0.1 alongside the structure NBT templates.
+  # full ForgeGradle environment. This job runs the Iron's-LESS profile
+  # (Iron's is compileOnly, so it is absent from the run classpath) and is
+  # BLOCKING (audit E7): it proves the dedicated-server fallback path boots
+  # and all required GameTests pass without Iron's installed. The
+  # Iron's-loaded profile (-PwithIronsRuntimeGameTests) remains a local/manual
+  # run because it needs the CurseMaven runtime jars.
   gametest:
-    name: GameTest server
+    name: GameTest server (Iron's-less)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: build-and-test
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,8 +94,19 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run GameTest server
-        run: ./gradlew runGameTestServer --no-daemon --stacktrace || true
-        # GameTest scaffold runs but full scenarios land in 2.0.1.
+        run: ./gradlew runGameTestServer --no-daemon --stacktrace
+
+      # runGameTestServer exits 0 / BUILD SUCCESSFUL even when the server
+      # crashes at boot, so the gradle exit code alone proves nothing — the
+      # log line "All N required tests passed" is the real success signal.
+      - name: Verify GameTest results
+        run: |
+          if ! grep -q "required tests passed" run/logs/latest.log; then
+            echo "::error::GameTest server did not report success (boot crash or test failure)"
+            tail -n 80 run/logs/latest.log || true
+            exit 1
+          fi
+          grep "required tests passed" run/logs/latest.log
 
       - name: Upload GameTest logs
         if: always()

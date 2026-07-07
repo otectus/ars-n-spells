@@ -171,14 +171,21 @@ public class CrossCastingHandler {
             CrossCastTrace.Stage.DESCRIPTOR_VALIDATED,
             "type", type, "index", index, "spellId", vr.spellId());
 
+        boolean castOk;
         switch (type) {
             case ARS_NOUVEAU:
-                return castArsSpell(player, item, hand, spellData, attemptId);
+                castOk = castArsSpell(player, item, hand, spellData, attemptId);
+                break;
             case IRONS_SPELLBOOKS:
-                return castIronsSpell(player, item, spellData, attemptId);
+                castOk = castIronsSpell(player, item, spellData, attemptId);
+                break;
             default:
                 return false;
         }
+        if (castOk) {
+            com.otectus.arsnspells.util.AdvancementUtil.grant(player, "first_cross_cast");
+        }
+        return castOk;
     }
 
     private static int peekSelectedIndex(ItemStack stack) {

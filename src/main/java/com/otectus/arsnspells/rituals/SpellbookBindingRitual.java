@@ -152,6 +152,13 @@ public class SpellbookBindingRitual extends AbstractRitual {
 
         playBindEffects(level, pos);
         RitualFeedback.success(level, pos, LANG_PREFIX + "success", spellLabel(arsTag));
+
+        // Audit H4: the ritual has no owning player, so credit the nearest one —
+        // rituals are player-initiated and the initiator is standing at the brazier.
+        if (level.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 16.0, false)
+                instanceof net.minecraft.server.level.ServerPlayer nearest) {
+            com.otectus.arsnspells.util.AdvancementUtil.grant(nearest, "bind_spell");
+        }
     }
 
     private void playBindEffects(Level level, BlockPos pos) {

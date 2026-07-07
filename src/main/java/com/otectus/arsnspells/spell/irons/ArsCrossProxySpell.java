@@ -107,6 +107,10 @@ public class ArsCrossProxySpell extends AbstractSpell {
         UUID attemptId = UUID.randomUUID();
         CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "runtime", "ARS_PROXY", "pool", poolId);
-        CrossCastingHandler.castArsSpell(player, book, hand, entry, attemptId);
+        if (CrossCastingHandler.castArsSpell(player, book, hand, entry, attemptId)) {
+            // Audit H4: the native-wheel path bypasses serverHandleCast, so the
+            // advancement is granted here too (grant() is idempotent).
+            com.otectus.arsnspells.util.AdvancementUtil.grant(player, "first_cross_cast");
+        }
     }
 }

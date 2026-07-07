@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed: affinity decay ran ~20x faster than documented (audit D1)
+
+- `AffinityDecayHandler` floored the per-interval proportional amount and clamped it to a minimum of 1, so every non-zero school lost a flat point per interval regardless of level — a maxed school emptied in ~5 in-game days instead of the documented proportional curve. Fractional decay now accrues in a per-school residual ([DecayAccumulator.java](src/main/java/com/otectus/arsnspells/data/DecayAccumulator.java), persisted in the capability NBT, survives relogs, sanitizes corrupt values) and a point is removed only once a whole point accumulates. At defaults a level-100 school now loses one point per ~20 real minutes, slowing proportionally as it drops. Only affects installs with `enable_affinity_decay = true` (default off).
+
+### New: `aura_failure_mode` — control fail-open free casts (audit D2)
+
+- When the Covenant/Nature's Aura reflection bridge is degraded (e.g. an untested Covenant update), aura-cost checks previously always failed OPEN: Virtue Ring casts became free, silently. New server config `aura_failure_mode` under `Virtue Ring`: `open` (default, historical behavior) or `closed` (block Virtue Ring casts until the bridge works). Either way the first degraded decision per session now logs at WARN.
+
+### New: datapack tags replace hardcoded compat IDs (audit F-1/F-2)
+
+- Ring, Blasphemy, and Source Jar detection is now tag-driven: item tags `ars_n_spells:cursed_rings` (Covenant + Enigmatic Legacy rings), `ars_n_spells:virtue_rings`, `ars_n_spells:blasphemy_curios`, and block tag `ars_n_spells:source_jars` (Ars source + creative source jars). All shipped entries are `required: false`. Pack makers can add custom rings/blasphemies/jars without a code change; Blasphemy school matching is now namespace-agnostic (item path `<school>_blasphemy`). The Source Jar scan also got cheaper per block (tag lookup instead of registry-key + substring).
+
+### New: advancement chain for the cross-cast workflow
+
+- Four advancements guide the loom pipeline: **Warp and Weft** (craft the Spell Loom) → **Written in Starlight** (inscribe a scroll at the loom) → **A Foreign Chapter** (bind it into an Iron's spellbook, via ritual or `/ans bind_scroll_to_irons_book`) → **Two Schools, One Voice** (cast an Ars spell through Iron's, sidecar or native wheel).
+
+### Changed
+
+- Untested Covenant of the Seven versions now surface a once-per-session gold chat notice on login (the HUD mixin degrades silently on version drift; the log-only warning was invisible to affected players).
+- Progression bonus curve is config-driven: `progression_bonus_per_cast` (default 0.001) and `progression_bonus_cap` (default 0.25) replace the hardcoded values (audit F4).
+- Spell-school classification consults an explicit glyph→school map (verified against Ars 4.12.7) before the registry-path substring heuristic; fixes the Firework glyph classifying as fire school via the "fire" substring (audit F8).
+- `ResonanceManager` and the Source Jar synergy boost no longer swallow exceptions silently — first failure per session logs at WARN so "feature silently does nothing" regressions are diagnosable (audit D4).
+- `mods.toml` gains `issueTrackerURL`, `displayURL`, and `updateJSONURL` (Forge update checker via `update.json` in the repo).
+- Player capability NBT now carries an `AnsDataVersion` schema field for future migrations (audit E3).
+- CI: the Iron's-less GameTest job is now blocking and verifies the "All N required tests passed" log line instead of trusting the gradle exit code (audit E7).
+- `AnsConfig.safeSave()` returns `void` — the old unconditional `true` read as "save succeeded" at call sites (audit D5).
+
 ### Spell Loom screen readability + usability rework
 
 - The Spell Loom screen now uses the same high-contrast treatment as the config screen: opaque bordered panel with bevels, shadowed labels, and per-slot chrome, so blur mods/shaders can no longer wash it out. The GUI grew to 176×208 and all slot/widget coordinates now derive from named layout constants in [SpellLoomMenu.java](src/main/java/com/otectus/arsnspells/menu/SpellLoomMenu.java) — a single source of truth shared by menu and screen (the recipe row moved from y=35 to y=40).

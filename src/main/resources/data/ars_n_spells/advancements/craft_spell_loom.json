@@ -1,0 +1,21 @@
+{
+  "display": {
+    "icon": { "item": "ars_n_spells:spell_loom" },
+    "title": { "translate": "advancements.ars_n_spells.craft_spell_loom.title" },
+    "description": { "translate": "advancements.ars_n_spells.craft_spell_loom.description" },
+    "background": "ars_n_spells:textures/block/spell_loom_top.png",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_spell_loom": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [ { "items": ["ars_n_spells:spell_loom"] } ]
+      }
+    }
+  },
+  "requirements": [["has_spell_loom"]]
+}

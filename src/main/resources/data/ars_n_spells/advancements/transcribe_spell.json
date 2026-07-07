@@ -1,0 +1,16 @@
+{
+  "parent": "ars_n_spells:craft_spell_loom",
+  "display": {
+    "icon": { "item": "ars_nouveau:spell_parchment" },
+    "title": { "translate": "advancements.ars_n_spells.transcribe_spell.title" },
+    "description": { "translate": "advancements.ars_n_spells.transcribe_spell.description" },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "transcribed": { "trigger": "minecraft:impossible" }
+  },
+  "requirements": [["transcribed"]]
+}

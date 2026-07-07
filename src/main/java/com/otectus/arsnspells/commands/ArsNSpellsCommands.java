@@ -320,6 +320,7 @@ public class ArsNSpellsCommands {
             return 0;
         }
         scroll.shrink(1);
+        com.otectus.arsnspells.util.AdvancementUtil.grant(player, "bind_spell");
         context.getSource().sendSuccess(
             () -> Component.translatable("commands.ans.bind.success").withStyle(ChatFormatting.GREEN),
             true);

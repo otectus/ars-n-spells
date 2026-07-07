@@ -1,4 +1,12 @@
 {
+  "advancements.ars_n_spells.craft_spell_loom.title": "Warp and Weft",
+  "advancements.ars_n_spells.craft_spell_loom.description": "Craft a Spell Loom, where Ars Nouveau spells are woven onto Iron's scrolls",
+  "advancements.ars_n_spells.transcribe_spell.title": "Written in Starlight",
+  "advancements.ars_n_spells.transcribe_spell.description": "Use the Spell Loom to inscribe an Ars Nouveau spell onto a blank Iron's scroll",
+  "advancements.ars_n_spells.bind_spell.title": "A Foreign Chapter",
+  "advancements.ars_n_spells.bind_spell.description": "Bind an inscribed scroll into an Iron's spellbook",
+  "advancements.ars_n_spells.first_cross_cast.title": "Two Schools, One Voice",
+  "advancements.ars_n_spells.first_cross_cast.description": "Cast an Ars Nouveau spell through Iron's Spellbooks",
   "item.ars_n_spells.spell_transcription": "Spell Transcription",
   "ars_n_spells.ritual_desc.spell_transcription": "Inscribes a cross-mod spell onto a blank target item. Drop a filled Ars Nouveau spell parchment, focus, or spellbook (or an Iron's Spellbooks scroll) as the source, and a blank target item within three blocks of the brazier. Right-click the inscribed item to cast the spell; sneak-right-click cycles between multiple inscriptions.",
   "ritual.ars_n_spells.mana_well": "Ritual of the Mana Well",
