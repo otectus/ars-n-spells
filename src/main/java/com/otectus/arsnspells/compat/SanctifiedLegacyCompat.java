@@ -11,6 +11,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,30 +36,12 @@ public class SanctifiedLegacyCompat {
     private static boolean isBloodMagicLoaded = false;
     private static boolean initialized = false;
 
-    // Pre-built set of all Blasphemy curio IDs for single-scan optimization
-    private static final Set<ResourceLocation> BLASPHEMY_IDS = new HashSet<>();
-    static {
-        String[] types = {
-            "fire_blasphemy", "ice_blasphemy", "lightning_blasphemy", "holy_blasphemy",
-            "ender_blasphemy", "blood_blasphemy", "evocation_blasphemy", "nature_blasphemy",
-            "eldritch_blasphemy", "aqua_blasphemy", "geo_blasphemy", "wind_blasphemy",
-            "dormant_blasphemy"
-        };
-        for (String type : types) {
-            BLASPHEMY_IDS.add(new ResourceLocation(MOD_ID, type));
-        }
-    }
-
-    // Cached ring resource locations — avoid allocating per check.
-    // Sets so both Enigmatic Legacy and Covenant of the Seven namespaces resolve to
-    // the same ring type when present (they ship equivalent items in some packs).
-    private static final Set<ResourceLocation> CURSED_RING_IDS = Set.of(
-        new ResourceLocation(ENIGMATIC_LEGACY_MOD_ID, "cursed_ring"),
-        new ResourceLocation(MOD_ID, "cursed_ring")
-    );
-    private static final Set<ResourceLocation> VIRTUE_RING_IDS = Set.of(
-        new ResourceLocation(MOD_ID, "virtue_ring")
-    );
+    // Audit F-1: ring and Blasphemy detection is tag-driven — see
+    // com.otectus.arsnspells.registry.ModTags and the shipped defaults under
+    // data/ars_n_spells/tags/items/ (cursed_rings, virtue_rings,
+    // blasphemy_curios). The former hardcoded ResourceLocation sets are gone;
+    // pack makers extend or replace the tags to add custom rings without a
+    // code change.
 
     // ------------------------------------------------------------------
     // Curio-state cache
@@ -623,13 +606,14 @@ public class SanctifiedLegacyCompat {
                 for (int i = 0; i < handler.getSlots(); i++) {
                     ItemStack stack = handler.getStackInSlot(i);
                     if (stack.isEmpty()) continue;
-                    ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
-                    if (itemId == null) continue;
-                    if (CURSED_RING_IDS.contains(itemId)) {
+                    // Audit F-1: tag-driven membership (datapack-extensible).
+                    if (stack.is(com.otectus.arsnspells.registry.ModTags.CURSED_RINGS)) {
                         cursed[0] = true;
-                    } else if (VIRTUE_RING_IDS.contains(itemId)) {
+                    } else if (stack.is(com.otectus.arsnspells.registry.ModTags.VIRTUE_RINGS)) {
                         virtue[0] = true;
-                    } else if (BLASPHEMY_IDS.contains(itemId)) {
+                    } else if (stack.is(com.otectus.arsnspells.registry.ModTags.BLASPHEMY_CURIOS)) {
+                        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+                        if (itemId == null) continue;
                         if (blasphemiesRef[0] == null) blasphemiesRef[0] = new HashSet<>(2);
                         blasphemiesRef[0].add(itemId);
                     }
@@ -965,8 +949,16 @@ public class SanctifiedLegacyCompat {
         if (!isAvailable() || schoolType == null) {
             return false;
         }
-        ResourceLocation id = new ResourceLocation(MOD_ID, schoolType.toLowerCase() + "_blasphemy");
-        return getState(player).blasphemies.contains(id);
+        // Audit F-1: match by path so pack-added blasphemies (any namespace,
+        // named "<school>_blasphemy", tagged ars_n_spells:blasphemy_curios)
+        // school-match exactly like Covenant's own.
+        String wantedPath = schoolType.toLowerCase(Locale.ROOT) + "_blasphemy";
+        for (ResourceLocation worn : getState(player).blasphemies) {
+            if (worn.getPath().equals(wantedPath)) {
+                return true;
+            }
+        }
+        return false;
     }
     
     /**

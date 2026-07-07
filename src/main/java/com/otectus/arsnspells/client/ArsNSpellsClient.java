@@ -69,6 +69,24 @@ public class ArsNSpellsClient {
     private static final String TESTED_COVENANT_VERSION = "2.2.6";
 
     /**
+     * Audit D3: non-null when the probe detected an untested Covenant version.
+     * {@link CovenantCompatNotice} reads this to show a once-per-session chat
+     * notice on login — log-only warnings were invisible to the players who
+     * actually see the wrongly-scaled aura bar.
+     */
+    private static volatile String untestedCovenantVersion = null;
+
+    /** The untested Covenant version detected at client setup, or null if none. */
+    public static String getUntestedCovenantVersion() {
+        return untestedCovenantVersion;
+    }
+
+    /** The Covenant version the HUD mixin was verified against (for the notice text). */
+    public static String getTestedCovenantVersion() {
+        return TESTED_COVENANT_VERSION;
+    }
+
+    /**
      * N-4: warn if Covenant of the Seven is present at a version the aura-bar HUD mixin
      * was not verified against. {@link com.otectus.arsnspells.mixin.covenant.MixinResourceBarOverlay}
      * uses {@code require = 0} (so a mismatch can't crash the client) and is pinned to
@@ -82,6 +100,7 @@ public class ArsNSpellsClient {
             if (version.contains(TESTED_COVENANT_VERSION)) {
                 LOGGER.info("Covenant of the Seven {} detected - aura-bar HUD peak-tracking active.", version);
             } else {
+                untestedCovenantVersion = version;
                 LOGGER.warn("Covenant of the Seven {} detected, but the aura-bar HUD mixin "
                     + "(MixinResourceBarOverlay) was bytecode-verified against {}. If the Virtue-Ring "
                     + "aura bar fills against Covenant's 2,000,000 cap instead of your personal peak, "

@@ -187,6 +187,8 @@ Config file (per-world, server-authoritative, auto-synced to clients): `<world>/
 
 > **Migration note:** the 3.0.1 audit removed a number of config keys that no code ever read (hybrid sync rate, mana overflow, per-glyph/per-school bonus tables, several resonance/cooldown caps, progression/affinity multipliers, discount stacking, per-cast reagent, mana sync/caching). If your TOML still contains them they are silently ignored. Every key below is live.
 
+**Defaults at a glance** — enabled out of the box: mana unification (`iss_primary`), resonance, progression, affinity, LP system (Cursed Ring), virtue aura (Virtue Ring), curio discounts, Source Jar synergy, cross-cast inscription. Disabled out of the box: unified cooldowns, affinity decay, `death_on_insufficient_lp`, debug mode.
+
 ### Master toggles
 
 | Option | Default | Description |
@@ -241,8 +243,10 @@ Config file (per-world, server-authoritative, auto-synced to clients): `<world>/
 | Option | Default | Range | Description |
 | --- | --- | --- | --- |
 | `enable_cross_mod_progression` | `true` | -- | Ars casts grant Iron's school progression and vice versa. |
+| `progression_bonus_per_cast` | `0.001` | 0–0.1 | Attribute bonus per cast in a school (+0.1%). Transient, so changes rescale everyone immediately. |
+| `progression_bonus_cap` | `0.25` | 0–2 | Cap on the per-school progression bonus (+25%, hit after 250 casts at defaults). |
 | `enable_affinity_decay` | `false` | -- | Opt-in affinity decay for unused schools. |
-| `affinity_decay_rate` | `0.01` | 0–1 | Fraction of current affinity lost per Minecraft day. |
+| `affinity_decay_rate` | `0.01` | 0–1 | Fraction of current affinity lost per Minecraft day. Decay accrues fractionally and removes a point only once a whole point accumulates (proportional, fixed in 3.0.2). |
 | `affinity_decay_interval_ticks` | `1200` | 20–24000 | How often the decay handler ticks each player. |
 
 ### Curio discounts
@@ -285,6 +289,7 @@ The aura pool (max, regen, persistence, HUD) belongs to Covenant of the Seven; t
 | --- | --- | --- | --- |
 | `enable_virtue_aura_system` | `true` | -- | Master toggle for the Virtue Ring aura-cost path. |
 | `ars_virtue_aura_multiplier` | `1.0` | 0.1–10 | Multiplier applied to the Ars mana cost to derive the Covenant-aura cost. |
+| `aura_failure_mode` | `open` | `open`/`closed` | What aura checks do when the Covenant/Nature's Aura reflection bridge is degraded (e.g. an untested Covenant update): `open` allows casts without an aura check (effectively free while degraded); `closed` blocks Virtue Ring casts until the bridge works. Either way the first degraded decision logs at WARN. |
 
 ### Scroll costs and spell scaling
 
@@ -322,6 +327,20 @@ These keys configure the Ritual of Mana Infusion and Ritual of the Mana Well. Bo
 | `mana_well_regen_rate` | `2.0` | 0.1–100 | Mana per tick granted to players within Mana Well range. |
 
 ---
+
+## For pack makers: datapack tags
+
+All cross-mod item/block detection is tag-driven and datapack-extensible. Shipped defaults use `"required": false` entries, so every tag loads cleanly even when the referenced mod is absent. Extend a tag by shipping your own `data/ars_n_spells/tags/...` file (merged by default), or set `"replace": true` to restrict it.
+
+| Tag | Type | Default contents | Controls |
+| --- | --- | --- | --- |
+| `ars_n_spells:irons_spell_books` | item | all 16 tiered Iron's spellbooks | Which books the Spell Transcription / Spellbook Binding ritual pedestals accept. |
+| `ars_n_spells:cursed_rings` | item | Covenant + Enigmatic Legacy `cursed_ring` | Which rings trigger the LP-cost path. |
+| `ars_n_spells:virtue_rings` | item | Covenant `virtue_ring` | Which rings trigger the aura-cost path. |
+| `ars_n_spells:blasphemy_curios` | item | Covenant's 13 blasphemies | Which curios grant school discounts. School matching is by item path `<school>_blasphemy` (any namespace), so name custom entries accordingly (e.g. `mypack:fire_blasphemy`). |
+| `ars_n_spells:source_jars` | block | Ars `source_jar`, `creative_source_jar` | Which blocks count for Source Jar regen synergy. |
+
+Key economy knobs live in `ars_n_spells-server.toml`: LP multipliers (`ars_lp_*`, `irons_lp_*`, rarity ladder), `aura_failure_mode` (block vs. free casts when the Covenant bridge is degraded), `cross_cast_cost_multiplier`, and the master toggles listed above.
 
 ## Mana bars
 

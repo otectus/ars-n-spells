@@ -7,12 +7,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -187,9 +185,10 @@ public class RegenSynergyHandler {
         BlockPos min = new BlockPos(pos.getX() - radius, minY, pos.getZ() - radius);
         BlockPos max = new BlockPos(pos.getX() + radius, maxY, pos.getZ() + radius);
         for (BlockPos checkPos : BlockPos.betweenClosed(min, max)) {
-            Block block = level.getBlockState(checkPos).getBlock();
-            var blockKey = ForgeRegistries.BLOCKS.getKey(block);
-            if (blockKey != null && blockKey.getPath().contains("source_jar")) {
+            // Audit F-2: tag-driven (ars_n_spells:source_jars, datapack-extensible)
+            // instead of a per-block registry-key lookup + substring match — also
+            // cheaper: BlockState.is(TagKey) is a set lookup with no allocation.
+            if (level.getBlockState(checkPos).is(com.otectus.arsnspells.registry.ModTags.SOURCE_JARS)) {
                 return true;
             }
         }

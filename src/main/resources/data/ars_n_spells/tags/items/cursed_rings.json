@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    { "id": "covenant_of_the_seven:cursed_ring", "required": false },
+    { "id": "enigmaticlegacy:cursed_ring", "required": false }
+  ]
+}

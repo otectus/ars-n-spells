@@ -68,6 +68,7 @@
   "tooltip.ars_n_spells.cross_spell.ars_generic": "Ars Nouveau spell",
   "tooltip.ars_n_spells.cross_spell.cycle_hint": "Sneak-right-click to cycle",
   "tooltip.ars_n_spells.cross_spell.cast_hint": "Right-click to cast",
+  "message.ars_n_spells.covenant_hud_untested": "Ars 'n Spells: Covenant of the Seven %s is untested with the aura-bar HUD integration (verified against %s). The Virtue Ring aura bar may show Covenant's default 2,000,000 scale instead of your personal peak.",
   "message.ars_n_spells.lp.consumed": "Consumed %s LP",
   "message.ars_n_spells.lp.insufficient": "Insufficient LP - Spell Cancelled",
   "message.ars_n_spells.lp.death": "DEATH: Insufficient LP (%s LP required)",

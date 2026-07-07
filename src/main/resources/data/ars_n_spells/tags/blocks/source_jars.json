@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    { "id": "ars_nouveau:source_jar", "required": false },
+    { "id": "ars_nouveau:creative_source_jar", "required": false }
+  ]
+}
