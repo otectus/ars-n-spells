@@ -81,6 +81,14 @@ public class ArsNSpellsCommands {
                         )
                     )
                 )
+                .then(Commands.literal("export_to_irons_scroll")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ArsNSpellsCommands::exportToIronsScroll)
+                )
+                .then(Commands.literal("bind_scroll_to_irons_book")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ArsNSpellsCommands::bindScrollToIronsBook)
+                )
         );
 
         LOGGER.debug("Ars 'n' Spells commands registered");
@@ -179,6 +187,117 @@ public class ArsNSpellsCommands {
                 () -> Component.translatable("commands.ans.info.schools", schoolCount), false);
         }
 
+        return 1;
+    }
+
+    /**
+     * Exports the Ars spell held in the player's main hand onto a real Iron's
+     * scroll carrier and places it in their inventory. Admin/test counterpart to
+     * the Spell Loom. Routes through ANS util classes so this file stays free of
+     * Iron's imports (it loads on Iron's-less servers too).
+     */
+    private static int exportToIronsScroll(CommandContext<CommandSourceStack> context) {
+        ServerPlayer player;
+        try {
+            player = context.getSource().getPlayerOrException();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.not_player"));
+            return 0;
+        }
+        if (!com.otectus.arsnspells.compat.IronsCompat.isLoaded()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.irons_required"));
+            return 0;
+        }
+
+        net.minecraft.world.item.ItemStack source = player.getMainHandItem();
+        java.util.Optional<com.hollingsworth.arsnouveau.api.spell.Spell> spell =
+            com.otectus.arsnspells.spell.ArsSpellExportUtil.extractArsSpell(source);
+        if (spell.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.no_ars_spell"));
+            return 0;
+        }
+
+        net.minecraft.world.item.ItemStack carrier =
+            com.otectus.arsnspells.spell.ArsSpellExportUtil.createIronsScrollCarrier(spell.get());
+        if (carrier.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.scroll_unavailable"));
+            return 0;
+        }
+
+        player.getInventory().placeItemBackInInventory(carrier);
+        context.getSource().sendSuccess(
+            () -> Component.translatable("commands.ans.export.success").withStyle(ChatFormatting.GREEN),
+            true);
+        return 1;
+    }
+
+    /**
+     * Binds the carrier scroll and Iron's spellbook the player is holding (one in
+     * each hand, either order). The scroll's Ars spell — with its Spell Loom
+     * display metadata, if any — is appended to the book's cross-cast sidecar,
+     * mirrored into Iron's native wheel, and one scroll is consumed.
+     */
+    private static int bindScrollToIronsBook(CommandContext<CommandSourceStack> context) {
+        ServerPlayer player;
+        try {
+            player = context.getSource().getPlayerOrException();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.not_player"));
+            return 0;
+        }
+        if (!com.otectus.arsnspells.compat.IronsCompat.isLoaded()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.irons_required"));
+            return 0;
+        }
+
+        net.minecraft.world.item.ItemStack main = player.getMainHandItem();
+        net.minecraft.world.item.ItemStack off = player.getOffhandItem();
+        net.minecraft.world.item.ItemStack scroll;
+        net.minecraft.world.item.ItemStack book;
+        if (com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsScroll(main)
+            && com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsSpellBook(off)) {
+            scroll = main;
+            book = off;
+        } else if (com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsScroll(off)
+            && com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsSpellBook(main)) {
+            scroll = off;
+            book = main;
+        } else {
+            context.getSource().sendFailure(Component.translatable("commands.ans.bind.need_scroll_and_book"));
+            return 0;
+        }
+
+        java.util.Optional<com.otectus.arsnspells.spell.CrossModSpell> entry =
+            com.otectus.arsnspells.spell.IronsBookBindingUtil.extractSingleEntry(scroll);
+        if (entry.isEmpty() || entry.get().arsSpellTag().isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.bind.scroll_not_carrier"));
+            return 0;
+        }
+
+        int maxCap = AnsConfig.MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK.get();
+        com.otectus.arsnspells.spell.IronsBookBindingUtil.AppendResult result =
+            com.otectus.arsnspells.spell.IronsBookBindingUtil.appendArsSpellToBook(
+                book, entry.get().arsSpellTag().get(),
+                entry.get().customName().orElse(null),
+                entry.get().nature().orElse(null),
+                entry.get().iconSymbol().orElse(null),
+                maxCap);
+        switch (result) {
+            case ADDED:
+                break;
+            case DUPLICATE:
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.duplicate"));
+                return 0;
+            case BOOK_FULL:
+            case FAILED:
+            default:
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.failed"));
+                return 0;
+        }
+        scroll.shrink(1);
+        context.getSource().sendSuccess(
+            () -> Component.translatable("commands.ans.bind.success").withStyle(ChatFormatting.GREEN),
+            true);
         return 1;
     }
 

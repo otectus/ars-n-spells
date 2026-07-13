@@ -1,0 +1,25 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_book": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          { "items": [ "minecraft:book" ] }
+        ]
+      }
+    },
+    "has_the_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": {
+        "recipe": "ars_n_spells:spell_loom"
+      }
+    }
+  },
+  "requirements": [
+    [ "has_book", "has_the_recipe" ]
+  ],
+  "rewards": {
+    "recipes": [ "ars_n_spells:spell_loom" ]
+  }
+}

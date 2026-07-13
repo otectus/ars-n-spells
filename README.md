@@ -1,7 +1,17 @@
-# Ars 'n' Spells (v2.6.1, NeoForge 1.21.1)
+# Ars 'n' Spells (v3.0.2, NeoForge 1.21.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.21.1 on **NeoForge**. It unifies mana, scaling, and progression while keeping each mod playable on its own.
 
+> **Status (v3.0.2, NeoForge 1.21.1).** Full parity with the Forge 1.20.1 v3.0.1 line: **Ars spells
+> in Iron's native spell wheel** (export onto real Iron's scrolls via the new **Spell Loom**
+> workstation or `/ans export_to_irons_scroll`, bind onto real Iron's spellbooks via the
+> Spellbook Binding ritual or `/ans bind_scroll_to_irons_book`; bound spells appear as their own
+> wheel entries with a player-chosen name, nature, and icon, casting through the ANS cost
+> pipeline exactly once), plus the 3.0.x audit fixes (SEPARATE-mode pre-pay/refund, Source-Jar
+> chunk-load guard + kill switch, apparatus-recipe tag fix, config screen legibility + multiplayer
+> read-only gating, dead-config removal). Compile targets: Ars Nouveau 5.11.1 / **Iron's Spells
+> 1.21.1-3.16.0**. The LP/aura features of 1.20.1 3.0.x remain out of scope (see below).
+>
 > **Status (v2.6.1, NeoForge 1.21.1).** Mana unification, cross-cast inscription, rituals, affinity, progression, resonance, cooldowns, and equipment scaling are all live (the mana mixins were repaired against Ars 5.x / Iron's 3.x in 2.0.1). **2.6.1 restores core parity with the Forge 1.20.1 build:** the in-game config screen, Ars mana-potion mirroring into the unified pool, a mana-only pre-cast validator, and the debug overlay are all functional again (each was stubbed or unported in 2.5.0). **2.5.0** was a correctness release: affinity now tracks *every* Iron's addon school dynamically instead of a hardcoded sixteen, the Curios spell-discount applies on both the Ars and Iron's sides, and two datapack features that silently broke in the 1.20.1 → 1.21 directory flattening (the ritual apparatus recipes and the curio-discount tag) are restored to their correct singular paths. Compile targets are pinned to Ars Nouveau 5.11.1 / Iron's Spells 3.15.6; the mod runs against newer (5.11.7 / 3.16.0) at runtime. The previous **Covenant of the Seven / Sanctified Legacy** integration (Cursed Ring, Virtue Ring, Blasphemy curios, LP / aura systems) remains **removed** (no NeoForge 1.21.1 build of that addon exists); the `#ars_n_spells:curio_spell_discount` item tag is its replacement footprint.
 
 ## Requirements
@@ -11,7 +21,7 @@ Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for M
 | Minecraft (NeoForge) | 1.21.1 / 21.1.84+ | Yes |
 | Java | 21 | Yes |
 | Ars Nouveau | 5.11.1+ | Yes |
-| Iron's Spells 'n Spellbooks | 1.21.1-3.15.6+ | No |
+| Iron's Spells 'n Spellbooks | 1.21.1-3.16.0+ | No |
 
 If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior. The mod will not load on Forge or on Minecraft versions other than 1.21.1.
 
@@ -91,6 +101,18 @@ Cross-cast spells pay an overhead set by `cross_cast_cost_multiplier` (default `
 **4. Strip an inscription.**
 Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank parchment (reagent), a water bucket, a source gem, and an archwood log — 500 source. Drop one inscribed item within three blocks of the brazier with no other items in range. Ash and smoke particles plus a fire-extinguish sound mark the strip; the result is bit-identical to a fresh blank target so the same item can be re-inscribed cleanly. The uninscribe ritual is Iron's-independent and remains useful for cleanup even if Iron's Spellbooks is later removed.
 
+### Ars spells in Iron's native spell wheel (3.0.x)
+
+Beyond the generic right-click cross-cast, an Ars spell can be bound into a real Iron's spellbook where it appears as **its own entry in Iron's spell-selection wheel**, with a player-chosen name, nature, and icon, cast through Iron's native flow:
+
+**1. Make a carrier scroll.** Craft the **Spell Loom** (gold ingot over lapis-book-lapis over three obsidian). Insert an Ars spell source (filled parchment, focus, or spellbook) and a blank Iron's scroll, type a display name, cycle a nature and icon, and press *Inscribe*. The output is a real `irons_spellbooks:scroll` carrying the Ars spell as an ANS component sidecar. (`/ans export_to_irons_scroll` is the admin shortcut.)
+
+**2. Bind it onto a spellbook.** Craft the **Spellbook Binding** tablet on the Enchanting Apparatus (novice spellbook reagent; any Iron's spellbook, an Iron's scroll, a source gem block, and an archwood log on pedestals — 2500 source). Run the ritual with exactly one carrier scroll and one Iron's spellbook dropped near the brazier. One scroll is consumed; the book gains the Ars spell. (`/ans bind_scroll_to_irons_book` binds the two items you hold, one per hand.)
+
+**3. Cast from the wheel.** The bound spell shows in Iron's spell wheel as its own entry (name/icon from the loom; defaults otherwise). Casting delegates to the ANS cross-cast pipeline, so the cost multiplier, unification mode, and SEPARATE dual-cost split all apply — exactly once (the wheel entry itself is a zero-cost proxy spell).
+
+Mechanically, each book can hold up to **8** bound Ars spells: they are driven by a finite pool of registered proxy spells (`ars_n_spells:ars_cross_1..8`), because Iron's wheel merges entries by spell id. Proxy slots are added into grown container capacity, so the player's real Iron's spells are never evicted. Binding is gated by `allow_ars_spells_in_irons_spellbooks` and capped by `max_ars_cross_spells_per_irons_spellbook`.
+
 ### Cross-cast storage (1.21.1)
 
 On NeoForge 1.21.1 the cross-cast inscription is stored as a `DataComponentType<CrossModSpellList>` registered under `ars_n_spells:cross_spells` ([`ModDataComponents`](src/main/java/com/otectus/arsnspells/spell/ModDataComponents.java)). The component carries an immutable list of inscribed entries plus the currently-selected index for sneak-cycling, with both a JSON `Codec` and a `StreamCodec` for network sync. The Forge-era root-NBT keys (`arsnspells:cross_spells`, `arsnspells:cross_spell_index`) are gone; items inscribed under the previous Forge build will not migrate automatically.
@@ -145,11 +167,20 @@ An **in-game config screen** is available from the mod list (**Mods → Ars 'n' 
 | Option | Default | Description |
 | --- | --- | --- |
 | `cross_cast_cost_multiplier` | `1.25` | Overhead applied to cross-cast spell base mana cost. |
-| `enable_per_cast_reagent` | `false` | Reserved hook for a future per-cast reagent system. |
+| `allow_ars_spells_in_irons_spellbooks` | `true` | Allow binding Ars spells into Iron's spellbooks / spell wheel. |
+| `max_ars_cross_spells_per_irons_spellbook` | `-1` | Per-book cap on bound Ars spells (-1 = no cap; hard-bounded by the 8-slot proxy pool). |
+
+### Source Jar synergy
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `enable_source_jar_synergy` | `true` | Kill switch for the proximity-regen scan (off = zero per-tick cost). |
+| `source_jar_scan_interval_ticks` | `20` | Ticks between proximity checks per player (1–200). |
+| `source_jar_scan_radius` | `4` | Horizontal scan radius in blocks (1–8; the scan never loads chunks). |
 
 ### Removed in the NeoForge 1.21.1 port
 
-The following config sections from the Forge 1.20.1 build are no longer surfaced (the underlying features are gone with Sanctified Legacy / Covenant of the Seven removal): `enable_lp_system`, `lp_source_mode`, `death_on_insufficient_lp`, `show_lp_cost_messages`, `ars_lp_*`, `irons_lp_*`, `aura_*`, `virtue_ring_discount`, `blasphemy_*`, `hide_mana_bar_with_ring`, `scroll_cost_mode`. Dead config keys may still appear in autogenerated config files until a follow-up cleanup pass; they have no effect on gameplay.
+The config keys for subsystems without a 1.21.1 build (Blood Magic LP / Covenant of the Seven aura and rings) and the never-read keys flagged by the 1.20.1 audit (ANS-MED-044) were **deleted from the spec in 3.0.1** — they no longer appear in generated TOMLs: `enable_lp_system`, `lp_source_mode`, `death_on_insufficient_lp`, `show_lp_cost_messages`, `ars_lp_*`, `irons_lp_*`, `aura_*`, `blasphemy_*`, `hide_mana_bar_with_ring`, `scroll_cost_mode`, the glyph/school bonus sections, resonance caps, category cooldowns, and the performance keys. `virtue_ring_discount` and `max_total_curio_discount` are **kept** — they were repurposed as the generic `#ars_n_spells:curio_spell_discount` per-curio discount and its stacking cap.
 
 ---
 
@@ -199,7 +230,7 @@ Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMa
 
 Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`.
 
-Output jar: `build/libs/ars_n_spells-2.6.1.jar`
+Output jar: `build/libs/ars_n_spells-3.0.2.jar`
 
 ## Changelog
 

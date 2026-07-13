@@ -68,16 +68,25 @@ public class CrossCastingHandler {
     /** Inscribe an Ars Nouveau spell onto a stack. */
     public static void addCrossModSpell(ItemStack stack, Spell spell) {
         if (spell == null) return;
-        // Serialise the Spell via its MapCodec into a CompoundTag for the component payload.
-        var encoded = Spell.CODEC.codec().encodeStart(NbtOps.INSTANCE, spell).result().orElse(null);
-        CompoundTag arsTag = (encoded instanceof CompoundTag c) ? c : null;
+        CompoundTag arsTag = encodeArsSpell(spell);
         CrossModSpellComponents.addCrossModSpell(
             stack,
-            ResourceLocation.fromNamespaceAndPath("ars_nouveau", "spell"),
+            CrossModSpellComponents.ARS_PLACEHOLDER_ID,
             1,
             CrossSpellType.ARS_NOUVEAU,
             arsTag
         );
+    }
+
+    /**
+     * Serialise a {@link Spell} via its MapCodec into the CompoundTag shape the
+     * cross-cast component stores. Shared by inscription, export, and tooltip
+     * paths so the payload format never diverges.
+     */
+    public static CompoundTag encodeArsSpell(Spell spell) {
+        if (spell == null) return null;
+        var encoded = Spell.CODEC.codec().encodeStart(NbtOps.INSTANCE, spell).result().orElse(null);
+        return (encoded instanceof CompoundTag c) ? c : null;
     }
 
     /** Inscribe a foreign-mod spell by id + level + type. */
@@ -107,6 +116,12 @@ public class CrossCastingHandler {
         }
         ItemStack stack = event.getItemStack();
         if (!CrossModSpellComponents.has(stack)) {
+            return;
+        }
+        // 3.0.0: Iron's spellbooks cast their bound Ars entries through Iron's own
+        // right-click flow (native wheel -> ars_cross proxy spell -> castArsSpell).
+        // Hijacking the click here would suppress Iron's native casting entirely.
+        if (IronsBookBindingUtil.isIronsSpellBook(stack)) {
             return;
         }
         Player player = event.getEntity();
@@ -175,39 +190,86 @@ public class CrossCastingHandler {
         if (entry == null || entry.type != CrossSpellType.ARS_NOUVEAU || entry.multiplierApplied) {
             return;
         }
-
-        double mul = AnsConfig.CROSS_CAST_COST_MULTIPLIER.get();
-        if (mul <= 0.0 || Math.abs(mul - 1.0) < 1.0e-4) {
-            entry.multiplierApplied = true;
-            return;
-        }
-
-        int multiplied = (int) Math.max(0, Math.round(event.currentCost * mul));
-        event.currentCost = multiplied;
         entry.multiplierApplied = true;
 
         ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        if (mode == ManaUnificationMode.SEPARATE) {
-            double arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get();
-            double issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get();
-            entry.arsCost = (float) (multiplied * arsPercent);
-            entry.issCost = (float) (multiplied * issPercent);
-            event.currentCost = (int) Math.round(entry.arsCost);
+        boolean unified = BridgeManager.isUnificationEnabled();
+        float multiplier = (float) Math.max(0.0, AnsConfig.CROSS_CAST_COST_MULTIPLIER.get());
+        int baseEventCost = Math.max(0, event.currentCost);
+        // Apply the cross-cast multiplier to the Ars-computed base cost first;
+        // the SEPARATE-mode dual-cost split (below) then operates on the
+        // already-multiplied total, matching the Iron's-side accounting where
+        // the multiplier is applied before the split.
+        int totalCost = Math.max(0, Math.round(baseEventCost * multiplier));
+
+        if (unified && mode == ManaUnificationMode.SEPARATE) {
+            float arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
+            float issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
+            float arsCost = totalCost * arsPercent;
+            float issCost = (float) (totalCost * issPercent * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+
+            entry.arsCost = arsCost;
+            entry.issCost = issCost;
+            entry.costsReady = true;
+
+            if (!player.isCreative() && issCost > 0.0f) {
+                var issBridge = BridgeManager.getSecondaryBridge();
+                float issMana = issBridge != null ? issBridge.getMana(player) : 0.0f;
+                if (issMana < issCost) {
+                    entry.blocked = true;
+                    event.currentCost = Integer.MAX_VALUE;
+                    CrossCastContext.clear(player);
+                    logDebug("Insufficient Iron mana for cross-cast: need {}, have {}", issCost, issMana);
+                    return;
+                }
+                // ANS-CRIT-002: pre-consume Iron's atomically with the Ars cost-calc.
+                // The previous design deferred the Iron's-side consume to the @TAIL of
+                // MixinSpellResolverMana, but the TAIL silently swallowed consume failures,
+                // letting Ars mana drain one-way. Consuming here makes the dual-cost
+                // atomic with the sufficiency check above, and the TAIL is now a no-op
+                // for entries that have already paid (issCost = 0).
+                if (issBridge != null && !issBridge.consumeMana(player, issCost)) {
+                    entry.blocked = true;
+                    event.currentCost = Integer.MAX_VALUE;
+                    CrossCastContext.clear(player);
+                    logDebug("Iron mana consume failed for cross-cast: need {}, have {}", issCost, issMana);
+                    return;
+                }
+                // ANS-HIGH-030: remember what was pre-paid so castArsSpell can
+                // refund it if the Ars leg fails (insufficient Ars mana or a
+                // downstream cancel). issCost must still go to 0 for the TAIL
+                // mixin's already-paid contract (ANS-CRIT-002).
+                entry.issPaid = issCost;
+                entry.issCost = 0.0f;
+            }
+
+            event.currentCost = Math.max(0, Math.round(arsCost));
+            logDebug("Ars cross-cast (SEPARATE): base={} multiplier={} total={} ars={} iss={}",
+                baseEventCost, multiplier, totalCost, arsCost, issCost);
+            return;
         }
 
+        // Non-SEPARATE (or unified=false): Ars deducts the full multiplied
+        // cost from its own pool. The multiplier is the only adjustment we make.
+        event.currentCost = totalCost;
+        logDebug("[CrossCasting] Ars cross-cast cost multiplier applied: x{} -> {}", multiplier, event.currentCost);
+    }
+
+    private static void logDebug(String message, Object... args) {
         if (AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get()) {
-            LOGGER.info("[CrossCasting] Ars cross-cast cost multiplier applied: x{} -> {}", mul, event.currentCost);
+            LOGGER.info(message, args);
         }
     }
 
     @SubscribeEvent
     public static void onArsSpellCastFailed(SpellCastEvent event) {
         // Defensive cleanup: if Ars cancels the cast entirely (e.g., validation
-        // failure), drop the staged context so we don't leak it into the next cast.
+        // failure), drop the staged context — refunding any pre-paid Iron's
+        // share (ANS-HIGH-030) — so we don't leak it into the next cast.
         if (event.isCanceled() && event.getEntity() instanceof Player player) {
             CrossCastContext.Entry entry = CrossCastContext.peek(player);
             if (entry != null && entry.type == CrossSpellType.ARS_NOUVEAU) {
-                CrossCastContext.clear(player);
+                refundPrepaidIronsShare(player);
             }
         }
     }
@@ -232,8 +294,12 @@ public class CrossCastingHandler {
      * Ars 5.x {@link Spell#CODEC}, builds a {@link SpellContext} via
      * {@link SpellContext#fromEntity(Spell, net.minecraft.world.entity.LivingEntity, ItemStack)},
      * and invokes {@link SpellResolver#onCast(ItemStack, net.minecraft.world.level.Level)}.
+     *
+     * <p>Public so the native-wheel proxy spells
+     * ({@code spell.irons.ArsCrossProxySpell}) can delegate their server-side
+     * {@code onCast} into the exact same cost/multiplier/context pipeline.
      */
-    private static boolean castArsSpell(Player player, ItemStack stack, CrossModSpell entry) {
+    public static boolean castArsSpell(Player player, ItemStack stack, CrossModSpell entry) {
         Optional<CompoundTag> tag = entry.arsSpellTag();
         if (tag.isEmpty()) {
             return false;
@@ -258,12 +324,33 @@ public class CrossCastingHandler {
                 resolver.onCast(stack, player.level());
                 return true;
             }
-            CrossCastContext.clear(player);
+            refundPrepaidIronsShare(player);
             return false;
         } catch (Throwable t) {
             LOGGER.warn("Ars cross-cast failed for {}: {}", entry.spellId(), t.toString());
-            CrossCastContext.clear(player);
+            refundPrepaidIronsShare(player);
             return false;
+        }
+    }
+
+    /**
+     * ANS-HIGH-030: SEPARATE mode pre-pays the Iron's share during cost-calc
+     * ({@code onArsSpellCost}). If the Ars leg then fails, compensate — matching
+     * the BridgeManager rollback contract (ANS-CRIT-003). {@code take()} drains
+     * the entry atomically; blocked paths that already cleared it consumed
+     * nothing, so a missing entry means nothing to refund.
+     */
+    private static void refundPrepaidIronsShare(Player player) {
+        CrossCastContext.Entry entry = CrossCastContext.take(player);
+        if (entry != null && entry.issPaid > 0.0f) {
+            var issBridge = BridgeManager.getSecondaryBridge();
+            if (issBridge != null) {
+                issBridge.addMana(player, entry.issPaid);
+                logDebug("Refunded pre-paid Iron's share after failed Ars cross-cast: {}", entry.issPaid);
+            } else {
+                LOGGER.warn("Cross-cast failed after Iron's mana was consumed but no "
+                    + "secondary bridge is available to refund {} mana", entry.issPaid);
+            }
         }
     }
 
@@ -321,7 +408,8 @@ public class CrossCastingHandler {
         }
     }
 
-    private static Spell decodeArsSpell(CompoundTag tag) {
+    /** Codec-decode a cross-cast Ars payload back into a {@link Spell}; null on failure. */
+    public static Spell decodeArsSpell(CompoundTag tag) {
         try {
             var result = Spell.CODEC.codec().parse(NbtOps.INSTANCE, tag);
             return result.result().orElse(null);

@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "ars_n_spells:block/spell_loom" }
+  }
+}

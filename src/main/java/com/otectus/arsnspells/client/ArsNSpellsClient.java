@@ -1,13 +1,16 @@
 package com.otectus.arsnspells.client;
 
 import com.otectus.arsnspells.ArsNSpells;
+import com.otectus.arsnspells.client.screen.ConfigScreenFactory;
+import com.otectus.arsnspells.client.screen.SpellLoomScreen;
 import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.config.ConfigScreenFactory;
+import com.otectus.arsnspells.registry.ModMenus;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +27,11 @@ import org.slf4j.LoggerFactory;
 @EventBusSubscriber(modid = ArsNSpells.MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ArsNSpellsClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(ArsNSpellsClient.class);
+
+    @SubscribeEvent
+    public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
+        event.register(ModMenus.SPELL_LOOM.get(), SpellLoomScreen::new);
+    }
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {

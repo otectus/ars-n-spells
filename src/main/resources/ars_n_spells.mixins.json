@@ -12,7 +12,9 @@
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana"
   ],
-  "client": [],
+  "client": [
+    "irons.MixinAbstractSpellArsIcon"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

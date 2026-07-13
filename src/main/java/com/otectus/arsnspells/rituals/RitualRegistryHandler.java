@@ -8,6 +8,15 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
+/**
+ * Registers ANS rituals with Ars Nouveau at common setup and splices their
+ * tablets into Ars's {@code ritualItemMap}.
+ *
+ * <p>{@code /reload}-safety (audit F6): Ars's {@code ritualItemMap} is a static
+ * {@code ConcurrentHashMap} populated once in {@code <clinit>} and never rebuilt
+ * on datapack reload, so entries spliced here survive {@code /reload}. Verified
+ * against Ars 4.12.7 on 1.20.1; re-verify if AN changes the map's lifecycle.
+ */
 public class RitualRegistryHandler {
     private static boolean registered = false;
 
@@ -32,9 +41,12 @@ public class RitualRegistryHandler {
         RitualRegistry.registerRitual(new ManaInfusionRitual());
         RitualRegistry.registerRitual(new SpellTranscriptionRitual());
         RitualRegistry.registerRitual(new ManaWellRitual());
+        RitualRegistry.registerRitual(new SpellbookBindingRitual());
 
         spliceTablet(SpellTranscriptionRitual.REGISTRY_PATH,
             ModItemsRegistry.spellTranscriptionTablet());
+        spliceTablet(SpellbookBindingRitual.REGISTRY_PATH,
+            ModItemsRegistry.spellbookBindingTablet());
 
         registered = true;
     }

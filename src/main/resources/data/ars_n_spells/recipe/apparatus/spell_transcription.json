@@ -12,7 +12,7 @@
   },
   "pedestalItems": [
     {
-      "item": "irons_spellbooks:spell_book"
+      "tag": "ars_n_spells:irons_spell_books"
     },
     {
       "tag": "c:logs/archwood"

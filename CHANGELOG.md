@@ -2,6 +2,124 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.2] — config screen blur hotfix (2026-07-12)
+
+### Fixed
+- **Config screen unreadable under the 1.21 menu blur.** On 1.21+ the vanilla `Screen.render()`
+  applies the gaussian-blur background as its *first* step; the config screen drew its panel and
+  option rows first and called `super.render()` last, so the blur (plus the menu background) was
+  composited over every row — only the Done/Reset buttons, drawn after the blur inside
+  `super.render()`, stayed legible. The screen now overrides `renderBackground` to paint only its
+  owned near-opaque fill (no blur, no menu texture) and calls `super.render()` first, drawing the
+  panel/rows/scrollbar on top. (`client/screen/ConfigScreenFactory`)
+
+### Known issues (confirmed by the 3.0.2 pre-release review; fixes targeted for 3.0.3)
+- **Cross-cast mana is over-charged.** The cross-cast cost multiplier and the SEPARATE-mode dual
+  split apply only to the sufficiency check, not the amount actually deducted
+  (`SpellCostCalcEvent$Post` at expend time is left unmodified) — in SEPARATE mode a cross-cast
+  pays the Iron's share *plus* the full undiscounted Ars cost.
+- **Canceled casts do not refund the pre-paid Iron's share** (the refund listener never receives
+  canceled `SpellCastEvent`s), and the stale context can make the next cross-cast skip cost
+  adjustment.
+- **Spell Loom can destroy items.** The source slot accepts and *consumes* any Ars caster item —
+  including a full spellbook — and a scroll already carrying a native Iron's spell is silently
+  overwritten. Until 3.0.3: only feed the loom throwaway caster items and truly blank scrolls.
+- **Legacy 2.6.x books:** Iron's spellbooks inscribed via the 2.6.x ritual lose the right-click
+  cast path (no proxy-pool migration yet); uninscription does not remove the mirrored wheel proxy.
+- Minor: `/ans bind_scroll_to_irons_book` bypasses `allow_ars_spells_in_irons_spellbooks`; hoppers
+  can wedge the loom output slot; an out-of-whitelist nature key renders a missing texture in the
+  wheel.
+
+## [3.0.1] — full 3.0.x parity with 1.20.1: native spell wheel + Spell Loom (2026-07-05)
+
+Ports the entire Forge 1.20.1 3.0.0/3.0.1 line (including its audit remediation) onto NeoForge
+1.21.1, aligning version numbers so 3.0.1 means the same feature set on both game versions.
+Compile targets: **Ars Nouveau 5.11.1 / Iron's Spellbooks 1.21.1-3.16.0** (the Iron's pin was
+bumped from 3.15.6 to match the play instance; every API this release touches was re-verified
+against the 3.16.0 jar). Build- and test-verified (60 JUnit tests, 0 failures); in-game runtime
+validation per TESTING_GUIDE.
+
+### Added — Ars spells in Iron's native spell wheel (3.0.0 feature A+B)
+- **Export → bind workflow.** An Ars Nouveau spell is exported onto a real `irons_spellbooks:scroll`
+  carrier (`ArsSpellExportUtil`), then bound onto a real Iron's spellbook
+  (`IronsBookBindingUtil.appendArsSpellToBook`), where it appears as **its own entry in Iron's
+  native spell wheel** and casts through Iron's native right-click flow.
+- **Proxy-spell pool.** Eight real registered Iron's spells (`ars_n_spells:ars_cross_1..8`,
+  `ArsCrossProxyRegistry` on `SpellRegistry.SPELL_REGISTRY_KEY`) drive the wheel entries. Each
+  proxy has mana cost 0 (the delegated Ars cast pays the real cost exactly once), ENDER school
+  (never blocked by "not learned"), instant cast, no cooldown. `IronsProxySlotWriter` grows the
+  book's native container capacity so the player's real Iron's spells are never evicted.
+- **Data model.** `CrossModSpell` gains additive `proxy_pool_id` / `custom_name` / `nature` /
+  `icon_symbol` fields with backward-compatible codecs — components written by 2.6.1 decode
+  unchanged, and entries without proxy metadata encode byte-identically to the 2.6.1 shape.
+- **Wheel cosmetics.** New client mixin `MixinAbstractSpellArsIcon` (gated on Iron's presence,
+  `require = 0`) substitutes the player-chosen name and a whitelisted nature/icon texture in the
+  wheel. 17 icon textures ship under `textures/gui/icons/spell/`, plus
+  `textures/gui/spell_icons/ars_cross_1..8.png` as Iron's un-mixed fallback path so a skipped
+  mixin degrades gracefully instead of showing a missing texture.
+- **Spellbook Binding ritual** (`spellbook_binding` tablet, apparatus recipe, brazier ritual):
+  drop one carrier scroll + one Iron's spellbook; validates fully before mutating, consumes ONE
+  scroll (stacks preserved), reports DUPLICATE/BOOK_FULL precisely. Config:
+  `allow_ars_spells_in_irons_spellbooks` (default true) and
+  `max_ars_cross_spells_per_irons_spellbook` (default -1 = pool-size bound).
+- **Commands** `/ans export_to_irons_scroll` and `/ans bind_scroll_to_irons_book` (permission 2).
+- **Tooltips.** `CrossSpellTooltipHandler` (client) shows inscribed-spell entries and cast/cycle
+  hints on any inscribed item.
+- Right-clicking an Iron's **spellbook** now always defers to Iron's native flow — the ANS
+  sidecar right-click cast no longer hijacks spellbook clicks.
+
+### Added — Spell Loom workstation (3.0.0 feature C)
+- **First block in the mod**: craftable Spell Loom (gold + lapis + book + obsidian). Right-click
+  opens a 3-slot menu (Ars source + blank Iron's scroll → carrier output) with a name field and
+  nature/icon cyclers. The inscribe action is a server-authoritative payload
+  (`SpellLoomExportPayload`): the server re-reads the block entity slots, validates the scroll,
+  clamps the name to 40 chars, and whitelists nature/icon keys. Hoppers can interact via the
+  item-handler block capability. Ships blockstate/models/textures, loot table, shaped recipe,
+  and recipe-unlock advancement (all at singular 1.21 datapack paths).
+
+### Fixed — audit ports from the 1.20.1 3.0.x line
+- **ANS-CRIT-005 (world-load deadlock risk):** `RegenSynergyHandler`'s Source-Jar scan now verifies
+  all covered chunks are loaded (non-loading `hasChunk` via new pure `ChunkScanUtil`) before
+  reading block states, clamps Y to build height, and skips-and-retries near unloaded chunks.
+  New config: `enable_source_jar_synergy` (kill switch, default true),
+  `source_jar_scan_interval_ticks` (20, 1–200), `source_jar_scan_radius` (4, 1–8).
+- **ANS-CRIT-002 / ANS-HIGH-030 (SEPARATE-mode mana integrity):** the Iron's share of a dual-cost
+  cast is now pre-paid atomically with the sufficiency check during Ars cost-calc (previously the
+  post-cast TAIL consume silently swallowed failures — a one-way Ars drain), and a failed Ars leg
+  **refunds** the pre-paid Iron's share via the secondary bridge.
+- **F1 (apparatus recipes uncraftable with Iron's loaded):** pedestal ingredient
+  `irons_spellbooks:spell_book` is not a registered item (Iron's ships 16 tiered books). Recipes
+  now use the new `#ars_n_spells:irons_spell_books` tag (entries `required: false`, so the tag
+  loads Iron's-less).
+- **3.0.1 config screen:** full legibility pass (owned near-opaque background so blur mods can't
+  frost it, bounded panel, row stripes with hover, real button chrome with shared render/click
+  geometry, description truncation + hover tooltip, scrollbar) and full read-only gating in
+  multiplayer. Fixed "Reset Toggles" wrongly setting `enable_cooldown_system` to true (TOML
+  default is false). Moved to `client/screen/` (audit F3).
+- **Payload registration hardening:** all payloads register unconditionally (an Iron's-gated
+  registration could fail channel negotiation when server/client disagree on Iron's presence);
+  network protocol bumped to "2" so 2.6.1 ↔ 3.0.1 cross-connects are cleanly rejected.
+- **F5:** the remaining direct `enable_mana_unification` read in `RegenSynergyHandler` now routes
+  through `BridgeManager.isUnificationEnabled()`. **F6:** `/reload`-safety of the ritual-tablet
+  splice documented on `RitualRegistryHandler`.
+
+### Removed — dead configuration (ANS-MED-044 / F4 + subsystem-gone keys)
+- Removed 59 config keys no code ever read: the Ars Glyph Bonuses and Iron's School Bonuses
+  sections, 4 resonance caps, category-cooldown keys, `allow_discount_stacking`, the Performance
+  keys (`mana_sync_interval`, `enable_caching`, `cache_duration`), `hybrid_sync_rate`,
+  `allow_mana_overflow`, and — 1.21.1-only, because Blood Magic / Covenant of the Seven have no
+  1.21.1 builds — the entire Cursed Ring LP, Aura, and Blasphemy sections plus
+  `hide_mana_bar_with_ring` and `scroll_cost_mode` (its reader mixin was never ported; re-add
+  key + mixin together if the feature returns). Kept: `virtue_ring_discount` and
+  `max_total_curio_discount` (repurposed by the live curio discount system) and the resonance
+  master keys (parity with 1.20.1).
+
+### Not ported (no 1.21.1 builds of the backing mods)
+- Everything LP/aura-flavored from 1.20.1 3.0.x: the pending-cost FIFO race fix (ANS-MED-042,
+  lived in `ScrollLPTracker`), the LP death-net tick scoping (ANS-HIGH-028), scroll full-mode LP
+  costs (ANS-MED-043), and F9/F10/F13. These target Blood Magic / Covenant of the Seven code that
+  does not exist in this port.
+
 ## [2.6.1] — core feature parity with 1.20.1 (2026-06-18)
 
 Restores four features that were stubbed or unported in the 2.5.0 NeoForge port, closing the

@@ -133,7 +133,7 @@ Pass: affinity and progression persist; the chest item's `CrossModSpellList` dat
 2. Toggle a master switch and click the **Mana Mode** row to cycle it; click **Done**.
 3. Run `/ans mode` and inspect `serverconfig/ars_n_spells-server.toml`.
 
-Pass: the screen opens, the Mana Mode row cycles through the five modes, and on **Done** the value is saved and applied live (`BridgeManager.refreshMode`) so `/ans mode` reflects the change. In multiplayer the Save/Reset controls are disabled and the button reads **Close**. Registered via `IConfigScreenFactory` in [`ArsNSpellsClient`](src/main/java/com/otectus/arsnspells/client/ArsNSpellsClient.java); screen body in [`ConfigScreenFactory`](src/main/java/com/otectus/arsnspells/config/ConfigScreenFactory.java).
+Pass: the screen opens **with no blur over the options** (3.0.2: opaque dark background; rows, title, and scrollbar fully legible when opened in-game where the 1.21 menu blur applies), the Mana Mode row cycles through the five modes, and on **Done** the value is saved and applied live (`BridgeManager.refreshMode`) so `/ans mode` reflects the change. In multiplayer the Save/Reset controls are disabled and the button reads **Close**. Registered via `IConfigScreenFactory` in [`ArsNSpellsClient`](src/main/java/com/otectus/arsnspells/client/ArsNSpellsClient.java); screen body in [`ConfigScreenFactory`](src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java).
 
 ### V12 — Ars mana potions feed the unified pool — should pass now (Iron's required)
 
@@ -176,6 +176,58 @@ The ritual classifier ([`InscriptionInputs`](src/main/java/com/otectus/arsnspell
 3. Compare the resulting item's component map to a fresh blank target.
 
 Pass: the `ars_n_spells:cross_spells` component is gone; component map equality holds. The new [`CrossModSpellComponents.clear`](src/main/java/com/otectus/arsnspells/spell/CrossModSpellComponents.java) call removes the component entirely (rather than leaving an empty list), matching the Forge-era `tag.isEmpty() ⇒ setTag(null)` collapse.
+
+## W17 – W24 — 3.0.x wheel + loom scenarios (Iron's required unless noted)
+
+### W17 — Spell Loom inscribe flow
+
+1. Craft the Spell Loom (` G ` / `LBL` / `OOO` — gold, lapis/book/lapis, obsidian) and place it.
+2. Right-click; insert a filled Ars parchment (source slot) and a blank Iron's scroll (scroll slot).
+3. Type a name, cycle Nature/Icon, press **Inscribe**.
+
+Pass: output slot holds one `irons_spellbooks:scroll` named *Ars Scroll: <name>*, the inputs shrank by one each, and `/data get entity @s SelectedItem` on the scroll shows the `ars_n_spells:cross_spells` component (one entry with `custom_name`/`nature`/`icon_symbol`) plus `ars_n_spells:export_mode = "irons_scroll_carrier"`. An inscribed (non-blank) scroll in the scroll slot must be rejected with an action-bar message.
+
+### W18 — Spellbook Binding ritual
+
+1. Craft the Spellbook Binding tablet (apparatus: novice spellbook reagent; pedestals any Iron's spellbook, Iron's scroll, source gem block, archwood log — 2500 source).
+2. Place it on a brazier; drop exactly one W17 carrier scroll and one Iron's spellbook nearby; activate.
+
+Pass: success message names the spell, ONE scroll is consumed (drop a stack of 2+ to verify the rest survives), and the book now lists the Ars entry in its `ars_n_spells:cross_spells` component with a `proxy_pool_id` ≥ 1. Extra items in range, multiple scrolls, or multiple books must each fail with the precise error message, mutating nothing.
+
+### W19 — Native wheel entry + cast (the headline check)
+
+1. Hold the bound book; open Iron's spell wheel.
+2. Select the Ars entry (custom name + chosen icon should show) and cast it.
+
+Pass: the Ars spell resolves; **Ars-side mana is charged exactly once through the ANS pipeline** (proxy cost is 0 — watch the mana bar; with `debug_mode` the cost log line appears once). The player's pre-existing Iron's spells are still in their original slots. Also verify: right-clicking the book casts through Iron's native flow (the ANS sidecar right-click no longer hijacks spellbooks), and the "not learned" gate never blocks the proxy (ENDER-school trick).
+
+### W20 — Wheel dedup / pool exhaustion
+
+1. Bind a second, different Ars spell onto the same book.
+2. Then attempt to bind the same spell payload again, and finally bind up to the cap.
+
+Pass: two distinct wheel entries show simultaneously (dedup-by-id check — each bind claimed its own `ars_cross_k`); re-binding an identical payload fails with the *already carries* message; the 9th bind (or `max_ars_cross_spells_per_irons_spellbook`+1st) fails with *book full*.
+
+### W21 — Admin commands round-trip
+
+`/ans export_to_irons_scroll` with a filled parchment in main hand → carrier lands in inventory. Hold carrier + book (one per hand) → `/ans bind_scroll_to_irons_book` → bound (metadata preserved), scroll consumed. Both commands fail cleanly with the localized message when Iron's is absent or the held items are wrong.
+
+### W22 — SEPARATE-mode pre-pay/refund (ANS-CRIT-002 / ANS-HIGH-030)
+
+1. `/ans mode set separate`; note both pools.
+2. Cross-cast an Ars spell with plenty of both manas → both pools drop per the dual-cost split, once.
+3. Drain the Iron's pool below the split share; cast again → cast is blocked and **neither** pool is charged.
+4. With enough Iron's but not enough Ars mana, cast → the cast fails and the Iron's share is **refunded** (pool returns to its pre-cast value).
+
+### W23 — Source-Jar guard + kill switch (ANS-CRIT-005)
+
+1. Stand near a Source Jar in `iss_primary` → mana ticks up every `source_jar_scan_interval_ticks`.
+2. Set `enable_source_jar_synergy = false` → regen stops; with `debug_mode` on, the once-per-minute scan-counter log stops advancing.
+3. Teleport ~10k blocks repeatedly during chunk streaming → no server freeze; skipped-scan counter increments instead.
+
+### W24 — Iron's-less boot (regression gate, no Iron's installed)
+
+Remove Iron's Spellbooks from the instance. Pass: client and dedicated server boot clean (no `ClassMetadataNotFoundException` from the icon mixin, no proxy-registry classload), the Spell Loom places and opens but Inscribe reports *Iron's Spellbooks is not installed*, the binding tablet/recipes are absent, and the `#ars_n_spells:irons_spell_books` tag loads without errors (`required: false`).
 
 ## Removed scenarios
 

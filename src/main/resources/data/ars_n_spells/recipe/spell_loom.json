@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " G ",
+    "LBL",
+    "OOO"
+  ],
+  "key": {
+    "G": { "item": "minecraft:gold_ingot" },
+    "L": { "item": "minecraft:lapis_lazuli" },
+    "B": { "item": "minecraft:book" },
+    "O": { "item": "minecraft:obsidian" }
+  },
+  "result": {
+    "id": "ars_n_spells:spell_loom",
+    "count": 1
+  }
+}

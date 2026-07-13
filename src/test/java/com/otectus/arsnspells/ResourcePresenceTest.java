@@ -38,8 +38,17 @@ class ResourcePresenceTest {
         String[] jsonResources = {
             "/data/ars_n_spells/recipe/apparatus/spell_transcription.json",
             "/data/ars_n_spells/recipe/apparatus/spell_uninscription.json",
+            "/data/ars_n_spells/recipe/apparatus/spellbook_binding.json",
+            "/data/ars_n_spells/recipe/spell_loom.json",
             "/data/ars_n_spells/tags/item/curio_spell_discount.json",
+            "/data/ars_n_spells/tags/item/irons_spell_books.json",
             "/data/ars_n_spells/tags/entity_type/magical_companions.json",
+            "/data/ars_n_spells/loot_table/blocks/spell_loom.json",
+            "/data/ars_n_spells/advancement/recipes/misc/spell_loom.json",
+            "/assets/ars_n_spells/blockstates/spell_loom.json",
+            "/assets/ars_n_spells/models/block/spell_loom.json",
+            "/assets/ars_n_spells/models/item/spell_loom.json",
+            "/assets/ars_n_spells/models/item/spellbook_binding.json",
             "/assets/ars_n_spells/lang/en_us.json",
             "/ars_n_spells.mixins.json",
             "/pack.mcmeta",
@@ -51,6 +60,30 @@ class ResourcePresenceTest {
             } catch (Exception e) {
                 fail("Resource " + path + " is missing or not valid JSON: " + e);
             }
+        }
+    }
+
+    @Test
+    void wheelIconTexturesShipForEveryWhitelistedKey() {
+        // The icon mixin only returns paths built from these whitelists, and the
+        // spell_icons/ars_cross_k.png files are Iron's un-mixed fallback path —
+        // a missing file here means a purple checkerboard in the spell wheel.
+        for (String symbol : com.otectus.arsnspells.spell.CrossModSpellComponents.ICON_SYMBOLS) {
+            assertNotNull(res("/assets/ars_n_spells/textures/gui/icons/spell/icon_" + symbol + ".png"),
+                "missing icon texture for whitelisted symbol: " + symbol);
+        }
+        for (String nature : com.otectus.arsnspells.spell.CrossModSpellComponents.NATURE_KEYS) {
+            assertNotNull(res("/assets/ars_n_spells/textures/gui/icons/spell/nature_" + nature + ".png"),
+                "missing nature texture for whitelisted key: " + nature);
+        }
+        assertNotNull(res("/assets/ars_n_spells/textures/gui/icons/spell/ars_cross_default.png"));
+        for (int k = 1; k <= com.otectus.arsnspells.spell.CrossModSpellComponents.PROXY_POOL_SIZE; k++) {
+            assertNotNull(res("/assets/ars_n_spells/textures/gui/spell_icons/ars_cross_" + k + ".png"),
+                "missing un-mixed fallback texture for proxy slot " + k);
+        }
+        for (String tex : new String[] {"spell_loom_top", "spell_loom_side", "spell_loom_bottom"}) {
+            assertNotNull(res("/assets/ars_n_spells/textures/block/" + tex + ".png"),
+                "missing Spell Loom block texture: " + tex);
         }
     }
 
@@ -87,6 +120,7 @@ class ResourcePresenceTest {
         for (String path : new String[] {
             "/data/ars_n_spells/recipe/apparatus/spell_transcription.json",
             "/data/ars_n_spells/recipe/apparatus/spell_uninscription.json",
+            "/data/ars_n_spells/recipe/apparatus/spellbook_binding.json",
         }) {
             try (InputStream in = res(path)) {
                 assertNotNull(in, "Missing recipe on classpath: " + path);

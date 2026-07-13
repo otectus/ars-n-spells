@@ -125,6 +125,13 @@ public final class CrossCastContext {
         public boolean blocked;
         public String spellId;
         public boolean multiplierApplied;
+        /**
+         * ANS-CRIT-002 / ANS-HIGH-030: Iron's share pre-paid atomically during
+         * Ars cost-calc in SEPARATE mode. Non-zero means the TAIL consume must
+         * no-op ({@code issCost} is zeroed alongside) and a failed Ars leg must
+         * refund this amount via the secondary bridge.
+         */
+        public volatile float issPaid;
 
         private Entry(CrossSpellType type, long expiresAt) {
             this.type = type;

@@ -19,7 +19,10 @@ import com.otectus.arsnspells.events.IronsProgressionHandler;
 import com.otectus.arsnspells.events.ProgressionHandler;
 import com.otectus.arsnspells.events.ResonanceEvents;
 import com.otectus.arsnspells.network.PacketHandler;
+import com.otectus.arsnspells.registry.ModBlockEntities;
+import com.otectus.arsnspells.registry.ModBlocksRegistry;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
+import com.otectus.arsnspells.registry.ModMenus;
 import com.otectus.arsnspells.rituals.RitualRegistryHandler;
 import com.otectus.arsnspells.spell.CrossCastIronsHandler;
 import com.otectus.arsnspells.spell.ModDataComponents;
@@ -31,6 +34,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,16 +60,25 @@ public class ArsNSpells {
         ModItemsRegistry.registerCommonItems();
         if (ModList.get().isLoaded("irons_spellbooks")) {
             ModItemsRegistry.registerIronsDependentItems();
+            // Native-wheel proxy spells (ars_cross_1..8). FQN-only reference:
+            // ArsCrossProxyRegistry's static init classloads Iron's SpellRegistry,
+            // so the class must never be touched on Iron's-less installs.
+            com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry.register(modBus);
         }
         ModItemsRegistry.register(modBus);
         AttachmentTypes.register(modBus);
         ModDataComponents.register(modBus);
+        // Spell Loom workstation (block + block item + block entity + menu).
+        ModBlocksRegistry.register(modBus);
+        ModBlockEntities.register(modBus);
+        ModMenus.register(modBus);
 
         // ---- Mod-bus listeners ----
         modBus.addListener(this::commonSetup);
         modBus.addListener(this::onConfigLoading);
         modBus.addListener(this::onConfigReloading);
         modBus.addListener(PacketHandler::onRegisterPayloadHandlers);
+        modBus.addListener(ArsNSpells::onRegisterCapabilities);
 
         // ---- Config registration via ModContainer ----
         // SERVER (was COMMON): gameplay tunables — mana mode, conversion rates, dual-cost
@@ -104,6 +118,13 @@ public class ArsNSpells {
         // mod-bus listeners via modBus.addListener above — the class has no
         // game-bus @SubscribeEvent methods, so we do NOT call
         // NeoForge.EVENT_BUS.register(this) here.
+    }
+
+    private static void onRegisterCapabilities(final RegisterCapabilitiesEvent event) {
+        // Expose the Spell Loom's slots to hoppers/pipes (parity with the 1.20.1
+        // ForgeCapabilities.ITEM_HANDLER exposure).
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK,
+            ModBlockEntities.SPELL_LOOM.get(), (be, side) -> be.getItems());
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {

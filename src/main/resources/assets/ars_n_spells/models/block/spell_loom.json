@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "ars_n_spells:block/spell_loom_top",
+    "side": "ars_n_spells:block/spell_loom_side",
+    "bottom": "ars_n_spells:block/spell_loom_bottom",
+    "particle": "ars_n_spells:block/spell_loom_side"
+  }
+}

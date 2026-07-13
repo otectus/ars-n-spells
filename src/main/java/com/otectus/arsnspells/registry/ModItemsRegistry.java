@@ -4,6 +4,7 @@ import com.hollingsworth.arsnouveau.common.items.RitualTablet;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.rituals.SpellTranscriptionRitual;
 import com.otectus.arsnspells.rituals.SpellUninscriptionRitual;
+import com.otectus.arsnspells.rituals.SpellbookBindingRitual;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.IEventBus;
@@ -34,6 +35,7 @@ public final class ModItemsRegistry {
 
     private static DeferredHolder<Item, RitualTablet> spellTranscriptionTablet;
     private static DeferredHolder<Item, RitualTablet> spellUninscriptionTablet;
+    private static DeferredHolder<Item, RitualTablet> spellbookBindingTablet;
 
     private ModItemsRegistry() {}
 
@@ -49,6 +51,10 @@ public final class ModItemsRegistry {
         spellTranscriptionTablet = ITEMS.register(
             SpellTranscriptionRitual.REGISTRY_PATH,
             () -> new RitualTablet(new SpellTranscriptionRitual())
+        );
+        spellbookBindingTablet = ITEMS.register(
+            SpellbookBindingRitual.REGISTRY_PATH,
+            () -> new RitualTablet(new SpellbookBindingRitual())
         );
     }
 
@@ -76,5 +82,9 @@ public final class ModItemsRegistry {
 
     public static DeferredHolder<Item, RitualTablet> spellUninscriptionTablet() {
         return spellUninscriptionTablet;
+    }
+
+    public static DeferredHolder<Item, RitualTablet> spellbookBindingTablet() {
+        return spellbookBindingTablet;
     }
 }

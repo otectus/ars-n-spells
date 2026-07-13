@@ -39,7 +39,8 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         if (mixinClassName.endsWith("MixinIronsSpellDamage")
-            || mixinClassName.endsWith("MixinIronsMagicDataMana")) {
+            || mixinClassName.endsWith("MixinIronsMagicDataMana")
+            || mixinClassName.endsWith("MixinAbstractSpellArsIcon")) {
             return ironsPresent;
         }
         if (mixinClassName.endsWith("MixinManaCapability")) {

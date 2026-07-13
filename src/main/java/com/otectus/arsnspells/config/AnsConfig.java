@@ -22,10 +22,7 @@ public class AnsConfig {
     // ========================================
     public static final ModConfigSpec.DoubleValue CONVERSION_RATE_ARS_TO_IRON;
     public static final ModConfigSpec.DoubleValue CONVERSION_RATE_IRON_TO_ARS;
-    public static final ModConfigSpec.DoubleValue HYBRID_SYNC_RATE;
     public static final ModConfigSpec.ConfigValue<String> HYBRID_MANA_BAR;
-    public static final ModConfigSpec.BooleanValue HIDE_MANA_BAR_WITH_RING;
-    public static final ModConfigSpec.BooleanValue ALLOW_MANA_OVERFLOW;
     public static final ModConfigSpec.DoubleValue DUAL_COST_ARS_PERCENTAGE;
     public static final ModConfigSpec.DoubleValue DUAL_COST_ISS_PERCENTAGE;
     public static final ModConfigSpec.DoubleValue DEFAULT_MAX_MANA;
@@ -36,30 +33,6 @@ public class AnsConfig {
     public static final ModConfigSpec.DoubleValue CROSS_SYSTEM_REGEN_REFERENCE_POOL;
 
     // ========================================
-    // ARS GLYPH BONUSES
-    // ========================================
-    public static final ModConfigSpec.DoubleValue AMPLIFY_DAMAGE_BONUS;
-    public static final ModConfigSpec.DoubleValue EXTEND_TIME_DURATION_BONUS;
-    public static final ModConfigSpec.IntValue SPLIT_PROJECTILE_COUNT;
-    public static final ModConfigSpec.DoubleValue PIERCE_ARMOR_PENETRATION;
-    public static final ModConfigSpec.DoubleValue SENSITIVE_CRIT_BONUS;
-
-    // ========================================
-    // IRON'S SPELLBOOKS SCHOOL BONUSES
-    // ========================================
-    public static final ModConfigSpec.BooleanValue ENABLE_SCHOOL_BONUSES;
-    public static final ModConfigSpec.DoubleValue SCHOOL_BONUS_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue FIRE_SCHOOL_DAMAGE_PER_LEVEL;
-    public static final ModConfigSpec.DoubleValue ICE_SCHOOL_DURATION_PER_LEVEL;
-    public static final ModConfigSpec.DoubleValue LIGHTNING_SCHOOL_CHAIN_PER_LEVEL;
-    public static final ModConfigSpec.DoubleValue EVOCATION_SCHOOL_SPEED_PER_LEVEL;
-    public static final ModConfigSpec.DoubleValue HOLY_SCHOOL_HEALING_PER_LEVEL;
-    public static final ModConfigSpec.DoubleValue ENDER_SCHOOL_TELEPORT_RANGE_PER_LEVEL;
-    public static final ModConfigSpec.DoubleValue BLOOD_SCHOOL_LIFESTEAL_PER_LEVEL;
-    public static final ModConfigSpec.DoubleValue NATURE_SCHOOL_GROWTH_PER_LEVEL;
-    public static final ModConfigSpec.DoubleValue ELDRITCH_SCHOOL_DEBUFF_PER_LEVEL;
-
-    // ========================================
     // RESONANCE SYSTEM
     // ========================================
     public static final ModConfigSpec.BooleanValue ENABLE_ARS_RESONANCE;
@@ -68,20 +41,14 @@ public class AnsConfig {
     public static final ModConfigSpec.DoubleValue RESONANCE_THRESHOLD;
     public static final ModConfigSpec.IntValue RESONANCE_DURATION;
     public static final ModConfigSpec.DoubleValue MAX_DAMAGE_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue MAX_DURATION_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue MAX_PROJECTILE_SPLIT;
-    public static final ModConfigSpec.DoubleValue MAX_CHAIN_CHANCE;
-    public static final ModConfigSpec.DoubleValue MAX_AREA_MULTIPLIER;
 
     // ========================================
     // COOLDOWN SYSTEM
     // ========================================
     public static final ModConfigSpec.BooleanValue ENABLE_UNIFIED_COOLDOWNS;
-    public static final ModConfigSpec.BooleanValue ENABLE_CATEGORY_COOLDOWNS;
     public static final ModConfigSpec.BooleanValue ENABLE_CROSS_MOD_COOLDOWNS;
     public static final ModConfigSpec.IntValue COOLDOWN_CATEGORY_DURATION;
     public static final ModConfigSpec.DoubleValue CROSS_MOD_COOLDOWN_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue COOLDOWN_REDUCTION_CAP;
 
     // ========================================
     // PROGRESSION SYSTEM
@@ -101,53 +68,6 @@ public class AnsConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_CURIO_DISCOUNTS;
     public static final ModConfigSpec.DoubleValue VIRTUE_RING_DISCOUNT;
     public static final ModConfigSpec.DoubleValue MAX_TOTAL_CURIO_DISCOUNT;
-    public static final ModConfigSpec.DoubleValue BLASPHEMY_DISCOUNT;
-    public static final ModConfigSpec.DoubleValue BLASPHEMY_MATCHING_SCHOOL_BONUS;
-    public static final ModConfigSpec.BooleanValue ALLOW_DISCOUNT_STACKING;
-    
-    // ========================================
-    // CURSED RING LP SYSTEM
-    // ========================================
-    public static final ModConfigSpec.BooleanValue ENABLE_LP_SYSTEM;
-    public static final ModConfigSpec.ConfigValue<String> LP_SOURCE_MODE;
-    public static final ModConfigSpec.BooleanValue DEATH_ON_INSUFFICIENT_LP;
-    public static final ModConfigSpec.BooleanValue SHOW_LP_COST_MESSAGES;
-    
-    // LP Calculation for Ars Nouveau Spells
-    public static final ModConfigSpec.DoubleValue ARS_LP_BASE_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue ARS_LP_TIER1_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue ARS_LP_TIER2_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue ARS_LP_TIER3_MULTIPLIER;
-    public static final ModConfigSpec.IntValue ARS_LP_MINIMUM_COST;
-    
-    // LP Calculation for Iron's Spellbooks Spells
-    public static final ModConfigSpec.DoubleValue IRONS_LP_BASE_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue IRONS_LP_PER_LEVEL_MULTIPLIER;
-    public static final ModConfigSpec.IntValue IRONS_LP_MINIMUM_COST;
-    
-    // LP Rarity Multipliers for Iron's Spells
-    public static final ModConfigSpec.DoubleValue IRONS_LP_COMMON_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue IRONS_LP_UNCOMMON_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue IRONS_LP_RARE_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue IRONS_LP_EPIC_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue IRONS_LP_LEGENDARY_MULTIPLIER;
-
-    // ========================================
-    // AURA SYSTEM (Ring of Seven Virtues)
-    // ========================================
-    public static final ModConfigSpec.IntValue AURA_MAX_DEFAULT;
-    public static final ModConfigSpec.DoubleValue AURA_REGEN_RATE;
-    public static final ModConfigSpec.DoubleValue AURA_BASE_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue AURA_TIER1_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue AURA_TIER2_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue AURA_TIER3_MULTIPLIER;
-    public static final ModConfigSpec.IntValue AURA_MINIMUM_COST;
-    public static final ModConfigSpec.BooleanValue SHOW_AURA_MESSAGES;
-
-    // ========================================
-    // SCROLL COST SYSTEM
-    // ========================================
-    public static final ModConfigSpec.ConfigValue<String> SCROLL_COST_MODE;
 
     // ========================================
     // SPELL SCALING
@@ -155,14 +75,11 @@ public class AnsConfig {
     public static final ModConfigSpec.DoubleValue SPELL_POWER_CAP;
 
     // ========================================
-    // BLASPHEMY RING DISCOUNTS
-    // ========================================
-    public static final ModConfigSpec.DoubleValue BLASPHEMY_LP_DISCOUNT;
-    public static final ModConfigSpec.DoubleValue BLASPHEMY_AURA_DISCOUNT;
-
-    // ========================================
     // SOURCE JAR SYNERGY
     // ========================================
+    public static final ModConfigSpec.BooleanValue ENABLE_SOURCE_JAR_SYNERGY;
+    public static final ModConfigSpec.IntValue SOURCE_JAR_SCAN_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue SOURCE_JAR_SCAN_RADIUS;
     public static final ModConfigSpec.DoubleValue SOURCE_JAR_SYNERGY_MULTIPLIER;
 
     // ========================================
@@ -176,14 +93,13 @@ public class AnsConfig {
     // CROSS-CAST INSCRIPTION
     // ========================================
     public static final ModConfigSpec.DoubleValue CROSS_CAST_COST_MULTIPLIER;
+    public static final ModConfigSpec.BooleanValue ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS;
+    public static final ModConfigSpec.IntValue MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK;
 
     // ========================================
     // PERFORMANCE TUNING
     // ========================================
     public static final ModConfigSpec.DoubleValue SOURCE_JAR_CACHE_MOVE_THRESHOLD;
-    public static final ModConfigSpec.IntValue MANA_SYNC_INTERVAL;
-    public static final ModConfigSpec.BooleanValue ENABLE_CACHING;
-    public static final ModConfigSpec.IntValue CACHE_DURATION;
 
     static {
         // ========================================
@@ -250,10 +166,6 @@ public class AnsConfig {
             .comment("Conversion rate from Iron's mana to Ars mana (1.0 = 1:1)")
             .defineInRange("conversion_rate_iron_to_ars", 1.0, 0.01, 10.0);
         
-        HYBRID_SYNC_RATE = BUILDER
-            .comment("How often hybrid pools sync (in ticks, 20 = 1 second)")
-            .defineInRange("hybrid_sync_rate", 1.0, 0.1, 10.0);
-        
         HYBRID_MANA_BAR = BUILDER
             .comment(
                 "Which mana bar to display in HYBRID mode:",
@@ -263,19 +175,6 @@ public class AnsConfig {
             )
             .define("hybrid_mana_bar", "irons");
 
-        HIDE_MANA_BAR_WITH_RING = BUILDER
-            .comment(
-                "Hide the Ars Nouveau and Iron's Spellbooks mana bars while wearing the",
-                "Ring of the Seven Curses (LP) or Ring of the Seven Virtues (Aura).",
-                "Spells consume LP/Aura instead of mana when these rings are equipped,",
-                "so displaying a mana bar is misleading."
-            )
-            .define("hide_mana_bar_with_ring", true);
-
-        ALLOW_MANA_OVERFLOW = BUILDER
-            .comment("Allow mana to overflow max capacity during conversion")
-            .define("allow_mana_overflow", false);
-        
         DUAL_COST_ARS_PERCENTAGE = BUILDER
             .comment("Percentage of Ars mana cost in SEPARATE mode (0.5 = 50%)")
             .defineInRange("dual_cost_ars_percentage", 0.5, 0.0, 1.0);
@@ -330,85 +229,22 @@ public class AnsConfig {
 
         BUILDER.pop();
 
-        // ========================================
-        // ARS GLYPH BONUSES
-        // ========================================
-        BUILDER.push("Ars Glyph Bonuses");
-        BUILDER.comment("Bonuses applied by Ars Nouveau augment glyphs");
-        
-        AMPLIFY_DAMAGE_BONUS = BUILDER
-            .comment("Damage multiplier per Amplify glyph")
-            .defineInRange("amplify_damage_bonus", 0.2, 0.0, 10.0);
-        
-        EXTEND_TIME_DURATION_BONUS = BUILDER
-            .comment("Duration multiplier per Extend Time glyph")
-            .defineInRange("extend_time_duration_bonus", 1.5, 0.0, 10.0);
-        
-        SPLIT_PROJECTILE_COUNT = BUILDER
-            .comment("Additional projectiles per Split glyph")
-            .defineInRange("split_projectile_count", 1, 0, 10);
-        
-        PIERCE_ARMOR_PENETRATION = BUILDER
-            .comment("Armor penetration per Pierce glyph")
-            .defineInRange("pierce_armor_penetration", 0.1, 0.0, 1.0);
-        
-        SENSITIVE_CRIT_BONUS = BUILDER
-            .comment("Critical damage multiplier per Sensitive glyph")
-            .defineInRange("sensitive_crit_bonus", 0.25, 0.0, 10.0);
-        
-        BUILDER.pop();
-
-        // ========================================
-        // IRON'S SPELLBOOKS SCHOOL BONUSES
-        // ========================================
-        BUILDER.push("Iron's School Bonuses");
-        BUILDER.comment("Bonuses from Iron's Spellbooks school levels");
-        
-        ENABLE_SCHOOL_BONUSES = BUILDER
-            .comment("Enable school level bonuses for Ars spells")
-            .define("enable_school_bonuses", true);
-        
-        SCHOOL_BONUS_MULTIPLIER = BUILDER
-            .comment("Global multiplier for all school bonuses")
-            .defineInRange("school_bonus_multiplier", 1.0, 0.0, 10.0);
-        
-        FIRE_SCHOOL_DAMAGE_PER_LEVEL = BUILDER
-            .comment("Fire damage bonus per school level")
-            .defineInRange("fire_school_damage", 0.02, 0.0, 1.0);
-        
-        ICE_SCHOOL_DURATION_PER_LEVEL = BUILDER
-            .comment("Ice effect duration bonus per school level")
-            .defineInRange("ice_school_duration", 0.02, 0.0, 1.0);
-        
-        LIGHTNING_SCHOOL_CHAIN_PER_LEVEL = BUILDER
-            .comment("Lightning chain chance bonus per school level")
-            .defineInRange("lightning_school_chain", 0.02, 0.0, 1.0);
-        
-        EVOCATION_SCHOOL_SPEED_PER_LEVEL = BUILDER
-            .comment("Evocation projectile speed bonus per school level")
-            .defineInRange("evocation_school_speed", 0.02, 0.0, 1.0);
-        
-        HOLY_SCHOOL_HEALING_PER_LEVEL = BUILDER
-            .comment("Holy healing bonus per school level")
-            .defineInRange("holy_school_healing", 0.02, 0.0, 1.0);
-        
-        ENDER_SCHOOL_TELEPORT_RANGE_PER_LEVEL = BUILDER
-            .comment("Ender teleport range bonus per school level")
-            .defineInRange("ender_school_range", 0.02, 0.0, 1.0);
-        
-        BLOOD_SCHOOL_LIFESTEAL_PER_LEVEL = BUILDER
-            .comment("Blood lifesteal bonus per school level")
-            .defineInRange("blood_school_lifesteal", 0.02, 0.0, 1.0);
-        
-        NATURE_SCHOOL_GROWTH_PER_LEVEL = BUILDER
-            .comment("Nature growth effect bonus per school level")
-            .defineInRange("nature_school_growth", 0.02, 0.0, 1.0);
-        
-        ELDRITCH_SCHOOL_DEBUFF_PER_LEVEL = BUILDER
-            .comment("Eldritch debuff strength bonus per school level")
-            .defineInRange("eldritch_school_debuff", 0.02, 0.0, 1.0);
-        
-        BUILDER.pop();
+        // ANS-MED-044 / audit F4 tombstones — sections removed because no code
+        // ever read them (setting them had zero effect):
+        //   "Ars Glyph Bonuses" (amplify/extend/split/pierce/sensitive bonuses),
+        //   "Iron's School Bonuses" (enable_school_bonuses + per-school keys),
+        //   resonance caps (max_duration_multiplier, max_projectile_split,
+        //     max_chain_chance, max_area_multiplier),
+        //   category cooldowns (enable_category_cooldowns, cooldown_reduction_cap),
+        //   allow_discount_stacking, "Performance" keys (mana_sync_interval,
+        //     enable_caching, cache_duration), hybrid_sync_rate, allow_mana_overflow.
+        // Also removed on the NeoForge 1.21.1 line only — the backing subsystems
+        // (Blood Magic LP, Covenant of the Seven aura/rings) have no 1.21.1 build:
+        //   "Cursed Ring LP System" (lp_source_mode + all *_lp_* keys),
+        //   "Aura System", "Blasphemy Ring Discounts", hide_mana_bar_with_ring,
+        //   scroll_cost_mode (ANS-MED-043: reader mixin was never ported; re-add
+        //     key + MixinScrollItem together if the feature returns).
+        // Re-add any of these alongside an implementation if/when shipped.
 
         // ========================================
         // RESONANCE SYSTEM
@@ -443,22 +279,6 @@ public class AnsConfig {
             .comment("Maximum damage multiplier from resonance")
             .defineInRange("max_damage_multiplier", 5.0, 1.0, 100.0);
         
-        MAX_DURATION_MULTIPLIER = BUILDER
-            .comment("Maximum duration multiplier from resonance")
-            .defineInRange("max_duration_multiplier", 5.0, 1.0, 100.0);
-        
-        MAX_PROJECTILE_SPLIT = BUILDER
-            .comment("Maximum projectile split from resonance")
-            .defineInRange("max_projectile_split", 5.0, 1.0, 100.0);
-        
-        MAX_CHAIN_CHANCE = BUILDER
-            .comment("Maximum chain chance from resonance (1.0 = 100%)")
-            .defineInRange("max_chain_chance", 1.0, 0.0, 1.0);
-        
-        MAX_AREA_MULTIPLIER = BUILDER
-            .comment("Maximum area of effect multiplier from resonance")
-            .defineInRange("max_area_multiplier", 5.0, 1.0, 100.0);
-        
         BUILDER.pop();
 
         // ========================================
@@ -474,10 +294,6 @@ public class AnsConfig {
             .comment("Enable cross-mod cooldown sharing")
             .define("enable_unified_cooldowns", false);
         
-        ENABLE_CATEGORY_COOLDOWNS = BUILDER
-            .comment("Enable category-based cooldowns (offensive, defensive, etc.)")
-            .define("enable_category_cooldowns", false);
-        
         ENABLE_CROSS_MOD_COOLDOWNS = BUILDER
             .comment("CRITICAL: Enable cross-mod cooldown interference (false = each mod has independent cooldowns)")
             .define("enable_cross_mod_cooldowns", false);
@@ -489,10 +305,6 @@ public class AnsConfig {
         CROSS_MOD_COOLDOWN_MULTIPLIER = BUILDER
             .comment("Multiplier for cross-mod cooldowns (0.5 = 50% of normal)")
             .defineInRange("cross_mod_cooldown_multiplier", 0.5, 0.0, 10.0);
-        
-        COOLDOWN_REDUCTION_CAP = BUILDER
-            .comment("Maximum cooldown reduction from all sources (0.8 = 80% max reduction)")
-            .defineInRange("cooldown_reduction_cap", 0.8, 0.0, 1.0);
         
         BUILDER.pop();
 
@@ -559,208 +371,6 @@ public class AnsConfig {
                      "stacked discount curios from trivialising mana cost.")
             .defineInRange("max_total_curio_discount", 0.50, 0.0, 1.0);
 
-        BLASPHEMY_DISCOUNT = BUILDER
-            .comment("Base mana cost discount from Blasphemy curios (0.15 = 15% reduction)")
-            .defineInRange("blasphemy_discount", 0.15, 0.0, 1.0);
-        
-        BLASPHEMY_MATCHING_SCHOOL_BONUS = BUILDER
-            .comment("Additional discount when Blasphemy school matches spell school (0.10 = 10% extra)")
-            .defineInRange("blasphemy_matching_school_bonus", 0.10, 0.0, 1.0);
-        
-        ALLOW_DISCOUNT_STACKING = BUILDER
-            .comment("Allow Ring of Virtue and Blasphemy discounts to stack multiplicatively")
-            .define("allow_discount_stacking", true);
-        
-        BUILDER.pop();
-
-        // ========================================
-        // CURSED RING LP SYSTEM
-        // ========================================
-        BUILDER.push("Cursed Ring LP System");
-        BUILDER.comment(
-            "Controls behavior when casting spells with insufficient LP (Cursed Ring).",
-            "Applies to both Ars Nouveau and Iron's Spellbooks spells."
-        );
-
-        ENABLE_LP_SYSTEM = BUILDER
-            .comment("Master toggle for the Cursed Ring LP system.",
-                     "When disabled, spells use normal mana even with Cursed Ring equipped.")
-            .define("enable_lp_system", true);
-
-        LP_SOURCE_MODE = BUILDER
-            .comment(
-                "Where to consume LP from when wearing the Cursed Ring:",
-                "  BLOOD_MAGIC_PRIORITY - Use Blood Magic if available, fall back to health (DEFAULT)",
-                "  BLOOD_MAGIC_ONLY - Only use Blood Magic Soul Network (fails if Blood Magic not installed)",
-                "  HEALTH_ONLY - Always use player health (100 LP = 10 health = 5 hearts)"
-            )
-            .define("lp_source_mode", "BLOOD_MAGIC_PRIORITY");
-
-        DEATH_ON_INSUFFICIENT_LP = BUILDER
-            .comment(
-                "If enabled: Spell casts but player dies when LP is insufficient",
-                "If disabled: Spell is cancelled and player takes minor damage (1 heart)"
-            )
-            .define("death_on_insufficient_lp", false);
-
-        SHOW_LP_COST_MESSAGES = BUILDER
-            .comment("Show LP cost messages in action bar when casting spells")
-            .define("show_lp_cost_messages", true);
-
-        BUILDER.pop();
-        
-        // ========================================
-        // LP CALCULATION - ARS NOUVEAU SPELLS
-        // ========================================
-        BUILDER.push("LP Calculation - Ars Nouveau");
-        BUILDER.comment(
-            "Configure how LP costs are calculated for Ars Nouveau spells.",
-            "Formula: LP = (Mana Cost × Base Multiplier) × Tier Multiplier",
-            "Health cost = LP / 10 (so 10 LP = 1 health = 0.5 hearts)",
-            "Minimum LP cost is enforced after all calculations."
-        );
-
-        ARS_LP_BASE_MULTIPLIER = BUILDER
-            .comment("Base LP multiplier (Mana × this value = base LP cost)",
-                "Default 1.0: A 20 mana spell costs ~30 LP = 3 health (1.5 hearts)")
-            .defineInRange("ars_lp_base_multiplier", 1.0, 0.1, 100.0);
-
-        ARS_LP_TIER1_MULTIPLIER = BUILDER
-            .comment("LP multiplier for Tier 1 glyphs")
-            .defineInRange("ars_lp_tier1_multiplier", 1.5, 0.1, 10.0);
-
-        ARS_LP_TIER2_MULTIPLIER = BUILDER
-            .comment("LP multiplier for Tier 2 glyphs")
-            .defineInRange("ars_lp_tier2_multiplier", 2.0, 0.1, 10.0);
-
-        ARS_LP_TIER3_MULTIPLIER = BUILDER
-            .comment("LP multiplier for Tier 3 glyphs")
-            .defineInRange("ars_lp_tier3_multiplier", 2.5, 0.1, 10.0);
-
-        ARS_LP_MINIMUM_COST = BUILDER
-            .comment("Minimum LP cost for any Ars Nouveau spell (10 LP = 1 health)")
-            .defineInRange("ars_lp_minimum_cost", 10, 1, 10000);
-
-        BUILDER.pop();
-
-        // ========================================
-        // LP CALCULATION - IRON'S SPELLBOOKS SPELLS
-        // ========================================
-        BUILDER.push("LP Calculation - Iron's Spellbooks");
-        BUILDER.comment(
-            "Configure how LP costs are calculated for Iron's Spellbooks spells.",
-            "Formula: LP = (Mana Cost × Base Multiplier) × (1 + Level × Level Multiplier) × Rarity Multiplier",
-            "Health cost = LP / 10 (so 10 LP = 1 health = 0.5 hearts)",
-            "Minimum LP cost is enforced after all calculations."
-        );
-
-        IRONS_LP_BASE_MULTIPLIER = BUILDER
-            .comment("Base LP multiplier (Mana × this value = base LP cost)",
-                "Default 0.5: Iron's spells have higher base mana costs, so use lower multiplier")
-            .defineInRange("irons_lp_base_multiplier", 0.5, 0.1, 100.0);
-
-        IRONS_LP_PER_LEVEL_MULTIPLIER = BUILDER
-            .comment("Additional LP cost per spell level (0.1 = 10% per level)")
-            .defineInRange("irons_lp_per_level_multiplier", 0.1, 0.0, 10.0);
-
-        IRONS_LP_MINIMUM_COST = BUILDER
-            .comment("Minimum LP cost for any Iron's Spellbooks spell (10 LP = 1 health)")
-            .defineInRange("irons_lp_minimum_cost", 10, 1, 10000);
-        
-        BUILDER.pop();
-        
-        // ========================================
-        // LP RARITY MULTIPLIERS - IRON'S SPELLS
-        // ========================================
-        BUILDER.push("LP Rarity Multipliers - Iron's Spells");
-        BUILDER.comment(
-            "Multipliers based on spell rarity for Iron's Spellbooks.",
-            "Higher rarity = higher LP cost."
-        );
-        
-        IRONS_LP_COMMON_MULTIPLIER = BUILDER
-            .comment("LP multiplier for COMMON rarity spells")
-            .defineInRange("irons_lp_common_multiplier", 1.0, 0.1, 100.0);
-        
-        IRONS_LP_UNCOMMON_MULTIPLIER = BUILDER
-            .comment("LP multiplier for UNCOMMON rarity spells")
-            .defineInRange("irons_lp_uncommon_multiplier", 1.5, 0.1, 100.0);
-        
-        IRONS_LP_RARE_MULTIPLIER = BUILDER
-            .comment("LP multiplier for RARE rarity spells")
-            .defineInRange("irons_lp_rare_multiplier", 2.0, 0.1, 100.0);
-        
-        IRONS_LP_EPIC_MULTIPLIER = BUILDER
-            .comment("LP multiplier for EPIC rarity spells")
-            .defineInRange("irons_lp_epic_multiplier", 3.0, 0.1, 100.0);
-        
-        IRONS_LP_LEGENDARY_MULTIPLIER = BUILDER
-            .comment("LP multiplier for LEGENDARY rarity spells")
-            .defineInRange("irons_lp_legendary_multiplier", 5.0, 0.1, 100.0);
-        
-        BUILDER.pop();
-
-        // ========================================
-        // AURA SYSTEM (Ring of Seven Virtues)
-        // ========================================
-        BUILDER.push("Aura System");
-        BUILDER.comment(
-            "Aura resource system for Ring of Seven Virtues.",
-            "When wearing the Virtue Ring, spell mana costs are replaced with aura costs.",
-            "Aura regenerates passively over time."
-        );
-
-        AURA_MAX_DEFAULT = BUILDER
-            .comment("Default maximum aura pool")
-            .defineInRange("aura_max_default", 1000, 100, 100000);
-
-        AURA_REGEN_RATE = BUILDER
-            .comment("Aura regenerated per tick (20 ticks = 1 second). 0.5 = 10 aura/sec")
-            .defineInRange("aura_regen_rate", 0.5, 0.0, 100.0);
-
-        AURA_BASE_MULTIPLIER = BUILDER
-            .comment("Base conversion from mana cost to aura cost (mana x this = base aura)")
-            .defineInRange("aura_base_multiplier", 1.0, 0.1, 100.0);
-
-        AURA_TIER1_MULTIPLIER = BUILDER
-            .comment("Aura cost multiplier for Tier 1 glyphs")
-            .defineInRange("aura_tier1_multiplier", 1.0, 0.1, 10.0);
-
-        AURA_TIER2_MULTIPLIER = BUILDER
-            .comment("Aura cost multiplier for Tier 2 glyphs")
-            .defineInRange("aura_tier2_multiplier", 1.5, 0.1, 10.0);
-
-        AURA_TIER3_MULTIPLIER = BUILDER
-            .comment("Aura cost multiplier for Tier 3 glyphs")
-            .defineInRange("aura_tier3_multiplier", 2.0, 0.1, 10.0);
-
-        AURA_MINIMUM_COST = BUILDER
-            .comment("Minimum aura cost for any spell")
-            .defineInRange("aura_minimum_cost", 5, 1, 10000);
-
-        SHOW_AURA_MESSAGES = BUILDER
-            .comment("Show aura cost messages in action bar when casting spells")
-            .define("show_aura_messages", true);
-
-        BUILDER.pop();
-
-        // ========================================
-        // SCROLL COST SYSTEM
-        // ========================================
-        BUILDER.push("Scroll Cost System");
-        BUILDER.comment(
-            "Controls resource costs when casting Iron's Spellbooks spells from scrolls."
-        );
-
-        SCROLL_COST_MODE = BUILDER
-            .comment(
-                "Cost mode for Iron's Spellbooks scroll usage:",
-                "  full - Scrolls consume mana and LP just like normal casting",
-                "  lp_only - Scrolls are free of mana cost but still consume LP if Cursed Ring equipped",
-                "  free - Scrolls have no resource cost (LP from Cursed Ring still applies)"
-            )
-            .define("scroll_cost_mode", "full");
-
         BUILDER.pop();
 
         // ========================================
@@ -777,29 +387,28 @@ public class AnsConfig {
         BUILDER.pop();
 
         // ========================================
-        // BLASPHEMY RING DISCOUNTS
-        // ========================================
-        BUILDER.push("Blasphemy Ring Discounts");
-        BUILDER.comment(
-            "Independent discount rates for LP and Aura costs when Blasphemy curios are equipped.",
-            "These are separate from the mana discount (configured in Curio Discount System)."
-        );
-
-        BLASPHEMY_LP_DISCOUNT = BUILDER
-            .comment("LP cost discount when matching Blasphemy is equipped (0.85 = 85% discount, pay only 15%)")
-            .defineInRange("blasphemy_lp_discount", 0.85, 0.0, 1.0);
-
-        BLASPHEMY_AURA_DISCOUNT = BUILDER
-            .comment("Aura cost discount when matching Blasphemy is equipped (0.85 = 85% discount, pay only 15%)")
-            .defineInRange("blasphemy_aura_discount", 0.85, 0.0, 1.0);
-
-        BUILDER.pop();
-
-        // ========================================
         // SOURCE JAR SYNERGY
         // ========================================
         BUILDER.push("Source Jar Synergy");
         BUILDER.comment("Controls the passive mana regen bonus when near Ars Nouveau Source Jars.");
+
+        ENABLE_SOURCE_JAR_SYNERGY = BUILDER
+            .comment("Master kill switch for the Source Jar proximity regen synergy.",
+                     "Set false to disable the periodic block scan entirely (zero per-tick cost).",
+                     "This is the supported way to turn the feature off;",
+                     "source_jar_synergy_multiplier keeps its 0.1 minimum. (ANS-CRIT-005 follow-up)")
+            .define("enable_source_jar_synergy", true);
+
+        SOURCE_JAR_SCAN_INTERVAL_TICKS = BUILDER
+            .comment("Ticks between Source Jar proximity checks per player (20 = once per second).",
+                     "Raise on busy servers to reduce scan cost.")
+            .defineInRange("source_jar_scan_interval_ticks", 20, 1, 200);
+
+        SOURCE_JAR_SCAN_RADIUS = BUILDER
+            .comment("Horizontal scan radius in blocks around the player.",
+                     "Any value up to the hard cap of 8 covers at most a 2x2 chunk area.",
+                     "The scan never loads chunks - cycles near unloaded chunks are skipped and retried.")
+            .defineInRange("source_jar_scan_radius", 4, 1, 8);
 
         SOURCE_JAR_SYNERGY_MULTIPLIER = BUILDER
             .comment("Multiplier for Source Jar proximity regen bonus.",
@@ -849,6 +458,25 @@ public class AnsConfig {
             )
             .defineInRange("cross_cast_cost_multiplier", 1.25, 0.5, 5.0);
 
+        ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS = BUILDER
+            .comment(
+                "Allow Ars Nouveau spells to be bound onto Iron's Spellbooks spellbooks, where",
+                "they appear as their own entries in Iron's native spell wheel and cast through",
+                "Ars 'n Spells' cross-cast pipeline. Disabling rejects new binds with a clear",
+                "message; spells already bound keep working. No effect without Iron's installed."
+            )
+            .define("allow_ars_spells_in_irons_spellbooks", true);
+
+        MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK = BUILDER
+            .comment(
+                "Maximum number of Ars spells that may be bound onto a single Iron's spellbook.",
+                "-1 = no cap (default). Whatever the value, it is bounded at runtime by the",
+                "native-wheel proxy pool size ("
+                    + com.otectus.arsnspells.spell.CrossModSpellComponents.PROXY_POOL_SIZE + "): only that many",
+                "Ars entries can be shown as distinct entries in Iron's spell wheel per book."
+            )
+            .defineInRange("max_ars_cross_spells_per_irons_spellbook", -1, -1, 64);
+
         BUILDER.pop();
 
         // ========================================
@@ -861,18 +489,6 @@ public class AnsConfig {
             .comment("Distance in blocks a player must move before re-scanning for Source Jars.",
                      "Higher values = less scanning but slower detection of jar changes.")
             .defineInRange("source_jar_cache_move_threshold", 4.0, 1.0, 32.0);
-        
-        MANA_SYNC_INTERVAL = BUILDER
-            .comment("Mana synchronization interval (ticks, lower = more responsive but higher CPU)")
-            .defineInRange("mana_sync_interval", 5, 2, 100);
-        
-        ENABLE_CACHING = BUILDER
-            .comment("Enable caching for expensive calculations")
-            .define("enable_caching", true);
-        
-        CACHE_DURATION = BUILDER
-            .comment("Cache duration (ticks)")
-            .defineInRange("cache_duration", 20, 1, 200);
         
         BUILDER.pop();
 
@@ -903,7 +519,8 @@ public class AnsConfig {
             case "cooldown": return ENABLE_COOLDOWN_SYSTEM.get();
             case "progression": return ENABLE_PROGRESSION_SYSTEM.get();
             case "affinity": return ENABLE_AFFINITY_SYSTEM.get();
-            case "lp": return ENABLE_LP_SYSTEM.get();
+            // "lp" removed: the LP system (Blood Magic / Cursed Ring) has no
+            // NeoForge 1.21.1 build; enable_lp_system was deleted with it.
             default: return false;
         }
     }
