@@ -3,6 +3,7 @@ package com.otectus.arsnspells.events;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.data.ProgressionData;
 import com.otectus.arsnspells.progression.ProgressionAttributes;
+import com.otectus.arsnspells.spell.CrossCastNbt;
 import io.redspace.ironsspellbooks.api.events.SpellOnCastEvent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -27,6 +28,11 @@ public class IronsProgressionHandler {
 
     @SubscribeEvent
     public void onIronsSpellCast(SpellOnCastEvent event) {
+        // The delegated Ars cast credits progression for its own school; crediting the
+        // ENDER-school proxy here would both double-count the cast and file it wrong.
+        if (CrossCastNbt.isArsCrossProxyId(event.getSpellId())) {
+            return;
+        }
         if (!AnsConfig.ENABLE_PROGRESSION_SYSTEM.get() || !AnsConfig.ENABLE_CROSS_MOD_PROGRESSION.get()) {
             return;
         }

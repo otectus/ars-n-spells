@@ -2,6 +2,7 @@ package com.otectus.arsnspells.events;
 
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.spell.CrossCastNbt;
 import io.redspace.ironsspellbooks.api.events.SpellOnCastEvent;
 import io.redspace.ironsspellbooks.api.events.SpellPreCastEvent;
 import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
@@ -62,6 +63,13 @@ public class IronsLPHandler {
                 player == null ? "null" : player.getName().getString(),
                 event.getSpellId(), event.getSpellLevel(),
                 player == null ? "?" : (player.level().isClientSide() ? "CLIENT" : "SERVER"));
+        }
+
+        // An ANS proxy reports a mana cost of 0 and is not a real Iron's spell; the
+        // delegated Ars cast pays LP through the Ars pipeline. Staging an LP cost here
+        // would bill the player a second time for the same cast.
+        if (CrossCastNbt.isArsCrossProxyId(event.getSpellId())) {
+            return;
         }
 
         if (player == null || player.level().isClientSide()) {
@@ -160,6 +168,11 @@ public class IronsLPHandler {
             LOGGER.debug("[IronsLPHandler] OnCast event received from Iron's (player={}, spell={}, manaCost={})",
                 player == null ? "null" : player.getName().getString(),
                 event.getSpellId(), manaCostBefore);
+        }
+
+        // See the PreCast guard: proxies are paid for by the delegated Ars cast.
+        if (CrossCastNbt.isArsCrossProxyId(event.getSpellId())) {
+            return;
         }
 
         if (player == null || player.level().isClientSide()) {

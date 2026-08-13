@@ -75,7 +75,29 @@ public final class CrossCastNbt {
      */
     public static final int PROXY_POOL_SIZE = 8;
 
+    /** Registry-path prefix shared by every {@code ars_cross_k} proxy spell. */
+    public static final String PROXY_ID_PATH_PREFIX = "ars_cross_";
+
+    /**
+     * Fully-qualified id prefix of the proxy spells. Declared here (Iron's-free) so
+     * the Iron's event handlers can recognize a proxy cast from the event's spell-id
+     * string without classloading {@code ArsCrossProxyRegistry}.
+     */
+    public static final String PROXY_SPELL_ID_PREFIX = "ars_n_spells:" + PROXY_ID_PATH_PREFIX;
+
     private CrossCastNbt() {}
+
+    /**
+     * True when {@code spellId} names one of ANS's own native-wheel proxy spells.
+     *
+     * <p>Iron's-side accounting (affinity, cooldown, LP, progression, mana) must skip
+     * these: the proxy is a zero-cost ENDER-school placeholder whose real cost, school
+     * and cooldown are owned by the delegated Ars cast. Charging Iron's rules against
+     * the placeholder double-bills the player and attributes the cast to the wrong school.
+     */
+    public static boolean isArsCrossProxyId(String spellId) {
+        return spellId != null && spellId.startsWith(PROXY_SPELL_ID_PREFIX);
+    }
 
     /**
      * Append an inscription entry to {@code stackTag}'s cross-spell list,
@@ -212,6 +234,35 @@ public final class CrossCastNbt {
             }
         }
         return null;
+    }
+
+    /**
+     * Remove the Ars entry whose {@link #TAG_PROXY_POOL_ID} equals {@code poolId}.
+     * Returns true when an entry was removed. Collapses the whole cross-spell list
+     * (and cycle index) when the removal empties it, so a rolled-back bind leaves
+     * the stack exactly as it was found.
+     *
+     * <p>This is the rollback half of the binding transaction: {@code appendArsSpellToBook}
+     * writes the sidecar entry first, and calls this if the native proxy-slot write
+     * then fails, so the book can never keep a sidecar entry with no wheel slot.
+     */
+    public static boolean removeEntryByProxyPoolId(CompoundTag stackTag, int poolId) {
+        if (stackTag == null || !stackTag.contains(TAG_CROSS_MOD_SPELLS, Tag.TAG_LIST)) {
+            return false;
+        }
+        ListTag list = stackTag.getList(TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag entry = list.getCompound(i);
+            if (entry.contains(TAG_PROXY_POOL_ID, Tag.TAG_INT)
+                && entry.getInt(TAG_PROXY_POOL_ID) == poolId) {
+                list.remove(i);
+                if (list.isEmpty()) {
+                    clearCrossModSpellsFromTag(stackTag);
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Count of Ars-type entries (those carrying an {@link #TAG_ARS_SPELL} payload). */

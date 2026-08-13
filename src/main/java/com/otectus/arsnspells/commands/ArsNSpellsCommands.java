@@ -304,20 +304,47 @@ public class ArsNSpellsCommands {
             return 0;
         }
 
-        java.util.Optional<net.minecraft.nbt.CompoundTag> arsTag =
-            com.otectus.arsnspells.spell.IronsBookBindingUtil.extractSingleArsEntry(scroll);
-        if (arsTag.isEmpty()) {
+        // Read the WHOLE entry, not just the ars_spell sub-tag: the Spell Loom's chosen
+        // name/nature/icon live as siblings of it and must ride onto the book, or the
+        // bound wheel entry loses the identity the player gave it at the loom.
+        java.util.Optional<net.minecraft.nbt.CompoundTag> entryOpt =
+            com.otectus.arsnspells.spell.IronsBookBindingUtil.extractSingleEntry(scroll);
+        if (entryOpt.isEmpty()) {
             context.getSource().sendFailure(Component.translatable("commands.ans.bind.scroll_not_carrier"));
             return 0;
         }
-        if (com.otectus.arsnspells.spell.IronsBookBindingUtil.containsEquivalentArsSpell(book, arsTag.get())) {
-            context.getSource().sendFailure(Component.translatable("commands.ans.bind.duplicate"));
+        net.minecraft.nbt.CompoundTag entry = entryOpt.get();
+        net.minecraft.nbt.CompoundTag arsTag =
+            entry.getCompound(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ARS_SPELL);
+
+        // Reject an unreadable payload before the scroll is consumed, rather than binding
+        // a wheel entry that silently does nothing when selected.
+        if (!com.otectus.arsnspells.spell.IronsBookBindingUtil.isCastableArsPayload(arsTag)) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.bind.uncastable"));
             return 0;
         }
 
-        if (!com.otectus.arsnspells.spell.IronsBookBindingUtil.appendArsSpellToBook(book, arsTag.get())) {
-            context.getSource().sendFailure(Component.translatable("commands.ans.bind.failed"));
-            return 0;
+        int maxCap = AnsConfig.MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK.get();
+        com.otectus.arsnspells.spell.IronsBookBindingUtil.AppendResult result =
+            com.otectus.arsnspells.spell.IronsBookBindingUtil.appendArsSpellToBook(
+                book, arsTag,
+                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_CUSTOM_NAME),
+                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_NATURE),
+                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ICON_SYMBOL),
+                maxCap);
+        switch (result) {
+            case ADDED:
+                break;
+            case DUPLICATE:
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.duplicate"));
+                return 0;
+            case BOOK_FULL:
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.book_full",
+                    com.otectus.arsnspells.spell.IronsBookBindingUtil.effectiveProxyCeiling(maxCap)));
+                return 0;
+            default:
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.failed"));
+                return 0;
         }
         scroll.shrink(1);
         com.otectus.arsnspells.util.AdvancementUtil.grant(player, "bind_spell");

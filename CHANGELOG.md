@@ -2,6 +2,72 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.3] - 2026-07-22
+
+> **Provenance note.** 3.0.3 was published to CurseForge (file `8490162`, SHA-256
+> `cc580f83…13610c3`) but was never committed or tagged in this repository. This entry and the
+> matching source were reconstructed from the published artifact: the jar was decompiled, the
+> delta against 3.0.2 was ported back into source, and the rebuild was verified to produce a
+> class-for-class match with identical public signatures. See `NEXT_MAJOR_UPDATE_PLAN.md` §2 for
+> the full audit. The reconstruction differs from the published jar only in compiler-generated
+> temporary names, one method declaration order, one log format string, and one extracted private
+> helper in the test driver.
+
+### Fixed: a bound Ars spell could be selected in Iron's wheel and cast nothing
+
+- **The book could not be found.** `ArsCrossProxySpell.onCast` read only
+  `MagicData.getPlayerCastingItem()`, which comes back empty for a spellbook worn in the Curios
+  spellbook slot — the normal way to carry one. The proxy then returned silently, so the wheel
+  entry selected, played no effect, and logged nothing. Resolution now falls back through the
+  equipped spellbook, main hand, and offhand, and each candidate must actually carry a sidecar
+  entry for that pool id, so a player holding two bound books can never resolve to the wrong one.
+- **Binding could half-succeed.** `IronsBookBindingUtil.appendArsSpellToBook` discarded the result
+  of the native proxy-slot write and always reported `ADDED`. A failed native write left a sidecar
+  entry with no wheel slot: invisible, uncastable, reported as success. The sidecar entry is now
+  rolled back (`CrossCastNbt.removeEntryByProxyPoolId`) and the bind returns `FAILED`.
+- **Both failure modes are now audible.** Each surfaces a WARN naming the pool id, the resolved
+  book, and the entry count, plus a translated action-bar message for the player
+  (`arsnspells.crosscast.proxy.book_missing`, `arsnspells.crosscast.proxy.entry_missing`).
+
+### Fixed: casting an Ars spell through Iron's wheel also ran Iron's own accounting
+
+The `ars_cross_*` proxies are zero-cost `ENDER`-school placeholders whose real cost, school and
+cooldown belong to the delegated Ars cast. Iron's-side handlers were treating them as genuine
+Iron's spells, so a single cast could be billed twice and filed under the wrong school. New
+`CrossCastNbt.isArsCrossProxyId` now short-circuits `IronsAffinityHandler`, `IronsCooldownHandler`,
+`IronsLPHandler` (pre-cast and on-cast), `IronsProgressionHandler`, and `CrossCastIronsHandler`.
+
+### Fixed: unreadable payloads bound and cast instead of failing
+
+- `IronsBookBindingUtil.isCastableArsPayload` deserializes and requires a non-empty recipe with a
+  cast method. The bind command and the Spellbook Binding ritual both check it **before** anything
+  is consumed, so a payload written by a different Ars version (or one whose glyph mod was removed)
+  is refused with a translated message instead of binding a silent dud.
+- `CrossCastingHandler` rejects an invalid deserialized spell before opening the cast context, so
+  no resource is spent.
+- The ritual's native-write failure now reports against the **book**
+  (`…error.bind_failed`) rather than telling players to re-export a scroll that parsed fine.
+
+### Changed
+
+- `/ans bind_scroll_to_irons_book` now reads the whole carrier entry rather than just the spell
+  payload: it honours `max_ars_cross_spells_per_irons_spellbook`, forwards the Spell Loom's chosen
+  name/nature/icon onto the book, and reports `DUPLICATE` / `BOOK_FULL` / failure distinctly
+  instead of collapsing every outcome into one message.
+- Iron's spell-wheel icon and name lookup checks the equipped spellbook slot before the hands,
+  which is where a bound book actually sits while the wheel is being rendered.
+- New GameTests drive real Iron's cast machinery (`IronsProxyCastDriver`) and assert an observable
+  world effect rather than NBT shape: Curios-slot cast, survival cast with mana, hand fallback,
+  no-op without a sidecar entry, bind-command rejection (with a positive control), and a guard
+  asserting Iron's still reports an empty casting item for spellbook casts — the assumption the
+  fallback chain exists for.
+
+### Known issue, still open in this release
+
+- Exported scrolls are created without a native Iron's spell container, so putting one in Iron's
+  Inscription Table and pressing Inscribe throws an NPE. `ArsSpellExportUtil` is byte-identical
+  between 3.0.2 and 3.0.3. Tracked in `NEXT_MAJOR_UPDATE_PLAN.md` §4.1.
+
 ## [3.0.2] - 2026-07-07
 
 ### Fixed: affinity decay ran ~20x faster than documented (audit D1)

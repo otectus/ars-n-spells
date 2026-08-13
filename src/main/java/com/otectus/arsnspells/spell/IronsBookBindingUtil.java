@@ -208,10 +208,39 @@ public final class IronsBookBindingUtil {
         // Mirror into Iron's native container so the entry shows in the wheel.
         // Gated + referenced by FQN so IronsProxySlotWriter (which imports Iron's
         // API) only classloads when Iron's is present.
-        if (IronsCompat.isLoaded()) {
-            com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.addProxySlot(book, poolId, 1);
+        //
+        // The native write is the half that can fail (container refused the grown
+        // slot). Ignoring its result used to leave a sidecar entry with no wheel
+        // slot: invisible, uncastable, and reported to the player as success. Roll
+        // the sidecar back so the book is byte-identical to before the attempt.
+        if (IronsCompat.isLoaded()
+            && !com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.addProxySlot(book, poolId, 1)) {
+            CrossCastNbt.removeEntryByProxyPoolId(bookTag, poolId);
+            return AppendResult.FAILED;
         }
         return AppendResult.ADDED;
+    }
+
+    /**
+     * True when {@code arsTag} deserializes to a spell that can actually be cast.
+     *
+     * <p>Checked before any resource is spent, so a payload written by a different
+     * Ars Nouveau version (or by a glyph whose mod has since been removed) is
+     * rejected with a translated message instead of binding a wheel entry that
+     * silently does nothing when selected.
+     */
+    public static boolean isCastableArsPayload(CompoundTag arsTag) {
+        if (arsTag == null || arsTag.isEmpty()) {
+            return false;
+        }
+        try {
+            com.hollingsworth.arsnouveau.api.spell.Spell spell =
+                com.hollingsworth.arsnouveau.api.spell.Spell.fromTag(arsTag);
+            return spell != null && spell.recipe != null && !spell.recipe.isEmpty()
+                && spell.getCastMethod() != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

@@ -10,14 +10,19 @@ import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import io.redspace.ironsspellbooks.api.spells.CastSource;
 import io.redspace.ironsspellbooks.api.spells.CastType;
 import io.redspace.ironsspellbooks.api.spells.SpellRarity;
+import io.redspace.ironsspellbooks.api.util.Utils;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.registries.ForgeRegistries;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.UUID;
 
@@ -39,6 +44,8 @@ import java.util.UUID;
  * (constructed by {@link ArsCrossProxyRegistry}).
  */
 public class ArsCrossProxySpell extends AbstractSpell {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ArsCrossProxySpell.class);
+
     private final int poolId;
     private final ResourceLocation spellResource;
     private final DefaultConfig defaultConfig;
@@ -94,12 +101,29 @@ public class ArsCrossProxySpell extends AbstractSpell {
         if (level.isClientSide() || !(entity instanceof ServerPlayer player)) {
             return;
         }
-        ItemStack book = playerMagicData.getPlayerCastingItem();
-        if (book == null || book.isEmpty() || !book.hasTag()) {
+        Carrier carrier = resolveCastingBook(player, playerMagicData);
+        if (carrier == null) {
+            // Previously a silent return: the wheel slot selected and nothing happened,
+            // with no way for a player or a log reader to tell why.
+            LOGGER.warn("Ars cross proxy {} cast by {} (source={}, equipmentSlot={}) but no carried "
+                    + "spellbook holds a sidecar entry for pool {} — the native wheel slot is desynced "
+                    + "from the {} sidecar, or the book was unequipped mid-cast",
+                spellResource, player.getGameProfile().getName(), castSource,
+                playerMagicData.getCastingEquipmentSlot(), poolId, CrossCastNbt.TAG_CROSS_MOD_SPELLS);
+            player.displayClientMessage(
+                Component.translatable("arsnspells.crosscast.proxy.book_missing", poolId), true);
             return;
         }
-        CompoundTag entry = CrossCastNbt.findEntryByProxyPoolId(book.getTag(), poolId);
-        if (entry == null || !entry.contains(CrossCastNbt.TAG_ARS_SPELL, Tag.TAG_COMPOUND)) {
+        ItemStack book = carrier.book();
+        CompoundTag entry = carrier.entry();
+        if (!entry.contains(CrossCastNbt.TAG_ARS_SPELL, Tag.TAG_COMPOUND)) {
+            LOGGER.warn("Ars cross proxy {} cast by {} resolved book {} for pool {} but that entry "
+                    + "carries no {} payload ({} Ars entries present)",
+                spellResource, player.getGameProfile().getName(),
+                ForgeRegistries.ITEMS.getKey(book.getItem()), poolId,
+                CrossCastNbt.TAG_ARS_SPELL, CrossCastNbt.countArsEntries(book.getTag()));
+            player.displayClientMessage(
+                Component.translatable("arsnspells.crosscast.proxy.entry_missing", poolId), true);
             return;
         }
         InteractionHand hand = player.getOffhandItem() == book
@@ -113,4 +137,39 @@ public class ArsCrossProxySpell extends AbstractSpell {
             com.otectus.arsnspells.util.AdvancementUtil.grant(player, "first_cross_cast");
         }
     }
+
+    /**
+     * Find the stack that actually carries this proxy's sidecar entry.
+     *
+     * <p>{@code MagicData.getPlayerCastingItem()} is the authoritative answer only when
+     * Iron's set it for this cast; it comes back empty for a book held in the Curios
+     * spellbook slot, which made every such cast a silent no-op. The equipped spellbook
+     * and both hands are checked as fallbacks, and each candidate must actually hold an
+     * entry for this pool id — so a player carrying two bound books can never resolve to
+     * the wrong one.
+     */
+    private Carrier resolveCastingBook(ServerPlayer player, MagicData magicData) {
+        Carrier carrier = carrierOf(magicData.getPlayerCastingItem());
+        if (carrier != null) {
+            return carrier;
+        }
+        carrier = carrierOf(Utils.getPlayerSpellbookStack(player));
+        if (carrier != null) {
+            return carrier;
+        }
+        carrier = carrierOf(player.getMainHandItem());
+        return carrier != null ? carrier : carrierOf(player.getOffhandItem());
+    }
+
+    /** The carrier view of {@code stack}, or null when it holds no entry for this pool id. */
+    private Carrier carrierOf(ItemStack stack) {
+        if (stack == null || stack.isEmpty() || !stack.hasTag()) {
+            return null;
+        }
+        CompoundTag entry = CrossCastNbt.findEntryByProxyPoolId(stack.getTag(), poolId);
+        return entry == null ? null : new Carrier(stack, entry);
+    }
+
+    /** A resolved book and the sidecar entry on it that belongs to this proxy. */
+    private record Carrier(ItemStack book, CompoundTag entry) {}
 }

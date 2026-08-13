@@ -1,6 +1,8 @@
 package com.otectus.arsnspells.gametest;
 
 import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.hollingsworth.arsnouveau.common.spell.effect.EffectHeal;
+import com.hollingsworth.arsnouveau.common.spell.method.MethodSelf;
 import com.mojang.authlib.GameProfile;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.network.CrossCastRequestPacket;
@@ -11,12 +13,15 @@ import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.util.FakePlayerFactory;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -245,6 +250,215 @@ public final class CrossCastGameTests {
             helper.fail("the native container must hold ars_cross_* proxy slots after binding");
         }
 
+        helper.succeed();
+    }
+
+    // ------------------------------------------------------------------
+    // Behavioural cast tests. Unlike the NBT-shape tests above, these drive real
+    // Iron's cast machinery through IronsProxyCastDriver and assert an observable
+    // world effect (the bound spell is Self+Heal, so a resolved cast raises health).
+    // They exist because every NBT assertion above passed while the "bound spell
+    // casts but does nothing" bug was live: the shape was right, the runtime path
+    // was not.
+    // ------------------------------------------------------------------
+
+    /** Bind a real, castable Self+Heal onto a real spellbook; returns the bound book. */
+    private static ItemStack bindHealSpellOntoRealBook(GameTestHelper helper) {
+        Item bookItem = findIronsSpellBook();
+        if (bookItem == null) {
+            helper.fail("no irons_spellbooks spellbook item is registered despite Iron's being loaded");
+        }
+        ItemStack book = new ItemStack(bookItem);
+        Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
+        IronsBookBindingUtil.AppendResult bound = IronsBookBindingUtil.appendArsSpellToBook(
+            book, heal.serialize(), "E2E Heal", "water", "heart", -1);
+        if (bound != IronsBookBindingUtil.AppendResult.ADDED) {
+            helper.fail("binding a real Ars spell onto a real spellbook must ADD, got " + bound);
+        }
+        if (CrossCastNbt.findEntryByProxyPoolId(book.getOrCreateTag(), 1) == null) {
+            helper.fail("the first bind must land in proxy pool 1");
+        }
+        return book;
+    }
+
+    /** A hurt fake player holding nothing, with no spellbook equipped and clean cast state. */
+    private static ServerPlayer emptyHandedPlayer(GameTestHelper helper) {
+        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), FAKE_PROFILE);
+        player.moveTo(helper.absoluteVec(new Vec3(1.0, 2.0, 1.0)));
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
+        // Hurt, so a resolved heal is observable as a health increase.
+        player.setHealth(10.0f);
+        IronsProxyCastDriver.equipSpellbook(player, ItemStack.EMPTY);
+        IronsProxyCastDriver.resetCastingState(player);
+        return player;
+    }
+
+    private static ServerPlayer handHoldingPlayer(GameTestHelper helper, ItemStack stack) {
+        ServerPlayer player = emptyHandedPlayer(helper);
+        player.setItemInHand(InteractionHand.MAIN_HAND, stack);
+        return player;
+    }
+
+    /**
+     * The headline regression: a book equipped in the Curios spellbook slot (not a hand)
+     * must resolve its bound Ars spell. This is exactly the configuration where
+     * {@code MagicData.getPlayerCastingItem()} comes back empty, which used to make the
+     * wheel entry a silent no-op.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_boundArsSpell_creativeCastResolvesThroughProxy(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack book = bindHealSpellOntoRealBook(helper);
+        ServerPlayer player = emptyHandedPlayer(helper);
+        player.setGameMode(GameType.CREATIVE);
+        IronsProxyCastDriver.castViaEquippedSpellbook(player, book, 1);
+        if (player.getHealth() <= 10.0f) {
+            helper.fail("creative proxy cast of a Curios-equipped book must resolve the bound Ars "
+                + "spell (heal); health unchanged means the proxy could not locate the book it was "
+                + "cast from, or the data path (sidecar/deserialize/resolve) is broken");
+        }
+        helper.succeed();
+    }
+
+    /** Same path in survival with mana to spare: the resource authority must not deny a funded cast. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_boundArsSpell_survivalCastWithManaResolves(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack book = bindHealSpellOntoRealBook(helper);
+        ServerPlayer player = emptyHandedPlayer(helper);
+        player.setGameMode(GameType.SURVIVAL);
+        IronsProxyCastDriver.setIronsMana(player, 10000.0f);
+        IronsProxyCastDriver.castViaEquippedSpellbook(player, book, 1);
+        if (player.getHealth() <= 10.0f) {
+            helper.fail("survival proxy cast with ample mana must resolve the bound Ars spell; "
+                + "health unchanged means the resource-authority leg denies a funded cast");
+        }
+        helper.succeed();
+    }
+
+    /** A book held in the main hand must still resolve, via the hand fallback. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_boundArsSpell_heldBookResolvesViaHandFallback(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack book = bindHealSpellOntoRealBook(helper);
+        ServerPlayer player = handHoldingPlayer(helper, book);
+        player.setGameMode(GameType.CREATIVE);
+        IronsProxyCastDriver.castViaArmedProxyWithoutEquipping(player, 1);
+        if (player.getHealth() <= 10.0f) {
+            helper.fail("a bound book held in the main hand must resolve via the hand fallback");
+        }
+        helper.succeed();
+    }
+
+    /** A wheel slot with no backing sidecar entry must do nothing — and must not throw. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_proxyCastWithoutSidecarEntry_isNoopWithoutCrash(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        Item bookItem = findIronsSpellBook();
+        if (bookItem == null) {
+            helper.fail("no irons_spellbooks spellbook item is registered despite Iron's being loaded");
+        }
+        ItemStack book = new ItemStack(bookItem);
+        ServerPlayer player = emptyHandedPlayer(helper);
+        IronsProxyCastDriver.castViaEquippedSpellbook(player, book, 1);
+        if (player.getHealth() != 10.0f) {
+            helper.fail("a proxy cast with no backing sidecar entry must not resolve any spell");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The bind command must refuse a payload that cannot deserialize to a castable spell,
+     * rather than consuming the scroll and binding a wheel entry that does nothing. The
+     * positive control runs first so a command that silently binds nothing at all cannot
+     * make the rejection assertion pass vacuously.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_bindCommand_rejectsUncastablePayload(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        Item scrollItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", "scroll"));
+        Item bookItem = findIronsSpellBook();
+        if (scrollItem == null || bookItem == null) {
+            helper.fail("Iron's scroll/spellbook items must be registered when Iron's is loaded");
+        }
+
+        // Positive control: a readable payload binds.
+        Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
+        ItemStack goodScroll = new ItemStack(scrollItem);
+        CrossCastNbt.addArsEntryWithMetaToTag(goodScroll.getOrCreateTag(),
+            IronsBookBindingUtil.ARS_PLACEHOLDER_ID, 1, heal.serialize(),
+            CrossCastNbt.NO_PROXY_POOL_ID, null, null, null);
+        ItemStack goodBook = new ItemStack(bookItem);
+        runBindCommand(helper, goodScroll, goodBook);
+        if (!CrossCastNbt.hasCrossModSpells(goodBook.getOrCreateTag())) {
+            helper.fail("positive control failed: the bind command must bind a readable payload. "
+                + "The rejection assertion below would be vacuous.");
+        }
+
+        // The real assertion: garbage is refused.
+        ItemStack scroll = new ItemStack(scrollItem);
+        CrossCastNbt.addArsEntryWithMetaToTag(scroll.getOrCreateTag(),
+            IronsBookBindingUtil.ARS_PLACEHOLDER_ID, 1, arsPayload("not_a_real_spell"),
+            CrossCastNbt.NO_PROXY_POOL_ID, null, null, null);
+        ItemStack book = new ItemStack(bookItem);
+        runBindCommand(helper, scroll, book);
+        if (CrossCastNbt.hasCrossModSpells(book.getOrCreateTag())) {
+            helper.fail("the bind command must reject a payload that cannot deserialize to a "
+                + "castable Ars spell instead of binding a silent dud");
+        }
+        helper.succeed();
+    }
+
+    private static void runBindCommand(GameTestHelper helper, ItemStack scroll, ItemStack book) {
+        ServerPlayer player = handHoldingPlayer(helper, scroll);
+        player.setItemInHand(InteractionHand.OFF_HAND, book);
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(
+            player.createCommandSourceStack().withPermission(2), "ans bind_scroll_to_irons_book");
+    }
+
+    /**
+     * Guards the assumption {@code ArsCrossProxySpell.resolveCastingBook} is built on. If a
+     * future Iron's release starts recording a real casting item for spellbook casts, this
+     * fails and tells us the fallback chain can be simplified — rather than leaving dead
+     * defensive code nobody dares remove.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_spellbookCast_leavesCastingItemEmpty(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack book = bindHealSpellOntoRealBook(helper);
+        ServerPlayer player = emptyHandedPlayer(helper);
+        player.setGameMode(GameType.CREATIVE);
+        int index = IronsProxyCastDriver.proxySlotIndex(book, 1);
+        if (index < 0) {
+            helper.fail("the bound proxy must occupy a real slot in the book's Iron's container");
+        }
+        if (!IronsProxyCastDriver.initiateViaSpellSelection(player, book, index)) {
+            helper.fail("Utils.serverSideInitiateCast refused the selection; the proxy slot or the "
+                + "SpellSelection index no longer lines up with Iron's SpellSelectionManager");
+        }
+        if (!IronsProxyCastDriver.castingItemIsEmpty(player)) {
+            helper.fail("Iron's now records a real casting item for spellbook casts — revisit "
+                + "ArsCrossProxySpell.resolveCastingBook, which exists only because it did not");
+        }
         helper.succeed();
     }
 }

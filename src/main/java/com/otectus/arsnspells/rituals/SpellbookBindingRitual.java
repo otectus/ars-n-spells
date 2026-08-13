@@ -112,6 +112,15 @@ public class SpellbookBindingRitual extends AbstractRitual {
             return;
         }
 
+        // Reject an unreadable payload before anything is consumed. Binding it would
+        // produce a wheel entry that selects and does nothing, and the scroll would
+        // already be gone.
+        if (!IronsBookBindingUtil.isCastableArsPayload(arsTag)) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.uncastable",
+                scrollStack.getHoverName().getString());
+            return;
+        }
+
         // Validation complete -- mutation begins here. The util allocates a
         // native-wheel proxy slot and mirrors the entry (with the scroll's chosen
         // display name/nature/icon) into Iron's container.
@@ -136,8 +145,12 @@ public class SpellbookBindingRitual extends AbstractRitual {
                 return;
             case FAILED:
             default:
-                RitualFeedback.error(level, pos, LANG_PREFIX + "error.scroll_parse_failed",
-                    scrollStack.getHoverName().getString());
+                // The book refused the entry (native container write failed) and the
+                // binding util has already rolled the sidecar back. Report it against
+                // the BOOK — the scroll parsed fine, so "scroll parse failed" sent
+                // players to re-export a scroll that was never the problem.
+                RitualFeedback.error(level, pos, LANG_PREFIX + "error.bind_failed",
+                    bookStack.getHoverName().getString());
                 return;
         }
         bookEntity.setItem(bookStack);

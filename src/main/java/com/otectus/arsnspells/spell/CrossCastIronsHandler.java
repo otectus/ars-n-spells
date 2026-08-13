@@ -22,6 +22,13 @@ public class CrossCastIronsHandler {
             return;
         }
 
+        // An ANS proxy's own Iron's-side cost is always 0 and must stay 0: the delegated
+        // Ars cast charges the real cost through onArsSpellCost. Applying the cross-cast
+        // multiplier or the ARS_PRIMARY conversion to the proxy would bill the player
+        // twice for one cast. The context entry is still drained below so lifecycle
+        // cleanup is unchanged.
+        boolean isProxy = CrossCastNbt.isArsCrossProxyId(event.getSpellId());
+
         ManaUnificationMode mode = BridgeManager.getCurrentMode();
         boolean unified = BridgeManager.isUnificationEnabled();
 
@@ -31,6 +38,10 @@ public class CrossCastIronsHandler {
             // Drop the entry and let the cast proceed without our adjustments.
             if (entry.spellId != null && !entry.spellId.equals(event.getSpellId())) {
                 CrossCastContext.clear(player);
+                return;
+            }
+
+            if (isProxy) {
                 return;
             }
 
@@ -72,6 +83,10 @@ public class CrossCastIronsHandler {
             // Clear after applying so a duplicate event fire (or stale entry
             // surviving beyond this cast) cannot apply the multiplier twice.
             CrossCastContext.clear(player);
+            return;
+        }
+
+        if (isProxy) {
             return;
         }
 

@@ -216,6 +216,15 @@ public class CrossCastingHandler {
         }
 
         Spell spell = Spell.fromTag(arsSpellTag);
+        // A payload written by a different Ars version, or one whose glyph mod has since
+        // been removed, deserializes to an empty/invalid recipe. Fail before the context
+        // is opened so no resource is spent and the player is told why.
+        if (!spell.isValid()) {
+            LOGGER.warn("Cross-mod Ars spell deserialized to an invalid/empty recipe: {}", spellData);
+            player.displayClientMessage(
+                Component.translatable("arsnspells.crosscast.invalid.ars_spell_unreadable"), true);
+            return false;
+        }
         ISpellCaster caster = new SpellCaster(item);
 
         // Always mark the cast so onArsSpellCost can apply the cross-cast cost

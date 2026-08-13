@@ -4,6 +4,7 @@ import com.otectus.arsnspells.spell.CrossCastNbt;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import com.otectus.arsnspells.spell.irons.ArsCrossProxySpell;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
+import io.redspace.ironsspellbooks.api.util.Utils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -69,6 +70,14 @@ public abstract class MixinAbstractSpellArsIcon {
     private static CompoundTag arsnspells$entry(Player player, int poolId) {
         if (player == null) {
             return null;
+        }
+        // Check the equipped spellbook slot first: that is where a bound book normally
+        // lives while its entries are being rendered in the wheel, and neither hand
+        // holds it. Without this the wheel fell back to the default icon and name.
+        CompoundTag fromEquipped =
+            arsnspells$entryFrom(Utils.getPlayerSpellbookStack(player), poolId);
+        if (fromEquipped != null) {
+            return fromEquipped;
         }
         CompoundTag fromMain = arsnspells$entryFrom(player.getMainHandItem(), poolId);
         return fromMain != null ? fromMain : arsnspells$entryFrom(player.getOffhandItem(), poolId);
