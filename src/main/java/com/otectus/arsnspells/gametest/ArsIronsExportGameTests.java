@@ -177,7 +177,9 @@ public final class ArsIronsExportGameTests {
         tag.put("ISB_Spells", isb);
         CompoundTag isbBaseline = isb.copy();
 
-        CrossCastNbt.clearCrossModSpells(book);
+        // Exercise the real uninscribe entry point, not the raw NBT strip underneath it:
+        // the whole point of this test is that the shipped path preserves siblings.
+        IronsBookBindingUtil.removeAllArsEntries(book);
 
         if (book.isEmpty()) {
             helper.fail("clearing inscriptions must not turn the stack into EMPTY");

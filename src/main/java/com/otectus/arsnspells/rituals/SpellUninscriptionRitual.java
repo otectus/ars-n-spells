@@ -1,7 +1,7 @@
 package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
-import com.otectus.arsnspells.spell.CrossCastNbt;
+import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
@@ -21,9 +21,12 @@ import java.util.List;
  * fresh blank target so the same item can be re-used in a subsequent
  * transcribe ritual without orphan NBT or cycle-index residue.
  *
- * Deliberately Iron's-independent: it manipulates a known root NBT key only,
- * so it remains useful even if Iron's Spellbooks has been uninstalled and
- * the player wants to clean up legacy inscribed items.
+ * Usable without Iron's: the cleanup is routed through
+ * {@link IronsBookBindingUtil#removeAllArsEntries(ItemStack)}, which touches only
+ * ANS-owned keys and gates the native-wheel half on Iron's being present. So the ritual
+ * still works for a player cleaning up legacy inscribed items after uninstalling Iron's;
+ * with Iron's present it additionally removes the native proxy slots, which the old
+ * NBT-only strip left behind as selectable, no-op wheel entries.
  *
  * Validation rules (strict, matching transcribe):
  *  <ul>
@@ -34,6 +37,9 @@ import java.util.List;
  * Every violation produces a lang-keyed message naming the offending items.
  */
 public class SpellUninscriptionRitual extends AbstractRitual {
+    private static final org.slf4j.Logger LOGGER =
+        org.slf4j.LoggerFactory.getLogger(SpellUninscriptionRitual.class);
+
     public static final String REGISTRY_PATH = "spell_uninscription";
     private static final String LANG_PREFIX = "ritual.ars_n_spells.spell_uninscription.";
     private static final int SEARCH_RADIUS = 3;
@@ -88,10 +94,16 @@ public class SpellUninscriptionRitual extends AbstractRitual {
         ItemStack stack = inscribedEntity.getItem();
         String displayName = stack.getHoverName().getString();
 
-        // Strip cleanly. CrossCastNbt drops both the spells list and the
-        // cycle index, then collapses an empty residual root tag to null so
-        // the result matches a never-inscribed item bit-for-bit.
-        CrossCastNbt.clearCrossModSpells(stack);
+        // Strip cleanly, native side first. This used to call
+        // CrossCastNbt.clearCrossModSpells alone, which dropped the sidecar but left
+        // Iron's native wheel slots pointing at pool ids that no longer resolved —
+        // a selectable entry that did nothing. The pool ids only exist in the sidecar,
+        // so they have to be read (and the slots removed) before it is cleared.
+        int proxiesRemoved = IronsBookBindingUtil.removeAllArsEntries(stack);
+        if (proxiesRemoved > 0) {
+            LOGGER.debug("Uninscribe removed {} native proxy slot(s) from {}",
+                proxiesRemoved, displayName);
+        }
         inscribedEntity.setItem(stack);
 
         playUninscribeEffects(level, pos);

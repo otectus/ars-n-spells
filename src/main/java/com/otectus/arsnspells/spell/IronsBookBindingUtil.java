@@ -244,6 +244,54 @@ public final class IronsBookBindingUtil {
     }
 
     /**
+     * Remove every ANS-owned artifact from {@code stack}: native wheel proxy slots first,
+     * then the sidecar entries, then ANS's own export marker.
+     *
+     * <p><b>Order matters.</b> The pool ids live in the sidecar, so clearing the sidecar first
+     * loses the only record of which native slots belong to ANS — which is exactly the bug this
+     * replaces. Uninscription used to call {@code clearCrossModSpells} alone, leaving the
+     * proxy slots behind: {@code IronsProxySlotWriter.removeProxySlot} had no callers anywhere
+     * in the codebase. The result was an orphan wheel entry that stayed selectable and did
+     * nothing — the same symptom as the binding bug, reached from the other direction.
+     *
+     * <p>Only ANS-owned keys are touched. Custom names and third-party NBT are left alone: a
+     * hover name cannot be attributed to ANS after the fact (the player may have renamed the
+     * item at an anvil), and destroying another mod's data to clean up our own would be a
+     * worse bug than the one being fixed. A scroll carrier therefore comes out of this as a
+     * valid, blank Iron's scroll — its native container is Iron's, not ours, and stays.
+     *
+     * @return the number of native proxy slots removed
+     */
+    public static int removeAllArsEntries(ItemStack stack) {
+        if (stack == null || stack.isEmpty() || !stack.hasTag()) {
+            return 0;
+        }
+        CompoundTag tag = stack.getTag();
+        if (tag == null) {
+            return 0;
+        }
+        int removed = 0;
+        if (IronsCompat.isLoaded()) {
+            for (int poolId : CrossCastNbt.usedProxyPoolIds(tag)) {
+                if (com.otectus.arsnspells.spell.irons.IronsProxySlotWriter
+                        .removeProxySlot(stack, poolId)) {
+                    removed++;
+                }
+            }
+        }
+        CrossCastNbt.clearCrossModSpells(stack);
+        // clearCrossModSpells may have dropped the root tag entirely; re-read before
+        // touching the marker so this cannot resurrect an empty compound.
+        if (stack.hasTag() && stack.getTag() != null) {
+            stack.getTag().remove(ArsSpellExportUtil.TAG_EXPORT_MODE);
+            if (stack.getTag().isEmpty()) {
+                stack.setTag(null);
+            }
+        }
+        return removed;
+    }
+
+    /**
      * The effective per-book Ars ceiling: a negative {@code maxCap} means
      * "no cap" (still bounded by {@link CrossCastNbt#PROXY_POOL_SIZE}, the number
      * of distinct native-wheel slots that can exist).

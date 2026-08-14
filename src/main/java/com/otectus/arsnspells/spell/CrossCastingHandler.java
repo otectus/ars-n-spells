@@ -525,11 +525,16 @@ public class CrossCastingHandler {
     }
 
     /**
-     * Strip every cross-mod inscription artifact from an item, including the
-     * cycle index. The result is bit-identical to a never-inscribed stack.
+     * Strip every cross-mod inscription artifact from an item: native wheel proxy slots,
+     * the sidecar entries, the cycle index, and ANS's export marker.
+     *
+     * <p>Routed through {@link IronsBookBindingUtil#removeAllArsEntries(ItemStack)} rather
+     * than {@link CrossCastNbt#clearCrossModSpells(ItemStack)} so this entry point cannot
+     * reintroduce the orphan-wheel-slot bug: the raw NBT strip drops the sidecar that holds
+     * the pool ids, leaving Iron's native slots behind as selectable no-ops.
      */
     public static void clearCrossModSpells(ItemStack stack) {
-        CrossCastNbt.clearCrossModSpells(stack);
+        IronsBookBindingUtil.removeAllArsEntries(stack);
     }
 
     /**

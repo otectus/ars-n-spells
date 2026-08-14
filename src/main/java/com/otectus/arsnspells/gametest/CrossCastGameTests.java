@@ -558,6 +558,76 @@ public final class CrossCastGameTests {
     }
 
     /**
+     * Unbinding must remove the native wheel slot, not just the sidecar.
+     *
+     * <p>The old path cleared the sidecar and left Iron's proxy slot in place, producing an
+     * entry the player could still select that did nothing — the mirror image of the binding
+     * bug. This asserts the slot is genuinely gone from Iron's container, and that unbinding
+     * a book leaves no selectable residue.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_unbind_removesNativeProxySlotAndSidecar(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack book = bindHealSpellOntoRealBook(helper);
+
+        // Precondition: the proxy really is in Iron's container, or the removal proves nothing.
+        if (IronsProxyCastDriver.proxySlotIndex(book, 1) < 0) {
+            helper.fail("test setup failed: the bound proxy is not in the book's native container");
+        }
+
+        IronsBookBindingUtil.removeAllArsEntries(book);
+
+        if (IronsProxyCastDriver.proxySlotIndex(book, 1) >= 0) {
+            helper.fail("unbinding must remove the native wheel slot; leaving it behind is the "
+                + "orphan-proxy bug — a selectable entry with no payload that casts nothing");
+        }
+        if (book.hasTag() && CrossCastNbt.hasCrossModSpells(book.getTag())) {
+            helper.fail("unbinding must also clear the ANS sidecar");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Unbinding an exported scroll leaves a valid, blank Iron's scroll — the native container
+     * belongs to Iron's and must survive, or we would recreate the Inscription Table crash on
+     * the way out.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_unbindCarrier_leavesValidBlankScroll(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
+        ItemStack carrier = ArsSpellExportUtil.createIronsScrollCarrier(heal);
+        if (carrier.isEmpty()) {
+            helper.fail("export must yield a carrier when Iron's is loaded");
+        }
+
+        IronsBookBindingUtil.removeAllArsEntries(carrier);
+
+        if (carrier.isEmpty()) {
+            helper.fail("unbinding must not destroy the scroll stack");
+        }
+        if (carrier.hasTag()
+            && carrier.getTag().contains(ArsSpellExportUtil.TAG_EXPORT_MODE)) {
+            helper.fail("unbinding must remove ANS's own export marker");
+        }
+        if (!IronsProxyCastDriver.scrollContainerDereferenceSucceeds(carrier)) {
+            helper.fail("unbinding stripped the native Iron's container — that container is Iron's, "
+                + "not ANS's, and removing it recreates the Inscription Table NPE");
+        }
+        if (IronsInscriptionPolicy.evaluate(carrier) != IronsInscriptionPolicy.Verdict.ALLOW) {
+            helper.fail("an unbound carrier is an ordinary blank Iron's scroll and must pass the "
+                + "inscription guard");
+        }
+        helper.succeed();
+    }
+
+    /**
      * Guards the assumption {@code ArsCrossProxySpell.resolveCastingBook} is built on. If a
      * future Iron's release starts recording a real casting item for spellbook casts, this
      * fails and tells us the fallback chain can be simplified — rather than leaving dead
