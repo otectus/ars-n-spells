@@ -1,8 +1,14 @@
-# Testing Guide — Ars 'n' Spells 3.0.1
+# Testing Guide — Ars 'n' Spells 3.1.0
 
 This guide covers manual verification scenarios for the cross-cast pipeline
 (introduced in 2.0.0), the native-wheel/Spell Loom export systems (3.0.0),
-and the 3.0.x hardening fixes. It supersedes the pre-1.8 testing notes.
+and the 3.0.x / 3.1.0 hardening fixes. It supersedes the pre-1.8 testing notes.
+
+**Read this first: much of what used to be manual is now automated.** The
+scenarios below are for what a human still has to look at — rendering, feel,
+and multi-mod packs. Before running any of them, run the automated suites; if
+one of those is red, a manual pass will only rediscover the same fault more
+slowly. See [Automated coverage](#automated-coverage).
 
 For an at-a-glance description of features and configuration, start with the
 [README](README.md). For the change history, see [CHANGELOG.md](CHANGELOG.md).
@@ -13,7 +19,10 @@ For an at-a-glance description of features and configuration, start with the
 | --- | --- | --- |
 | Minecraft (Forge) | 1.20.1 / 47.4.0+ | All tests |
 | Ars Nouveau | 4.12.7 | All tests |
-| Iron's Spells 'n Spellbooks | 3.15.x | "Ars + Iron's" tests, scaling, progression, scrolls, cross-cast |
+| Iron's Spells 'n Spellbooks | 3.15.x or 3.16.x | "Ars + Iron's" tests, scaling, progression, scrolls, cross-cast |
+| Ars Elemental | 0.6.8.0 | Addon compatibility scenarios |
+| Too Many Glyphs | 1.20.1 | Addon compatibility scenarios |
+| JEI and/or EMI | Any | Recipe-viewer scenarios |
 | Covenant of the Seven (Sanctified Legacy) | Any | Cursed/Virtue Ring tests |
 | Blood Magic | Any | LP source `BLOOD_MAGIC_*` tests |
 
@@ -32,6 +41,47 @@ debug_mode = true
 
 This adds `[Cooldown]`, `[CurioDiscount]`, `[CrossCastTrace]`, and similar log
 prefixes to most event paths.
+
+## Automated coverage
+
+Run these before any manual pass.
+
+```bash
+./gradlew test                                                   # 213 JUnit tests
+./gradlew runGameTestServer                                      # Iron's-absent boot + fallback
+rm -rf run/world && ./gradlew runGameTestServer -PwithIronsRuntimeGameTests
+rm -rf run/world && ./gradlew runGameTestServer -PwithArsElemental
+rm -rf run/world && ./gradlew runGameTestServer -PwithTooManyGlyphs
+rm -rf run/world && ./gradlew runGameTestServer -PwithIronsRuntimeGameTests -PwithArsElemental -PwithTooManyGlyphs
+```
+
+Two traps worth knowing:
+
+- **Gradle's exit code is not the result.** `runGameTestServer` reports
+  `BUILD SUCCESSFUL` even when the server failed to load a world and ran no
+  tests at all. Assert on the log line instead: `All N required tests passed`
+  in `run/logs/latest.log`. CI does this deliberately.
+- **`rm -rf run/world` between profile switches.** The profiles share `run/`,
+  and an Iron's-loaded run leaves an `irons_spellbooks:pocket_dimension`
+  reference in the save that a later Iron's-absent run cannot load.
+
+On the Iron's-absent run, every Iron's-gated test self-skips, so a green result
+there proves boot safety only — not that the cross-cast pipeline works. Only the
+Iron's-loaded number is evidence about casting.
+
+What the automated suites already cover, so you do not need to re-do it by hand:
+export → bind → cast from the Curios spellbook slot, main hand and offhand;
+unbind removing both sidecar and native wheel slot; the Inscription Table guard
+on client and server; legacy carrier repair; bind rejection of unreadable and
+missing-glyph payloads; proxy hiding from recipe viewers; school resolution
+including filter glyphs and multi-school glyphs; and addon glyph round-trips.
+
+What still needs a human: anything visual (wheel icons, names, mana bars, the
+Spell Loom screen under shaders), anything about *feel* (costs, cooldowns,
+balance), Covenant of the Seven paths (the ring predicates need Covenant at
+runtime, which is not on the test classpath), and real-pack interactions.
+
+---
 
 ## 2.0.0 cross-cast pipeline matrix
 
@@ -136,6 +186,95 @@ places/opens, and pressing Inscribe shows the `irons_missing` message instead of
 crashing. (Automated: `CrossCastGameTests` / `ArsIronsExportGameTests` self-skip
 the Iron-loaded paths; run `./gradlew runGameTestServer` with and without
 `-PwithIronsRuntimeGameTests`.)
+
+## 3.1.0 — what automation cannot reach
+
+Each of these covers a fix whose *mechanism* is already tested headlessly but
+whose end-to-end behaviour needs a real client, a real server, or a mod that
+cannot be put on the test classpath.
+
+### X1 — Inscription Table, legacy carrier (the reported crash)
+
+Needs a carrier exported by **3.0.3 or earlier**, so make one before updating.
+
+1. On 3.0.3, export any Ars spell to a scroll. Keep the world.
+2. Update to 3.1.0, load the same world.
+3. Put that scroll in an Iron's Inscription Table with any spell book and press
+   **Inscribe**.
+
+Expected: no crash. A red message points you at the Spellbook Binding workflow,
+and the scroll is **not** consumed. On 3.0.3 this crashes the client instantly.
+
+4. Repeat on a **dedicated server** with a second player watching. Expected: no
+   server crash and no disconnect. This is the half the original report never
+   showed — the same malformed scroll hits two more unguarded dereferences on
+   the server thread.
+
+### X2 — Inscription Table, freshly exported carrier
+
+Export a spell on 3.1.0 and repeat X1 step 3. Expected: the same polite refusal,
+scroll intact. (A new carrier has a valid container so nothing can crash, but
+Iron's would otherwise consume it and inscribe an empty spell.)
+
+### X3 — Orphan wheel entry cleanup
+
+1. On 3.0.3, bind an Ars spell into a book, then uninscribe it with the
+   Uninscription ritual.
+2. Note the book still shows a selectable wheel entry that casts nothing.
+3. Update to 3.1.0 and bind any spell into that same book.
+
+Expected: the orphan entry is gone, and the newly bound spell works. Repair is
+lazy by design — it happens when something touches the book, not on a timer, so
+merely loading the world will not clear it.
+
+### X4 — Virtue Ring with the aura system disabled
+
+Needs **Covenant of the Seven**, which cannot be automated here.
+
+1. Set `enable_virtue_aura_system = false`.
+2. Wear the Ring of Seven Virtues, cast any Ars spell.
+
+Expected: **normal mana is consumed**. On 3.0.3 and earlier the cast was free —
+nothing took aura, and nothing took mana either.
+
+3. Set the toggle back to `true` and confirm aura is consumed instead of mana.
+
+### X5 — Cursed Ring pays one currency, not two
+
+Needs Covenant. With `scroll_cost_mode = full`, `enable_lp_system = true` and the
+Ring of Seven Curses worn, use an Iron's scroll with a non-zero mana cost.
+
+Expected: LP is deducted, mana is **not**. This is deliberate and matches normal
+casting; it is documented behaviour, not a missed charge.
+
+### X6 — Recipe viewers are clean
+
+With **JEI** installed, search `ars_cross`. Expected: no results. Open the
+Arcane Anvil category and confirm no `ars_cross_*` entries. Repeat with **EMI**
+installed, then with both. Also check the creative menu's Iron's Scrolls tab.
+
+Then confirm nothing legitimate was lost: the Spell Loom, both ritual tablets,
+their recipes, and ordinary Iron's scrolls must all still appear.
+
+### X7 — Addon removal fails loudly
+
+1. With **Ars Elemental** installed, build a spell using one of its glyphs
+   (e.g. Watery Grave), export it, and bind it to a book.
+2. Remove Ars Elemental. Load the world.
+3. Select and cast that entry.
+
+Expected: a red message naming the missing glyph, and **no mana or LP spent**.
+On earlier versions the spell silently cast a shortened version of itself —
+different behaviour, full price.
+
+### X8 — Addon school sanity
+
+With Ars Elemental installed, cast a few of its elemental spells and confirm the
+school ANS reports (affinity gain, elemental scaling) matches the element you
+would expect. If one disagrees, it is a mapping opinion rather than a bug — fix
+it from a datapack, see the README's *Spell schools* section.
+
+---
 
 ## P0 regression scenarios (1.9.0 stabilization pass)
 

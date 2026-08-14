@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v3.0.2)
+# Ars 'n' Spells (v3.1.0)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It rests on three pillars: **mana unification** (five configurable modes for how the two pools interact), **cross-mod scaling and progression** (Iron's spell-power attributes scale Ars spells; both mods feed shared school progression and affinity), and **cross-casting** (inscribe spells from either mod onto arbitrary items, or export Ars spells onto real Iron's scrolls and spellbooks and cast them from Iron's native spell wheel). Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -8,7 +8,7 @@ Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for M
 | --- | --- | --- |
 | Minecraft (Forge) | 1.20.1 / 47.4.0+ | Yes |
 | Ars Nouveau | 4.12.7 – 4.12.x (`[4.12.7,4.13)`) | Yes |
-| Iron's Spells 'n Spellbooks | 3.15.0 – 3.x (`[3.15.0,4.0.0)`) | No |
+| Iron's Spells 'n Spellbooks | 3.15.0 – 3.x (`[3.15.0,4.0.0)`) | No³ |
 | Covenant of the Seven (Sanctified Legacy) | 2.2.6 recommended¹ | No |
 | Blood Magic | Any | No |
 | Apotheosis / Apothic Curios | Any | No² |
@@ -18,6 +18,7 @@ If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars b
 
 ¹ The Covenant aura-bar HUD mixin is verified against Covenant 2.2.6; other versions still work, but the client logs a warning if the overlay bytecode has drifted.
 ² No hard dependency — mana stats on curios are read generically through the Curios API (see [Gear perks and enchantments](#gear-perks-and-enchantments)).
+³ The advertised range is verified rather than assumed: every Iron's API type Ars 'n' Spells uses is byte-identical between 3.15.0 and 3.16.2 (the only difference across the whole API package is five *added* spell-registry constants), and the automated GameTest suite runs against both.
 
 ## Features
 
@@ -55,7 +56,9 @@ Worn **curios** (rings, amulets, belts) have their attribute modifiers read the 
 
 ### Spell scaling
 
-Ars spell potency scales with Iron's spell power attributes. The base `SPELL_POWER` attribute applies to every Ars cast; if the first glyph indicates an element (fire, ice, lightning, holy, ender, blood, evocation, nature, eldritch), the matching Iron's elemental spell-power attribute layers on additively. Affinity (per-school) and resonance (mana fullness) further shape the multiplier. The final scalar is clamped to `spell_power_cap` (default 3.0).
+Ars spell potency scales with Iron's spell power attributes. The base `SPELL_POWER` attribute applies to every Ars cast; when the spell resolves to an element (fire, ice, lightning, holy, ender, blood, evocation, nature, eldritch), the matching Iron's elemental spell-power attribute layers on additively. Affinity (per-school) and resonance (mana fullness) further shape the multiplier. The final scalar is clamped to `spell_power_cap` (default 3.0).
+
+Since 3.1.0 the school comes from **Ars Nouveau's own glyph metadata** (`AbstractSpellPart.spellSchools`) rather than from guessing at the glyph's registry name, so addon glyphs classify correctly without ANS shipping a hardcoded list — see [Spell schools](#spell-schools).
 
 Implementation: scaling activates on each Ars `SpellCastEvent` and is applied within a 60-tick window to spell-flavored damage from the casting player. Iron's must be installed for the scaling path to fire — without Iron's, Ars spells use their native damage values.
 
@@ -116,6 +119,8 @@ Hold the exported scroll and an Iron's spellbook and run `/ans bind_scroll_to_ir
 **3. Cast from the spellbook — through Iron's native spell wheel.**
 Each bound Ars spell appears as its **own entry in Iron's native spell-selection wheel**, with the name and icon you chose. Select it like any Iron's spell and right-click the spellbook to cast — it runs the real Ars spell through Ars 'n' Spells' server-authoritative cross-cast pipeline (mana, the `cross_cast_cost_multiplier`, scaling, cooldown). Your book's native Iron's spells are untouched and cast exactly as before. Under the hood, each entry occupies one of a small pool of registered proxy spells (`ars_cross_1..8`); the real Ars data lives in the book's `arsnspells:cross_spells` sidecar, since Iron's own per-slot data has no room for it. Up to **8** Ars spells per book show in the wheel. (Generic inscribed items that aren't Iron's spellbooks still cast via right-click / sneak-cycle as before.)
 
+**Iron's Inscription Table and ANS carriers.** An exported carrier is a real Iron's scroll, but its payload is an Ars spell that Iron's own Inscription Table cannot read. Putting one in the table and pressing Inscribe is refused with a message pointing you back at the binding workflow above — it does not consume the scroll. Carriers exported by 3.0.3 and earlier lacked a native spell container entirely and **crashed** the table (and, on a dedicated server, the server); 3.1.0 both fixes new exports and repairs old carriers in place the first time something touches them.
+
 ---
 
 ## Covenant of the Seven integration
@@ -157,9 +162,11 @@ Iron's Spellbooks scrolls respect resource costs. The `scroll_cost_mode` config 
 
 | Mode | Behavior |
 | --- | --- |
-| `full` (default) | Scrolls consume mana and LP/aura like normal casting. |
+| `full` (default) | Scrolls cost the same as casting the spell normally. |
 | `lp_only` | Scrolls are mana-free but LP is still consumed for Cursed Ring wearers. |
 | `free` | No resource cost for scrolls (LP from Cursed Ring still applies). |
+
+Wearing the Cursed Ring (with `enable_lp_system` on) makes **LP replace mana** rather than add to it — exactly as it does for normal casting, where Iron's mana cost is zeroed for ring wearers. A ring wearer is never charged both currencies for one cast.
 
 ---
 
@@ -318,7 +325,7 @@ The aura pool (max, regen, persistence, HUD) belongs to Covenant of the Seven; t
 
 ### Rituals
 
-These keys configure the Ritual of Mana Infusion and Ritual of the Mana Well. Both rituals are registered (Iron's-gated) but **currently have no craftable tablet or recipe, so they are not obtainable in survival**.
+These keys configure the Ritual of Mana Infusion and Ritual of the Mana Well. Both rituals are registered (Iron's-gated) but **currently have no craftable tablet or recipe, so they are not obtainable in survival**. They are pending a keep-or-remove decision; until then the config keys are inert in normal play, and Mana Well's per-tick area query is deliberately left alone rather than optimised for a feature nobody can obtain.
 
 | Option | Default | Range | Description |
 | --- | --- | --- | --- |
@@ -334,11 +341,41 @@ All cross-mod item/block detection is tag-driven and datapack-extensible. Shippe
 
 | Tag | Type | Default contents | Controls |
 | --- | --- | --- | --- |
-| `ars_n_spells:irons_spell_books` | item | all 16 tiered Iron's spellbooks | Which books the Spell Transcription / Spellbook Binding ritual pedestals accept. |
+| `ars_n_spells:irons_spell_books` | item | all 16 tiered Iron's spellbooks | Which books the ritual pedestals accept, and an **additive** second source for binding-target detection. Since 3.1.0 the primary test is Iron's own `ISpellbook` interface, so this tag is only needed to declare a spellbook-like item from a *third* mod. |
 | `ars_n_spells:cursed_rings` | item | Covenant + Enigmatic Legacy `cursed_ring` | Which rings trigger the LP-cost path. |
 | `ars_n_spells:virtue_rings` | item | Covenant `virtue_ring` | Which rings trigger the aura-cost path. |
 | `ars_n_spells:blasphemy_curios` | item | Covenant's 13 blasphemies | Which curios grant school discounts. School matching is by item path `<school>_blasphemy` (any namespace), so name custom entries accordingly (e.g. `mypack:fire_blasphemy`). |
 | `ars_n_spells:source_jars` | block | Ars `source_jar`, `creative_source_jar` | Which blocks count for Source Jar regen synergy. |
+
+### Spell schools
+
+Ars 'n' Spells classifies every glyph into one canonical school — `fire`, `ice`, `lightning`, `nature`, `holy`, `ender`, `blood`, `evocation`, `eldritch`, or `generic` — and that single answer drives affinity, progression, scaling, cooldowns, LP cost and the UI alike. Resolution order:
+
+1. **An explicit glyph override** from a datapack (below). Highest authority: a pack author's deliberate correction beats even the addon's own metadata.
+2. **Ars Nouveau's declared schools** (`AbstractSpellPart.spellSchools`). Vanilla Ars populates these for every glyph and Ars Elemental populates them explicitly, so most addon content classifies correctly with no configuration at all.
+3. **A small registry-name keyword fallback**, for a glyph that declares nothing.
+
+Ars's own school vocabulary is a different axis from Iron's, so ANS translates: Ars models Freeze as `water` and Iron's has no water school, so `water` → `ice`; `abjuration` → `holy`, `conjuration` → `evocation`, `manipulation` → `ender`, `air` → `lightning`, `earth` → `nature`. The parent `elemental` school is deliberately unmapped, since it does not say *which* element a glyph is. Glyphs declaring several schools resolve deterministically, never by collection order.
+
+Override any of it from a datapack — no Java, no mod update — with `data/<your_pack>/ans_glyph_schools/anything.json`:
+
+```json
+{
+  "glyphs": {
+    "ars_elemental:glyph_watery_grave": "ice",
+    "toomanyglyphs:glyph_gravity": "nature"
+  },
+  "ars_schools": {
+    "water": "nature"
+  }
+}
+```
+
+`glyphs` keys are full glyph registry ids and override one glyph. `ars_schools` keys are Ars school ids and re-aim an entire school at once. Files are merged over the shipped defaults, reload with `/reload`, and a bad entry is skipped with a warning in the log rather than failing the datapack.
+
+### Recipe viewers
+
+The internal `ars_cross_1..8` proxy spells that make bound Ars spells appear in Iron's wheel are hidden from JEI, EMI and the creative menu. They remain registered and castable — disabling them would break every already-bound spellbook — they simply do not appear as items or recipes. No configuration needed, and JEI is never required.
 
 Key economy knobs live in `ars_n_spells-server.toml`: LP multipliers (`ars_lp_*`, `irons_lp_*`, rarity ladder), `aura_failure_mode` (block vs. free casts when the Covenant bridge is degraded), `cross_cast_cost_multiplier`, and the master toggles listed above.
 
@@ -357,6 +394,8 @@ While a Cursed or Virtue Ring is equipped, both mana bars are hidden (`hide_mana
 
 Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 
+- **3.1.0 — Crash fix, honest addon compatibility, no more recipe-viewer ghosts.** Exported scrolls no longer crash Iron's Inscription Table — the reported client NPE turned out to be one of *three* unguarded dereferences, two of them on the server thread, so this was a remote-crash vector on dedicated servers; legacy carriers are repaired in place. Unbinding now removes the native wheel entry instead of leaving a selectable no-op. The Virtue Ring no longer makes Ars spells free when `enable_virtue_aura_system` is off. `ars_cross_*` ghosts are gone from JEI, EMI and the creative menu. Spell schools come from Ars Nouveau's own glyph metadata with datapack overrides, filter glyphs no longer decide a spell's school, and removing an addon now fails loudly instead of silently turning a bound spell into a different one. Verified against Ars Elemental 0.6.8.0 and Too Many Glyphs in every profile combination.
+- **3.0.3 — Cross-cast hotfix** *(published to CurseForge but never tagged; reconstructed into git in 3.1.0)*. A bound Ars spell equipped in the Curios spellbook slot cast nothing; binding could half-succeed; Iron's affinity/cooldown/LP/progression double-billed proxy casts; unreadable payloads bound instead of being refused.
 - **3.0.2 — Second audit pass: decay fix, pack-maker tags, advancements.** Affinity decay now follows its documented proportional curve (it previously drained a flat point per interval, ~20x too fast); ring/Blasphemy/Source Jar detection moved to datapack-extensible tags (`ars_n_spells:cursed_rings`, `virtue_rings`, `blasphemy_curios`, `source_jars`); a four-step advancement chain guides the Spell Loom workflow; new `aura_failure_mode` lets servers block (instead of free-allow) Virtue Ring casts when the Covenant bridge is degraded, and untested Covenant versions now announce themselves in chat; the progression bonus curve is config-driven (`progression_bonus_per_cast`/`progression_bonus_cap`); spell-school classification uses an explicit glyph map (Firework is no longer "fire school"); the Spell Loom screen got the high-contrast readability treatment with region tooltips; `mods.toml` gained issue-tracker/homepage/update-checker metadata. See [CHANGELOG.md](CHANGELOG.md).
 - **3.0.1 — Full-codebase audit remediation.** The Spell Transcription and Spellbook Binding tablets are craftable again when Iron's is installed (recipes now use the pack-overridable [`ars_n_spells:irons_spell_books`](src/main/resources/data/ars_n_spells/tags/items/irons_spell_books.json) tag instead of a nonexistent item id); `enable_lp_system` is honored by every LP path (closing a double-penalty and a scrolls-charge-LP-when-disabled inconsistency); `mana_unification_mode = "disabled"` is respected consistently by equipment bridging, Source Jar synergy, and mana-bar hiding; config screen readability rewrite with a proper multiplayer read-only mode; Source Jar synergy kill switch and scan tuning; fixed a startup crash on installs without Iron's; pruned zero-reader config keys; assorted dead-code cleanup. See [AUDIT_FINDINGS.md](AUDIT_FINDINGS.md).
 - **3.0.0 — Ars → scroll → spellbook export.** The Spell Loom workstation, Spellbook Binding ritual, and `/ans export_to_irons_scroll` / `/ans bind_scroll_to_irons_book` commands carry an Ars spell onto real Iron's items, cast through Iron's native spell wheel via a registered proxy-spell pool. Also fixed the pending-cost race (per-player FIFO queues) and added Iron-loaded GameTests.
@@ -370,7 +409,11 @@ Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 - **Gear perks not affecting mana**: Confirm `respect_armor_bonuses=true` and the correct mode. In `separate`, perks are not cross-applied.
 - **Double mana bars**: Verify your mode and check for overlay conflicts from other UI mods.
 - **"Insufficient LP" despite enough hearts**: Ensure `lp_source_mode` is not `BLOOD_MAGIC_ONLY` without Blood Magic installed. Default is `BLOOD_MAGIC_PRIORITY`.
-- **Scrolls casting for free**: Verify `scroll_cost_mode` is set to `full` (default).
+- **Scrolls casting for free**: Verify `scroll_cost_mode` is set to `full` (default). Note that a Cursed Ring wearer pays LP *instead of* mana by design — that is not a free cast.
+- **Ars spells casting for free while wearing the Virtue Ring**: Fixed in 3.1.0. With `enable_virtue_aura_system=false`, older builds cancelled the mana cost without anything taking aura in its place.
+- **Iron's Inscription Table crashes when I insert an exported scroll**: Fixed in 3.1.0, which also repairs carriers made by older versions. On 3.0.3 and earlier this crashes the client, and a dedicated server, every time.
+- **A bound spell shows in the wheel but does nothing**: If unbinding left it behind, 3.1.0 removes such orphan entries the next time the book is bound to or reconciled. If it never worked, check the log for `ars_cross_` warnings — they name the exact reason.
+- **An addon glyph gets the wrong school**: Override it from a datapack; see [Spell schools](#spell-schools). No mod update needed.
 - **Aura bar looks wrong with a newer Covenant version**: The aura-bar HUD mixin is verified against Covenant 2.2.6; the client logs a warning when the overlay has drifted. Gameplay is unaffected.
 
 ## Building from source
@@ -384,9 +427,21 @@ Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 
 Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven; no manual jar placement required.
 
-Output jar: `build/libs/ars_n_spells-3.0.2.jar` (version tracks `mod_version` in `gradle.properties`).
+Output jar: `build/libs/ars_n_spells-3.1.0.jar` (version tracks `mod_version` in `gradle.properties`).
 
-To run the Iron-loaded GameTest scenarios (CYCLE, export→bind→coexist round-trips), use the opt-in profile: `./gradlew runGameTestServer -PwithIronsRuntimeGameTests`.
+### Test profiles
+
+`./gradlew test` runs the JUnit suite (213 tests). GameTests run on a real server via `runGameTestServer`, with opt-in profiles that put real dependencies on the runtime classpath:
+
+| Command | Covers |
+| --- | --- |
+| `./gradlew runGameTestServer` | Iron's-absent fallback and boot safety |
+| `./gradlew runGameTestServer -PwithIronsRuntimeGameTests` | The cross-cast pipeline against real Iron's: bind, cast from the Curios spellbook slot, unbind, inscription guard, legacy repair |
+| `./gradlew runGameTestServer -PwithArsElemental` | Ars Elemental 0.6.8.0 glyph round-trip and school resolution |
+| `./gradlew runGameTestServer -PwithTooManyGlyphs` | Too Many Glyphs equivalent |
+| Any combination of the above | Mixed-addon recipes |
+
+Gradle reports `BUILD SUCCESSFUL` even when a GameTest world fails to load, so assert on the log line instead: `All N required tests passed`. The profiles share the `run/` directory, and an Iron's-loaded run leaves an `irons_spellbooks:pocket_dimension` reference in `run/world` that a later Iron's-absent run cannot load — delete `run/world` between profile switches.
 
 ## License
 

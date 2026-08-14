@@ -6,6 +6,20 @@ Works with **Minecraft 1.20.1** on **Forge**.
 
 ---
 
+## What's new in 3.1.0
+
+**If you export Ars spells onto Iron's scrolls, update.** Putting one of those scrolls into Iron's **Inscription Table** and pressing Inscribe used to crash — and on a dedicated server it crashed the *server*, not just the player who did it. That is fixed, scrolls made by older versions are repaired automatically, and the table now politely tells you to use the Spellbook Binding workflow instead of eating your scroll.
+
+Also in this release:
+
+- **Unbinding actually unbinds.** Removing a bound Ars spell used to leave a ghost entry in Iron's spell wheel that you could select and that did nothing. Those are cleaned up.
+- **No more phantom scrolls in JEI/EMI.** The internal `ars_cross_*` entries that cluttered recipe viewers and the creative menu are hidden. They still work in bound spellbooks — they just stop pretending to be items.
+- **Virtue Ring free-cast fixed.** With `enable_virtue_aura_system` turned off, Ars spells were costing *nothing at all* — no aura, no mana. They now use normal mana as the setting promises.
+- **Real addon support, actually tested.** Spell schools now come from Ars Nouveau's own glyph data instead of guesswork, so **Ars Elemental**, **Too Many Glyphs** and other addons classify correctly out of the box. Both are verified by the automated test suite, together and separately. Pack makers can override any glyph's school from a datapack.
+- **Removing an addon no longer silently changes your spells.** Previously, uninstalling a glyph mod turned a bound spell into a shortened version of itself that still cost full price. Now it refuses to cast and tells you which glyph is missing.
+
+---
+
 ## What's new in 3.0.x
 
 - **The Spell Loom** — a new workstation that exports any Ars Nouveau spell onto a real Iron's scroll, with a name, nature, and icon of your choosing.
@@ -20,10 +34,12 @@ Works with **Minecraft 1.20.1** on **Forge**.
 | Mod | Required? |
 |-----|-----------|
 | **Ars Nouveau** (4.12.7+) | Yes |
-| **Iron's Spells 'n Spellbooks** (3.15.0 – 3.x) | No — falls back to native Ars behavior if absent |
+| **Iron's Spells 'n Spellbooks** (3.15.0 – 3.x) | No — falls back to native Ars behavior if absent. Tested against both 3.15.0 and 3.16.2. |
 | **Covenant of the Seven** (Sanctified Legacy) | No — enables LP and aura ring systems (2.2.6 recommended for the aura HUD) |
 | **Blood Magic** | No — optional LP source for Ring of Seven Curses |
 | **Apotheosis** + **Apothic Curios** | No — lets affix/socket mana stats on curios feed the unified pool |
+| **Ars Elemental** / **Too Many Glyphs** | No — supported and covered by the automated test suite |
+| **JEI** / **EMI** | No — internal proxy entries are hidden from both when present |
 
 *(Curios is required by Ars Nouveau, so it is always present.)*
 
@@ -214,6 +230,21 @@ A: Make sure Iron's Spells 'n Spellbooks (3.15.0+) is installed. Check logs for 
 
 **Q: I can't craft the Spell Transcription or Spellbook Binding tablet.**
 A: Fixed in 3.0.1 — update the mod. The recipes accept any tiered Iron's spellbook.
+
+**Q: My game crashes when I put an exported scroll in Iron's Inscription Table.**
+A: Fixed in 3.1.0. Older scrolls are repaired automatically the first time the mod touches them. The Inscription Table can't read an Ars spell, so it now refuses politely — use the Spellbook Binding ritual or `/ans bind_scroll_to_irons_book` instead.
+
+**Q: A spell in my wheel does nothing when I select it.**
+A: If you unbound it earlier, that's a leftover ghost entry from a pre-3.1.0 version; bind anything to that book and it gets cleaned up. Otherwise check the log for `ars_cross_` warnings, which name the exact cause.
+
+**Q: I see weird `ars_cross_1` scrolls in JEI/EMI.**
+A: Fixed in 3.1.0 — those are internal plumbing and are now hidden from recipe viewers and the creative menu.
+
+**Q: My Ars spells cost nothing while wearing the Ring of Seven Virtues.**
+A: Fixed in 3.1.0. With `enable_virtue_aura_system` disabled, nothing was charging aura *or* mana. Normal mana is now used, as the setting describes.
+
+**Q: An addon glyph is treated as the wrong element.**
+A: Override it with a datapack — no mod update needed. See the *Spell schools* section of the README.
 
 **Q: I see two mana bars.**
 A: Verify your mana mode is set correctly. Check for overlay conflicts from other UI mods.

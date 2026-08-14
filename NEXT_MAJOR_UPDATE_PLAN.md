@@ -1,19 +1,37 @@
 # Ars 'n' Spells — Next Major Update Plan
 
-**Status:** Phases 1–5 complete. Phase 6 (server profiling) and Phase 7 (cohesion) not started.
+**Author:** coding agent
+**Started:** 2026-08-13
+**Tree at start:** `main` @ `3017bbc` ("Release 3.0.2"), clean, identical to `origin/main`.
+**Tree now:** `v3.1.0` tagged; JUnit 213/213, GameTests 39/39 across every profile combination.
+
+**Status:** Phases 1–5 and 7 complete. **Phase 6 (server optimisation) is not started and is
+blocked on a profile that cannot be captured in this environment** — see §7.3 and §8.
 
 | Phase | State |
 |---|---|
 | 1 — reproduce and document | Complete; 3.0.3 recovered, reconstructed and tagged (§2) |
-| 2 — scroll/binding architecture | Crash fix and uninscription fix landed; `BindingService` unification, legacy reconciler, schema version and tag-based spellbook detection still open |
-| 3 — resource accounting | Ring toggles and game-time expiry landed; FIFO→transaction-id still open |
+| 2 — scroll/binding architecture | Crash fix, uninscription fix, legacy reconciler, item schema version and type/tag-based spellbook detection all landed. One item deliberately deferred: a single `BindingService` façade. The invariant it was meant to enforce is now enforced at each mutation point instead, so the remaining value is tidiness rather than correctness — see §5.1 |
+| 3 — resource accounting | Ring toggles and game-time expiry landed; FIFO→transaction-id still open (see §4.7) |
 | 4 — JEI proxy pollution | Complete (creative tab + `allowCrafting` + JEI plugin) |
 | 5 — addon compatibility | Complete (school resolution centralised, missing-glyph detection, addon profiles run) |
 | 6 — server optimisation | **Not started** — needs the profile in §8 first |
-| 7 — cohesion and incomplete features | Not started |
-**Author:** coding agent
-**Date:** 2026-08-13
-**Working tree at time of writing:** `main` @ `3017bbc` ("Release 3.0.2"), clean, identical to `origin/main`.
+| 7 — cohesion and incomplete features | Dead helpers removed, stale `ISB_Spells` tests rewritten against the modern container, version coherence restored and **v3.1.0 tagged**. Mana Infusion / Mana Well keep-or-remove is an open product decision — see §9 |
+
+### Open items, in priority order
+
+1. **Phase 6 — server optimisation.** Blocked. Every magnitude in §4.9 is a mechanism read off
+   source, not a measurement, and Phase 6's acceptance criteria are all comparative ("no
+   synchronised spike above 1 ms", "material reduction"), so there is nothing to compare against
+   until the baseline in §8 exists. Optimising first would be guessing at which hotspots matter.
+2. **Mana Infusion / Mana Well** — keep or remove (§9). A product decision: removing deletes
+   registered content from existing worlds, keeping means tablets, recipes, tests and fixing Mana
+   Well's per-tick area query for a feature no player can currently obtain.
+3. **FIFO delayed-cast accounting** (§4.7) — projectiles can resolve out of cast order, so FIFO
+   alone cannot guarantee the right cast pays the right cost. Needs a transaction id threaded
+   through `CrossCastContext`. Not observed in the wild; it is a correctness gap, not a report.
+4. **`BindingService` façade** (§5.1) — deferred deliberately. Its invariant is now enforced at
+   each mutation point, so what remains is consolidation rather than a behaviour change.
 
 ---
 
