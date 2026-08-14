@@ -124,6 +124,24 @@ public class ArsNSpells {
         MinecraftForge.EVENT_BUS.register(this);
     }
 
+    /**
+     * Register the datapack-driven glyph → school overrides. Fires on world load and on
+     * {@code /reload}, so pack authors can iterate without restarting.
+     */
+    @net.minecraftforge.eventbus.api.SubscribeEvent
+    public void onAddReloadListeners(net.minecraftforge.event.AddReloadListenerEvent event) {
+        event.addListener(new com.otectus.arsnspells.data.GlyphSchoolReloadListener());
+    }
+
+    /**
+     * Drop datapack overrides when the server stops, so a single-player session that loads a
+     * pack with overrides does not leak them into the next world opened without it.
+     */
+    @net.minecraftforge.eventbus.api.SubscribeEvent
+    public void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
+        com.otectus.arsnspells.util.SchoolMappings.reset();
+    }
+
     private void registerCaps(RegisterCapabilitiesEvent event) {
         event.register(AffinityData.class);
         event.register(CooldownData.class);

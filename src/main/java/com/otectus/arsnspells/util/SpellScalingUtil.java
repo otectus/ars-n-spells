@@ -1,6 +1,5 @@
 package com.otectus.arsnspells.util;
 
-import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.affinity.AffinityBonuses;
 import com.otectus.arsnspells.affinity.AffinityType;
@@ -11,8 +10,7 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.registries.RegistryObject;
 
-import java.util.HashMap;
-import java.util.Locale;
+import java.util.EnumMap;
 import java.util.Map;
 
 /**
@@ -24,24 +22,33 @@ import java.util.Map;
  * crash before the gate runs.
  */
 public class SpellScalingUtil {
-    private static volatile Map<String, RegistryObject<Attribute>> ELEMENT_MAP;
+    private static volatile Map<SpellSchoolId, RegistryObject<Attribute>> ELEMENT_MAP;
 
-    private static Map<String, RegistryObject<Attribute>> elementMap() {
-        Map<String, RegistryObject<Attribute>> m = ELEMENT_MAP;
+    /**
+     * Canonical school → Iron's elemental spell-power attribute.
+     *
+     * <p>Keyed by {@link SpellSchoolId} rather than by string, so it is a compile-time-checked
+     * total mapping: every non-generic school has an attribute, and no school can be introduced
+     * that silently has none. The old string map was missing entries for the {@code aqua},
+     * {@code geo} and {@code wind} values the classifier could produce, so those spells got no
+     * elemental bonus at all and nothing reported it.
+     */
+    private static Map<SpellSchoolId, RegistryObject<Attribute>> elementMap() {
+        Map<SpellSchoolId, RegistryObject<Attribute>> m = ELEMENT_MAP;
         if (m == null) {
             synchronized (SpellScalingUtil.class) {
                 m = ELEMENT_MAP;
                 if (m == null) {
-                    m = new HashMap<>();
-                    m.put("fire", AttributeRegistry.FIRE_SPELL_POWER);
-                    m.put("ice", AttributeRegistry.ICE_SPELL_POWER);
-                    m.put("lightning", AttributeRegistry.LIGHTNING_SPELL_POWER);
-                    m.put("holy", AttributeRegistry.HOLY_SPELL_POWER);
-                    m.put("ender", AttributeRegistry.ENDER_SPELL_POWER);
-                    m.put("blood", AttributeRegistry.BLOOD_SPELL_POWER);
-                    m.put("evocation", AttributeRegistry.EVOCATION_SPELL_POWER);
-                    m.put("nature", AttributeRegistry.NATURE_SPELL_POWER);
-                    m.put("eldritch", AttributeRegistry.ELDRITCH_SPELL_POWER);
+                    m = new EnumMap<>(SpellSchoolId.class);
+                    m.put(SpellSchoolId.FIRE, AttributeRegistry.FIRE_SPELL_POWER);
+                    m.put(SpellSchoolId.ICE, AttributeRegistry.ICE_SPELL_POWER);
+                    m.put(SpellSchoolId.LIGHTNING, AttributeRegistry.LIGHTNING_SPELL_POWER);
+                    m.put(SpellSchoolId.HOLY, AttributeRegistry.HOLY_SPELL_POWER);
+                    m.put(SpellSchoolId.ENDER, AttributeRegistry.ENDER_SPELL_POWER);
+                    m.put(SpellSchoolId.BLOOD, AttributeRegistry.BLOOD_SPELL_POWER);
+                    m.put(SpellSchoolId.EVOCATION, AttributeRegistry.EVOCATION_SPELL_POWER);
+                    m.put(SpellSchoolId.NATURE, AttributeRegistry.NATURE_SPELL_POWER);
+                    m.put(SpellSchoolId.ELDRITCH, AttributeRegistry.ELDRITCH_SPELL_POWER);
                     ELEMENT_MAP = m;
                 }
             }
@@ -53,29 +60,30 @@ public class SpellScalingUtil {
         float multiplier = (float) player.getAttributeValue(AttributeRegistry.SPELL_POWER.get());
 
         SpellAnalysis.Result analysis = SpellAnalysis.analyze(spell);
-        AbstractSpellPart effect = analysis.firstEffect();
-        String school = analysis.dominantSchool();
+        SpellSchoolId school = analysis.school();
 
-        // Additive scaling: base power + (elemental bonus - 1.0) prevents exponential stacking
-        if (effect != null && effect.getRegistryName() != null) {
-            String path = effect.getRegistryName().getPath().toLowerCase(Locale.ROOT);
-            for (Map.Entry<String, RegistryObject<Attribute>> entry : elementMap().entrySet()) {
-                if (path.contains(entry.getKey())) {
-                    float elementalPower = (float) player.getAttributeValue(entry.getValue().get());
-                    multiplier = multiplier + (elementalPower - 1.0f);
-                    break;
-                }
-            }
+        // Additive scaling: base power + (elemental bonus - 1.0) prevents exponential stacking.
+        //
+        // This now uses the SAME school the rest of the mod uses. It previously called
+        // SpellAnalysis, discarded the answer, and re-derived the element with a different
+        // substring test over a HashMap — so Firework counted as generic for affinity but
+        // matched "fire" for scaling, and a path containing two element names resolved by hash
+        // iteration order.
+        RegistryObject<Attribute> elemental = elementMap().get(school);
+        if (elemental != null) {
+            float elementalPower = (float) player.getAttributeValue(elemental.get());
+            multiplier = multiplier + (elementalPower - 1.0f);
         }
 
         // Apply affinity bonus: 0.5% per affinity level for matching school
-        if (AnsConfig.ENABLE_AFFINITY_SYSTEM.get() && !"generic".equals(school)) {
+        if (AnsConfig.ENABLE_AFFINITY_SYSTEM.get() && !school.isGeneric()) {
             try {
-                AffinityType affinityType = AffinityType.valueOf(school.toUpperCase(Locale.ROOT));
+                AffinityType affinityType = AffinityType.valueOf(school.name());
                 float affinityMultiplier = AffinityBonuses.getAttributeMultiplier(player, affinityType);
                 multiplier *= affinityMultiplier;
             } catch (IllegalArgumentException ignored) {
-                // School doesn't map to an AffinityType — skip
+                // Unreachable for the canonical vocabulary (every non-generic school has an
+                // AffinityType constant); kept so adding a school cannot crash a cast.
             }
         }
 

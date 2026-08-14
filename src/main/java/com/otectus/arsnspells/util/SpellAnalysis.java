@@ -3,6 +3,7 @@ package com.otectus.arsnspells.util;
 import com.hollingsworth.arsnouveau.api.spell.AbstractAugment;
 import com.hollingsworth.arsnouveau.api.spell.AbstractCastMethod;
 import com.hollingsworth.arsnouveau.api.spell.AbstractEffect;
+import com.hollingsworth.arsnouveau.api.spell.AbstractFilter;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.cooldown.CooldownCategory;
@@ -56,8 +57,11 @@ public final class SpellAnalysis {
         /** All AbstractEffect parts found in the recipe. */
         public List<AbstractSpellPart> allEffects() { return allEffects; }
 
-        /** The derived school: "fire", "ice", "holy", etc., or "generic" if unknown. */
+        /** The derived school id: "fire", "ice", "holy", etc., or "generic" if unknown. */
         public String dominantSchool() { return dominantSchool; }
+
+        /** Enum-typed companion to {@link #dominantSchool()}; prefer this at new call sites. */
+        public SpellSchoolId school() { return SpellSchoolId.fromId(dominantSchool); }
 
         /** The cooldown category for this spell. */
         public CooldownCategory category() { return category; }
@@ -90,6 +94,7 @@ public final class SpellAnalysis {
     private static Result analyzeRecipe(List<AbstractSpellPart> recipe) {
         AbstractSpellPart castMethod = null;
         AbstractSpellPart firstEffect = null;
+        AbstractSpellPart firstFilter = null;
         List<AbstractSpellPart> allEffects = new ArrayList<>();
 
         for (AbstractSpellPart part : recipe) {
@@ -98,6 +103,17 @@ public final class SpellAnalysis {
             if (part instanceof AbstractCastMethod) {
                 if (castMethod == null) {
                     castMethod = part;
+                }
+            } else if (part instanceof AbstractFilter) {
+                // AbstractFilter EXTENDS AbstractEffect in Ars Nouveau, so the plain
+                // `instanceof AbstractEffect` test below used to claim filter glyphs as the
+                // spell's first effect. A recipe like Projectile -> Sensitive -> Ignite was
+                // then classified by Sensitive, giving the wrong school, the wrong cooldown
+                // category, and the wrong elemental scaling. Filters select targets; they are
+                // not what the spell *does*, so they are remembered only as a fallback for a
+                // recipe that contains nothing else.
+                if (firstFilter == null) {
+                    firstFilter = part;
                 }
             } else if (part instanceof AbstractEffect) {
                 allEffects.add(part);
@@ -108,110 +124,36 @@ public final class SpellAnalysis {
             // AbstractAugment parts are intentionally skipped
         }
 
-        String school = deriveSchool(firstEffect);
-        CooldownCategory category = deriveCategory(firstEffect);
+        // A filter-only recipe still needs a representative part rather than nothing.
+        AbstractSpellPart representative = firstEffect != null ? firstEffect : firstFilter;
 
-        return new Result(firstEffect, castMethod, allEffects, school, category);
+        String school = deriveSchool(representative);
+        CooldownCategory category = deriveCategory(representative);
+
+        return new Result(representative, castMethod, allEffects, school, category);
     }
 
     /**
-     * Audit F8: explicit school classification for every Ars Nouveau 1.20.1
-     * (4.12.7) effect glyph that has one, keyed by full registry name. Verified
-     * against the pinned jar's GlyphLib. Consulted BEFORE the substring
-     * heuristic so known glyphs classify deterministically; the heuristic
-     * remains only as a fallback for unknown glyphs (other mods, future Ars).
+     * Derive the spell school from a glyph.
      *
-     * <p>{@code glyph_firework -> generic} is a deliberate correction: the
-     * substring heuristic matched "fire" inside "firework" and classified a
-     * decorative glyph as fire school. Glyphs absent from this map fall
-     * through to the heuristic and (for current Ars content) resolve to
-     * "generic", matching pre-map behavior.
-     */
-    private static final Map<String, String> KNOWN_GLYPH_SCHOOLS = Map.ofEntries(
-            Map.entry("ars_nouveau:glyph_ignite", "fire"),
-            Map.entry("ars_nouveau:glyph_flare", "fire"),
-            Map.entry("ars_nouveau:glyph_freeze", "ice"),
-            Map.entry("ars_nouveau:glyph_cold_snap", "ice"),
-            Map.entry("ars_nouveau:glyph_lightning", "lightning"),
-            Map.entry("ars_nouveau:glyph_heal", "holy"),
-            Map.entry("ars_nouveau:glyph_light", "holy"),
-            Map.entry("ars_nouveau:glyph_blink", "ender"),
-            Map.entry("ars_nouveau:glyph_ender_inventory", "ender"),
-            Map.entry("ars_nouveau:glyph_fangs", "evocation"),
-            Map.entry("ars_nouveau:glyph_grow", "nature"),
-            Map.entry("ars_nouveau:glyph_harvest", "nature"),
-            Map.entry("ars_nouveau:glyph_wither", "eldritch"),
-            Map.entry("ars_nouveau:glyph_hex", "eldritch"),
-            Map.entry("ars_nouveau:glyph_conjure_water", "aqua"),
-            Map.entry("ars_nouveau:glyph_crush", "geo"),
-            Map.entry("ars_nouveau:glyph_earthshake", "geo"),
-            Map.entry("ars_nouveau:glyph_gust", "wind"),
-            Map.entry("ars_nouveau:glyph_wind_shear", "wind"),
-            Map.entry("ars_nouveau:glyph_firework", "generic"));
-
-    /**
-     * Derive the spell school from the first effect glyph: exact lookup in
-     * {@link #KNOWN_GLYPH_SCHOOLS} first (audit F8), then keyword analysis of
-     * the registry path for unknown glyphs. Consolidates logic formerly
-     * duplicated in SanctifiedLegacyCompat.determineSpellSchool and
-     * SpellScalingUtil.
+     * <p>Delegates entirely to {@link SchoolResolver}, which is the single authority every
+     * subsystem consults. This method survives only as the legacy string-shaped façade.
+     *
+     * <p>What used to live here — a hardcoded {@code ars_nouveau:}-only table plus a substring
+     * fallback — had two structural problems. It ignored
+     * {@code AbstractSpellPart.spellSchools}, the real metadata that vanilla Ars populates in
+     * its constructor and Ars Elemental populates explicitly, so addon glyphs could only ever
+     * be supported by adding more Java. And it could return {@code aqua}, {@code geo} or
+     * {@code wind} — values with no {@code AffinityType} and no Iron's attribute — so those
+     * spells silently received neither affinity nor elemental scaling.
      */
     public static String deriveSchool(@Nullable AbstractSpellPart effect) {
-        if (effect == null || effect.getRegistryName() == null) {
-            return "generic";
-        }
+        return SchoolResolver.resolve(effect).id();
+    }
 
-        String known = KNOWN_GLYPH_SCHOOLS.get(effect.getRegistryName().toString());
-        if (known != null) {
-            return known;
-        }
-
-        String path = effect.getRegistryName().getPath().toLowerCase(Locale.ROOT);
-
-        if (path.contains("fire") || path.contains("ignite") || path.contains("flare")
-                || path.contains("burn") || path.contains("plasma")) {
-            return "fire";
-        }
-        if (path.contains("ice") || path.contains("freeze") || path.contains("frost")
-                || path.contains("cold")) {
-            return "ice";
-        }
-        if (path.contains("lightning") || path.contains("shock") || path.contains("storm")) {
-            return "lightning";
-        }
-        if (path.contains("heal") || path.contains("holy")
-                || (path.contains("light") && !path.contains("lightning"))) {
-            return "holy";
-        }
-        if (path.contains("ender") || path.contains("blink") || path.contains("warp")
-                || path.contains("teleport") || path.contains("rift")) {
-            return "ender";
-        }
-        if (path.contains("blood") || path.contains("drain") || path.contains("vampire")) {
-            return "blood";
-        }
-        if (path.contains("fang") || path.contains("evocation")) {
-            return "evocation";
-        }
-        if (path.contains("grow") || path.contains("nature") || path.contains("plant")
-                || path.contains("harvest")) {
-            return "nature";
-        }
-        if (path.contains("wither") || path.contains("dark") || path.contains("hex")
-                || path.contains("eldritch") || path.contains("void")) {
-            return "eldritch";
-        }
-        if (path.contains("water") || path.contains("conjure_water")) {
-            return "aqua";
-        }
-        if (path.contains("earth") || path.contains("stone") || path.contains("crush")) {
-            return "geo";
-        }
-        if (path.contains("wind") || path.contains("gust") || path.contains("air")) {
-            return "wind";
-        }
-
-        return "generic";
+    /** Enum-typed companion to {@link #deriveSchool}; prefer this at new call sites. */
+    public static SpellSchoolId resolveSchool(@Nullable AbstractSpellPart effect) {
+        return SchoolResolver.resolve(effect);
     }
 
     /**

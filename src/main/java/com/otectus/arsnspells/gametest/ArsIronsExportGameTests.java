@@ -198,6 +198,53 @@ public final class ArsIronsExportGameTests {
         helper.succeed();
     }
 
+    /**
+     * A payload naming a glyph from an uninstalled mod must be detected, and an intact one
+     * must not be. This needs the live glyph registry, so it cannot be a unit test.
+     *
+     * <p>The failure this guards is quiet rather than loud: {@code Spell.fromTag} skips
+     * unresolvable glyphs and returns a shorter recipe that Ars still calls valid, so before
+     * this check a removed addon turned a bound spell into a different, cheaper spell that
+     * still charged full price.
+     */
+    @GameTest(template = "platform")
+    public static void missingGlyphs_areDetectedBeforeAnythingIsSpent(GameTestHelper helper) {
+        // Positive control: a real, resolvable recipe must read as intact, or the negative
+        // assertion below would pass for the wrong reason.
+        CompoundTag intact = new CompoundTag();
+        CompoundTag intactRecipe = new CompoundTag();
+        intactRecipe.putInt("size", 1);
+        intactRecipe.putString("part0", "ars_nouveau:glyph_projectile");
+        intact.put("recipe", intactRecipe);
+        if (!com.otectus.arsnspells.util.ArsSpellIntegrity.isIntact(intact)) {
+            helper.fail("a payload naming only registered glyphs must read as intact; "
+                + "glyph_projectile should always resolve with Ars Nouveau loaded");
+        }
+
+        // A glyph from a mod that is not installed.
+        CompoundTag broken = new CompoundTag();
+        CompoundTag brokenRecipe = new CompoundTag();
+        brokenRecipe.putInt("size", 2);
+        brokenRecipe.putString("part0", "ars_nouveau:glyph_projectile");
+        brokenRecipe.putString("part1", "definitely_not_installed:glyph_phantasm");
+        broken.put("recipe", brokenRecipe);
+
+        List<String> missing = com.otectus.arsnspells.util.ArsSpellIntegrity.missingGlyphIds(broken);
+        if (missing.size() != 1 || !missing.get(0).contains("definitely_not_installed")) {
+            helper.fail("the unresolvable glyph must be reported exactly once, got " + missing);
+        }
+        if (com.otectus.arsnspells.util.ArsSpellIntegrity.isIntact(broken)) {
+            helper.fail("a payload referencing an uninstalled mod's glyph must not read as intact");
+        }
+
+        // And the binding gate must refuse it rather than binding a silently different spell.
+        if (IronsBookBindingUtil.isCastableArsPayload(broken)) {
+            helper.fail("binding must reject a payload whose glyphs cannot all be resolved; "
+                + "Spell.fromTag would silently drop the missing one and bind a different spell");
+        }
+        helper.succeed();
+    }
+
     /** 5 — malformed carriers are rejected cleanly; helpers never throw and never mutate. */
     @GameTest(template = "platform")
     public static void malformedCarrier_isRejectedAndDoesNotThrow(GameTestHelper helper) {

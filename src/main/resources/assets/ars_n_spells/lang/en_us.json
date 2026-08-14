@@ -100,6 +100,7 @@
   "arsnspells.crosscast.invalid.iron_id": "Cross-cast failed: the Iron's spell id is missing or malformed.",
   "arsnspells.crosscast.invalid.iron_level": "Cross-cast failed: the Iron's spell level is invalid.",
   "arsnspells.crosscast.invalid.iron_unresolved": "Cross-cast failed: that Iron's spell is not installed.",
+  "arsnspells.crosscast.invalid.missing_glyphs": "Cross-cast failed: this spell uses glyphs that are no longer installed (%1$s). Reinstall the addon that adds them, or rebuild the spell.",
   "arsnspells.crosscast.invalid.ars_spell_unreadable": "Cross-cast failed: the bound Ars spell could not be read. Rebind it from a freshly exported scroll.",
   "arsnspells.crosscast.proxy.book_missing": "Cross-cast failed: the book carrying this spell (wheel slot %1$s) could not be found. Make sure it is equipped in your spellbook slot.",
   "arsnspells.crosscast.proxy.entry_missing": "Cross-cast failed: this book no longer carries an Ars spell for wheel slot %1$s. Rebind the spell.",

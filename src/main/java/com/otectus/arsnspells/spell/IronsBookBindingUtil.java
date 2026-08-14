@@ -234,6 +234,13 @@ public final class IronsBookBindingUtil {
             return false;
         }
         try {
+            // A payload with glyphs from an uninstalled mod deserializes to a SHORTER recipe
+            // that Ars still reports as valid, so this check has to come first — see
+            // ArsSpellIntegrity. Binding such a payload would produce an entry that casts
+            // something other than what the player built.
+            if (!com.otectus.arsnspells.util.ArsSpellIntegrity.isIntact(arsTag)) {
+                return false;
+            }
             com.hollingsworth.arsnouveau.api.spell.Spell spell =
                 com.hollingsworth.arsnouveau.api.spell.Spell.fromTag(arsTag);
             return spell != null && spell.recipe != null && !spell.recipe.isEmpty()

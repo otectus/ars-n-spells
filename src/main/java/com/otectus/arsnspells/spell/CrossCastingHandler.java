@@ -215,10 +215,25 @@ public class CrossCastingHandler {
             return false;
         }
 
+        // Checked BEFORE deserializing, because deserialization is where the evidence is lost:
+        // Spell.fromTag skips glyphs whose mod is no longer installed and hands back a SHORTER
+        // recipe that isValid() still accepts. Without this, removing an addon silently turned
+        // a bound spell into a different spell — and still charged full price for it.
+        java.util.List<String> missingGlyphs =
+            com.otectus.arsnspells.util.ArsSpellIntegrity.missingGlyphIds(arsSpellTag);
+        if (!missingGlyphs.isEmpty()) {
+            LOGGER.warn("Cross-mod Ars spell references {} glyph(s) that are no longer registered: {}",
+                missingGlyphs.size(), missingGlyphs);
+            player.displayClientMessage(
+                Component.translatable("arsnspells.crosscast.invalid.missing_glyphs",
+                    com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(missingGlyphs)),
+                true);
+            return false;
+        }
+
         Spell spell = Spell.fromTag(arsSpellTag);
-        // A payload written by a different Ars version, or one whose glyph mod has since
-        // been removed, deserializes to an empty/invalid recipe. Fail before the context
-        // is opened so no resource is spent and the player is told why.
+        // A payload written by a different Ars version deserializes to an empty/invalid
+        // recipe. Fail before the context is opened so no resource is spent.
         if (!spell.isValid()) {
             LOGGER.warn("Cross-mod Ars spell deserialized to an invalid/empty recipe: {}", spellData);
             player.displayClientMessage(
