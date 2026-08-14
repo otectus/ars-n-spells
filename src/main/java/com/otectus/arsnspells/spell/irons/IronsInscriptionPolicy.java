@@ -67,6 +67,10 @@ public final class IronsInscriptionPolicy {
             return Verdict.ALLOW;
         }
         if (scroll.hasTag() && CrossCastNbt.hasCrossModSpells(scroll.getTag())) {
+            // A legacy carrier reaching the table is a repair opportunity: something already
+            // holds the stack. Repairing here means the same scroll stops being a crash risk
+            // everywhere else too, not just in front of this guard.
+            CarrierReconciler.reconcile(scroll);
             return Verdict.ANS_CARRIER;
         }
         if (!IronsScrollFactory.hasNativeContainer(scroll)) {

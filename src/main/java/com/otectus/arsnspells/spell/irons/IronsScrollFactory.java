@@ -57,4 +57,18 @@ public final class IronsScrollFactory {
     public static boolean hasNativeContainer(ItemStack stack) {
         return stack != null && !stack.isEmpty() && ISpellContainer.isSpellContainer(stack);
     }
+
+    /**
+     * True when {@code stack} is an Iron's spell book, by Iron's own published interface.
+     *
+     * <p>Replaces a registry-path substring test ({@code path.contains("spell_book")}), which
+     * matched on naming convention rather than on what an item <em>is</em> — so any Iron's item
+     * that happened to contain that fragment qualified, and a book that did not follow the
+     * convention did not. {@code ISpellbook} lives in Iron's {@code api} package and is
+     * identical in 3.15.0 and 3.16.2.
+     */
+    public static boolean isSpellBookItem(ItemStack stack) {
+        return stack != null && !stack.isEmpty()
+            && stack.getItem() instanceof io.redspace.ironsspellbooks.api.item.ISpellbook;
+    }
 }

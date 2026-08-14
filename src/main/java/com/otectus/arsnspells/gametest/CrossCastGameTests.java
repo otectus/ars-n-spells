@@ -177,27 +177,40 @@ public final class CrossCastGameTests {
             helper.fail("a single-entry carrier scroll must yield its Ars payload");
         }
 
-        // Bind onto a real Iron's spellbook carrying a native ISB_Spells container.
+        // Bind onto a real Iron's spellbook that already holds a genuine Iron's spell in its
+        // MODERN container. Earlier revisions of this test wrote a hand-made "ISB_Spells"
+        // compound — Iron's LEGACY key, which it still reads but no longer writes — so it
+        // asserted coexistence with a format no current book actually uses. The real question
+        // is whether binding disturbs a native spell in the container Iron's writes today.
         Item bookItem = findIronsSpellBook();
         if (bookItem == null) {
             helper.fail("no irons_spellbooks spellbook item is registered despite Iron's being loaded");
         }
         ItemStack book = new ItemStack(bookItem);
-        CompoundTag isb = new CompoundTag();
-        isb.putInt("maxSpells", 3);
-        book.getOrCreateTag().put("ISB_Spells", isb);
-        CompoundTag isbBaseline = isb.copy();
+        if (!IronsProxyCastDriver.addNativeSpellToBook(book)) {
+            helper.fail("could not seed the book with a genuine Iron's spell");
+        }
+        int nativeSpellsBefore = IronsProxyCastDriver.nativeSpellCount(book);
+        if (nativeSpellsBefore < 1) {
+            helper.fail("test setup failed: the book should hold at least one real Iron's spell");
+        }
 
         if (!IronsBookBindingUtil.appendArsSpellToBook(book, extracted.get())) {
             helper.fail("binding the extracted Ars entry onto a real spellbook must succeed");
         }
 
-        // Coexistence: the ANS sidecar lands and the native container is untouched.
+        // Coexistence: the ANS sidecar lands and the player's real spells are untouched.
         if (!CrossCastNbt.hasCrossModSpells(book.getOrCreateTag())) {
             helper.fail("bound spellbook must carry the ANS cross_spells sidecar");
         }
-        if (!isbBaseline.equals(book.getOrCreateTag().getCompound("ISB_Spells"))) {
-            helper.fail("native ISB_Spells container must be untouched by binding");
+        if (IronsProxyCastDriver.nativeSpellCount(book) != nativeSpellsBefore) {
+            helper.fail("binding must not add, remove or displace the player's genuine Iron's "
+                + "spells; native count changed from " + nativeSpellsBefore + " to "
+                + IronsProxyCastDriver.nativeSpellCount(book));
+        }
+        // And the legacy key must not be resurrected by anything ANS does.
+        if (book.getOrCreateTag().contains("ISB_Spells")) {
+            helper.fail("ANS must never write Iron's legacy ISB_Spells key");
         }
 
         // Dedup by payload on the real item: re-binding the same payload is rejected.
@@ -738,6 +751,101 @@ public final class CrossCastGameTests {
                 .poolIdOf(proxy.getSpellResource()) != 1) {
             helper.fail("the registered proxy must still resolve by its ars_cross_1 id; bound "
                 + "spellbooks look it up that way at cast time");
+        }
+        helper.succeed();
+    }
+
+    // ------------------------------------------------------------------
+    // Legacy repair. Items written by older builds already exist in worlds and
+    // cannot be reached by a fix at the creation site, so they are repaired when
+    // something already holds them.
+    // ------------------------------------------------------------------
+
+    /** A legacy container-less carrier is repaired in place, not merely rejected. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_reconciler_repairsLegacyCarrierContainer(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        Item scrollItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", "scroll"));
+        if (scrollItem == null) {
+            helper.fail("Iron's scroll item must be registered when Iron's is loaded");
+        }
+        ItemStack legacy = new ItemStack(scrollItem);
+        CrossCastNbt.addArsEntryWithMetaToTag(legacy.getOrCreateTag(),
+            IronsBookBindingUtil.ARS_PLACEHOLDER_ID, 1, arsPayload("legacy"),
+            CrossCastNbt.NO_PROXY_POOL_ID, null, null, null);
+        // Strip the container the modern writer would have added, reproducing the old shape.
+        legacy.getOrCreateTag().remove("irons_spellbooks:spell_container");
+
+        if (IronsProxyCastDriver.scrollContainerDereferenceSucceeds(legacy)) {
+            helper.fail("test setup no longer reproduces the legacy shape");
+        }
+
+        com.otectus.arsnspells.spell.irons.CarrierReconciler.reconcile(legacy);
+
+        if (!IronsProxyCastDriver.scrollContainerDereferenceSucceeds(legacy)) {
+            helper.fail("the reconciler must give a legacy carrier the native container it was "
+                + "created without — these already exist in players' chests and cannot be fixed "
+                + "at the creation site");
+        }
+        if (IronsBookBindingUtil.extractSingleArsEntry(legacy).isEmpty()) {
+            helper.fail("repair must not disturb the Ars payload it was protecting");
+        }
+        helper.succeed();
+    }
+
+    /** An orphan wheel slot with no sidecar entry is removed; a live one is kept. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_reconciler_removesOrphanProxiesButKeepsLiveOnes(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack book = bindHealSpellOntoRealBook(helper); // occupies pool 1, sidecar + slot
+
+        // Forge an orphan: a native slot for pool 2 with no matching sidecar entry, exactly what
+        // the pre-fix uninscribe path left behind.
+        com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.addProxySlot(book, 2, 1);
+        if (IronsProxyCastDriver.proxySlotIndex(book, 2) < 0) {
+            helper.fail("test setup failed: could not forge an orphan proxy slot");
+        }
+
+        com.otectus.arsnspells.spell.irons.CarrierReconciler.reconcile(book);
+
+        if (IronsProxyCastDriver.proxySlotIndex(book, 2) >= 0) {
+            helper.fail("an orphan proxy slot with no sidecar entry must be removed; leaving it "
+                + "gives the player a selectable wheel entry that casts nothing");
+        }
+        if (IronsProxyCastDriver.proxySlotIndex(book, 1) < 0) {
+            helper.fail("the LIVE proxy slot must survive reconciliation — removing it would "
+                + "unbind a spell the player legitimately owns");
+        }
+        helper.succeed();
+    }
+
+    /** Spellbook detection uses Iron's type, not a path substring. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_spellbookDetection_usesTypeNotNaming(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        Item bookItem = findIronsSpellBook();
+        if (bookItem == null) {
+            helper.fail("no irons_spellbooks spellbook item is registered despite Iron's being loaded");
+        }
+        if (!IronsBookBindingUtil.isIronsSpellBook(new ItemStack(bookItem))) {
+            helper.fail("a real Iron's spell book must be recognized");
+        }
+        // A scroll lives in the same namespace and is emphatically not a book.
+        Item scrollItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", "scroll"));
+        if (scrollItem != null && IronsBookBindingUtil.isIronsSpellBook(new ItemStack(scrollItem))) {
+            helper.fail("an Iron's scroll must not be mistaken for a spell book");
+        }
+        if (IronsBookBindingUtil.isIronsSpellBook(new ItemStack(Items.BOOK))) {
+            helper.fail("a vanilla book must not be mistaken for an Iron's spell book");
         }
         helper.succeed();
     }

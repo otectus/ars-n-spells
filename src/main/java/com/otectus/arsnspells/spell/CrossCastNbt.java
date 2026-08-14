@@ -68,6 +68,37 @@ public final class CrossCastNbt {
     public static final int NO_PROXY_POOL_ID = -1;
 
     /**
+     * Schema version stamped on ANS-owned item NBT, so a future format change can migrate
+     * existing items instead of guessing at their shape.
+     *
+     * <p>Absent means version 0: everything ANS shipped up to and including 3.0.3. Version 1 is
+     * the first stamped format, and additionally guarantees that a carrier scroll owns a valid
+     * native Iron's spell container — the invariant whose absence crashed the Inscription Table.
+     * Because 0 and 1 differ only in guarantees ANS now enforces on write, no data rewrite is
+     * needed to move between them; the stamp exists so the <em>next</em> change has something to
+     * branch on.
+     */
+    public static final String TAG_SCHEMA_VERSION = "arsnspells:schema_version";
+
+    /** Current schema version written by this build. */
+    public static final int SCHEMA_VERSION = 1;
+
+    /** Schema version of {@code stackTag}; 0 for items written before stamping existed. */
+    public static int schemaVersion(CompoundTag stackTag) {
+        if (stackTag == null || !stackTag.contains(TAG_SCHEMA_VERSION, Tag.TAG_INT)) {
+            return 0;
+        }
+        return stackTag.getInt(TAG_SCHEMA_VERSION);
+    }
+
+    /** Stamp the current schema version onto {@code stackTag}. */
+    public static void stampSchemaVersion(CompoundTag stackTag) {
+        if (stackTag != null) {
+            stackTag.putInt(TAG_SCHEMA_VERSION, SCHEMA_VERSION);
+        }
+    }
+
+    /**
      * Number of distinct native-wheel proxy slots per Iron's spellbook. Declared
      * here (Iron's-free) so binding/allocation logic and unit tests can reference
      * it without classloading the Iron's-gated {@code ArsCrossProxyRegistry}. The
@@ -178,6 +209,9 @@ public final class CrossCastNbt {
 
         spellList.add(spellData);
         stackTag.put(TAG_CROSS_MOD_SPELLS, spellList);
+        // Stamp on every write, so any item ANS has touched carries a version a future
+        // migration can branch on.
+        stampSchemaVersion(stackTag);
         return spellList.size() - 1;
     }
 
@@ -288,6 +322,9 @@ public final class CrossCastNbt {
     public static void clearCrossModSpellsFromTag(CompoundTag stackTag) {
         stackTag.remove(TAG_CROSS_MOD_SPELLS);
         stackTag.remove(TAG_SPELL_INDEX);
+        // The stamp is ANS-owned, so it goes too: an uninscribed item must be indistinguishable
+        // from one ANS never touched.
+        stackTag.remove(TAG_SCHEMA_VERSION);
     }
 
     /**

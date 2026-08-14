@@ -170,8 +170,15 @@ public final class ArsIronsExportGameTests {
         CrossCastNbt.addCrossModSpellToTag(tag,
             IronsBookBindingUtil.ARS_PLACEHOLDER_ID, 1, CrossSpellType.ARS_NOUVEAU, arsPayload("x"));
         tag.putInt(CrossCastNbt.TAG_SPELL_INDEX, 0);
-        // Sibling root data that must survive.
+        // Sibling root data that must survive. Two shapes are represented deliberately:
+        // an unrelated vanilla key, and BOTH of Iron's container keys — the modern one it
+        // writes today and the legacy one it still reads. Earlier revisions checked only the
+        // legacy key, so they proved nothing about the format current books actually use.
         tag.putInt("Damage", 4);
+        CompoundTag modern = new CompoundTag();
+        modern.putInt("maxSpells", 3);
+        tag.put("irons_spellbooks:spell_container", modern);
+        CompoundTag modernBaseline = modern.copy();
         CompoundTag isb = new CompoundTag();
         isb.putInt("maxSpells", 3);
         tag.put("ISB_Spells", isb);
@@ -192,8 +199,12 @@ public final class ArsIronsExportGameTests {
         if (after.getInt("Damage") != 4) {
             helper.fail("unrelated root NBT must survive uninscribe");
         }
+        if (!modernBaseline.equals(after.getCompound("irons_spellbooks:spell_container"))) {
+            helper.fail("Iron's MODERN native container must be untouched by uninscribe — this is "
+                + "the key current books actually use");
+        }
         if (!isbBaseline.equals(after.getCompound("ISB_Spells"))) {
-            helper.fail("a native ISB_Spells sibling must be untouched by uninscribe");
+            helper.fail("Iron's legacy ISB_Spells sibling must also be untouched by uninscribe");
         }
         helper.succeed();
     }

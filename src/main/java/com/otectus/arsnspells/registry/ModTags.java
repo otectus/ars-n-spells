@@ -35,6 +35,17 @@ public final class ModTags {
     public static final TagKey<Item> BLASPHEMY_CURIOS =
         ItemTags.create(new ResourceLocation(ArsNSpells.MODID, "blasphemy_curios"));
 
+    /**
+     * Items that count as Iron's spell books for binding.
+     *
+     * <p>The shipped file lists every Iron's tier. It is additive on top of the
+     * {@code ISpellbook} interface check, which is the primary test — the tag exists so a pack
+     * can declare a spellbook-like item from a third mod that does not implement Iron's
+     * interface, not because the tag has to enumerate Iron's own books to work.
+     */
+    public static final TagKey<Item> IRONS_SPELL_BOOKS =
+        ItemTags.create(new ResourceLocation(ArsNSpells.MODID, "irons_spell_books"));
+
     /** Blocks that count as Source Jars for the regen synergy scan. */
     public static final TagKey<Block> SOURCE_JARS =
         BlockTags.create(new ResourceLocation(ArsNSpells.MODID, "source_jars"));

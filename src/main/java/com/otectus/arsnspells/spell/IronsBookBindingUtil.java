@@ -43,20 +43,39 @@ public final class IronsBookBindingUtil {
     }
 
     /**
-     * True when {@code stack} is an Iron's spellbook. Matches any item in the
-     * {@code irons_spellbooks} namespace whose path denotes a spell book, so
-     * tiered book variants are recognized without loading Iron's classes.
+     * True when {@code stack} is a spell book that can accept a bound Ars entry.
+     *
+     * <p>Two sources, in order of authority:
+     * <ol>
+     *   <li>Iron's own {@code ISpellbook} interface — what the item <em>is</em>, published in
+     *       Iron's {@code api} package and identical across 3.15.0 and 3.16.2.</li>
+     *   <li>The {@code ars_n_spells:irons_spell_books} item tag — additive, so a pack can
+     *       declare a spellbook-like item from a third mod that does not implement Iron's
+     *       interface.</li>
+     * </ol>
+     *
+     * <p>This replaces {@code path.contains("spell_book") || path.contains("spellbook")}, which
+     * keyed off naming convention rather than type: any Iron's item whose path happened to
+     * contain the fragment qualified, and a book not following the convention did not. The tag
+     * shipped with audit F1 was never actually consulted by any code until now.
      */
     public static boolean isIronsSpellBook(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return false;
         }
-        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
-        if (id == null || !IronsCompat.MODID.equals(id.getNamespace())) {
+        // Gated + FQN so the Iron's-importing helper only classloads when Iron's is present.
+        if (IronsCompat.isLoaded()
+            && com.otectus.arsnspells.spell.irons.IronsScrollFactory.isSpellBookItem(stack)) {
+            return true;
+        }
+        try {
+            return stack.is(com.otectus.arsnspells.registry.ModTags.IRONS_SPELL_BOOKS);
+        } catch (Exception e) {
+            // Tag lookups throw if consulted before tags bind (early registry, some tests).
+            // Falling through to false is correct: with Iron's loaded the interface check above
+            // has already answered, and without it there is no book to bind onto anyway.
             return false;
         }
-        String path = id.getPath();
-        return path.contains("spell_book") || path.contains("spellbook");
     }
 
     /**
@@ -193,6 +212,12 @@ public final class IronsBookBindingUtil {
                                                     String iconSymbol, int maxCap) {
         if (book == null || book.isEmpty() || arsTag == null || arsTag.isEmpty()) {
             return AppendResult.FAILED;
+        }
+        // Binding is a natural repair point: the book is in hand and about to be rewritten
+        // anyway, so clear out any orphan wheel slots a pre-fix uninscribe left behind before
+        // allocating a new pool id — otherwise a stale slot can hold an id this bind wants.
+        if (IronsCompat.isLoaded()) {
+            com.otectus.arsnspells.spell.irons.CarrierReconciler.reconcile(book);
         }
         if (containsEquivalentArsSpell(book, arsTag)) {
             return AppendResult.DUPLICATE;

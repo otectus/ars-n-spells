@@ -2,6 +2,92 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.0] - unreleased
+
+### Fixed: Iron's Inscription Table crashed on ANS-exported scrolls
+
+- Exported carriers were built as a bare scroll stack with only ANS sidecar NBT, satisfying Iron's
+  `instanceof Scroll` while breaking its unwritten "a scroll has a spell container" invariant.
+  `ISpellContainer.get` returns null for such a stack and Iron's dereferences it **unguarded in
+  three places** — one on the client (`InscriptionTableScreen.onInscription`, the reported NPE) and
+  **two on the server** (`InscriptionTableMenu.clickMenuButton` and `doInscription`). On a
+  dedicated server this was a crash any player could trigger with a legacy scroll, not just a
+  client-side annoyance. Verified identical in Iron's 3.15.0 and 3.16.2, so it was never version
+  drift.
+- Carriers now receive a valid empty single-slot container before being handed out, and export
+  returns nothing at all rather than an invalid real scroll if that fails.
+- A shared guard rejects both a container-less legacy carrier and a well-formed ANS carrier at the
+  native table, on client **and** server. The second rejection also prevents a quieter corruption:
+  a valid empty container makes `getSpellAtIndex(0)` return `SpellData.EMPTY`, whose `getSpell()`
+  is a real `SpellRegistry.none()`, which `doInscription` would have written into the book while
+  consuming the scroll.
+- Legacy carriers already sitting in chests are repaired in place when something already holds
+  them (binding, casting, the inscription guard) — lazily, never by scanning inventories.
+
+### Fixed: unbinding left orphan entries in Iron's spell wheel
+
+- `IronsProxySlotWriter.removeProxySlot` had **zero callers**. Uninscribing cleared the ANS sidecar
+  and left the native wheel slot behind: selectable, and casting nothing — the binding bug's mirror
+  image. Teardown now removes native slots first, since the pool ids live in the sidecar that was
+  being cleared. Custom names and third-party NBT are deliberately left alone.
+
+### Fixed: Virtue Ring made Ars spells free when its system was disabled
+
+- The mixin that cancels mana checked only whether the ring was worn, while the handler that
+  consumes aura checked `enable_virtue_aura_system`. With the toggle off, nothing took aura and
+  nothing took mana. Both halves now read one predicate, applied consistently across mana
+  expenditure, pre-cast validation, and the scroll path.
+
+### Fixed: `ars_cross_*` proxy spells polluted JEI, EMI and the creative menu
+
+- Iron's builds one scroll per enabled spell into its Scrolls creative tab, which is where JEI and
+  EMI both source their item lists — so filtering at the tab clears every recipe viewer at once and
+  cleans up the creative menu. Proxies additionally declare `allowCrafting=false` (removing a
+  nonsense Scroll Forge craft), and an optional client-only JEI plugin hides the Arcane Anvil
+  recipes that no flag reaches. The spells stay enabled: disabling them would break every
+  already-bound spellbook, which resolves them by id.
+
+### Changed: spell-school classification rebuilt on Ars Nouveau's own metadata
+
+- School is now a closed enum whose every value maps 1:1 onto both an affinity type and an Iron's
+  spell-power attribute. The old string heuristic could return `aqua`, `geo` or `wind` — values
+  with neither — so those spells silently received no affinity and no elemental scaling.
+- Resolution consults an explicit glyph mapping, then `AbstractSpellPart.spellSchools` (which
+  vanilla Ars populates in its constructor and Ars Elemental populates explicitly), then a
+  substring fallback. Multi-school glyphs resolve deterministically instead of by hash order.
+- Scaling now consumes the same school as everything else; it previously re-derived the element
+  with a *different* heuristic, so the Firework glyph counted as generic for affinity but matched
+  "fire" for scaling.
+- Filter glyphs no longer decide a spell's school. `AbstractFilter` extends `AbstractEffect`, so
+  `Projectile → Sensitive → Ignite` was being classified by *Sensitive*.
+- Addon glyph mappings are datapack-driven via `data/<ns>/ans_glyph_schools/*.json`, so supporting
+  a new addon no longer means editing Java.
+
+### Fixed: removing an addon silently changed bound spells instead of failing
+
+- `Spell.fromTag` skips glyphs whose mod is gone and `isValid()` only checks non-emptiness, so an
+  exported `Projectile → Ignite → WaterGrave` became `Projectile → Ignite` after uninstalling Ars
+  Elemental: shorter, still "valid", still castable, doing something other than what the player
+  built — at full price. Payload integrity is now checked against the registry before
+  deserialising, at both the bind and cast gates, with a message naming the missing glyphs.
+
+### Changed
+
+- Spell-book detection uses Iron's published `ISpellbook` interface plus the
+  `ars_n_spells:irons_spell_books` tag, replacing a registry-path substring test. The tag shipped
+  in 3.0.1 but no code had ever consulted it.
+- Gameplay transaction expiry (scroll costs, Iron's LP, death prevention) uses server game time
+  instead of wall-clock, so a lag spike or a paused world can no longer expire a staged cost while
+  its commit is still pending. Cache TTLs and log rate-limiting keep wall-clock deliberately.
+- ANS-owned item NBT carries a schema version for future migrations.
+- `scroll_cost_mode` documentation corrected: a Cursed Ring wearer pays LP **instead of** mana, as
+  in normal casting, never both. The behaviour was already correct; the wording implied otherwise.
+- Removed an unreachable curio-discount getter whose cache-miss path returned a stub "no
+  discounts", which would have silently mis-answered the first caller to use it.
+- Optional GameTest profiles for Ars Elemental 0.6.8.0 and Too Many Glyphs, run in all six
+  combinations; addon glyphs are verified to round-trip, resolve schools from declared metadata,
+  and survive mixed-addon recipes.
+
 ## [3.0.3] - 2026-07-22
 
 > **Provenance note.** 3.0.3 was published to CurseForge (file `8490162`, SHA-256

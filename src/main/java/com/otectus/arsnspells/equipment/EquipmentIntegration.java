@@ -471,40 +471,14 @@ public class EquipmentIntegration {
         }
     }
 
-    /**
-     * Get curio discount data for a player (cached).
-     * 
-     * @param player The player
-     * @return Curio discount data
-     */
-    public static CurioDiscountData getCurioDiscounts(Player player) {
-        if (!AnsConfig.ENABLE_CURIO_DISCOUNTS.get()) {
-            return CurioDiscountData.NONE;
-        }
-        
-        CachedEquipmentData cached = equipmentCache.get(player.getUUID());
-        long currentTime = System.currentTimeMillis();
-        
-        if (cached != null && (currentTime - cached.timestamp) < CACHE_DURATION_MS) {
-            return cached.curioDiscounts;
-        }
-        
-        // Cache miss - will be recalculated on next equipment scan
-        return calculateCurioDiscounts(player);
-    }
-    
-    /**
-     * Calculate curio discount data for a player.
-     * 
-     * @param player The player
-     * @return Curio discount data
-     */
-    private static CurioDiscountData calculateCurioDiscounts(Player player) {
-        // This will be populated by SanctifiedLegacyCompat
-        // For now, return empty data - actual calculation happens in CurioDiscountHandler
-        return CurioDiscountData.NONE;
-    }
-    
+    // getCurioDiscounts(Player) and its calculateCurioDiscounts(Player) helper were removed
+    // here. Both were unreachable — nothing in the mod called either — and the pair was a trap
+    // rather than dead weight: on a cache miss the public getter returned a stub NONE with the
+    // comment "actual calculation happens in CurioDiscountHandler", so the first caller to
+    // arrive would silently have been told a player has no curio discounts whenever the cache
+    // had expired. calculateCurioDiscountsInternal, which genuinely computes the value and is
+    // used by the equipment scan, is retained below.
+
     /**
      * Internal method to calculate curio discounts (called during equipment scan).
      * 

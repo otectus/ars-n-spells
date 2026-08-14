@@ -185,6 +185,29 @@ final class IronsProxyCastDriver {
         return false;
     }
 
+    /**
+     * How many genuine (non-proxy) Iron's spells {@code book}'s native container holds.
+     *
+     * <p>Counts through the modern container Iron's actually writes, so a coexistence test
+     * cannot pass by inspecting the legacy {@code ISB_Spells} key that current books no longer
+     * use.
+     */
+    static int nativeSpellCount(ItemStack book) {
+        if (!ISpellContainer.isSpellContainer(book)) {
+            return 0;
+        }
+        int count = 0;
+        for (SpellSlot slot : ISpellContainer.get(book).getActiveSpells()) {
+            if (slot == null || slot.getSpell() == null) {
+                continue;
+            }
+            if (ArsCrossProxyRegistry.poolIdOf(slot.getSpell().getSpellResource()) < 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     static void setIronsMana(ServerPlayer player, float mana) {
         MagicData.getPlayerMagicData(player).setMana(mana);
     }
