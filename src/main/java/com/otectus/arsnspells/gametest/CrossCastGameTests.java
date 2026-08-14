@@ -286,7 +286,17 @@ public final class CrossCastGameTests {
         return book;
     }
 
-    /** A hurt fake player holding nothing, with no spellbook equipped and clean cast state. */
+    /**
+     * A hurt fake player holding nothing, with no spellbook equipped and clean cast state.
+     *
+     * <p><b>Every cast-gating property is reset explicitly, not inherited.</b>
+     * {@code FakePlayerFactory.get} returns a cached instance per (level, profile), so all
+     * tests in this class share ONE player object and whatever the previous test left on it.
+     * That was a latent flake: a test that ran after a survival test inherited survival with no
+     * mana, and Iron's then refused to initiate the cast for a reason unrelated to what was
+     * being tested. It stayed hidden until loading addon profiles changed the test order.
+     * Tests that specifically want survival downgrade from here.
+     */
     private static ServerPlayer emptyHandedPlayer(GameTestHelper helper) {
         ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), FAKE_PROFILE);
         player.moveTo(helper.absoluteVec(new Vec3(1.0, 2.0, 1.0)));
@@ -294,6 +304,9 @@ public final class CrossCastGameTests {
         player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
         // Hurt, so a resolved heal is observable as a health increase.
         player.setHealth(10.0f);
+        // Permissive defaults so a cast can only be refused for the reason under test.
+        player.setGameMode(GameType.CREATIVE);
+        IronsProxyCastDriver.setIronsMana(player, 10000.0f);
         IronsProxyCastDriver.equipSpellbook(player, ItemStack.EMPTY);
         IronsProxyCastDriver.resetCastingState(player);
         return player;

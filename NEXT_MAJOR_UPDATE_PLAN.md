@@ -1,6 +1,16 @@
 # Ars 'n' Spells — Next Major Update Plan
 
-**Status:** Phase 1 complete (reproduce and document). Phases 2–7 not started.
+**Status:** Phases 1–5 complete. Phase 6 (server profiling) and Phase 7 (cohesion) not started.
+
+| Phase | State |
+|---|---|
+| 1 — reproduce and document | Complete; 3.0.3 recovered, reconstructed and tagged (§2) |
+| 2 — scroll/binding architecture | Crash fix and uninscription fix landed; `BindingService` unification, legacy reconciler, schema version and tag-based spellbook detection still open |
+| 3 — resource accounting | Ring toggles and game-time expiry landed; FIFO→transaction-id still open |
+| 4 — JEI proxy pollution | Complete (creative tab + `allowCrafting` + JEI plugin) |
+| 5 — addon compatibility | Complete (school resolution centralised, missing-glyph detection, addon profiles run) |
+| 6 — server optimisation | **Not started** — needs the profile in §8 first |
+| 7 — cohesion and incomplete features | Not started |
 **Author:** coding agent
 **Date:** 2026-08-13
 **Working tree at time of writing:** `main` @ `3017bbc` ("Release 3.0.2"), clean, identical to `origin/main`.
@@ -597,6 +607,39 @@ Iron's-loaded number is evidence about the cross-cast paths.
 > **Gradle still reports `BUILD SUCCESSFUL`**. This is precisely why the CI job asserts on the
 > "All N required tests passed" log line rather than the exit code (3.0.2, audit E7). Any job
 > running both profiles must `rm -rf run/world` between them.
+
+### 7.1c Addon profiles — measured
+
+Opt-in runtime profiles now exist for the two addons the brief names, and all six combinations
+were executed:
+
+| Profile | Result |
+|---|---|
+| default (no addons, no Iron's) | `All 36 required tests passed` |
+| `-PwithIronsRuntimeGameTests` | `All 36 required tests passed` |
+| `-PwithArsElemental` (0.6.8.0, file `8399870`) | `All 36 required tests passed` |
+| `-PwithTooManyGlyphs` (file `4813803`) | `All 36 required tests passed` |
+| Iron's + Ars Elemental | `All 36 required tests passed` |
+| Iron's + Too Many Glyphs | `All 36 required tests passed` |
+| Iron's + both | `All 36 required tests passed` |
+
+Both addons were confirmed genuinely loaded, not silently skipped — Ars Elemental's mixin refmap
+remap, config generation and recipe loading all appear in the log.
+
+What the addon tests establish: every glyph of each addon survives its own serialisation
+round-trip with no silent part drops; declared schools translate to ANS schools (asserted via a
+deliberately unmatchable registry path, so a pass cannot come from the substring heuristic); every
+glyph resolves without throwing; the five named Ars Elemental effects are individually usable; a
+mixed Ars Elemental + Too Many Glyphs recipe round-trips; and a filter glyph placed before the
+real effect does not change the resolved school.
+
+> **A latent test flake surfaced here and was fixed.** Adding addon profiles changed GameTest
+> ordering and exposed that `FakePlayerFactory.get` returns a *cached* player per (level,
+> profile) — so all tests in `CrossCastGameTests` share one player object and inherit whatever
+> the previous test left on it. A test running after a survival test inherited survival with no
+> mana, and Iron's refused the cast for a reason unrelated to what was under test. The shared
+> fixture now resets game mode and mana explicitly. Worth remembering: the bug was always there,
+> and only a change in ordering revealed it.
 
 ### 7.2 Coverage gaps this baseline hides
 

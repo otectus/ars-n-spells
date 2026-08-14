@@ -84,6 +84,16 @@ dependencies {
         runtimeOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${irons_spellbooks_file}")
         runtimeOnly fg.deobf("dev.kosmx.player-anim:player-animation-lib-forge:${playeranimator_version}")
     }
+    // Optional Ars Nouveau addon profiles. Runtime-only and opt-in: ANS compiles against
+    // neither, and the addon GameTests self-skip when the mod is absent, so the default run
+    // is unaffected. Combine freely, e.g.
+    //   ./gradlew runGameTestServer -PwithIronsRuntimeGameTests -PwithArsElemental -PwithTooManyGlyphs
+    if (project.hasProperty('withArsElemental')) {
+        runtimeOnly fg.deobf("curse.maven:${ars_elemental_project}:${ars_elemental_file}")
+    }
+    if (project.hasProperty('withTooManyGlyphs')) {
+        runtimeOnly fg.deobf("curse.maven:${toomanyglyphs_project}:${toomanyglyphs_file}")
+    }
     // Curios API only (matches the version Ars Nouveau bundles at runtime).
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}:api")
     // JEI API, compile-only. ANS never requires JEI: the plugin class is annotated
