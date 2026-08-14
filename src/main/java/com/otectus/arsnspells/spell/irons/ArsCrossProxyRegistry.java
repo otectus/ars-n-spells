@@ -5,6 +5,9 @@ import com.otectus.arsnspells.spell.CrossCastNbt;
 import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.RegistryObject;
@@ -83,5 +86,32 @@ public final class ArsCrossProxyRegistry {
 
     public static void register(IEventBus modBus) {
         SPELLS.register(modBus);
+        // LOWEST so this runs after Iron's own listener has populated the Scrolls tab —
+        // there is nothing to remove before it adds.
+        modBus.addListener(EventPriority.LOWEST, ArsCrossProxyRegistry::hideProxyScrollsFromCreativeTabs);
+    }
+
+    /**
+     * Strip generated {@code ars_cross_*} scrolls out of creative tab contents.
+     *
+     * <p>Iron's builds one scroll per enabled spell into its Scrolls tab, and the proxies are
+     * enabled by necessity (the native wheel resolves them by id). That put eight ghost
+     * scrolls in the creative menu and, because both JEI and EMI source their ingredient
+     * lists from creative tabs, in every recipe viewer as well.
+     *
+     * <p>Every tab is swept rather than only Iron's, so a modpack that rehomes scrolls into a
+     * custom tab is covered too. Entries are collected before removal because the backing map
+     * must not be mutated mid-iteration.
+     */
+    private static void hideProxyScrollsFromCreativeTabs(BuildCreativeModeTabContentsEvent event) {
+        List<ItemStack> ghosts = new ArrayList<>();
+        for (var entry : event.getEntries()) {
+            if (ArsCrossProxyHiding.isProxyOnlyStack(entry.getKey())) {
+                ghosts.add(entry.getKey());
+            }
+        }
+        for (ItemStack ghost : ghosts) {
+            event.getEntries().remove(ghost);
+        }
     }
 }

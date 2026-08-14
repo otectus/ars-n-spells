@@ -62,6 +62,11 @@ repositories {
         name = 'KosmX'
         url = 'https://maven.kosmx.dev/'
     }
+    // JEI — compile-only API for the optional client-side proxy-recipe filter.
+    maven {
+        name = 'BlameJared'
+        url = 'https://maven.blamejared.com/'
+    }
 }
 
 dependencies {
@@ -81,6 +86,11 @@ dependencies {
     }
     // Curios API only (matches the version Ars Nouveau bundles at runtime).
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}:api")
+    // JEI API, compile-only. ANS never requires JEI: the plugin class is annotated
+    // @JeiPlugin and is simply never loaded when JEI is absent. Only the API artifacts are
+    // pulled — the full jar would drag JEI onto the runtime classpath of every run task.
+    compileOnly fg.deobf("mezz.jei:jei-1.20.1-common-api:${jei_version}")
+    compileOnly fg.deobf("mezz.jei:jei-1.20.1-forge-api:${jei_version}")
     // Ars Nouveau's own runtime graph (Curios full jar + GeckoLib) so
     // runClient/runGameTestServer can boot without hand-copied jars.
     runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}")

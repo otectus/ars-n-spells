@@ -12,6 +12,7 @@ import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 // Iron's-gated helpers: imports are compile-time only, and every call below sits behind an
 // IronsCompat.isLoaded() guard, so neither class is resolved on the Iron-absent run.
+import com.otectus.arsnspells.spell.irons.ArsCrossProxyHiding;
 import com.otectus.arsnspells.spell.irons.IronsInscriptionPolicy;
 import com.otectus.arsnspells.spell.irons.IronsScrollFactory;
 import net.minecraft.gametest.framework.GameTest;
@@ -623,6 +624,107 @@ public final class CrossCastGameTests {
         if (IronsInscriptionPolicy.evaluate(carrier) != IronsInscriptionPolicy.Verdict.ALLOW) {
             helper.fail("an unbound carrier is an ordinary blank Iron's scroll and must pass the "
                 + "inscription guard");
+        }
+        helper.succeed();
+    }
+
+    // ------------------------------------------------------------------
+    // Recipe-viewer pollution. The proxies must be registered (the native wheel
+    // resolves them by id) but must never appear as items or recipes. The critical
+    // safety property is the negative one: a real player book that happens to carry
+    // a bound Ars entry must NEVER be classified as a hideable ghost.
+    // ------------------------------------------------------------------
+
+    /** A generated proxy scroll — exactly what the creative tab and JEI produce — is hideable. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_generatedProxyScroll_isRecognizedAsGhost(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack ghost = IronsProxyCastDriver.makeProxyScroll(1);
+        if (!ArsCrossProxyHiding.isProxyOnlyStack(ghost)) {
+            helper.fail("a scroll whose only spell is an ars_cross_* proxy must be recognized as a "
+                + "generated ghost, or it stays visible in JEI/EMI and the creative menu");
+        }
+        helper.succeed();
+    }
+
+    /** A genuine Iron's scroll must never be hidden. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_nativeScroll_isNotAGhost(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack real = IronsProxyCastDriver.makeNativeScroll();
+        if (real.isEmpty()) {
+            helper.fail("no non-proxy Iron's spell is registered; the negative control cannot run");
+        }
+        if (ArsCrossProxyHiding.isProxyOnlyStack(real)) {
+            helper.fail("a genuine Iron's scroll must not be hidden — doing so would delete real "
+                + "content from every recipe viewer");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The one that matters: a player's spellbook holding a bound Ars entry AND a real Iron's
+     * spell must not be classified as a ghost. Getting this wrong would erase real player
+     * items from JEI and the creative menu.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_realBookWithBoundEntry_isNotAGhost(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack book = bindHealSpellOntoRealBook(helper);
+
+        // Precondition: it really does carry a proxy slot, so this is the ambiguous case.
+        if (IronsProxyCastDriver.proxySlotIndex(book, 1) < 0) {
+            helper.fail("test setup failed: the book should carry a proxy slot");
+        }
+        if (!IronsProxyCastDriver.addNativeSpellToBook(book)) {
+            helper.fail("could not add a genuine Iron's spell alongside the bound entry");
+        }
+        if (ArsCrossProxyHiding.isProxyOnlyStack(book)) {
+            helper.fail("a real spellbook carrying both a bound Ars entry and a genuine Iron's "
+                + "spell must never be treated as a generated ghost");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Proxies must declare themselves non-craftable while staying registered.
+     *
+     * <p>Asserted against {@code getDefaultConfig().allowCrafting} rather than
+     * {@code allowCrafting()}. The latter reads {@code SpellConfigManager}, which Iron's only
+     * populates from {@code OnDatapackSyncEvent} — i.e. on a real player join or {@code /reload}.
+     * A GameTest server never fires that, so {@code allowCrafting()} falls back to the global
+     * parameter default ({@code true}) here regardless of what the spell declares. Asserting it
+     * would test Iron's config plumbing under conditions that never occur in a real game;
+     * asserting the declaration tests the part ANS actually controls, which Iron's then copies
+     * via {@code config.setDefaultValue(ALLOW_CRAFTING, raw.allowCrafting)}.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_proxies_declareNonCraftableButStayRegistered(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        var proxy = com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry.get(1);
+        if (proxy == null) {
+            helper.fail("proxy pool 1 must be registered — the native wheel resolves it by id");
+        }
+        if (proxy.getDefaultConfig().allowCrafting) {
+            helper.fail("proxies must declare allowCrafting=false so Iron's Scroll Forge, and the "
+                + "recipes it feeds JEI, skip them");
+        }
+        if (com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry
+                .poolIdOf(proxy.getSpellResource()) != 1) {
+            helper.fail("the registered proxy must still resolve by its ars_cross_1 id; bound "
+                + "spellbooks look it up that way at cast time");
         }
         helper.succeed();
     }

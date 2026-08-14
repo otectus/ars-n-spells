@@ -2,13 +2,16 @@ package com.otectus.arsnspells.gametest;
 
 import com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
+import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import io.redspace.ironsspellbooks.api.spells.CastSource;
 import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
+import io.redspace.ironsspellbooks.api.spells.ISpellContainerMutable;
 import io.redspace.ironsspellbooks.api.spells.SpellSlot;
 import io.redspace.ironsspellbooks.api.util.Utils;
 import io.redspace.ironsspellbooks.compat.Curios;
 import io.redspace.ironsspellbooks.gui.overlays.SpellSelection;
+import io.redspace.ironsspellbooks.registries.ItemRegistry;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -137,6 +140,49 @@ final class IronsProxyCastDriver {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    /**
+     * A scroll carrying the proxy for {@code poolId} in a native container — i.e. exactly what
+     * Iron's creative-tab and JEI generators produce for a registered spell.
+     */
+    static ItemStack makeProxyScroll(int poolId) {
+        ItemStack scroll = new ItemStack(ItemRegistry.SCROLL.get());
+        ISpellContainer.createScrollContainer(requireProxy(poolId), 1, scroll);
+        return scroll;
+    }
+
+    /** A scroll carrying a genuine (non-proxy) Iron's spell, or EMPTY if none is registered. */
+    static ItemStack makeNativeScroll() {
+        for (AbstractSpell spell : SpellRegistry.getEnabledSpells()) {
+            if (spell == SpellRegistry.none()
+                || ArsCrossProxyRegistry.poolIdOf(spell.getSpellResource()) >= 0) {
+                continue;
+            }
+            ItemStack scroll = new ItemStack(ItemRegistry.SCROLL.get());
+            ISpellContainer.createScrollContainer(spell, spell.getMinLevel(), scroll);
+            return scroll;
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /** Add a genuine Iron's spell into {@code book}'s native container, alongside whatever is there. */
+    static boolean addNativeSpellToBook(ItemStack book) {
+        for (AbstractSpell spell : SpellRegistry.getEnabledSpells()) {
+            if (spell == SpellRegistry.none()
+                || ArsCrossProxyRegistry.poolIdOf(spell.getSpellResource()) >= 0) {
+                continue;
+            }
+            ISpellContainerMutable mutable = ISpellContainer.getOrCreate(book).mutableCopy();
+            int index = mutable.getMaxSpellCount();
+            mutable.setMaxSpellCount(index + 1);
+            if (!mutable.addSpellAtIndex(spell, spell.getMinLevel(), index, false)) {
+                return false;
+            }
+            ISpellContainer.set(book, mutable.toImmutable());
+            return true;
+        }
+        return false;
     }
 
     static void setIronsMana(ServerPlayer player, float mana) {
