@@ -480,6 +480,13 @@ must be *defined and tested*, not incidental.
    would leave dedicated servers exposed. This is what protects the scrolls already sitting in
    players' inventories, which the root fix cannot reach.
 
+**Status: both landed and verified.** `IronsScrollFactory` establishes the container before the
+carrier is returned (and returns `ItemStack.EMPTY` if it cannot), `IronsInscriptionPolicy` holds
+the shared verdict, and `MixinInscriptionTableScreen` / `MixinInscriptionTableMenu` enforce it on
+client and server. Four GameTests cover it, including one that performs Iron's exact dereference
+(`ISpellContainer.get(s).getSpellAtIndex(0)`) rather than a proxy predicate, and one that asserts
+its own setup still reproduces the pre-fix shape so the rejection test cannot pass vacuously.
+
 **The root fix alone is not sufficient, and this decides the native-table policy.** With an empty
 container in place the NPEs are gone, but `doInscription` then runs:
 
@@ -559,6 +566,37 @@ suites=53  tests=194  failures=0  errors=0  skipped=0
 
 Matches the brief's stated baseline of 194 tests across 53 suites exactly. This is the regression
 floor: it must stay green through every phase.
+
+### 7.1b GameTest baseline — measured, both profiles green
+
+Contrary to the assumption in §7.3, the Iron's-loaded GameTest profile turns out to verify far
+more than expected without a game client. Both profiles now run clean:
+
+| Profile | Command | Result |
+|---|---|---|
+| Iron's-absent (default) | `./gradlew runGameTestServer` | `All 21 required tests passed` |
+| Iron's-loaded | `./gradlew runGameTestServer -PwithIronsRuntimeGameTests` | `All 21 required tests passed` |
+
+**The Iron's-loaded run genuinely executes the cross-cast machinery** — proven by this line, which
+only the real `ArsCrossProxySpell.onCast` path can emit, from a fake player with a book in the
+actual Curios spellbook slot:
+
+```
+[Server thread/WARN] [c.o.a.spell.irons.ArsCrossProxySpell]: Ars cross proxy
+ars_n_spells:ars_cross_1 cast by ans_gametest (source=SPELLBOOK, equipmentSlot=spellbook)
+but no carried spellbook holds a sidecar entry for pool 1 …
+```
+
+That matters for interpreting the counts: on the Iron's-absent run every Iron's-gated test
+self-skips via `helper.succeed()`, so 21/21 there proves boot safety, not behaviour. Only the
+Iron's-loaded number is evidence about the cross-cast paths.
+
+> **CI hazard found while doing this.** The two profiles share `run/`, and the Iron's-loaded run
+> leaves `irons_spellbooks:pocket_dimension_type` in `run/world`. The next Iron's-absent run then
+> dies at world load with `Failed to get element ResourceKey[…pocket_dimension_type]` — and
+> **Gradle still reports `BUILD SUCCESSFUL`**. This is precisely why the CI job asserts on the
+> "All N required tests passed" log line rather than the exit code (3.0.2, audit E7). Any job
+> running both profiles must `rm -rf run/world` between them.
 
 ### 7.2 Coverage gaps this baseline hides
 

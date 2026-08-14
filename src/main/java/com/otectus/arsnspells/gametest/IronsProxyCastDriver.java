@@ -116,6 +116,29 @@ final class IronsProxyCastDriver {
         return -1;
     }
 
+    /**
+     * Perform the exact dereference Iron's Inscription Table performs on the scroll slot,
+     * and report whether it survives.
+     *
+     * <p>This is the crash reproduction, spelled the way Iron's spells it:
+     * {@code ISpellContainer.get(stack).getSpellAtIndex(0)}. Asserting
+     * {@code isSpellContainer(...)} instead would test a <em>different</em> function —
+     * that one reads the tag, this one decodes it — and would not catch a container that
+     * is present but fails to decode.
+     */
+    static boolean scrollContainerDereferenceSucceeds(ItemStack stack) {
+        try {
+            ISpellContainer container = ISpellContainer.get(stack);
+            if (container == null) {
+                return false;
+            }
+            container.getSpellAtIndex(0);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     static void setIronsMana(ServerPlayer player, float mana) {
         MagicData.getPlayerMagicData(player).setMana(mana);
     }

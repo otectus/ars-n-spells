@@ -90,6 +90,8 @@
   "message.ars_n_spells.mana.insufficient": "Not Enough Mana: Need %s, have %s",
   "message.ars_n_spells.lp.insufficient_need": "Insufficient Life Points: Need %s LP",
   "message.ars_n_spells.ring_conflict": "Ring conflict: Cursed Ring and Virtue Ring cancel each other - using normal mana",
+  "message.ars_n_spells.inscription.ans_carrier": "This scroll carries an Ars Nouveau spell, which the Inscription Table can't read. Bind it to a spell book with the Spellbook Binding ritual or /ans bind_scroll_to_irons_book.",
+  "message.ars_n_spells.inscription.no_container": "This scroll is missing its spell data and can't be inscribed. It was created by an older version of Ars 'n' Spells — export the spell again at a Spell Loom.",
   "arsnspells.crosscast.invalid.index_out_of_range": "Cross-cast failed: selected spell index is out of range.",
   "arsnspells.crosscast.invalid.empty_payload": "Cross-cast failed: this item carries no inscribed spells.",
   "arsnspells.crosscast.invalid.spell_type": "Cross-cast failed: the inscribed spell's type could not be resolved.",

@@ -15,10 +15,12 @@
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem",
+    "irons.MixinInscriptionTableMenu",
     "sanctified.MixinSanctifiedAbstractSpell"
   ],
   "client": [
     "irons.MixinAbstractSpellArsIcon",
+    "irons.MixinInscriptionTableScreen",
     "covenant.MixinResourceBarOverlay"
   ],
   "injectors": {

@@ -10,6 +10,10 @@ import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossCastNbt;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+// Iron's-gated helpers: imports are compile-time only, and every call below sits behind an
+// IronsCompat.isLoaded() guard, so neither class is resolved on the Iron-absent run.
+import com.otectus.arsnspells.spell.irons.IronsInscriptionPolicy;
+import com.otectus.arsnspells.spell.irons.IronsScrollFactory;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -430,6 +434,127 @@ public final class CrossCastGameTests {
         player.setItemInHand(InteractionHand.OFF_HAND, book);
         helper.getLevel().getServer().getCommands().performPrefixedCommand(
             player.createCommandSourceStack().withPermission(2), "ans bind_scroll_to_irons_book");
+    }
+
+    // ------------------------------------------------------------------
+    // Inscription Table crash (the reported NPE). Iron's dereferences
+    // ISpellContainer.get(scroll).getSpellAtIndex(0) with no null check in three
+    // places — one client, two server — and get() returns null for a scroll with
+    // no container NBT. These cover the root fix and both rejection verdicts.
+    // ------------------------------------------------------------------
+
+    /**
+     * The root fix: every scroll ANS hands out must satisfy Iron's container invariant.
+     * Asserted by performing the exact dereference that crashed, not by checking a
+     * different predicate that happens to agree today.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_exportedCarrier_survivesInscriptionDereference(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
+        ItemStack carrier = ArsSpellExportUtil.createIronsScrollCarrier(heal);
+        if (carrier.isEmpty() || !IronsBookBindingUtil.isIronsScroll(carrier)) {
+            helper.fail("export must yield a real irons_spellbooks:scroll when Iron's is loaded");
+        }
+        if (!IronsProxyCastDriver.scrollContainerDereferenceSucceeds(carrier)) {
+            helper.fail("an exported carrier must survive ISpellContainer.get(...).getSpellAtIndex(0) "
+                + "— this is the Inscription Table NPE, and a carrier without a native container "
+                + "crashes the client screen and the server menu alike");
+        }
+        // The container must not smuggle the carrier into Iron's spell wheel.
+        if (carrier.getOrCreateTag().getCompound("irons_spellbooks:spell_container")
+                .getBoolean("spellWheel")) {
+            helper.fail("the carrier's native container must not add it to Iron's spell wheel");
+        }
+        // The Ars payload must still be there — the container is additive, not a replacement.
+        if (IronsBookBindingUtil.extractSingleArsEntry(carrier).isEmpty()) {
+            helper.fail("initializing the native container must not disturb the ANS sidecar payload");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A legacy carrier — a real scroll with ANS sidecar NBT and no native container, exactly
+     * what shipped before the fix — must be refused rather than crashing. These already exist
+     * in players' inventories and chests, so the root fix cannot reach them.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_legacyContainerlessCarrier_isRejectedNotCrashed(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        Item scrollItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", "scroll"));
+        if (scrollItem == null) {
+            helper.fail("Iron's scroll item must be registered when Iron's is loaded");
+        }
+        // Reproduce the pre-fix shape: bare stack + sidecar, no container.
+        ItemStack legacy = new ItemStack(scrollItem);
+        CrossCastNbt.addArsEntryWithMetaToTag(legacy.getOrCreateTag(),
+            IronsBookBindingUtil.ARS_PLACEHOLDER_ID, 1, arsPayload("legacy"),
+            CrossCastNbt.NO_PROXY_POOL_ID, null, null, null);
+
+        // Precondition: this stack really is the crashing shape, or the test proves nothing.
+        if (IronsProxyCastDriver.scrollContainerDereferenceSucceeds(legacy)) {
+            helper.fail("test setup no longer reproduces the legacy shape: this stack already has a "
+                + "readable container, so the rejection assertion below would be vacuous");
+        }
+        if (IronsInscriptionPolicy.evaluate(legacy) == IronsInscriptionPolicy.Verdict.ALLOW) {
+            helper.fail("a container-less legacy carrier must be rejected by the inscription guard; "
+                + "allowing it lets Iron's NPE on the client screen and the server menu");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A well-formed post-fix carrier no longer crashes, but Iron's still cannot read its Ars
+     * payload — and would consume the scroll while inscribing an empty {@code none} spell.
+     * It must be refused, and refused with the carrier-specific message that points at the
+     * supported binding workflow.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_validCarrier_isRejectedFromNativeTable(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
+        ItemStack carrier = ArsSpellExportUtil.createIronsScrollCarrier(heal);
+        if (carrier.isEmpty()) {
+            helper.fail("export must yield a carrier when Iron's is loaded");
+        }
+        IronsInscriptionPolicy.Verdict verdict = IronsInscriptionPolicy.evaluate(carrier);
+        if (verdict != IronsInscriptionPolicy.Verdict.ANS_CARRIER) {
+            helper.fail("a valid ANS carrier must be refused as ANS_CARRIER (so the player is sent "
+                + "to the binding workflow), got " + verdict);
+        }
+        helper.succeed();
+    }
+
+    /** A genuine Iron's scroll must pass through the guard untouched. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_nativeScroll_isAllowedThroughGuard(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        Item scrollItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", "scroll"));
+        if (scrollItem == null) {
+            helper.fail("Iron's scroll item must be registered when Iron's is loaded");
+        }
+        // A scroll with a native container and no ANS sidecar is none of our business.
+        ItemStack native_ = new ItemStack(scrollItem);
+        if (!IronsScrollFactory.initializeCarrierContainer(native_)) {
+            helper.fail("could not give a plain scroll a native container; the factory is broken");
+        }
+        if (IronsInscriptionPolicy.evaluate(native_) != IronsInscriptionPolicy.Verdict.ALLOW) {
+            helper.fail("a native Iron's scroll with no ANS sidecar must pass the guard untouched — "
+                + "blocking it would break Iron's own inscription workflow");
+        }
+        helper.succeed();
     }
 
     /**
