@@ -76,10 +76,11 @@ public abstract class MixinSpellResolverPreCast {
         // let Ars Nouveau handle canCast() natively. This prevents the mod from
         // interfering with vanilla Ars mana validation when unification is off.
         if (!BridgeManager.isUnificationEnabled()) {
-            boolean hasSanctifiedRing = SanctifiedLegacyCompat.isAvailable()
-                && (SanctifiedLegacyCompat.isWearingCursedRing(player)
-                    || SanctifiedLegacyCompat.isWearingVirtueRing(player));
-            if (!hasSanctifiedRing) {
+            // Ask whether the ring's cost path is ACTIVE, not merely whether the ring is worn.
+            // A ring whose system is toggled off charges nothing, so ANS has no reason to take
+            // over validation — pre-cast and mana expenditure must agree on this, or one side
+            // waives a cost the other never collects.
+            if (!SanctifiedLegacyCompat.isAnyRingCostPathActive(player)) {
                 return; // Let native Ars canCast() run
             }
         }
@@ -114,8 +115,10 @@ public abstract class MixinSpellResolverPreCast {
         // during SpellCostCalcEvent and store their respective pending costs.
         if (cost <= 0) {
             if (SanctifiedLegacyCompat.isAvailable()) {
-                // Cursed Ring LP validation
-                if (SanctifiedLegacyCompat.isWearingCursedRing(player)) {
+                // Cursed Ring LP validation. Gated on the active path, not just the worn ring:
+                // a stale pending cost from before the toggle was flipped must not be validated
+                // (and then charged) after the owner disabled the system.
+                if (SanctifiedLegacyCompat.isCursedRingCostPathActive(player)) {
                     int pendingLpCost = CursedRingHandler.getPendingLPCost(player);
                     if (pendingLpCost > 0) {
                         LOGGER.debug("PRE-CAST VALIDATION (LP): Player={}, LP Cost={}",
@@ -153,7 +156,7 @@ public abstract class MixinSpellResolverPreCast {
 
                 // Virtue Ring aura validation \u2014 Covenant of the Seven owns the aura
                 // state; we read/spend via SanctifiedLegacyCompat reflection bridges.
-                if (SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
+                if (SanctifiedLegacyCompat.isVirtueAuraCostPathActive(player)) {
                     int pendingAuraCost = VirtueRingHandler.getPendingAuraCost(player);
                     if (pendingAuraCost > 0) {
                         LOGGER.debug("PRE-CAST VALIDATION (Aura): Player={}, Aura Cost={}",

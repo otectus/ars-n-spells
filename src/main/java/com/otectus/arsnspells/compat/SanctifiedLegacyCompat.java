@@ -560,6 +560,44 @@ public class SanctifiedLegacyCompat {
     }
 
     /**
+     * True when the Cursed Ring's LP-for-mana path should actually be applied to
+     * {@code player}: Covenant present, {@code enable_lp_system} on, and the ring worn.
+     *
+     * <p>Use this rather than {@link #isWearingCursedRing(Player)} at any site that
+     * <em>suppresses</em> a normal resource cost. The two are not interchangeable — the ring
+     * being worn says nothing about whether the server owner enabled the path — and mixing
+     * them is how a cost gets waived with nothing charged in its place.
+     */
+    public static boolean isCursedRingCostPathActive(Player player) {
+        return isAvailable()
+            && AnsConfig.ENABLE_LP_SYSTEM.get()
+            && isWearingCursedRing(player);
+    }
+
+    /**
+     * True when the Virtue Ring's aura-for-mana path should actually be applied to
+     * {@code player}: Covenant present, {@code enable_virtue_aura_system} on, and the ring worn.
+     *
+     * <p>This exists because the toggle was honoured by {@code VirtueRingHandler} (which
+     * <em>consumes</em> aura) but not by the mixin that <em>cancels</em> mana. With the toggle
+     * off, nothing took aura and nothing took mana, so Ars spells were free — the opposite of
+     * the documented "use normal mana instead of Covenant aura".
+     */
+    public static boolean isVirtueAuraCostPathActive(Player player) {
+        return isAvailable()
+            && AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get()
+            && isWearingVirtueRing(player);
+    }
+
+    /**
+     * True when either ring's cost path is active, i.e. ANS (not Ars) owns this cast's
+     * resource accounting.
+     */
+    public static boolean isAnyRingCostPathActive(Player player) {
+        return isCursedRingCostPathActive(player) || isVirtueAuraCostPathActive(player);
+    }
+
+    /**
      * Check if the player has both the Cursed Ring and Virtue Ring equipped (conflict state).
      * Covenant of the Seven ships both rings, so either source mod is sufficient — the previous
      * AND-gate silently dropped the conflict notification on C7-only setups.

@@ -26,14 +26,20 @@ public class LPDeathPrevention {
     private static final Logger LOGGER = LoggerFactory.getLogger(LPDeathPrevention.class);
 
     private static final Map<UUID, CastTransaction> activeTransactions = new ConcurrentHashMap<>();
-    private static final long IMMUNE_TIMEOUT_MS = 1000; // 1 second safety timeout
+    /**
+     * 20 ticks (1s at 20 TPS). Server game time, not wall-clock: the immunity window exists to
+     * span a single cast's damage processing, which is measured in ticks. Wall-clock expiry
+     * dropped the flag early during a lag spike and left it stale while the world was paused.
+     */
+    private static final long IMMUNE_TIMEOUT_TICKS = 20;
 
     private static class CastTransaction {
-        final long timestampMs;
+        /** Server game time (ticks) at which immunity was granted. */
+        final long grantedGameTime;
         final int playerTickCount;
 
-        CastTransaction(long timestampMs, int playerTickCount) {
-            this.timestampMs = timestampMs;
+        CastTransaction(long grantedGameTime, int playerTickCount) {
+            this.grantedGameTime = grantedGameTime;
             this.playerTickCount = playerTickCount;
         }
     }
@@ -45,7 +51,7 @@ public class LPDeathPrevention {
     public static void setLPImmune(Player player) {
         if (player != null) {
             activeTransactions.put(player.getUUID(),
-                new CastTransaction(System.currentTimeMillis(), player.tickCount));
+                new CastTransaction(player.level().getGameTime(), player.tickCount));
             LOGGER.debug("Set LP immune for {} at tick {}", player.getName().getString(), player.tickCount);
         }
     }
@@ -189,9 +195,9 @@ public class LPDeathPrevention {
         }
 
         if (event.player.tickCount % 60 == 0) {
-            long now = System.currentTimeMillis();
+            long now = event.player.level().getGameTime();
             activeTransactions.entrySet().removeIf(entry -> {
-                if (now - entry.getValue().timestampMs > IMMUNE_TIMEOUT_MS) {
+                if (now - entry.getValue().grantedGameTime > IMMUNE_TIMEOUT_TICKS) {
                     LOGGER.debug("Safety cleanup: removed stale LP immune flag for {}", entry.getKey());
                     return true;
                 }

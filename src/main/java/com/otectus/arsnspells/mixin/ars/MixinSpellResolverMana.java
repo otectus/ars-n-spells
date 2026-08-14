@@ -31,17 +31,20 @@ public abstract class MixinSpellResolverMana {
         if (spellContext != null) {
             LivingEntity caster = spellContext.getUnwrappedCaster();
             if (caster instanceof Player player) {
-                if (SanctifiedLegacyCompat.isAvailable()) {
-                    if (AnsConfig.ENABLE_LP_SYSTEM.get() && SanctifiedLegacyCompat.isWearingCursedRing(player)) {
-                        ci.cancel();
-                        return;
-                    }
-                    if (SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
-                        // Aura was already consumed via SanctifiedLegacyCompat.consumeCovenantAura
-                        // in VirtueRingHandler's SpellResolveEvent.Post hook.
-                        ci.cancel();
-                        return;
-                    }
+                if (SanctifiedLegacyCompat.isCursedRingCostPathActive(player)) {
+                    // LP was consumed in CursedRingHandler.onSpellResolve.
+                    ci.cancel();
+                    return;
+                }
+                // Must gate on ENABLE_VIRTUE_AURA_SYSTEM, not merely on the ring being worn.
+                // VirtueRingHandler checks the toggle before consuming aura; this cancel did
+                // not, so with the toggle off nothing took aura and nothing took mana and Ars
+                // spells were free. Both halves now read the same predicate.
+                if (SanctifiedLegacyCompat.isVirtueAuraCostPathActive(player)) {
+                    // Aura was already consumed via SanctifiedLegacyCompat.consumeCovenantAura
+                    // in VirtueRingHandler's SpellResolveEvent.Post hook.
+                    ci.cancel();
+                    return;
                 }
             }
         }

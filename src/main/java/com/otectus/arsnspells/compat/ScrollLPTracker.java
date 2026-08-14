@@ -22,18 +22,25 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * matching the ring handlers' ANS-3.0.0 migration. With the single slot, a
  * second scroll HEAD before the first's RETURN clobbered the first's staged
  * cost, so the first commit charged the wrong amount. Entries older than
- * {@link #PENDING_TTL_MS} are evicted opportunistically on stage/take (a RETURN
+ * {@link #PENDING_TTL_TICKS} are evicted opportunistically on stage/take (a RETURN
  * suppressed by another mod would otherwise leak its entry until logout).
+ *
+ * <p><b>Expiry is measured in server game time, not wall-clock milliseconds.</b> This is a
+ * gameplay transaction: it must age at the same rate as the cast it belongs to. Wall-clock
+ * expiry diverged from tick rate whenever the two disagreed — a lag spike, {@code /tick freeze},
+ * or a paused single-player world could expire a staged cost that the matching RETURN was still
+ * on its way to commit, silently making the cast free. Callers pass the level's game time.
  */
 public final class ScrollLPTracker {
-    private static final long PENDING_TTL_MS = 5000; // 100 ticks at 20 TPS, matching CrossCastContext
+    /** 100 ticks (5s at 20 TPS), matching CrossCastContext. */
+    private static final long PENDING_TTL_TICKS = 100;
 
     private static final Map<UUID, Deque<Entry>> PENDING = new ConcurrentHashMap<>();
 
     private ScrollLPTracker() {}
 
-    public static void stage(UUID uuid, int lpCost, boolean deathMode) {
-        stage(uuid, lpCost, deathMode, 0.0f);
+    public static void stage(UUID uuid, int lpCost, boolean deathMode, long gameTime) {
+        stage(uuid, lpCost, deathMode, 0.0f, gameTime);
     }
 
     /**
@@ -41,18 +48,18 @@ public final class ScrollLPTracker {
      * mode — the HEAD inject validates it, the RETURN inject consumes it only if
      * Iron's actually accepted the use.
      */
-    public static void stage(UUID uuid, int lpCost, boolean deathMode, float manaCost) {
+    public static void stage(UUID uuid, int lpCost, boolean deathMode, float manaCost, long gameTime) {
         Deque<Entry> queue = PENDING.computeIfAbsent(uuid, k -> new ConcurrentLinkedDeque<>());
-        evictStale(queue);
-        queue.addLast(new Entry(lpCost, deathMode, manaCost, System.currentTimeMillis()));
+        evictStale(queue, gameTime);
+        queue.addLast(new Entry(lpCost, deathMode, manaCost, gameTime));
     }
 
-    public static Entry take(UUID uuid) {
+    public static Entry take(UUID uuid, long gameTime) {
         Deque<Entry> queue = PENDING.get(uuid);
         if (queue == null) {
             return null;
         }
-        evictStale(queue);
+        evictStale(queue, gameTime);
         // Empty deques are intentionally left in the map: removing them here races
         // with a concurrent stage() on the same queue object. They are bounded by
         // online-player count and drained by clear() on logout.
@@ -68,10 +75,10 @@ public final class ScrollLPTracker {
         PENDING.remove(uuid);
     }
 
-    private static void evictStale(Deque<Entry> queue) {
-        long now = System.currentTimeMillis();
+    private static void evictStale(Deque<Entry> queue, long gameTime) {
         Entry head;
-        while ((head = queue.peekFirst()) != null && now - head.timestampMs > PENDING_TTL_MS) {
+        while ((head = queue.peekFirst()) != null
+            && gameTime - head.stagedGameTime > PENDING_TTL_TICKS) {
             queue.pollFirst();
         }
     }
@@ -80,13 +87,14 @@ public final class ScrollLPTracker {
         public final int lpCost;
         public final boolean deathMode;
         public final float manaCost;
-        public final long timestampMs;
+        /** Server game time (ticks) at which this cost was staged. */
+        public final long stagedGameTime;
 
-        Entry(int lpCost, boolean deathMode, float manaCost, long timestampMs) {
+        Entry(int lpCost, boolean deathMode, float manaCost, long stagedGameTime) {
             this.lpCost = lpCost;
             this.deathMode = deathMode;
             this.manaCost = manaCost;
-            this.timestampMs = timestampMs;
+            this.stagedGameTime = stagedGameTime;
         }
     }
 }

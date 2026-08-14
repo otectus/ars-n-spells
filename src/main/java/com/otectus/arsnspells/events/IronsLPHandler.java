@@ -41,7 +41,13 @@ public class IronsLPHandler {
     // because handlers can fire from network/tick threads.
     private static final Map<UUID, Deque<PendingIronsLP>> pendingCosts = new ConcurrentHashMap<>();
 
-    private static final long PENDING_TTL_MILLIS = 5000L;
+    /**
+     * 100 ticks (5s at 20 TPS). Measured in server game time, not wall-clock: this is a
+     * gameplay transaction and must age at the same rate as the cast it belongs to. Under
+     * wall-clock expiry a lag spike, /tick freeze, or a paused single-player world could
+     * expire a staged cost while its matching OnCast was still pending, making the cast free.
+     */
+    private static final long PENDING_TTL_TICKS = 100L;
 
     /** Enqueue a staged LP cost for the player (FIFO). */
     private static void stage(UUID id, PendingIronsLP cost) {
@@ -126,7 +132,7 @@ public class IronsLPHandler {
         if (!hasEnough) {
             if (AnsConfig.DEATH_ON_INSUFFICIENT_LP.get()) {
                 // Allow cast; death penalty handled on cast
-                stage(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
+                stage(player.getUUID(), new PendingIronsLP(lpCost, manaCost, player.level().getGameTime()));
                 LPDeathPrevention.markSpellCast(player);
                 return;
             }
@@ -151,7 +157,7 @@ public class IronsLPHandler {
             return;
         }
 
-        stage(player.getUUID(), new PendingIronsLP(lpCost, manaCost, System.currentTimeMillis()));
+        stage(player.getUUID(), new PendingIronsLP(lpCost, manaCost, player.level().getGameTime()));
         LPDeathPrevention.markSpellCast(player);
     }
 
@@ -200,11 +206,11 @@ public class IronsLPHandler {
                 player.getName().getString());
             return;
         }
-        long now = System.currentTimeMillis();
+        long now = player.level().getGameTime();
         PendingIronsLP pending = null;
         PendingIronsLP candidate;
         while ((candidate = queue.pollFirst()) != null) {
-            if (now - candidate.timestamp > PENDING_TTL_MILLIS) {
+            if (now - candidate.stagedGameTime > PENDING_TTL_TICKS) {
                 LOGGER.warn("Pending LP cost expired for {}", player.getName().getString());
                 continue;
             }
@@ -277,9 +283,9 @@ public class IronsLPHandler {
 
         if (event.player.tickCount % 100 == 0) { // Every 5 seconds
             // ANS-3.0.0: prune expired entries within each deque, then drop empty keys.
-            long now = System.currentTimeMillis();
+            long now = event.player.level().getGameTime();
             pendingCosts.entrySet().removeIf(entry -> {
-                entry.getValue().removeIf(c -> now - c.timestamp > PENDING_TTL_MILLIS);
+                entry.getValue().removeIf(c -> now - c.stagedGameTime > PENDING_TTL_TICKS);
                 return entry.getValue().isEmpty();
             });
         }
@@ -299,12 +305,13 @@ public class IronsLPHandler {
     private static class PendingIronsLP {
         final int lpCost;
         final int manaCost;
-        final long timestamp;
+        /** Server game time (ticks) at which this cost was staged. */
+        final long stagedGameTime;
 
-        PendingIronsLP(int lpCost, int manaCost, long timestamp) {
+        PendingIronsLP(int lpCost, int manaCost, long stagedGameTime) {
             this.lpCost = lpCost;
             this.manaCost = manaCost;
-            this.timestamp = timestamp;
+            this.stagedGameTime = stagedGameTime;
         }
     }
 }

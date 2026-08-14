@@ -687,9 +687,11 @@ public class AnsConfig {
         SCROLL_COST_MODE = BUILDER
             .comment(
                 "Cost mode for Iron's Spellbooks scroll usage:",
-                "  full - Scrolls consume mana and LP just like normal casting",
+                "  full - Scrolls cost the same as casting the spell normally",
                 "  lp_only - Scrolls are free of mana cost but still consume LP if Cursed Ring equipped",
-                "  free - Scrolls have no resource cost (LP from Cursed Ring still applies)"
+                "  free - Scrolls have no resource cost (LP from Cursed Ring still applies)",
+                "Note: wearing the Cursed Ring (with enable_lp_system on) makes LP REPLACE mana,",
+                "exactly as it does for normal casting - a ring wearer is never charged both."
             )
             .define("scroll_cost_mode", "full");
 

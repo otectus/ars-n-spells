@@ -20,13 +20,13 @@ class ScrollLPTrackerClearTest {
     @Test
     void stageThenClear_removesTheEntry() {
         UUID id = UUID.randomUUID();
-        ScrollLPTracker.stage(id, 50, false);
-        assertNotNull(ScrollLPTracker.take(id), "preconditions: stage and take work");
+        ScrollLPTracker.stage(id, 50, false, 0L);
+        assertNotNull(ScrollLPTracker.take(id, 0L), "preconditions: stage and take work");
 
         // Re-stage and clear via the new clear() hook.
-        ScrollLPTracker.stage(id, 25, true);
+        ScrollLPTracker.stage(id, 25, true, 0L);
         ScrollLPTracker.clear(id);
-        assertNull(ScrollLPTracker.take(id),
+        assertNull(ScrollLPTracker.take(id, 0L),
             "clear(id) must remove the staged entry so subsequent take() returns null");
     }
 

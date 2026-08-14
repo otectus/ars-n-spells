@@ -37,10 +37,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  *
  * <p>Behavior is controlled by the {@code scroll_cost_mode} config:
  * <ul>
- *   <li><b>full</b>: Scrolls consume mana and LP like normal casting.</li>
+ *   <li><b>full</b>: Scrolls cost the same as casting the spell normally.</li>
  *   <li><b>lp_only</b>: Scrolls are mana-free but LP is still consumed for Cursed Ring wearers.</li>
  *   <li><b>free</b>: No resource cost, but LP from Cursed Ring still applies.</li>
  * </ul>
+ *
+ * <p>In every mode, a Cursed Ring wearer (with {@code enable_lp_system} on) pays LP
+ * <em>instead of</em> mana, never both — the same substitution normal casting performs via
+ * {@code IronsLPHandler}'s {@code event.setManaCost(0)}.
  */
 @Mixin(value = io.redspace.ironsspellbooks.item.Scroll.class, remap = false)
 public class MixinScrollItem {
@@ -82,12 +86,19 @@ public class MixinScrollItem {
         int manaCost = spell.getManaCost(spellLevel);
 
         // --- Cursed Ring LP path (always applies regardless of scroll_cost_mode) ---
-        // Audit F13: honor the LP system's master toggle. Every other LP participant
-        // (CursedRingHandler, IronsLPHandler, MixinSpellResolverMana) gates on
-        // ENABLE_LP_SYSTEM ("When disabled, spells use normal mana even with Cursed
-        // Ring equipped"); scrolls must not keep charging LP when it is off.
-        if (AnsConfig.ENABLE_LP_SYSTEM.get()
-            && SanctifiedLegacyCompat.isAvailable() && SanctifiedLegacyCompat.isWearingCursedRing(player)) {
+        //
+        // LP REPLACES mana here; it is not additive. That is deliberate and matches every
+        // other LP path in the mod: IronsLPHandler.onIronsSpellCast calls event.setManaCost(0)
+        // for ring wearers, and MixinSpellResolverMana cancels expendMana outright. The
+        // scroll_cost_mode=full documentation ("consume mana and LP just like normal casting")
+        // means "the same rules normal casting uses", and under those rules a Cursed Ring
+        // wearer pays LP instead of mana. Charging both here would make scrolls uniquely
+        // double-priced for ring wearers.
+        //
+        // Audit F13: honor the LP system's master toggle. Every other LP participant gates on
+        // ENABLE_LP_SYSTEM ("When disabled, spells use normal mana even with Cursed Ring
+        // equipped"); scrolls must not keep charging LP when it is off.
+        if (SanctifiedLegacyCompat.isCursedRingCostPathActive(player)) {
             if (manaCost > 0) {
                 SpellRarity rarity = spell.getRarity(spellLevel);
                 if (rarity == null) {
@@ -103,7 +114,7 @@ public class MixinScrollItem {
                 if (!hasEnough) {
                     if (AnsConfig.DEATH_ON_INSUFFICIENT_LP.get()) {
                         // Death mode: scroll proceeds; RETURN inject will kill the player on success.
-                        ScrollLPTracker.stage(player.getUUID(), lpCost, true);
+                        ScrollLPTracker.stage(player.getUUID(), lpCost, true, level.getGameTime());
                         return;
                     }
 
@@ -121,10 +132,13 @@ public class MixinScrollItem {
                 }
 
                 // Sufficient LP: stage the commit. Actual consumption happens in RETURN.
-                ScrollLPTracker.stage(player.getUUID(), lpCost, false);
-                // Scroll proceeds; LP commits at RETURN if Iron's accepts the use.
+                ScrollLPTracker.stage(player.getUUID(), lpCost, false, level.getGameTime());
+                // Scroll proceeds; LP commits at RETURN if Iron's accepts the use. Returning
+                // here is what makes LP replace mana rather than add to it — see the note above.
                 return;
             }
+            // manaCost == 0: nothing to convert to LP, so fall through. The mana block below
+            // is also a no-op for a zero-cost spell, so no currency is charged either way.
         }
 
         // Virtue Ring aura path removed: Covenant of the Seven's own Iron's-spell
@@ -146,7 +160,7 @@ public class MixinScrollItem {
                 cir.setReturnValue(InteractionResultHolder.fail(stack));
                 return;
             }
-            ScrollLPTracker.stage(player.getUUID(), 0, false, manaCost);
+            ScrollLPTracker.stage(player.getUUID(), 0, false, manaCost, level.getGameTime());
         }
     }
 
@@ -167,7 +181,7 @@ public class MixinScrollItem {
         // Aura commit removed alongside the HEAD-side aura intercept — see the note
         // above. Only the Cursed-Ring / LP commit path remains.
 
-        ScrollLPTracker.Entry pending = ScrollLPTracker.take(player.getUUID());
+        ScrollLPTracker.Entry pending = ScrollLPTracker.take(player.getUUID(), level.getGameTime());
         if (pending == null) {
             return;
         }
@@ -179,9 +193,11 @@ public class MixinScrollItem {
             return;
         }
 
-        // ANS-MED-043: mana entry staged by "full" scroll cost mode. Distinct from
-        // the LP entries (those carry manaCost == 0); commit via the same authority
-        // that validated it at HEAD.
+        // ANS-MED-043: mana entry staged by "full" scroll cost mode. Under current staging an
+        // entry carries EITHER mana (no ring) OR LP (ring wearer, LP replaces mana), never
+        // both. This commits each independently rather than returning after the first, so if
+        // a future change ever does stage both, the second is charged instead of silently
+        // dropped — the failure mode here should be "charged correctly", not "charged once".
         if (pending.manaCost > 0.0f) {
             boolean consumed = com.otectus.arsnspells.casting.CastingAuthority
                 .consumeIronsSpellMana(player, Math.round(pending.manaCost));
@@ -189,7 +205,9 @@ public class MixinScrollItem {
                 LOGGER.warn("Scroll mana commit failed for {} despite successful validation; spell already cast",
                     player.getName().getString());
             }
-            return;
+            if (pending.lpCost <= 0 && !pending.deathMode) {
+                return;
+            }
         }
 
         if (pending.deathMode) {
@@ -203,6 +221,11 @@ public class MixinScrollItem {
                     true);
             }
             player.hurt(player.damageSources().magic(), Float.MAX_VALUE);
+            return;
+        }
+
+        if (pending.lpCost <= 0) {
+            // Mana-only entry already committed above; nothing left to charge.
             return;
         }
 
