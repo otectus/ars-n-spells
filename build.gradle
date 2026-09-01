@@ -158,6 +158,12 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    // ModDevGradle's unitTest harness runs the tests from build/minecraft-junit so the
+    // Minecraft bootstrap has a game directory. Several tests are structural - they read the
+    // resource tree and the registrar sources to assert invariants a compiler cannot - so they
+    // need the project root, not the harness's working directory. Hand it over explicitly
+    // rather than overriding workingDir, which the harness owns.
+    systemProperty 'ans.projectDir', projectDir.absolutePath
 }
 
 // `src/covenant-disabled/` is deliberately NOT a source set. It holds the 1.20.1 Covenant of

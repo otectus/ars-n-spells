@@ -685,8 +685,12 @@ public class AnsConfig {
      * config screen and {@code /ans} commands call this from the render / server
      * thread, where a synchronous file write under lock contention would stall the
      * tick — the old synchronous {@code Thread.sleep} retry loop (ANS-HIGH-017).
+     *
+     * <p>Returns void by design (audit D5): it only SCHEDULES the write, so any boolean it
+     * could return would describe the queueing, not the save, and would read at call sites as
+     * "the config was saved". The log is the source of truth for completion.
      */
-    public static boolean safeSave() {
+    public static void safeSave() {
         SAVE_EXEC.submit(() -> {
             try {
                 SPEC.save();
@@ -698,6 +702,5 @@ public class AnsConfig {
                     "Config save failed (not retried): {}", e.getMessage(), e);
             }
         });
-        return true;
     }
 }
