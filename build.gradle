@@ -3,7 +3,7 @@ plugins {
     id 'eclipse'
     id 'idea'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.78'
+    id 'net.neoforged.moddev' version '2.0.144'
 }
 
 version = mod_version
@@ -20,6 +20,46 @@ java {
 
 repositories {
     mavenCentral()
+    // Ars Nouveau + JEI.
+    maven {
+        name = 'BlameJared'
+        url = 'https://maven.blamejared.com'
+        content {
+            includeGroup 'com.hollingsworth.ars_nouveau'
+            includeGroup 'com.hollingsworth.nuggets'
+            includeGroup 'mezz.jei'
+            includeGroup 'vazkii.patchouli'
+        }
+    }
+    // Iron's Spells 'n Spellbooks.
+    maven {
+        name = 'Redspace'
+        url = 'https://code.redspace.io/releases'
+        content { includeGroup 'io.redspace' }
+    }
+    // Curios API (also a transitive runtime dep of Ars Nouveau).
+    maven {
+        name = 'Illusive Soulworks'
+        url = 'https://maven.theillusivec4.top/'
+        content { includeGroup 'top.theillusivec4.curios' }
+    }
+    // GeckoLib - transitive runtime dep of Ars Nouveau.
+    maven {
+        name = 'GeckoLib'
+        url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+        content { includeGroup 'software.bernie.geckolib' }
+    }
+    // TerraBlender - transitive runtime dep of Ars Nouveau. Served from the MinecraftForge
+    // maven, NOT from maven.glitchfiend.net: that host no longer resolves in DNS, and Ars'
+    // POM names it, so leaving it as the only source breaks `test` and every run task.
+    maven {
+        name = 'MinecraftForge'
+        url = 'https://maven.minecraftforge.net'
+        content { includeGroup 'com.github.glitchfiend' }
+    }
+    // CurseMaven: required for two of Ars Nouveau's own transitive runtime deps (Jade,
+    // Infiniverse), which its POM declares with curse.maven coordinates, and for the
+    // opt-in Ars Elemental test profile.
     maven {
         name = 'Curse Maven'
         url = 'https://cursemaven.com'
@@ -39,22 +79,27 @@ neoForge {
 
     runs {
         configureEach {
-            systemProperty 'forge.logging.markers', 'REGISTRIES'
-            systemProperty 'forge.logging.console.level', 'debug'
+            logLevel = org.slf4j.event.Level.DEBUG
         }
         client {
             client()
+            gameDirectory = project.file('run')
             programArguments.addAll '--username', 'Dev'
         }
         server {
             server()
+            gameDirectory = project.file('run-server')
             programArgument '--nogui'
         }
+        // Headless gameplay tests. Namespace-gated so other mods' GameTests do not run.
         gameTestServer {
             type = 'gameTestServer'
+            gameDirectory = project.file('run')
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
         }
         data {
             data()
+            gameDirectory = project.file('run-data')
             programArguments.addAll(
                 '--mod', mod_id,
                 '--all',
@@ -69,27 +114,41 @@ neoForge {
             sourceSet sourceSets.main
         }
     }
-}
 
-// Make the test source set inherit Minecraft + NeoForge from the main source set.
-// moddev doesn't do this automatically; without it, JUnit tests can't resolve
-// net.minecraft.* or com.mojang.serialization.* imports.
-sourceSets {
-    test {
-        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
-        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    // Puts Minecraft + NeoForge on the JUnit classpath. Replaces the hand-rolled
+    // `sourceSets.test.compileClasspath += sourceSets.main.compileClasspath` hack this project
+    // carried before: several tests touch net.minecraft.* and com.mojang.serialization.*.
+    unitTest {
+        enable()
+        testedMod = mods."${mod_id}"
     }
 }
 
 dependencies {
-    if (findProperty('ars_nouveau_file')?.toString()?.trim()) {
-        implementation "curse.maven:ars-nouveau-${ars_nouveau_project.tokenize('-').last()}:${ars_nouveau_file}"
+    // Ars Nouveau - hard dependency. Transitives are deliberately left ON so the dev runs get
+    // Ars' real runtime graph (GeckoLib, Curios, Nuggets, Patchouli, JEI, TerraBlender, Jade,
+    // Infiniverse) and `runClient` boots a genuine Ars install.
+    implementation "com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}"
+
+    // Iron's Spells 'n Spellbooks - OPTIONAL, compileOnly by design. Keeping it off the default
+    // run classpath is what makes `runGameTestServer` exercise the Iron's-LESS fallback path;
+    // the Iron's-loaded GameTests self-skip on IronsCompat.isLoaded()==false. Pass
+    // -PwithIronsRuntimeGameTests to also put Iron's on the run classpath.
+    compileOnly "io.redspace:irons_spellbooks:${irons_spellbooks_version}"
+    if (project.hasProperty('withIronsRuntimeGameTests')) {
+        runtimeOnly "io.redspace:irons_spellbooks:${irons_spellbooks_version}"
     }
-    if (findProperty('irons_spellbooks_file')?.toString()?.trim()) {
-        compileOnly "curse.maven:irons-spells-n-spellbooks-${irons_spellbooks_project.tokenize('-').last()}:${irons_spellbooks_file}"
-    }
-    if (findProperty('sanctified_file')?.toString()?.trim()) {
-        compileOnly "curse.maven:sanctified-legacy-${sanctified_project.tokenize('-').last()}:${sanctified_file}"
+
+    // Curios API only (Ars pulls the full jar transitively at runtime).
+    compileOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}"
+
+    // JEI API, compile-only. The full jar arrives transitively via Ars at runtime.
+    compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
+
+    // Optional Ars Nouveau addon profile. Runtime-only and opt-in: ANS compiles against it in
+    // no way, and the addon GameTests self-skip when the mod is absent.
+    if (project.hasProperty('withArsElemental')) {
+        runtimeOnly "curse.maven:ars-elemental-${ars_elemental_project}:${ars_elemental_file}"
     }
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
@@ -101,15 +160,32 @@ test {
     useJUnitPlatform()
 }
 
+// The GameTest harness resolves unprefixed templates (e.g. "platform") against
+// <run dir>/gameteststructures/*.snbt. Neither vanilla nor NeoForge ship any, so stage the
+// committed ones into the run dir before any game run.
+tasks.register('stageGameTestStructures', Copy) {
+    from 'src/test/resources/gameteststructures'
+    into 'run/gameteststructures'
+}
+tasks.matching { it.name in ['runGameTestServer', 'runClient', 'runServer'] }.configureEach {
+    dependsOn 'stageGameTestStructures'
+}
+
 processResources {
     def replaceProps = [
-        minecraft_version: minecraft_version,
-        neoforge_version: neoforge_version,
-        neoforge_version_range: neoforge_version_range,
-        loader_version_range: loader_version_range,
-        mod_id: mod_id, mod_name: mod_name,
-        mod_license: mod_license, mod_version: mod_version,
-        mod_authors: mod_authors, mod_description: mod_description,
+        minecraft_version             : minecraft_version,
+        minecraft_version_range       : minecraft_version_range,
+        neoforge_version              : neoforge_version,
+        neoforge_version_range        : neoforge_version_range,
+        loader_version_range          : loader_version_range,
+        ars_nouveau_version_range     : ars_nouveau_version_range,
+        irons_spellbooks_version_range: irons_spellbooks_version_range,
+        mod_id                        : mod_id,
+        mod_name                      : mod_name,
+        mod_license                   : mod_license,
+        mod_version                   : mod_version,
+        mod_authors                   : mod_authors,
+        mod_description               : mod_description,
     ]
     inputs.properties replaceProps
     filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
@@ -120,13 +196,12 @@ processResources {
 jar {
     manifest {
         attributes(
-            'Specification-Title'      : mod_id,
-            'Specification-Vendor'     : mod_authors,
-            'Specification-Version'    : '1',
-            'Implementation-Title'     : project.name,
-            'Implementation-Version'   : project.jar.archiveVersion,
-            'Implementation-Vendor'    : mod_authors,
-            'Implementation-Timestamp' : new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+            'Specification-Title'    : mod_id,
+            'Specification-Vendor'   : mod_authors,
+            'Specification-Version'  : '1',
+            'Implementation-Title'   : project.name,
+            'Implementation-Version' : project.jar.archiveVersion,
+            'Implementation-Vendor'  : mod_authors
         )
     }
 }

@@ -1,13 +1,19 @@
 modLoader = "javafml"
 loaderVersion = "${loader_version_range}"
 license = "${mod_license}"
+issueTrackerURL = "https://github.com/otectus/ars-n-spells/issues"
 
 [[mods]]
 modId = "${mod_id}"
 version = "${mod_version}"
 displayName = "${mod_name}"
+displayURL = "https://github.com/otectus/ars-n-spells"
+updateJSONURL = "https://raw.githubusercontent.com/otectus/ars-n-spells/main/update.json"
 authors = "${mod_authors}"
 description = '''${mod_description}'''
+
+[[mixins]]
+    config = "ars_n_spells.mixins.json"
 
 [[dependencies.${mod_id}]]
     modId = "neoforge"
@@ -19,23 +25,28 @@ description = '''${mod_description}'''
 [[dependencies.${mod_id}]]
     modId = "minecraft"
     type = "required"
-    versionRange = "[1.21.1,1.22)"
+    versionRange = "${minecraft_version_range}"
     ordering = "NONE"
     side = "BOTH"
 
+# Ars Nouveau is a hard dependency: this mod registers rituals into Ars' own RitualRegistry and
+# reads its glyph metadata, so it must load AFTER Ars. The range is floored at the line we
+# actually compile against - the 1.20.1 build once shipped a range that silently disagreed with
+# the compile classpath (CHANGELOG 3.0.0), and that must not repeat.
 [[dependencies.${mod_id}]]
     modId = "ars_nouveau"
     type = "required"
-    versionRange = "[5.0.0,)"
+    versionRange = "${ars_nouveau_version_range}"
     ordering = "AFTER"
     side = "BOTH"
 
+# Iron's Spells 'n Spellbooks is OPTIONAL. Without it the mod still loads and plays: mana
+# unification falls back to ARS_PRIMARY, the Iron's-gated items and recipes do not register, and
+# every Iron's-gated handler and mixin is skipped. Load AFTER it when present so its SpellRegistry
+# exists before ArsCrossProxyRegistry contributes the ars_cross_1..8 proxies.
 [[dependencies.${mod_id}]]
     modId = "irons_spellbooks"
     type = "optional"
-    versionRange = "[1.21.1-3.0.0,)"
+    versionRange = "${irons_spellbooks_version_range}"
     ordering = "AFTER"
     side = "BOTH"
-
-[[mixins]]
-    config = "ars_n_spells.mixins.json"

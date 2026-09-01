@@ -1,6 +1,7 @@
 {
   "pack": {
-    "description": "${mod_name} resources",
-    "pack_format": 34
+    "description": "${mod_name} built-in resources",
+    "pack_format": 34,
+    "supported_formats": {"min_inclusive": 34, "max_inclusive": 48}
   }
 }

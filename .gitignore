@@ -17,8 +17,8 @@ dependencies/
 mods/
 io/
 /com/
-gradle-8.4/
-gradle-8.4-bin.zip
+gradle-8.12/
+gradle-8.12-bin.zip
 *.jar
 
 # Root META-INF (build artifact, not src/main/resources one)
