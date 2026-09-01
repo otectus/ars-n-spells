@@ -1,6 +1,7 @@
 package com.otectus.arsnspells.mixin.irons;
 
 import com.otectus.arsnspells.augmentation.ResonanceManager;
+import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -31,6 +32,14 @@ public abstract class MixinIronsSpellDamage {
     @Inject(method = "getSpellPower", at = @At("RETURN"), cancellable = true, require = 0)
     private void arsnspells$applyResonanceMultiplier(int spellLevel, Entity sourceEntity, CallbackInfoReturnable<Float> cir) {
         if (sourceEntity instanceof Player player) {
+            // enable_irons_resonance is the Iron's half of the per-direction toggle the
+            // config advertised and nothing read. flag(), not get(): this runs on the client
+            // render path too (the spell wheel and the inscription table both call
+            // getSpellPower), where the SERVER config may not be loaded and get() throws
+            // straight into the render loop.
+            if (!AnsConfig.flag(AnsConfig.ENABLE_IRONS_RESONANCE, true)) {
+                return;
+            }
             float spellPower = cir.getReturnValue();
             double resonanceMultiplier = ResonanceManager.getResonance(player);
             cir.setReturnValue((float) (spellPower * resonanceMultiplier));

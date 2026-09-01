@@ -3,7 +3,7 @@ package com.otectus.arsnspells.events;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.data.AffinityData;
 import com.otectus.arsnspells.data.AttachmentTypes;
-import com.otectus.arsnspells.network.AffinitySyncPayload;
+import com.otectus.arsnspells.network.AffinityBulkSyncPayload;
 import com.otectus.arsnspells.network.PacketHandler;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -32,10 +32,17 @@ public class AffinitySyncOnLoginHandler {
             return;
         }
         AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
-        for (Map.Entry<String, Integer> entry : data.getAllLevels().entrySet()) {
-            if (entry.getValue() != null && entry.getValue() > 0) {
-                PacketHandler.sendToClient(new AffinitySyncPayload(entry.getKey(), entry.getValue()), player);
+        // One packet, not one per school. Affinity is keyed by full school id so addon
+        // schools are tracked, which makes the school count unbounded - and this resync runs
+        // on login, on respawn and on every dimension change.
+        Map<String, Integer> tracked = new java.util.LinkedHashMap<>();
+        data.getAllLevels().forEach((key, level) -> {
+            if (level != null && level > 0) {
+                tracked.put(key, level);
             }
+        });
+        if (!tracked.isEmpty()) {
+            PacketHandler.sendToClient(new AffinityBulkSyncPayload(tracked), player);
         }
     }
 }

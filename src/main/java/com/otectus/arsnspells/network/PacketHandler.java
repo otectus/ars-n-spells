@@ -25,10 +25,12 @@ public final class PacketHandler {
      * intended behaviour — a partial payload set would desync silently instead.
      *
      * <p>History: "2" = 3.0.x line (loom payload added).
+     * "4" = affinity_bulk_sync added, replacing the one-packet-per-school burst
+     *       the full resyncs sent on login / respawn / dimension change.
      * "3" = 3.2.0 parity pass — cross_cast_request added, restoring the
      * server-authoritative cast path from the 1.20.1 build.
      */
-    public static final String PROTOCOL_VERSION = "3";
+    public static final String PROTOCOL_VERSION = "4";
 
     private PacketHandler() {}
 
@@ -37,6 +39,8 @@ public final class PacketHandler {
 
         reg.playToClient(AffinitySyncPayload.TYPE, AffinitySyncPayload.STREAM_CODEC,
             AffinitySyncPayload::handleOnClient);
+        reg.playToClient(AffinityBulkSyncPayload.TYPE, AffinityBulkSyncPayload.STREAM_CODEC,
+            AffinityBulkSyncPayload::handleOnClient);
         reg.playToClient(CooldownSyncPayload.TYPE, CooldownSyncPayload.STREAM_CODEC,
             CooldownSyncPayload::handleOnClient);
         reg.playToClient(ResonanceSyncPayload.TYPE, ResonanceSyncPayload.STREAM_CODEC,

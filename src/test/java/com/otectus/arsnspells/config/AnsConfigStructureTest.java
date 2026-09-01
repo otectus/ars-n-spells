@@ -15,6 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+
 /**
  * ANS-HIGH-018, ANS-HIGH-027, ANS-HIGH-017, ANS-HIGH-016 — verifies the
  * structural changes to {@link AnsConfig}:
@@ -30,6 +38,9 @@ import static org.junit.jupiter.api.Assertions.fail;
  * system requires Mod-loading-context bootstrap that the unit tests do not have.
  */
 class AnsConfigStructureTest {
+
+    private static final String CONFIG_SOURCE =
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java";
 
     @Test
     void parallelAuraConfigKeys_areRemoved() {
@@ -143,5 +154,60 @@ class AnsConfigStructureTest {
                 + "client-only on dedicated servers");
         assertFalse(source.contains("ModConfig.Type.COMMON, AnsConfig.SPEC"),
             "stale COMMON registration must be removed");
+    }
+
+    /**
+     * Every declared config key must be read by something.
+     *
+     * <p>A key that generates into every server's TOML and is read by nothing is worse than a
+     * missing feature: it tells the server owner they have a knob they do not have. The
+     * 1.21.1 audit found five such keys - {@code max_damage_multiplier} (a port regression,
+     * now honoured as the resonance cap), {@code enable_ars_resonance} and
+     * {@code enable_irons_resonance} (inherited, now wired as the per-direction toggles),
+     * {@code resonance_threshold} and {@code resonance_duration} (inherited, describing
+     * threshold-gated lingering resonance that has never existed in either line, removed
+     * rather than invented), and {@code read_curio_attribute_modifiers} (port-added, removed
+     * because the behaviour it described is unconditional).
+     *
+     * <p>The Covenant of the Seven (LP / aura) block is exempt by design: Covenant has no
+     * 1.21.1 release, so those keys are deliberately inert and stay declared so an existing
+     * server's TOML carries over untouched. The exemption is scoped to the fields declared
+     * below that block's marker comment, so a new dead key cannot hide inside it.
+     */
+    @Test
+    void everyNonCovenantConfigKeyHasAReader() throws IOException {
+        String config = Files.readString(TestPaths.of(CONFIG_SOURCE));
+        int covenantMarker = config.indexOf("---- Covenant of the Seven");
+        assertTrue(covenantMarker > 0, "the Covenant exemption marker must exist");
+        String active = config.substring(0, covenantMarker);
+
+        Set<String> declared = new LinkedHashSet<>();
+        Matcher m = Pattern.compile(
+            "ModConfigSpec\\.\\w+(?:<[^>]+>)?\\s+([A-Z][A-Z0-9_]+)\\s*;").matcher(active);
+        while (m.find()) {
+            declared.add(m.group(1));
+        }
+        assertTrue(declared.size() > 20, "expected the active config block to declare many "
+            + "keys, saw " + declared.size());
+
+        StringBuilder readers = new StringBuilder();
+        try (Stream<Path> paths = Files.walk(TestPaths.of("src/main/java"))) {
+            for (Path path : paths.filter(p -> p.toString().endsWith(".java"))
+                    .filter(p -> !p.endsWith("AnsConfig.java")).toList()) {
+                readers.append(Files.readString(path));
+            }
+        }
+        String body = readers.toString();
+
+        List<String> unread = new ArrayList<>();
+        for (String key : declared) {
+            if (!body.contains("AnsConfig." + key) && !body.contains("." + key + ".get()")) {
+                unread.add(key);
+            }
+        }
+        if (!unread.isEmpty()) {
+            fail("config keys generated into every server TOML that nothing reads - either "
+                + "wire them or remove them: " + unread);
+        }
     }
 }

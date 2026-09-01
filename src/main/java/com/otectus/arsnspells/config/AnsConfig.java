@@ -38,8 +38,14 @@ public class AnsConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_ARS_RESONANCE;
     public static final ModConfigSpec.BooleanValue ENABLE_IRONS_RESONANCE;
     public static final ModConfigSpec.DoubleValue RESONANCE_STRENGTH;
-    public static final ModConfigSpec.DoubleValue RESONANCE_THRESHOLD;
-    public static final ModConfigSpec.IntValue RESONANCE_DURATION;
+    // resonance_threshold and resonance_duration were removed in the 1.21.1 audit. They
+    // described a threshold-gated, lingering resonance ("boosts damage above this mana
+    // fraction", "how long it lasts after dropping below"). No such behaviour has ever
+    // existed in either line: ResonanceManager.resonanceFor scales linearly from 0% mana and
+    // is recomputed every interval, so there is nothing to gate and nothing to linger. Both
+    // keys were read by nothing. Advertising behaviour the mod does not have is worse than
+    // not offering the knob, and implementing them as written would silently change how
+    // resonance behaves on every existing server.
     public static final ModConfigSpec.DoubleValue MAX_DAMAGE_MULTIPLIER;
 
     // ========================================
@@ -70,7 +76,13 @@ public class AnsConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_CURIO_DISCOUNTS;
     public static final ModConfigSpec.DoubleValue VIRTUE_RING_DISCOUNT;
     public static final ModConfigSpec.DoubleValue MAX_TOTAL_CURIO_DISCOUNT;
-    public static final ModConfigSpec.BooleanValue READ_CURIO_ATTRIBUTE_MODIFIERS;
+    // read_curio_attribute_modifiers was removed in the 1.21.1 audit. It was added during the
+    // port for config-surface parity and read by nothing. The behaviour it described is not
+    // missing - it is unconditional and cannot be separated out: Curios applies its modifiers
+    // to the PLAYER's attributes, and EquipmentIntegration mirrors the aggregate
+    // PerkAttributes.MAX_MANA / MANA_REGEN_BONUS, so curio-sourced mana gear (Apotheosis
+    // affixes, Magical Jewelry, ...) already feeds the bridge with no per-item scan and no
+    // toggle to honour.
     public static final ModConfigSpec.ConfigValue<String> SCROLL_COST_MODE;
 
     // ---- Covenant of the Seven (LP / aura). INERT on 1.21.1 ----
@@ -308,14 +320,6 @@ public class AnsConfig {
             .comment("Global multiplier for all resonance bonuses")
             .defineInRange("resonance_strength", 1.0, 0.0, 10.0);
         
-        RESONANCE_THRESHOLD = BUILDER
-            .comment("Mana percentage required to trigger resonance (0.95 = 95%)")
-            .defineInRange("resonance_threshold", 0.95, 0.0, 1.0);
-        
-        RESONANCE_DURATION = BUILDER
-            .comment("How long resonance lasts after dropping below threshold (ticks)")
-            .defineInRange("resonance_duration", 100, 0, 1200);
-        
         MAX_DAMAGE_MULTIPLIER = BUILDER
             .comment("Maximum damage multiplier from resonance")
             .defineInRange("max_damage_multiplier", 5.0, 1.0, 100.0);
@@ -423,14 +427,6 @@ public class AnsConfig {
                      "(0.50 = spells never cost less than 50% after curio discounts). Prevents",
                      "stacked discount curios from trivialising mana cost.")
             .defineInRange("max_total_curio_discount", 0.50, 0.0, 1.0);
-
-        READ_CURIO_ATTRIBUTE_MODIFIERS = BUILDER
-            .comment("Read max-mana / mana-regen attribute modifiers from worn Curios (rings, amulets,",
-                     "belts) and mirror them across the unified mana pool, the same way armor/weapon",
-                     "modifiers are handled. This is what lets Apotheosis (Apothic Curios) affixes and",
-                     "sockets, as well as other curio mana gear (Magical Jewelry, Jewelcraft, etc.),",
-                     "feed the Ars <-> Iron's bridge. Disable if a curio affix balance proves overpowered.")
-            .define("read_curio_attribute_modifiers", true);
 
         BUILDER.pop();
 

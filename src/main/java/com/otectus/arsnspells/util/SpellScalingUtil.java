@@ -83,8 +83,11 @@ public class SpellScalingUtil {
             }
         }
 
-        // Apply resonance multiplier from cross-mod mana synergy
-        if (AnsConfig.ENABLE_RESONANCE_SYSTEM.get()) {
+        // Apply resonance multiplier from cross-mod mana synergy. enable_ars_resonance is
+        // the per-direction toggle the config has always advertised and nothing ever read;
+        // this is the Ars half of it.
+        if (AnsConfig.flag(AnsConfig.ENABLE_RESONANCE_SYSTEM, false)
+            && AnsConfig.flag(AnsConfig.ENABLE_ARS_RESONANCE, true)) {
             multiplier *= (float) ResonanceManager.getResonance(player);
         }
 

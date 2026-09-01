@@ -98,4 +98,46 @@ class PayloadBoundsTest {
         assertEquals(CooldownCategory.OFFENSIVE.name(), p.categoryName());
         assertEquals(500L, p.timestamp());
     }
+
+    // ---- AffinityBulkSyncPayload: one packet carrying the whole map ----
+
+    @Test
+    void affinityBulk_clampsEveryLevel() {
+        var p = new AffinityBulkSyncPayload(new java.util.LinkedHashMap<>(java.util.Map.of(
+            "irons_spellbooks:fire", 5,
+            "irons_spellbooks:ice", 9999,
+            "irons_spellbooks:holy", -40)));
+        assertEquals(5, p.levels().get("irons_spellbooks:fire"));
+        assertEquals(100, p.levels().get("irons_spellbooks:ice"));
+        assertEquals(0, p.levels().get("irons_spellbooks:holy"));
+    }
+
+    @Test
+    void affinityBulk_dropsNullAndEmptyKeys() {
+        var raw = new java.util.LinkedHashMap<String, Integer>();
+        raw.put("irons_spellbooks:fire", 3);
+        raw.put("", 4);
+        raw.put(null, 5);
+        raw.put("irons_spellbooks:ice", null);
+        var p = new AffinityBulkSyncPayload(raw);
+        assertEquals(1, p.levels().size(),
+            "only the one well-formed entry may survive");
+        assertEquals(3, p.levels().get("irons_spellbooks:fire"));
+    }
+
+    @Test
+    void affinityBulk_boundsTheSchoolCount() {
+        var raw = new java.util.LinkedHashMap<String, Integer>();
+        for (int i = 0; i < 1000; i++) {
+            raw.put("addon:school_" + i, 1);
+        }
+        assertTrue(new AffinityBulkSyncPayload(raw).levels().size() <= 256,
+            "the school map must be bounded: the whole point of keying by id is that the "
+                + "count is open-ended, so the wire needs a ceiling");
+    }
+
+    @Test
+    void affinityBulk_tolerablesANullMap() {
+        assertTrue(new AffinityBulkSyncPayload(null).levels().isEmpty());
+    }
 }
