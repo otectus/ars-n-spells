@@ -18,6 +18,22 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record ResonanceSyncPayload(float resonance) implements CustomPacketPayload {
 
+    /** Wire ceiling, mirroring ResonanceManager.MAX_RESONANCE. */
+    private static final float MAX_RESONANCE = 100.0f;
+
+    /**
+     * Sanitize at construction, so a value that arrives off the wire is bounded before it can
+     * reach anything. This is the first of two layers: {@code ResonanceManager} clamps again on
+     * receipt (ANS-HIGH-006). NaN is the case that matters most - it is not merely out of
+     * range, it defeats every {@code Math.min}-style cap downstream, including the
+     * {@code spell_power_cap} that {@code SpellScalingUtil} applies.
+     */
+    public ResonanceSyncPayload {
+        resonance = (Float.isFinite(resonance) && resonance >= 0.0f)
+            ? Math.min(MAX_RESONANCE, resonance)
+            : 1.0f;
+    }
+
     public static final Type<ResonanceSyncPayload> TYPE = new Type<>(
         ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "resonance_sync"));
 

@@ -19,13 +19,29 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record AffinitySyncPayload(String typeName, int level) implements CustomPacketPayload {
 
+    /**
+     * Wire cap for the school id (ANS-MED-016). A full school id is
+     * {@code namespace:path} and comfortably under this; the default cap on an unbounded
+     * string read is {@code Short.MAX_VALUE}, i.e. 32 KB allocated per packet on demand.
+     */
+    private static final int MAX_ID_LENGTH = 128;
+
+    /** Affinity is defined on [0,100]; anything else is a malformed or hostile packet. */
+    private static final int MAX_LEVEL = 100;
+
+    /** Clamp at construction so nothing downstream has to trust the wire (ANS-MED-016). */
+    public AffinitySyncPayload {
+        typeName = typeName == null ? "" : typeName;
+        level = Math.max(0, Math.min(MAX_LEVEL, level));
+    }
+
     public static final Type<AffinitySyncPayload> TYPE = new Type<>(
         ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "affinity_sync"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, AffinitySyncPayload> STREAM_CODEC =
         StreamCodec.composite(
-            ByteBufCodecs.STRING_UTF8, AffinitySyncPayload::typeName,
-            ByteBufCodecs.INT,         AffinitySyncPayload::level,
+            ByteBufCodecs.stringUtf8(MAX_ID_LENGTH), AffinitySyncPayload::typeName,
+            ByteBufCodecs.INT,                       AffinitySyncPayload::level,
             AffinitySyncPayload::new
         );
 

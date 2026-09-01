@@ -37,14 +37,22 @@ public record SpellLoomExportPayload(String name, String nature, String iconSymb
 
     public static final int MAX_NAME = 40;
 
+    /**
+     * Wire cap on every string field (ANS-MED-016). This is a C2S payload, so an unbounded
+     * read lets any client make the server allocate 32 KB per field before validation runs.
+     * Generous versus MAX_NAME because the nature/icon fields are whitelisted by value, not
+     * truncated, and a slightly-too-long value should be rejected rather than silently cut.
+     */
+    private static final int MAX_WIRE_STRING = 128;
+
     public static final Type<SpellLoomExportPayload> TYPE = new Type<>(
         ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "spell_loom_export"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SpellLoomExportPayload> STREAM_CODEC =
         StreamCodec.composite(
-            ByteBufCodecs.STRING_UTF8, SpellLoomExportPayload::name,
-            ByteBufCodecs.STRING_UTF8, SpellLoomExportPayload::nature,
-            ByteBufCodecs.STRING_UTF8, SpellLoomExportPayload::iconSymbol,
+            ByteBufCodecs.stringUtf8(MAX_WIRE_STRING), SpellLoomExportPayload::name,
+            ByteBufCodecs.stringUtf8(MAX_WIRE_STRING), SpellLoomExportPayload::nature,
+            ByteBufCodecs.stringUtf8(MAX_WIRE_STRING), SpellLoomExportPayload::iconSymbol,
             SpellLoomExportPayload::new
         );
 
