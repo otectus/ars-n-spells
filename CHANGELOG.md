@@ -2,6 +2,93 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.2.1] - 2026-08-27
+
+Parity with the Forge 1.20.1 **3.2.1** line, plus every gap a full three-way sweep of the two
+trees turned up. The 3.2.0 release brought this port to the 3.2.0 feature set; the reference
+line had since moved on, and the sweep found the port had also carried some behaviour across
+without the guards that made it safe.
+
+### Fixed: a mixin conflict that could stop an entire modpack from loading
+
+- Adjusting the mana value Iron's reads inside `AbstractSpell.canBeCastedBy` used a `@Redirect`
+  aimed at one specific instruction in that method. A mod that replaces the whole method - One
+  Mana Bar does - removes that instruction, and Mixin treats it as a fatal error rather than
+  skipping the injection. `require = 0` does not help: the check runs before the requirement
+  count is ever consulted. On the 1.20.1 line this took twelve mods down with it.
+- The adjustment now uses only `HEAD` and `RETURN` injection points, which Mixin permits into a
+  replaced method by design. The ARS_PRIMARY mana conversion behaves exactly as before, and now
+  keeps working even when another mod rewrites that method.
+- A second, independent layer covers the case where a replacing mod does not read mana the way
+  Iron's does.
+
+### Fixed: mixin failures can no longer abort mod loading for the whole pack
+
+- Mixins targeting Iron's Spellbooks - an **optional** dependency - moved into a separate,
+  non-required mixin config. A conflict there now logs a warning and skips that one mixin
+  instead of aborting startup for every mod in the chain. Mixins targeting Ars Nouveau stay
+  required: Ars is a hard dependency, so a failure there means the mod is genuinely broken.
+- The startup self-check was asking the wrong question. It verified that ANS's own classes were
+  loadable - which they always are - rather than whether the mixins had actually applied. For a
+  target inherited from vanilla (`Scroll.use`) it reported OK even when the mixin never applied
+  at all. It now inspects the Iron's classes themselves for merged members, names any degraded
+  feature in one greppable line, and runs later in startup so it no longer forces Iron's classes
+  to load early.
+
+### Fixed: uninscription left unusable entries in the spell wheel
+
+Uninscribing cleared the sidecar that records which of Iron's native wheel slots belong to this
+mod - and cleared it *before* removing those slots. The record was the only way to find them, so
+they stayed: selectable wheel entries that cast nothing. Teardown now happens in the right
+order, and the result is byte-identical to an item that was never inscribed.
+
+### Fixed: Spell Transcription destroyed stacked source scrolls
+
+The ritual discarded the whole dropped item entity instead of consuming one. Iron's scrolls
+stack to 16, so transcribing from a stack of N destroyed N-1.
+
+### Fixed: ARS_PRIMARY could delete mana instead of spending it
+
+Iron's clamps every mana write down to the `max_mana` attribute, and nothing was raising that
+attribute in ARS_PRIMARY - so mana above Iron's own ceiling was deleted on the next write of any
+kind. The same path also folded Iron's *entire* pool into Ars's maximum rather than the
+gear-derived bonus, ignored `conversion_rate_iron_to_ars`, and skipped `respect_armor_bonuses`
+entirely.
+
+### Fixed: three ritual tablets used Ars Nouveau's art
+
+Spell Transcription, Spell Uninscription and Spellbook Binding pointed at
+`ars_nouveau:item/ritual_*` textures while the mod's own artwork shipped in the jar, unreferenced.
+
+### Other fixes
+
+- A failed mana consume no longer double-charges the cast, and the dual-cost split in SEPARATE
+  mode no longer overcharges when the two configured percentages sum to more than 1.
+- The ManaCap recursion guard is per-player again. A thread-global flag meant one player's
+  in-flight bridge call suppressed interception for every player on that thread, so AoE and
+  party-share spells bypassed the bridge entirely.
+- Removed a pair of classes that leaked the previous caster's spell into the next cast: they set
+  a `ThreadLocal` at method entry and cleared it at return, which does not run when the method
+  exits by throwing. Nothing read the value at all in this build.
+- `/ans info` reports Iron's raw mana again - the number to look at when a spell silently
+  refuses to cast.
+
+### Changed
+
+- **Mods without a 1.21.1 NeoForge build are out, cleanly.** The Covenant of the Seven (LP /
+  aura / ring / blasphemy) source is deleted rather than kept unbuilt, and its 24 config keys,
+  three dangling tag keys and stale documentation go with it. The config no longer advertises a
+  single knob it does not have.
+- The declared Iron's Spellbooks floor is `1.21.1-3.16.3`, the version this build is actually
+  tested against, rather than a range of eleven releases none of which were verified.
+- Inscribed items carry a schema stamp again, so a future migration has something to branch on.
+
+### Testing
+
+The test suite is at parity with the 1.20.1 line: **53 unit-test classes / 281 tests** and
+**8 GameTest classes / 43 required tests**, up from 26 and 3. The seven Covenant-only test
+classes are out of scope with their source.
+
 ## [3.2.0] — parity with the Forge 1.20.1 3.2.0 line (2026-08-25)
 
 Closes the gap from the 3.0.2 port. This release brings the NeoForge build up to the feature

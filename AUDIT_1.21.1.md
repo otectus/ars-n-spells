@@ -38,6 +38,14 @@ asserted.
 
 **Still not exercised: a running client.** §6 lists what needs a human at `runClient`.
 
+> **Superseded in places by the 3.2.1 parity pass.** This document describes the state after
+> the audit, when the port was at 3.2.0. The Forge reference has since been found to be at
+> **3.2.1**, and a full three-way sweep of both trees closed the remaining gaps - including a
+> mixin conflict that could abort mod loading for a whole pack, uninscription leaving unusable
+> wheel entries, and ARS_PRIMARY deleting mana. See the 3.2.1 section of
+> [`CHANGELOG.md`](CHANGELOG.md). Two entries in §4 ("Do NOT fix these") were reversed by that
+> pass and are struck through below.
+
 ---
 
 ## 1. Method
