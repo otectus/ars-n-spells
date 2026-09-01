@@ -3,7 +3,6 @@ package com.otectus.arsnspells.client;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.client.screen.ConfigScreenFactory;
 import com.otectus.arsnspells.client.screen.SpellLoomScreen;
-import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.registry.ModMenus;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -37,17 +36,15 @@ public class ArsNSpellsClient {
     public static void onClientSetup(FMLClientSetupEvent event) {
         LOGGER.info("Initializing Ars 'n' Spells client-side features");
 
-        // DEBUG_MODE lives on the SERVER config, which is not loaded at client setup
-        // (it syncs on world join). Read defensively so a not-yet-loaded spec cannot
-        // abort client init; the diagnostics overlay can be toggled later in-world.
-        boolean debugMode = false;
-        try {
-            debugMode = AnsConfig.DEBUG_MODE.get();
-        } catch (Exception ignored) {}
-        if (debugMode) {
-            LOGGER.info("Debug mode enabled - activating overlay diagnostics");
-            OverlayDiagnostics.enable();
-        }
+        // Overlay diagnostics are NOT driven from here. DEBUG_MODE lives on the SERVER
+        // config, which is not loaded at client setup — the read always throws and defaults
+        // to false, so this used to be the only caller of OverlayDiagnostics.enable() and it
+        // could never fire. The tool that dumps real GUI layer ids was therefore unreachable,
+        // which is a large part of why the mana-bar layer ids went wrong unnoticed.
+        //
+        // OverlayDiagnostics.syncWithConfig() is now called from the mod's config
+        // load/reload listeners instead, so it follows `/ans debug`, a hand-edited TOML and
+        // the config screen, and picks up a dedicated server's value when it syncs.
 
         // Register the in-game config screen (accessible from the Mods menu).
         // Registered here (CLIENT/MOD bus) so the client-only Screen never

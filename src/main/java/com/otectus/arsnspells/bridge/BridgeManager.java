@@ -125,7 +125,11 @@ public class BridgeManager {
             LOGGER.info("Secondary Bridge: {}", secondaryBridge.getBridgeType());
         }
         LOGGER.info("Mana Unification Enabled: {}", AnsConfig.ENABLE_MANA_UNIFICATION.get());
-        LOGGER.info("NOTE: Changing mana_unification_mode requires a game restart.");
+        // This used to claim a restart was required. It is not: refreshMode() runs from the
+        // mod's ModConfigEvent.Loading/Reloading listeners, from `/ans mode set`, and from the
+        // config screen, and this banner is printed by refreshMode itself - so anyone reading
+        // the line had already just changed the mode without restarting.
+        LOGGER.info("NOTE: mana_unification_mode applies immediately - no restart needed.");
         if (currentMode == ManaUnificationMode.SEPARATE) {
             double arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get();
             double issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get();

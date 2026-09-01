@@ -27,6 +27,35 @@ public class OverlayDiagnostics {
 
     private OverlayDiagnostics() {}
 
+    /**
+     * Turn diagnostics on or off to match {@code debug_mode}.
+     *
+     * <p>This exists because the tool was previously unreachable. It was enabled only from
+     * {@code ArsNSpellsClient} at {@code FMLClientSetupEvent}, gated on
+     * {@code AnsConfig.DEBUG_MODE} — but {@code debug_mode} lives on the SERVER config, which
+     * is not loaded at client setup. The read there always threw, was swallowed, and defaulted
+     * to false, so {@link #enable()} had no reachable caller and the one tool that dumps real
+     * GUI layer ids could never be switched on. That is a large part of why the mana-bar layer
+     * ids went wrong unnoticed.
+     *
+     * <p>Called from the mod's config load/reload listeners, so it follows {@code /ans debug},
+     * a hand-edited TOML, and the config screen, and it picks up the server's value when a
+     * dedicated server syncs its config to the client.
+     */
+    public static void syncWithConfig() {
+        boolean wanted;
+        try {
+            wanted = com.otectus.arsnspells.config.AnsConfig.DEBUG_MODE.get();
+        } catch (Exception configNotReady) {
+            return;
+        }
+        if (wanted) {
+            enable();
+        } else {
+            disable();
+        }
+    }
+
     /** Enable diagnostics: register the per-frame subscriber. */
     public static void enable() {
         if (diagnosticsEnabled) {

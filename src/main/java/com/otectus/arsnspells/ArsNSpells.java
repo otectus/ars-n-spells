@@ -29,12 +29,15 @@ import com.otectus.arsnspells.spell.CrossCastIronsHandler;
 import com.otectus.arsnspells.spell.ModDataComponents;
 import com.otectus.arsnspells.util.StartupValidator;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -164,6 +167,7 @@ public class ArsNSpells {
         // mode. This is the real bridge-init point on a server (common setup runs before
         // the SERVER config loads). Idempotent with BridgeManager.init().
         BridgeManager.refreshMode();
+        syncClientDiagnostics();
 
         LOGGER.info("========================================");
         LOGGER.info("OK Ars 'n' Spells initialization complete");
@@ -177,5 +181,31 @@ public class ArsNSpells {
         // Pick up runtime config edits (e.g. mana_unification_mode changed on disk or via
         // the config screen) without a restart.
         BridgeManager.refreshMode();
+        syncClientDiagnostics();
+    }
+
+    /**
+     * Follow {@code debug_mode} with the client-side overlay diagnostics.
+     *
+     * <p>Split behind a {@link FMLEnvironment#dist} check and a client-only holder because
+     * {@code OverlayDiagnostics} registers a {@code RenderGuiLayerEvent} listener: naming it
+     * from this common class directly would classload a client type on a dedicated server.
+     * Same shape the payload classes use for their client handlers.
+     */
+    private static void syncClientDiagnostics() {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        ClientDiagnosticsHook.sync();
+    }
+
+    /** Client-only indirection for {@link #syncClientDiagnostics()}. */
+    @OnlyIn(Dist.CLIENT)
+    private static final class ClientDiagnosticsHook {
+        private ClientDiagnosticsHook() {}
+
+        static void sync() {
+            com.otectus.arsnspells.client.OverlayDiagnostics.syncWithConfig();
+        }
     }
 }
