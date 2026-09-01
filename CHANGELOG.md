@@ -7,6 +7,49 @@ All notable changes to this project will be documented in this file.
 Closes the gap from the 3.0.2 port. This release brings the NeoForge build up to the feature
 set of Forge 1.20.1 **3.2.0**, with one documented exception (Covenant of the Seven).
 
+### Audit — 32 defects fixed
+
+A full stability / optimization / functionality pass over the whole mod, written up in
+[`AUDIT_1.21.1.md`](AUDIT_1.21.1.md). Twenty-one of the thirty-two were regressions against
+fixes the 1.20.1 line documents by ticket id: the port carried the behaviour across and
+dropped the guards. Highlights, in severity order:
+
+- **Uninscription left orphan wheel entries.** It cleared the sidecar holding the proxy pool
+  ids *before* removing the native wheel slots those ids identify, so the wheel kept showing
+  selectable entries that cast nothing.
+- **The Spell Loom's Inscribe button covered nine inventory slots** and ate their clicks; the
+  screen also lost its entire client-side validation mirror, so Inscribe was always enabled and
+  the only way to learn why it would fail was to press it.
+- **Every spell under 50 mana was free** at the config's 0.01 conversion-rate floor, because
+  validation and charging rounded differently.
+- **A failed mana consume double-charged the cast**, and the SEPARATE-mode rollback erased any
+  regen that landed mid-transaction.
+- **A single malformed save field silently erased every school's affinity** — NeoForge drops an
+  attachment whose codec throws, without logging.
+- **Ars mana-regen potions counted twice**: `MixinArsPotionEffects` mirrored an effect that Ars
+  5.x already applies as a `PerkAttributes` modifier, and its `mana_boost` half targeted an
+  effect Ars does not register. Deleted.
+- **Four per-player maps expired their values but never their keys.** One eviction handler now
+  covers logout, server stop and the periodic sweep.
+- Resonance had lost every bound; every payload had lost its input validation; nine config
+  reads could throw on the client render thread.
+
+### Changed
+
+- **Resonance gains a threshold gate.** `resonance_threshold` and `resonance_duration` have
+  always been documented and never implemented. The gate is orthogonal to the bonus curve, so
+  it is layered on top rather than replacing it: the bonus applies at or above the threshold,
+  or within `resonance_duration` ticks of last having been. **The default threshold is 0**, so
+  the gate is permanently open and resonance behaves exactly as it always has — set it to 0.95
+  to opt into the burst window the config text describes.
+- The affinity resync is one packet instead of one per school (protocol `"3"` → `"4"`).
+- The declared Iron's Spellbooks range now starts at `1.21.1-3.16.3`, the version this build is
+  actually tested against, rather than 3.15.0 — eleven releases, none of them verified. A new
+  startup self-check reports any mixin target that has drifted, which `require = 0` otherwise
+  hides completely.
+- `read_curio_attribute_modifiers` removed: what it described is unconditional and inseparable,
+  not missing. Curio mana gear already feeds the bridge via the aggregate player attribute.
+
 ### Platform
 
 - **NeoForge 21.1.84 → 21.1.248**, ModDevGradle 2.0.78 → 2.0.144, Gradle wrapper 8.10 → 8.12.
