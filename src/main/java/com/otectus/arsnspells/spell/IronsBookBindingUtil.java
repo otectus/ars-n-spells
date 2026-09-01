@@ -228,6 +228,39 @@ public final class IronsBookBindingUtil {
         }
     }
 
+    /**
+     * Remove every ANS-owned artifact from {@code stack}: native wheel proxy slots first, then
+     * the sidecar entries, then ANS's own export marker.
+     *
+     * <p><b>Order matters.</b> The pool ids live in the sidecar, so clearing the sidecar first
+     * loses the only record of which native slots belong to ANS - leaving selectable wheel
+     * entries that cast nothing. That is exactly the bug this exists to prevent, and it is what
+     * a bare {@code CrossModSpellComponents.clear(stack)} does.
+     *
+     * @return how many native proxy slots were removed
+     */
+    public static int removeAllArsEntries(ItemStack stack) {
+        if (stack == null || stack.isEmpty() || !CrossModSpellComponents.has(stack)) {
+            return 0;
+        }
+        int removed = 0;
+        if (IronsCompat.isLoaded()) {
+            // Read the pool ids BEFORE clearing - see the ordering note above.
+            for (int poolId : CrossModSpellComponents.usedProxyPoolIds(
+                    CrossModSpellComponents.get(stack))) {
+                if (com.otectus.arsnspells.spell.irons.IronsProxySlotWriter
+                        .removeProxySlot(stack, poolId)) {
+                    removed++;
+                }
+            }
+        }
+        CrossModSpellComponents.clear(stack);
+        // The cosmetic export marker is ANS-owned too; leaving it behind means the result is
+        // not byte-identical to a never-inscribed item and it survives a re-transcribe.
+        stack.remove(ModDataComponents.EXPORT_MODE.get());
+        return removed;
+    }
+
     public static int effectiveProxyCeiling(int maxCap) {
         if (maxCap < 0) {
             return CrossModSpellComponents.PROXY_POOL_SIZE;

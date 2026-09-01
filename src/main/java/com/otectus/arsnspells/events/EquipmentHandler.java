@@ -40,7 +40,7 @@ public final class EquipmentHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
-        if (AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get()) {
+        if (AnsConfig.debugEnabled()) {
             LOGGER.info("[Equipment] {} swapped slot {}: {} -> {}",
                 player.getName().getString(),
                 event.getSlot(),

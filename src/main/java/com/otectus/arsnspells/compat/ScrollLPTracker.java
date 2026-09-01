@@ -75,6 +75,11 @@ public final class ScrollLPTracker {
         PENDING.remove(uuid);
     }
 
+    /** Drop every player's staged costs. Server stop / integrated-server world exit. */
+    public static void clearAll() {
+        PENDING.clear();
+    }
+
     private static void evictStale(Deque<Entry> queue, long gameTime) {
         Entry head;
         while ((head = queue.peekFirst()) != null

@@ -27,6 +27,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -231,7 +232,13 @@ public class CrossCastingHandler {
         return castOk;
     }
 
-    @SubscribeEvent
+    /**
+     * ANS-CRIT-004: runs at HIGHEST so the cross-cast multiplier applies to the unmodified
+     * base cost, before any other listener rewrites {@code event.currentCost}. At default
+     * priority a listener that zeroes the cost first turns the documented 1.25x premium into
+     * 0x1.25 - which is how the 1.20.1 line lost the premium entirely for ring wearers.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onArsSpellCost(SpellCostCalcEvent event) {
         if (event.context == null) {
             return;
@@ -240,10 +247,15 @@ public class CrossCastingHandler {
             return;
         }
         CrossCastContext.Entry entry = CrossCastContext.peek(player);
-        if (entry == null || entry.type != CrossSpellType.ARS_NOUVEAU || entry.multiplierApplied) {
+        if (entry == null || entry.type != CrossSpellType.ARS_NOUVEAU) {
             return;
         }
-        entry.multiplierApplied = true;
+        // ANS-HIGH-004: atomic check-and-mark, not read-then-write. This event can fire more
+        // than once per resolve (preview vs. actual deduction), and the non-atomic version
+        // let two overlapping cross-casts both pass the check and both apply the premium.
+        if (!entry.tryMarkMultiplierApplied()) {
+            return;
+        }
 
         ManaUnificationMode mode = BridgeManager.getCurrentMode();
         boolean unified = BridgeManager.isUnificationEnabled();
@@ -256,10 +268,12 @@ public class CrossCastingHandler {
         int totalCost = Math.max(0, Math.round(baseEventCost * multiplier));
 
         if (unified && mode == ManaUnificationMode.SEPARATE) {
-            float arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
-            float issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
-            float arsCost = totalCost * arsPercent;
-            float issCost = (float) (totalCost * issPercent * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+            // Same normalised split BridgeManager spends through, so the amount stamped on
+            // the context entry is the amount the tail consume charges.
+            double[] split = AnsConfig.dualCostSplit();
+            float arsCost = (float) (totalCost * split[0]);
+            float issCost = (float) (totalCost * split[1]
+                * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
 
             entry.arsCost = arsCost;
             entry.issCost = issCost;
@@ -309,7 +323,7 @@ public class CrossCastingHandler {
     }
 
     private static void logDebug(String message, Object... args) {
-        if (AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get()) {
+        if (AnsConfig.debugEnabled()) {
             LOGGER.info(message, args);
         }
     }

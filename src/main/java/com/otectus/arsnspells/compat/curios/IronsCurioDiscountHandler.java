@@ -60,7 +60,7 @@ public final class IronsCurioDiscountHandler {
         int discounted = (int) Math.max(original > 0 ? 1 : 0, Math.round(original * factor));
         event.setManaCost(discounted);
 
-        if (AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get()) {
+        if (AnsConfig.debugEnabled()) {
             LOGGER.info("[CurioDiscount][Irons] {} matching curios -> {} (was {})",
                 matching, discounted, original);
         }

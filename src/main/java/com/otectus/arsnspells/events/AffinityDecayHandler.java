@@ -29,10 +29,15 @@ public class AffinityDecayHandler {
 
     @SubscribeEvent
     public void onPlayerTick(PlayerTickEvent.Post event) {
-        if (!AnsConfig.ENABLE_AFFINITY_SYSTEM.get() || !AnsConfig.ENABLE_AFFINITY_DECAY.get()) {
+        // Entity check first: PlayerTickEvent.Post fires for every client-side player too,
+        // and the SERVER config these keys live in is not loaded on a client at the menu.
+        // Two map lookups per tick per player were also being paid to answer a question the
+        // instanceof answers for free.
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
+        if (!AnsConfig.flag(AnsConfig.ENABLE_AFFINITY_SYSTEM, false)
+            || !AnsConfig.flag(AnsConfig.ENABLE_AFFINITY_DECAY, false)) {
             return;
         }
         int interval = AnsConfig.AFFINITY_DECAY_INTERVAL_TICKS.get();

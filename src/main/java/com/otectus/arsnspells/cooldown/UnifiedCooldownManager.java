@@ -234,7 +234,7 @@ public class UnifiedCooldownManager {
      * Log debug message if debug mode is enabled.
      */
     private static void logDebug(String message, Object... args) {
-        if (AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get()) {
+        if (AnsConfig.debugEnabled()) {
             LOGGER.info("[Cooldown] [DEBUG] " + message, args);
         }
     }

@@ -9,6 +9,7 @@ import com.otectus.arsnspells.rituals.InscriptionInputs;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+import com.otectus.arsnspells.util.AdvancementUtil;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -119,5 +120,8 @@ public record SpellLoomExportPayload(String name, String nature, String iconSymb
         items.extractItem(SpellLoomBlockEntity.SLOT_SCROLL, 1, false);
         items.setStackInSlot(SpellLoomBlockEntity.SLOT_OUTPUT, carrier);
         be.setChanged();
+        // Audit H4: transcribing has no vanilla trigger, so the advancement is code-awarded.
+        // Without this the loom chain's second step was unobtainable.
+        AdvancementUtil.grant(sender, "transcribe_spell");
     }
 }

@@ -2,6 +2,7 @@ package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
+import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
@@ -88,10 +89,10 @@ public class SpellUninscriptionRitual extends AbstractRitual {
         ItemStack stack = inscribedEntity.getItem();
         String displayName = stack.getHoverName().getString();
 
-        // Strip cleanly. CrossCastNbt drops both the spells list and the
-        // cycle index, then collapses an empty residual root tag to null so
-        // the result matches a never-inscribed item bit-for-bit.
-        CrossModSpellComponents.clear(stack);
+        // Strip cleanly, and in the right order: native wheel slots first, then the sidecar,
+        // then the export marker. A bare component clear loses the pool ids that say which
+        // wheel slots were ours, leaving selectable entries that cast nothing.
+        IronsBookBindingUtil.removeAllArsEntries(stack);
         inscribedEntity.setItem(stack);
 
         playUninscribeEffects(level, pos);

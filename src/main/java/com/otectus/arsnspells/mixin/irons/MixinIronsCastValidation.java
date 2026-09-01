@@ -106,7 +106,7 @@ public abstract class MixinIronsCastValidation {
     }
 
     private static void throttledLog(ServerPlayer player, String message, Object... args) {
-        if (AnsConfig.DEBUG_MODE == null || !AnsConfig.DEBUG_MODE.get()) {
+        if (!AnsConfig.debugEnabled()) {
             return;
         }
         long now = System.currentTimeMillis();

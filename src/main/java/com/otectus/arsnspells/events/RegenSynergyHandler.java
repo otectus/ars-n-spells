@@ -67,16 +67,18 @@ public final class RegenSynergyHandler {
         if (!IronsCompat.isLoaded()) {
             return;
         }
+        // Entity check before the config reads: this fires for client-side players too, where
+        // the SERVER config may not be loaded, and the instanceof is the cheapest gate here.
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
         // F5: route the unification gate through BridgeManager (single source of
         // truth for mode-dependent logic), not a raw config read.
         if (!BridgeManager.isUnificationEnabled()) {
             return;
         }
         // ANS-CRIT-005 follow-up: server-owner kill switch for this feature only.
-        if (!AnsConfig.ENABLE_SOURCE_JAR_SYNERGY.get()) {
-            return;
-        }
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
+        if (!AnsConfig.flag(AnsConfig.ENABLE_SOURCE_JAR_SYNERGY, false)) {
             return;
         }
         int scanInterval = Math.max(1, AnsConfig.SOURCE_JAR_SCAN_INTERVAL_TICKS.get());
@@ -171,7 +173,7 @@ public final class RegenSynergyHandler {
 
     private static boolean isDebugMode() {
         try {
-            return AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get();
+            return AnsConfig.debugEnabled();
         } catch (IllegalStateException e) {
             return false; // config not yet loaded
         }

@@ -48,7 +48,7 @@ public final class CrossCastTrace {
     }
 
     public static boolean enabled() {
-        return AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get();
+        return AnsConfig.debugEnabled();
     }
 
     public static void log(UUID attemptId, Player player, Side side, Stage stage, Object... kv) {

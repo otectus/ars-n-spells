@@ -81,6 +81,25 @@ public class IronsBridge implements IManaBridge {
         return false;
     }
 
+    /**
+     * Atomic add. Overriding this matters: {@link IManaBridge}'s default is
+     * {@code setMana(getMana() + amount)}, and every refund path in the mod - the SEPARATE
+     * rollback and the cross-cast pre-pay compensation - runs through here. A get-then-set
+     * loses any regen that lands between the two, which is exactly the race ANS-CRIT-003 was
+     * filed against.
+     */
+    @Override
+    public void addMana(Player player, float amount) {
+        if (player == null || player.level().isClientSide() || amount == 0.0f) return;
+        try {
+            MagicData data = MagicData.getPlayerMagicData(player);
+            if (data == null) return;
+            data.addMana(amount);
+        } catch (Throwable e) {
+            logCriticalError("addMana", e);
+        }
+    }
+
     /** Float slop below which a shortfall is rounding, not a clamp. */
     private static final float CLAMP_TOLERANCE = 1.0e-3f;
 

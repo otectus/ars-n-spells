@@ -7,6 +7,7 @@ import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.CrossModSpell;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+import com.otectus.arsnspells.util.AdvancementUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -149,8 +150,12 @@ public class SpellbookBindingRitual extends AbstractRitual {
                 return;
             case FAILED:
             default:
-                RitualFeedback.error(level, pos, LANG_PREFIX + "error.scroll_parse_failed",
-                    scrollStack.getHoverName().getString());
+                // The scroll parsed - addSpellToBook rejected it. Reporting a parse failure
+                // sent players to re-drop a scroll that was never the problem; bind_failed
+                // names the book, which is where the refusal came from. (The lang key was
+                // already shipping, orphaned.)
+                RitualFeedback.error(level, pos, LANG_PREFIX + "error.bind_failed",
+                    bookStack.getHoverName().getString());
                 return;
         }
         bookEntity.setItem(bookStack);
@@ -165,6 +170,13 @@ public class SpellbookBindingRitual extends AbstractRitual {
 
         playBindEffects(level, pos);
         RitualFeedback.success(level, pos, LANG_PREFIX + "success", spellLabel(arsTag));
+
+        // Audit H4: the ritual has no owning player, so credit the nearest one - rituals are
+        // player-initiated and the initiator is standing at the brazier.
+        if (level.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 16.0, false)
+                instanceof net.minecraft.server.level.ServerPlayer nearest) {
+            AdvancementUtil.grant(nearest, "bind_spell");
+        }
     }
 
     private void playBindEffects(Level level, BlockPos pos) {

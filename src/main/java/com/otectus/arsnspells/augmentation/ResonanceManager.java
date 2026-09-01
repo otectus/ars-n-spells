@@ -51,7 +51,10 @@ public class ResonanceManager {
     private static volatile double clientResonance = NEUTRAL;
 
     public static double getResonance(Player player) {
-        if (player == null || !AnsConfig.ENABLE_RESONANCE_SYSTEM.get()) {
+        // flag(), not get(): this is reached from AbstractSpell.getSpellPower, which the
+        // client calls while rendering the spell wheel and the inscription table - where the
+        // SERVER config may not be loaded and get() throws straight into the render loop.
+        if (player == null || !AnsConfig.flag(AnsConfig.ENABLE_RESONANCE_SYSTEM, false)) {
             return NEUTRAL;
         }
         if (player.level().isClientSide()) {
@@ -103,7 +106,7 @@ public class ResonanceManager {
 
     public static void computeResonance(Player player) {
         try {
-            if (player == null || !AnsConfig.ENABLE_RESONANCE_SYSTEM.get()) {
+            if (player == null || !AnsConfig.flag(AnsConfig.ENABLE_RESONANCE_SYSTEM, false)) {
                 return;
             }
             if (!ModList.get().isLoaded("irons_spellbooks")) {

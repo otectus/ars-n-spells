@@ -33,7 +33,7 @@ public class StartupValidator {
 
         boolean debugMode = false;
         try {
-            debugMode = com.otectus.arsnspells.config.AnsConfig.DEBUG_MODE.get();
+            debugMode = com.otectus.arsnspells.config.AnsConfig.debugEnabled();
         } catch (Exception ignored) {}
         if (debugMode) {
             allChecks &= checkConfigWritable();

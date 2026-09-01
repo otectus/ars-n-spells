@@ -8,6 +8,8 @@ import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.spell.CrossCastContext;
 import com.otectus.arsnspells.spell.CrossSpellType;
+import com.otectus.arsnspells.casting.CastingAuthority;
+import com.otectus.arsnspells.util.CrossCastTrace;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
@@ -54,17 +56,28 @@ public abstract class MixinSpellResolverMana {
             return;
         }
 
-        int cost = Math.max(0, getResolveCost());
-        double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
-        cost = (int) Math.round(cost * conversionRate);
-        if (cost == 0) {
+        // Same helper CastingAuthority validates with, so the amount charged is exactly the
+        // amount checked. This used to round to an int here and not there, which at the
+        // config's 0.01 rate floor rounded every spell under 50 mana down to free.
+        float cost = CastingAuthority.effectiveArsCost(Math.max(0, getResolveCost()));
+        if (cost <= 0.0f) {
+            // Cancel like every other exit does. Falling through ran Ars's native expendMana,
+            // which is the one path in this method that did not.
+            ci.cancel();
             return;
         }
 
         boolean consumed = BridgeManager.consumeManaForMode(player, cost, true);
-        if (consumed) {
-            ci.cancel();
-        }
+        // ANS-MED-010: cancel even when the consume failed. Otherwise Ars's native expendMana
+        // runs afterwards against possibly-stale ManaCap data and decrements the Ars pool too,
+        // double-charging the player for one cast.
+        ci.cancel();
+
+        CrossCastContext.Entry entry = CrossCastContext.peek(player);
+        java.util.UUID attemptId = entry != null ? entry.attemptId : null;
+        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+            CrossCastTrace.Stage.RESOURCE_SPEND,
+            "mode", mode, "cost", cost, "consumed", consumed);
     }
 
     @Inject(method = "expendMana", at = @At("TAIL"), require = 0)

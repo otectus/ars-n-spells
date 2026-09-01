@@ -70,6 +70,14 @@ public abstract class MixinAbstractSpellArsIcon {
         if (player == null) {
             return null;
         }
+        // Check the equipped spellbook slot first: that is where a bound book normally
+        // lives while its entries are being rendered in the wheel, and neither hand
+        // holds it. Without this the wheel fell back to the default icon and name.
+        CrossModSpell fromEquipped = arsnspells$entryFrom(
+            io.redspace.ironsspellbooks.api.util.Utils.getPlayerSpellbookStack(player), poolId);
+        if (fromEquipped != null) {
+            return fromEquipped;
+        }
         CrossModSpell fromMain = arsnspells$entryFrom(player.getMainHandItem(), poolId);
         return fromMain != null ? fromMain : arsnspells$entryFrom(player.getOffhandItem(), poolId);
     }

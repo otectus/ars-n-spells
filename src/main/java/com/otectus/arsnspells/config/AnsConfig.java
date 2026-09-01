@@ -207,7 +207,14 @@ public class AnsConfig {
                 "  ars - Show Ars Nouveau mana bar",
                 "Only applies when mana_unification_mode is set to 'hybrid'"
             )
-            .define("hybrid_mana_bar", "irons");
+            // Validated, not free-form: the HUD reduces this to a two-way choice, so any other
+            // string silently resolved to one of the two bars with nothing in the log to say
+            // the key was wrong - and which one it resolved to differed from the 1.20.1 line.
+            // A validator makes NeoForge reject the bad value at load and fall back to the
+            // default, which is the documented behaviour.
+            .define("hybrid_mana_bar", "irons",
+                o -> o instanceof String s
+                    && ("irons".equalsIgnoreCase(s) || "ars".equalsIgnoreCase(s)));
 
         DUAL_COST_ARS_PERCENTAGE = BUILDER
             .comment("Percentage of Ars mana cost in SEPARATE mode (0.5 = 50%)")
@@ -671,6 +678,67 @@ public class AnsConfig {
         }
     }
     
+    /**
+     * The dual-cost split as fractions that sum to exactly 1.
+     *
+     * <p>{@code dual_cost_ars_percentage} and {@code dual_cost_iss_percentage} are
+     * independently range-checked [0,1], so a pair summing to 1.2 is a perfectly valid
+     * config and the init-time sum check only WARNs about it. Every consumer previously
+     * multiplied the raw percentages straight into the cost, so such a config silently
+     * overcharged by 20% on every cast (and an under-1.0 pair undercharged). Normalising in
+     * one place keeps the two spend paths - {@code BridgeManager.consumeManaForMode} and the
+     * cross-cast cost-calc handler - from disagreeing about what a cast costs.
+     *
+     * @return {@code {arsShare, issShare}}, summing to 1.0
+     */
+    public static double[] dualCostSplit() {
+        double arsPct;
+        double issPct;
+        try {
+            arsPct = DUAL_COST_ARS_PERCENTAGE.get();
+            issPct = DUAL_COST_ISS_PERCENTAGE.get();
+        } catch (IllegalStateException configNotLoaded) {
+            return new double[] {0.5, 0.5};
+        }
+        double total = arsPct + issPct;
+        if (!(total > 0.0)) {
+            // Degenerate config (both zero, or NaN): charge the whole cost Ars-side rather
+            // than making every spell free.
+            return new double[] {1.0, 0.0};
+        }
+        return new double[] {arsPct / total, issPct / total};
+    }
+
+    /**
+     * Read a boolean key without ever throwing.
+     *
+     * <p>{@code ModConfigSpec.ConfigValue#get()} throws {@link IllegalStateException} when the
+     * owning config has not been loaded. That is reachable in normal play, not just in
+     * pathological cases: the SERVER spec is not loaded on a client sitting at the main menu
+     * or during a world transition, and several of this mod's reads happen on the client
+     * render thread (the spell wheel and the inscription table both call into spell-power
+     * calculation). A throw there is a hard crash of the render loop.
+     *
+     * <p>The stale {@code value != null} idiom this replaces does not help: the field is
+     * assigned at class-init, so it is non-null long before the config is loaded, and the
+     * check passes right up to the {@code get()} that throws.
+     */
+    public static boolean flag(ModConfigSpec.BooleanValue value, boolean fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return value.get();
+        } catch (IllegalStateException configNotLoaded) {
+            return fallback;
+        }
+    }
+
+    /** {@link #flag} for the debug toggle, whose fallback is always "off". */
+    public static boolean debugEnabled() {
+        return flag(DEBUG_MODE, false);
+    }
+
     /** Daemon executor so config writes never block the caller (render / server thread). */
     private static final java.util.concurrent.ExecutorService SAVE_EXEC =
         java.util.concurrent.Executors.newSingleThreadExecutor(r -> {

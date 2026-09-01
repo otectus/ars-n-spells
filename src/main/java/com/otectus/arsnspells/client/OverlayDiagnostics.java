@@ -7,6 +7,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -22,8 +23,18 @@ import java.util.TreeSet;
  */
 public class OverlayDiagnostics {
     private static final Logger LOGGER = LoggerFactory.getLogger(OverlayDiagnostics.class);
-    private static final Set<String> loggedOverlays = new TreeSet<>();
-    private static boolean diagnosticsEnabled = false;
+    /**
+     * Synchronized: {@code add} runs on the render thread (once per layer per frame) while
+     * {@code clear} runs on whichever thread flipped {@code debug_mode} - the server thread
+     * for {@code /ans debug}, the config-watcher thread for a hand-edited TOML. A bare
+     * {@code TreeSet} rebalancing under a concurrent traversal corrupts the tree, and the
+     * catch below would swallow the resulting exception frame by frame.
+     */
+    private static final Set<String> loggedOverlays =
+        Collections.synchronizedSet(new TreeSet<>());
+
+    /** volatile: written off-thread by enable/disable, read on the render thread per layer. */
+    private static volatile boolean diagnosticsEnabled = false;
 
     private OverlayDiagnostics() {}
 
@@ -45,7 +56,7 @@ public class OverlayDiagnostics {
     public static void syncWithConfig() {
         boolean wanted;
         try {
-            wanted = com.otectus.arsnspells.config.AnsConfig.DEBUG_MODE.get();
+            wanted = com.otectus.arsnspells.config.AnsConfig.debugEnabled();
         } catch (Exception configNotReady) {
             return;
         }
@@ -113,7 +124,10 @@ public class OverlayDiagnostics {
         LOGGER.info("Total Unique Layers: {}", loggedOverlays.size());
         LOGGER.info("");
         LOGGER.info("All Layers:");
-        loggedOverlays.forEach(overlay -> LOGGER.info("  - {}", overlay));
+        // Iteration over a synchronizedSet must hold its monitor; forEach alone does not.
+        synchronized (loggedOverlays) {
+            loggedOverlays.forEach(overlay -> LOGGER.info("  - {}", overlay));
+        }
         LOGGER.info("========================================");
     }
 }

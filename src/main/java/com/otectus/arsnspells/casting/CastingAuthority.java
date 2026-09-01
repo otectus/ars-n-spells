@@ -88,6 +88,25 @@ public class CastingAuthority {
     }
 
     /**
+     * The amount an Ars spell of {@code baseCost} actually costs under the current config.
+     *
+     * <p>Single source of truth for the Ars-side conversion, shared by pre-cast validation and
+     * by the expend-mana mixin. They used to compute it separately - {@code (float)(cost*rate)}
+     * in validation versus {@code (int) Math.round(cost*rate)} when charging - so the amount
+     * charged could differ from the amount checked by up to half a point, and at the config's
+     * 0.01 rate floor the rounding made every spell under 50 mana free.
+     */
+    public static float effectiveArsCost(int baseCost) {
+        if (baseCost <= 0) {
+            return 0.0f;
+        }
+        if (!BridgeManager.isUnificationEnabled()) {
+            return baseCost;
+        }
+        return (float) (baseCost * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+    }
+
+    /**
      * The mode-adjusted cost of an Iron's spell, in the units of whichever pool the
      * active mode spends from. Mirrors the conversion inside
      * {@link #validateManaResource} exactly, so the amount consumed always equals the
@@ -140,11 +159,11 @@ public class CastingAuthority {
                     ? BridgeManager.getManaForMode(player, false) : 0;
             }
         } else {
-            // Unified: apply the cross-system conversion rate, read the mode pool.
-            double conversionRate = fromArs
-                ? AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get()
-                : AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get();
-            effectiveCost = (float) (cost * conversionRate);
+            // Unified: convert through the same helper the charging path uses, so validate and
+            // charge can never drift apart again. Computing the rate inline here (and rounding
+            // differently over in the mixin) is exactly what made sub-50-mana spells free at
+            // the 0.01 rate floor.
+            effectiveCost = fromArs ? effectiveArsCost(cost) : effectiveIronsCost(cost);
             availableMana = BridgeManager.getManaForMode(player, fromArs);
         }
 
@@ -168,7 +187,7 @@ public class CastingAuthority {
     }
 
     private static void logDebug(String message, Object... args) {
-        if (AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get()) {
+        if (AnsConfig.debugEnabled()) {
             LOGGER.info("[CastingAuthority] [DEBUG] " + message, args);
         }
     }

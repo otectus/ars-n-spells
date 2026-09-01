@@ -82,7 +82,7 @@ public final class ManaBarController {
                 return;
             }
 
-            if (!loggedOnce && AnsConfig.DEBUG_MODE.get()) {
+            if (!loggedOnce && AnsConfig.debugEnabled()) {
                 LOGGER.info("[ManaBarController] Mana mode: {}, mana layer: {}", mode, layerId);
                 loggedOnce = true;
             }
@@ -95,7 +95,7 @@ public final class ManaBarController {
             // Never let a HUD listener take the render loop down. Logged only under debug so a
             // config-not-loaded window during a world transition cannot spam the log.
             try {
-                if (AnsConfig.DEBUG_MODE.get()) {
+                if (AnsConfig.debugEnabled()) {
                     LOGGER.error("[ManaBarController] Error in layer handler", e);
                 }
             } catch (Exception ignored) {
@@ -111,9 +111,18 @@ public final class ManaBarController {
             case ARS_PRIMARY:
                 return !isArs;
             case HYBRID:
-                String preferred = AnsConfig.HYBRID_MANA_BAR.get();
+                // The config validator restricts this to "irons"/"ars", so the only reachable
+                // values are the two the HUD understands; anything else was rejected at load
+                // and replaced by the default. Read defensively anyway - this is the render
+                // thread, and a config that is mid-reload must not throw here.
+                String preferred;
+                try {
+                    preferred = AnsConfig.HYBRID_MANA_BAR.get();
+                } catch (IllegalStateException configNotLoaded) {
+                    preferred = "irons";
+                }
                 boolean preferArs = "ars".equalsIgnoreCase(preferred);
-                return isArs ? !preferArs : preferArs;
+                return isArs != preferArs;
             case SEPARATE:
             case DISABLED:
             default:

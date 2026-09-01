@@ -8,7 +8,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 
 public final class CrossCastContext {
-    private static final long DEFAULT_TTL_TICKS = 200L;
+    // ANS-OPT-006: 100 ticks (5 seconds at 20 TPS), not 200. Faster eviction means less
+    // stale-state hazard if anything in the pipeline forgets to clear() on its own - and a
+    // stale entry here is not inert: peek() hands it to the cost-calc handler, which applies
+    // the cross-cast premium to an unrelated later cast.
+    private static final long DEFAULT_TTL_TICKS = 100L;
     private static final Map<UUID, Entry> ACTIVE_CASTS = new ConcurrentHashMap<>();
     private static final ThreadLocal<ManaCheckOverride> MANA_CHECK_OVERRIDE = new ThreadLocal<>();
 
@@ -89,6 +93,11 @@ public final class CrossCastContext {
         }
     }
 
+    /** Drop every player's in-flight cast context. Server stop / integrated-server exit. */
+    public static void clearAll() {
+        ACTIVE_CASTS.clear();
+    }
+
     public static void cleanupExpired(Player player, long gameTime) {
         if (player == null) {
             return;
@@ -141,12 +150,23 @@ public final class CrossCastContext {
          * logger substitutes the nil UUID.
          */
         public volatile java.util.UUID attemptId;
-        public float arsCost;
-        public float issCost;
-        public boolean costsReady;
-        public boolean blocked;
-        public String spellId;
-        public boolean multiplierApplied;
+        // ANS-HIGH-004: volatile so writes from the cost-calc event are visible to the TAIL
+        // mixin (which may run on a different thread under exotic mod chains) and to
+        // concurrent peek() readers. A torn read here charges the wrong pool.
+        public volatile float arsCost;
+        public volatile float issCost;
+        public volatile boolean costsReady;
+        public volatile boolean blocked;
+        public volatile String spellId;
+        /**
+         * ANS-HIGH-004: one-shot guard. The Ars cost-calc event can fire more than once
+         * during a resolve (preview vs. actual deduction). A plain read-then-write is racy
+         * under overlapping cross-casts, and losing that race applies the cross-cast premium
+         * twice; {@link #tryMarkMultiplierApplied()} uses compareAndSet so exactly one caller
+         * wins the first-application slot.
+         */
+        private final java.util.concurrent.atomic.AtomicBoolean multiplierApplied =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
         /**
          * ANS-CRIT-002 / ANS-HIGH-030: Iron's share pre-paid atomically during
          * Ars cost-calc in SEPARATE mode. Non-zero means the TAIL consume must
@@ -162,6 +182,11 @@ public final class CrossCastContext {
 
         public boolean isExpired(long gameTime) {
             return gameTime >= expiresAt;
+        }
+
+        /** Atomic check-and-mark. Returns true iff this is the first caller. */
+        public boolean tryMarkMultiplierApplied() {
+            return multiplierApplied.compareAndSet(false, true);
         }
     }
 

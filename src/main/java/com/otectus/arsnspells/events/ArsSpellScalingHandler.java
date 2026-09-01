@@ -76,9 +76,20 @@ public class ArsSpellScalingHandler {
         if (!isSpellDamage(src.getMsgId())) {
             return;
         }
+        // The cap read sits AFTER every bail above, so the common case (any non-spell hit by
+        // any player) never touches the config at all. The staged multiplier is already capped
+        // at stage time by SpellScalingUtil; this is the belt-and-braces second cap, so a
+        // config that cannot be read falls back to the multiplier itself rather than throwing
+        // on the damage path.
+        double cap;
+        try {
+            cap = AnsConfig.SPELL_POWER_CAP.get();
+        } catch (IllegalStateException configNotLoaded) {
+            cap = entry.multiplier;
+        }
         float scaled = (float) Math.min(
             event.getNewDamage() * entry.multiplier,
-            event.getNewDamage() * AnsConfig.SPELL_POWER_CAP.get());
+            event.getNewDamage() * cap);
         event.setNewDamage(scaled);
     }
 
@@ -95,6 +106,18 @@ public class ArsSpellScalingHandler {
             || type.contains("ars_nouveau")
             || type.equals("onFire")
             || type.equals("inFire");
+    }
+
+    /** Drop one player's pending scaling window. Logout. */
+    public static void clear(java.util.UUID uuid) {
+        if (uuid != null) {
+            ACTIVE.remove(uuid);
+        }
+    }
+
+    /** Drop every pending scaling window. Server stop / integrated-server exit. */
+    public static void clearAll() {
+        ACTIVE.clear();
     }
 
     private static final class ScalingEntry {

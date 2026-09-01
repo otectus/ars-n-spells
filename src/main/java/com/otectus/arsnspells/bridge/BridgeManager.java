@@ -171,7 +171,19 @@ public class BridgeManager {
     }
 
     public static boolean isUnificationEnabled() {
-        if (!AnsConfig.ENABLE_MANA_UNIFICATION.get()) {
+        // Guarded like its sibling getCurrentMode() below. This is the mod's most-called
+        // config read - every ManaCap read/write, every Ars cast, every Iron's mana access and
+        // two player-tick handlers reach it - and nearly all of those callers call
+        // getCurrentMode() straight afterwards. Leaving the defensive one behind the
+        // undefended one meant the SERVER config not being loaded (world transitions, early
+        // client render frames) threw from here before the guard downstream could help.
+        boolean enabled;
+        try {
+            enabled = AnsConfig.ENABLE_MANA_UNIFICATION.get();
+        } catch (Throwable configNotReady) {
+            return false;
+        }
+        if (!enabled) {
             return false;
         }
         ManaUnificationMode mode = getCurrentMode();
@@ -231,8 +243,11 @@ public class BridgeManager {
                 return activeBridge.consumeMana(player, amount);
 
             case SEPARATE:
-                float arsCost = amount * AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
-                float issCost = amount * AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
+                // ANS-MED-005: the split is normalised so the two halves always sum to the
+                // base cost, whatever the two independently-validated config keys add up to.
+                double[] split = AnsConfig.dualCostSplit();
+                float arsCost = (float) (amount * split[0]);
+                float issCost = (float) (amount * split[1]);
                 IManaBridge arsBridge = activeBridge;
                 IManaBridge issBridge = secondaryBridge;
 
@@ -246,7 +261,6 @@ public class BridgeManager {
                     return false;
                 }
 
-                float arsManaBefore = arsBridge.getMana(player);
                 boolean arsSuccess = arsBridge.consumeMana(player, arsCost);
                 if (!arsSuccess) {
                     return false;
@@ -254,7 +268,11 @@ public class BridgeManager {
 
                 boolean issSuccess = issBridge.consumeMana(player, issCost);
                 if (!issSuccess) {
-                    arsBridge.setMana(player, arsManaBefore);
+                    // ANS-CRIT-003: compensating refund, never snapshot-and-restore. The
+                    // previous setMana(manaBefore) clobbered any regen, buff or ritual mana
+                    // that landed between the snapshot and the rollback. addMana delegates to
+                    // the backing API's atomic add, so concurrent deltas survive.
+                    arsBridge.addMana(player, arsCost);
                     return false;
                 }
 

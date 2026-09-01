@@ -58,19 +58,19 @@ public class SpellScalingUtil {
         float multiplier = (float) player.getAttributeValue(AttributeRegistry.SPELL_POWER);
 
         SpellAnalysis.Result analysis = SpellAnalysis.analyze(spell);
-        AbstractSpellPart effect = analysis.firstEffect();
         String school = analysis.dominantSchool();
 
-        // Additive scaling: base power + (elemental bonus - 1.0) prevents exponential stacking
-        if (effect != null && effect.getRegistryName() != null) {
-            String path = effect.getRegistryName().getPath().toLowerCase(Locale.ROOT);
-            for (Map.Entry<String, Holder<Attribute>> entry : elementMap().entrySet()) {
-                if (path.contains(entry.getKey())) {
-                    float elementalPower = (float) player.getAttributeValue(entry.getValue());
-                    multiplier = multiplier + (elementalPower - 1.0f);
-                    break;
-                }
-            }
+        // Additive scaling: base power + (elemental bonus - 1.0) prevents exponential stacking.
+        //
+        // This uses the SAME school the rest of the mod uses. It previously called
+        // SpellAnalysis, discarded the answer, and re-derived the element with a different
+        // substring test over the map - so Firework counted as generic for affinity but
+        // matched "fire" for scaling, glyph_ender_inventory scaled as ender, and a path
+        // containing two element words resolved by hash iteration order.
+        Holder<Attribute> elemental = elementMap().get(school);
+        if (elemental != null) {
+            float elementalPower = (float) player.getAttributeValue(elemental);
+            multiplier = multiplier + (elementalPower - 1.0f);
         }
 
         // Apply affinity bonus: 0.5% per affinity level for the matching school.

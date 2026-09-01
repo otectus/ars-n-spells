@@ -35,6 +35,21 @@ public class ArsNativeBridge implements IManaBridge {
         cap.setMana(amount);
     }
 
+    /**
+     * Atomic add. Overriding this matters: {@link IManaBridge}'s default is
+     * {@code setMana(getMana() + amount)}, and every refund path in the mod - the SEPARATE
+     * rollback and the cross-cast pre-pay compensation - runs through here. A get-then-set
+     * loses any regen that lands between the two, which is the race ANS-CRIT-003 was filed
+     * against. {@code ManaCap.addMana} is Ars's own atomic add.
+     */
+    @Override
+    public void addMana(Player player, float amount) {
+        if (player == null || player.level().isClientSide() || amount == 0.0f) return;
+        ManaCap cap = CapabilityRegistry.getMana(player);
+        if (cap == null) return;
+        cap.addMana(amount);
+    }
+
     @Override
     public boolean consumeMana(Player player, float amount) {
         if (player == null || amount <= 0.0f) return amount <= 0.0f;

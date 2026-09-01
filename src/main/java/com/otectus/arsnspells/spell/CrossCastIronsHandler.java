@@ -77,7 +77,7 @@ public class CrossCastIronsHandler {
                 CrossCastTrace.Stage.IRON_COST_APPLIED,
                 "spell", event.getSpellId(), "mode", mode, "unified", unified,
                 "base", baseEventCost, "final", event.getManaCost());
-            if (AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get()) {
+            if (AnsConfig.debugEnabled()) {
                 LOGGER.info(
                     "[CrossCasting] [DEBUG] Iron's cross-cast spell={} mode={} unified={} baseEventCost={} finalCost={}",
                     event.getSpellId(), mode, unified, baseEventCost, event.getManaCost());
