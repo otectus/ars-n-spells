@@ -47,6 +47,13 @@ public class RitualRegistryHandler {
             ModItemsRegistry.spellTranscriptionTablet());
         spliceTablet(SpellbookBindingRitual.REGISTRY_PATH,
             ModItemsRegistry.spellbookBindingTablet());
+        // 3.2.0: these two were registered as rituals but never spliced, so no brazier or
+        // JEI lookup could resolve them back to an item - which is why they had no tablet
+        // and were unobtainable. Every registered ritual must have a spliced tablet.
+        spliceTablet(ManaInfusionRitual.REGISTRY_PATH,
+            ModItemsRegistry.manaInfusionTablet());
+        spliceTablet(ManaWellRitual.REGISTRY_PATH,
+            ModItemsRegistry.manaWellTablet());
 
         registered = true;
     }

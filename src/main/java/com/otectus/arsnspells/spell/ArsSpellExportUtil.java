@@ -89,6 +89,20 @@ public final class ArsSpellExportUtil {
         }
 
         ItemStack out = new ItemStack(item);
+
+        // 3.1.0: Iron's treats "is a Scroll item" and "has a spell container" as the same
+        // thing, and dereferences ISpellContainer.get(...) unguarded in three inscription
+        // code paths (one client, two server). A carrier built with only the ANS sidecar
+        // satisfies `instanceof Scroll` but breaks that invariant, which crashed the client
+        // - and would crash a dedicated server - the moment one reached an Inscription Table.
+        // Establish the native container FIRST, and refuse to hand back a real Scroll stack
+        // if that fails: an empty stack is a visible no-op, an invalid one is a crash waiting
+        // in a chest. Gated + referenced by FQN so the Iron's-importing helper only
+        // classloads with Iron's present; IronsCompat.isLoaded() was already checked above.
+        if (!com.otectus.arsnspells.spell.irons.IronsScrollFactory.initializeCarrierContainer(out)) {
+            return ItemStack.EMPTY;
+        }
+
         // Same schema every inscribed item uses -- keeps storage and casting aligned.
         CrossModSpellComponents.addArsEntryWithMeta(out,
             CrossModSpellComponents.ARS_PLACEHOLDER_ID, 1, arsTag,

@@ -115,5 +115,18 @@
   "ars_n_spells.icon.eye": "Eye",
   "ars_n_spells.icon.drop": "Drop",
   "ars_n_spells.icon.moon": "Moon",
-  "arsnspells.crosscast.selected": "Cross spell selected: %1$s/%2$s"
+  "arsnspells.crosscast.selected": "Cross spell selected: %1$s/%2$s",
+  "itemGroup.ars_n_spells": "Ars 'n' Spells",
+  "item.ars_n_spells.mana_infusion": "Mana Infusion",
+  "ars_n_spells.ritual_desc.mana_infusion": "Grants a one-off burst of mana to the nearest player when the ritual completes. The amount is server-configurable (ritual_mana_infusion_amount, 500 by default) and is paid into whichever pool the current mana unification mode treats as primary.",
+  "item.ars_n_spells.mana_well": "Mana Well",
+  "ars_n_spells.ritual_desc.mana_well": "Regenerates mana for every player within range for as long as the ritual runs. Radius and rate are server-configurable (mana_well_range, mana_well_regen_rate) and the mana is paid into whichever pool the current mana unification mode treats as primary.",
+  "advancements.ars_n_spells.craft_spell_loom.title": "Warp and Weft",
+  "advancements.ars_n_spells.craft_spell_loom.description": "Craft a Spell Loom, where Ars Nouveau spells are woven onto Iron's scrolls",
+  "advancements.ars_n_spells.transcribe_spell.title": "Written in Starlight",
+  "advancements.ars_n_spells.transcribe_spell.description": "Use the Spell Loom to inscribe an Ars Nouveau spell onto a blank Iron's scroll",
+  "advancements.ars_n_spells.bind_spell.title": "A Foreign Chapter",
+  "advancements.ars_n_spells.bind_spell.description": "Bind an inscribed scroll into an Iron's spellbook",
+  "advancements.ars_n_spells.first_cross_cast.title": "Two Schools, One Voice",
+  "advancements.ars_n_spells.first_cross_cast.description": "Cast an Ars Nouveau spell through Iron's Spellbooks"
 }

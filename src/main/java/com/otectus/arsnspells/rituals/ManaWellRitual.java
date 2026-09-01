@@ -1,13 +1,20 @@
 package com.otectus.arsnspells.rituals;
 
 import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
+import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.config.AnsConfig;
-import io.redspace.ironsspellbooks.api.magic.MagicData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 
+/**
+ * ANS-HIGH-002: routes the mana grant through {@link BridgeManager}. See
+ * {@link ManaInfusionRitual} for the full rationale.
+ */
 public class ManaWellRitual extends AbstractRitual {
+    /** Registry path shared by the ritual id, its tablet item, and its assets. */
+    public static final String REGISTRY_PATH = "mana_well";
+
     @Override
     protected void tick() {
         if (this.getWorld() == null || this.getWorld().isClientSide()) {
@@ -17,12 +24,8 @@ public class ManaWellRitual extends AbstractRitual {
         AABB area = new AABB(this.getPos()).inflate(range);
         float regenRate = AnsConfig.MANA_WELL_REGEN_RATE.get().floatValue();
 
-        this.getWorld().getEntitiesOfClass(Player.class, area).forEach(p -> {
-            MagicData data = MagicData.getPlayerMagicData(p);
-            if (data != null) {
-                data.addMana(regenRate);
-            }
-        });
+        this.getWorld().getEntitiesOfClass(Player.class, area).forEach(p ->
+            BridgeManager.getBridge().addMana(p, regenRate));
     }
 
     @Override
@@ -30,6 +33,6 @@ public class ManaWellRitual extends AbstractRitual {
 
     @Override
     public ResourceLocation getRegistryName() {
-        return ResourceLocation.fromNamespaceAndPath("ars_n_spells", "mana_well");
+        return ResourceLocation.fromNamespaceAndPath("ars_n_spells", REGISTRY_PATH);
     }
 }

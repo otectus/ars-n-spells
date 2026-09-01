@@ -2,6 +2,8 @@ package com.otectus.arsnspells.registry;
 
 import com.hollingsworth.arsnouveau.common.items.RitualTablet;
 import com.otectus.arsnspells.ArsNSpells;
+import com.otectus.arsnspells.rituals.ManaInfusionRitual;
+import com.otectus.arsnspells.rituals.ManaWellRitual;
 import com.otectus.arsnspells.rituals.SpellTranscriptionRitual;
 import com.otectus.arsnspells.rituals.SpellUninscriptionRitual;
 import com.otectus.arsnspells.rituals.SpellbookBindingRitual;
@@ -36,6 +38,8 @@ public final class ModItemsRegistry {
     private static DeferredHolder<Item, RitualTablet> spellTranscriptionTablet;
     private static DeferredHolder<Item, RitualTablet> spellUninscriptionTablet;
     private static DeferredHolder<Item, RitualTablet> spellbookBindingTablet;
+    private static DeferredHolder<Item, RitualTablet> manaInfusionTablet;
+    private static DeferredHolder<Item, RitualTablet> manaWellTablet;
 
     private ModItemsRegistry() {}
 
@@ -55,6 +59,18 @@ public final class ModItemsRegistry {
         spellbookBindingTablet = ITEMS.register(
             SpellbookBindingRitual.REGISTRY_PATH,
             () -> new RitualTablet(new SpellbookBindingRitual())
+        );
+        // 3.2.0: Mana Infusion and the Mana Well had been registered as rituals since the
+        // 1.x line with no tablet item at all, so a brazier could never resolve them and
+        // they were unobtainable in survival. Both are Iron's-gated only because their
+        // Enchanting Apparatus recipes call for irons_spellbooks:arcane_essence.
+        manaInfusionTablet = ITEMS.register(
+            ManaInfusionRitual.REGISTRY_PATH,
+            () -> new RitualTablet(new ManaInfusionRitual())
+        );
+        manaWellTablet = ITEMS.register(
+            ManaWellRitual.REGISTRY_PATH,
+            () -> new RitualTablet(new ManaWellRitual())
         );
     }
 
@@ -86,5 +102,13 @@ public final class ModItemsRegistry {
 
     public static DeferredHolder<Item, RitualTablet> spellbookBindingTablet() {
         return spellbookBindingTablet;
+    }
+
+    public static DeferredHolder<Item, RitualTablet> manaInfusionTablet() {
+        return manaInfusionTablet;
+    }
+
+    public static DeferredHolder<Item, RitualTablet> manaWellTablet() {
+        return manaWellTablet;
     }
 }

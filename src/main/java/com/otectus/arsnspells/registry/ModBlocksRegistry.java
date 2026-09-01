@@ -4,14 +4,12 @@ import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.block.SpellLoomBlock;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -41,12 +39,8 @@ public final class ModBlocksRegistry {
     public static void register(IEventBus modBus) {
         BLOCKS.register(modBus);
         BLOCK_ITEMS.register(modBus);
-        modBus.addListener(ModBlocksRegistry::addToCreativeTab);
-    }
-
-    private static void addToCreativeTab(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
-            event.accept(SPELL_LOOM_ITEM.get());
-        }
+        // 3.2.0: the Spell Loom no longer squats in vanilla FUNCTIONAL_BLOCKS. It is the icon
+        // and first entry of the mod's own tab instead - see ModCreativeTabs, which enumerates
+        // BLOCK_ITEMS directly.
     }
 }

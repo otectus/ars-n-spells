@@ -21,6 +21,7 @@ import com.otectus.arsnspells.events.ResonanceEvents;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.registry.ModBlockEntities;
 import com.otectus.arsnspells.registry.ModBlocksRegistry;
+import com.otectus.arsnspells.registry.ModCreativeTabs;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
 import com.otectus.arsnspells.registry.ModMenus;
 import com.otectus.arsnspells.rituals.RitualRegistryHandler;
@@ -72,6 +73,10 @@ public class ArsNSpells {
         ModBlocksRegistry.register(modBus);
         ModBlockEntities.register(modBus);
         ModMenus.register(modBus);
+        // 3.2.0: the mod's own creative tab. Registered AFTER the item registers so its
+        // displayItems callback enumerates a populated DeferredRegister; the Iron's gate above
+        // is what decides whether the four Iron's-only tablets are in it.
+        ModCreativeTabs.register(modBus);
 
         // ---- Mod-bus listeners ----
         modBus.addListener(this::commonSetup);
