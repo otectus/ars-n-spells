@@ -37,7 +37,18 @@ public class ProgressionData {
      */
     public double getBonusForSchool(String school) {
         int casts = getCastCount(school);
-        return Math.min(0.25, casts * 0.001);
+        // Audit F4: config-driven, was hardcoded 0.001 / 0.25. The bonus is transient
+        // (recomputed from the persistent cast count), so a config change rescales every
+        // player's bonus immediately rather than needing a data migration.
+        double perCast = 0.001;
+        double cap = 0.25;
+        try {
+            perCast = com.otectus.arsnspells.config.AnsConfig.PROGRESSION_BONUS_PER_CAST.get();
+            cap = com.otectus.arsnspells.config.AnsConfig.PROGRESSION_BONUS_CAP.get();
+        } catch (IllegalStateException configNotReady) {
+            // Config not loaded yet (very early tick) - use the historical defaults.
+        }
+        return Math.min(cap, casts * perCast);
     }
 
     public Map<String, Integer> getAllCastCounts() {

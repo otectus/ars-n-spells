@@ -38,8 +38,16 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        // ANS-CRIT-001: every mixin that names an Iron's class in its @Mixin target or
+        // its own bytecode must be listed here. MixinIronsCastValidation and
+        // MagicDataAccessor were once missing from this list, and an Iron's-less
+        // dedicated server crashed in the mixin loader with NoClassDefFoundError before
+        // any of the runtime gates could help.
         if (mixinClassName.endsWith("MixinIronsSpellDamage")
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
+            || mixinClassName.endsWith("MixinIronsCastValidation")
+            || mixinClassName.endsWith("MagicDataAccessor")
+            || mixinClassName.endsWith("MixinScrollItem")
             || mixinClassName.endsWith("MixinAbstractSpellArsIcon")) {
             return ironsPresent;
         }

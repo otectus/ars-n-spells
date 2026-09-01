@@ -54,6 +54,8 @@ public class AnsConfig {
     // PROGRESSION SYSTEM
     // ========================================
     public static final ModConfigSpec.BooleanValue ENABLE_CROSS_MOD_PROGRESSION;
+    public static final ModConfigSpec.DoubleValue PROGRESSION_BONUS_PER_CAST;
+    public static final ModConfigSpec.DoubleValue PROGRESSION_BONUS_CAP;
 
     // ========================================
     // AFFINITY SYSTEM
@@ -68,6 +70,8 @@ public class AnsConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_CURIO_DISCOUNTS;
     public static final ModConfigSpec.DoubleValue VIRTUE_RING_DISCOUNT;
     public static final ModConfigSpec.DoubleValue MAX_TOTAL_CURIO_DISCOUNT;
+    public static final ModConfigSpec.BooleanValue READ_CURIO_ATTRIBUTE_MODIFIERS;
+    public static final ModConfigSpec.ConfigValue<String> SCROLL_COST_MODE;
 
     // ========================================
     // SPELL SCALING
@@ -320,7 +324,19 @@ public class AnsConfig {
         ENABLE_CROSS_MOD_PROGRESSION = BUILDER
             .comment("Allow Ars spells to grant ISS XP and vice versa")
             .define("enable_cross_mod_progression", true);
-        
+
+        PROGRESSION_BONUS_PER_CAST = BUILDER
+            .comment("Attribute bonus gained per cast in a school (audit F4 - was hardcoded 0.001).",
+                     "0.001 = +0.1% per cast. The bonus is transient (derived from the persistent",
+                     "cast count), so changing this immediately rescales every player's bonus.")
+            .defineInRange("progression_bonus_per_cast", 0.001, 0.0, 0.1);
+
+        PROGRESSION_BONUS_CAP = BUILDER
+            .comment("Cap on the per-school progression attribute bonus (audit F4 - was hardcoded 0.25).",
+                     "0.25 = +25% maximum, reached after bonus_cap / bonus_per_cast casts",
+                     "(250 casts at defaults).")
+            .defineInRange("progression_bonus_cap", 0.25, 0.0, 2.0);
+
         BUILDER.pop();
 
         // ========================================
@@ -370,6 +386,35 @@ public class AnsConfig {
                      "(0.50 = spells never cost less than 50% after curio discounts). Prevents",
                      "stacked discount curios from trivialising mana cost.")
             .defineInRange("max_total_curio_discount", 0.50, 0.0, 1.0);
+
+        READ_CURIO_ATTRIBUTE_MODIFIERS = BUILDER
+            .comment("Read max-mana / mana-regen attribute modifiers from worn Curios (rings, amulets,",
+                     "belts) and mirror them across the unified mana pool, the same way armor/weapon",
+                     "modifiers are handled. This is what lets Apotheosis (Apothic Curios) affixes and",
+                     "sockets, as well as other curio mana gear (Magical Jewelry, Jewelcraft, etc.),",
+                     "feed the Ars <-> Iron's bridge. Disable if a curio affix balance proves overpowered.")
+            .define("read_curio_attribute_modifiers", true);
+
+        BUILDER.pop();
+
+        // ========================================
+        // SCROLL COST SYSTEM
+        // ========================================
+        BUILDER.push("Scroll Cost System");
+        BUILDER.comment("Controls what an Iron's Spellbooks scroll costs to use.");
+
+        SCROLL_COST_MODE = BUILDER
+            .comment(
+                "Cost mode for Iron's Spellbooks scroll usage:",
+                "  full - Scrolls cost the same as casting the spell normally",
+                "  lp_only - Scrolls are free of mana cost but still consume LP if Cursed Ring equipped",
+                "  free - Scrolls have no resource cost (LP from Cursed Ring still applies)",
+                "Note: wearing the Cursed Ring (with enable_lp_system on) makes LP REPLACE mana,",
+                "exactly as it does for normal casting - a ring wearer is never charged both.",
+                "The LP half of this setting is inert on 1.21.1: Covenant of the Seven has no",
+                "1.21.1 release, so lp_only behaves as free until that integration returns."
+            )
+            .define("scroll_cost_mode", "full");
 
         BUILDER.pop();
 

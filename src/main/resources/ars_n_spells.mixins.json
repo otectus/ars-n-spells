@@ -10,7 +10,10 @@
     "ars.MixinSpellResolverContext",
     "ars.MixinArsPotionEffects",
     "irons.MixinIronsSpellDamage",
-    "irons.MixinIronsMagicDataMana"
+    "irons.MixinIronsMagicDataMana",
+    "irons.MagicDataAccessor",
+    "irons.MixinIronsCastValidation",
+    "irons.MixinScrollItem"
   ],
   "client": [
     "irons.MixinAbstractSpellArsIcon"

@@ -88,6 +88,38 @@ public class CastingAuthority {
     }
 
     /**
+     * The mode-adjusted cost of an Iron's spell, in the units of whichever pool the
+     * active mode spends from. Mirrors the conversion inside
+     * {@link #validateManaResource} exactly, so the amount consumed always equals the
+     * amount validated.
+     */
+    public static float effectiveIronsCost(int baseCost) {
+        if (baseCost <= 0) {
+            return 0.0f;
+        }
+        if (!BridgeManager.isUnificationEnabled()) {
+            return baseCost;
+        }
+        return (float) (baseCost * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
+    }
+
+    /**
+     * ANS-MED-043: consume the mana previously validated by
+     * {@link #canCastIronsSpell(Player, int)}. Iron's scrolls never deduct mana
+     * natively, so {@code scroll_cost_mode=full} used to validate the cost and then
+     * charge nothing — documented as costing mana while actually being free.
+     */
+    public static boolean consumeIronsSpellMana(Player player, int manaCost) {
+        if (player == null) {
+            return false;
+        }
+        if (player.isCreative() || manaCost <= 0) {
+            return true;
+        }
+        return BridgeManager.consumeManaForMode(player, effectiveIronsCost(manaCost), false);
+    }
+
+    /**
      * Validate mana availability against the mode-correct pool.
      *
      * @param player  the player
