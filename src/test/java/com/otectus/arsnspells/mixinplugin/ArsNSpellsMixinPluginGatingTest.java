@@ -112,7 +112,6 @@ class ArsNSpellsMixinPluginGatingTest {
         "com.otectus.arsnspells.mixin.ars.MixinManaCapability",
         "com.otectus.arsnspells.mixin.ars.MixinSpellResolverMana",
         "com.otectus.arsnspells.mixin.ars.MixinSpellResolverPreCast",
-        "com.otectus.arsnspells.mixin.ars.MixinSpellResolverContext",
     };
 
     @Test

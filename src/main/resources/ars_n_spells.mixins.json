@@ -7,7 +7,6 @@
   "mixins": [
     "ars.MixinManaCapability",
     "ars.MixinSpellResolverMana",
-    "ars.MixinSpellResolverContext",
     "ars.MixinSpellResolverPreCast"
   ],
   "injectors": {

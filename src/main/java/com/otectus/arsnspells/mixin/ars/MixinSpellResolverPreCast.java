@@ -9,7 +9,6 @@ import com.hollingsworth.arsnouveau.common.util.PortUtil;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.casting.CastingAuthority;
 import com.otectus.arsnspells.spell.CrossCastContext;
-import com.otectus.arsnspells.util.CasterContext;
 import com.otectus.arsnspells.util.CrossCastTrace;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -40,13 +39,6 @@ import java.util.UUID;
  * ISS_PRIMARY mode where {@code playerOnTick} is suppressed. Since we bypass the rest
  * of the method we must also replicate its native recipe validation — hence the
  * explicit {@code getSpellCastingSpellValidator().validate(...)} call.
- *
- * <p><b>Interaction with {@link MixinSpellResolverContext}.</b> That mixin captures
- * {@link CasterContext} at {@code canCast} HEAD and clears it at RETURN. A cancelled
- * HEAD callback returns before the original RETURN opcodes, so its cleanup would never
- * run. Every cancel path here therefore clears the context itself; failing to do so
- * leaks a {@code ThreadLocal} reference to the player and the spell onto a server
- * worker thread.
  *
  * <p><b>Covenant of the Seven on 1.21.1.</b> The 1.20.1 build also validated Cursed
  * Ring LP and Virtue Ring aura in the {@code cost <= 0} branch, because those handlers
@@ -102,12 +94,6 @@ public abstract class MixinSpellResolverPreCast {
 
         SpellResolver resolver = (SpellResolver) (Object) this;
 
-        // getResolveCost() fires SpellCostCalcEvent, and the cost handlers (curio discounts,
-        // cross-cast multiplier) read CasterContext. MixinSpellResolverContext also sets it
-        // at this same injection point, but two @Injects at one point run in mixin
-        // application order, which is not a contract worth depending on. Setting it here is
-        // idempotent and makes this mixin correct in either order.
-        CasterContext.set(player, this.spell);
         int cost = resolver.getResolveCost();
 
         if (player.isCreative()) {
@@ -142,12 +128,8 @@ public abstract class MixinSpellResolverPreCast {
         arsnspells$finish(cir, canCast);
     }
 
-    /**
-     * Set the result and cancel, clearing the caster context that
-     * {@link MixinSpellResolverContext}'s RETURN inject can no longer clear for us.
-     */
+    /** Set the result and cancel. */
     private static void arsnspells$finish(CallbackInfoReturnable<Boolean> cir, boolean result) {
-        CasterContext.clear();
         cir.setReturnValue(result);
         cir.cancel();
     }

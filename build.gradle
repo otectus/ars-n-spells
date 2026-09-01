@@ -37,6 +37,13 @@ repositories {
         url = 'https://code.redspace.io/releases'
         content { includeGroup 'io.redspace' }
     }
+    // Player Animator - a mods.toml dependency of Iron's Spellbooks, used only by the
+    // -PwithIronsRuntimeGameTests profile.
+    maven {
+        name = 'kosmx'
+        url = 'https://maven.kosmx.dev/'
+        content { includeGroup 'dev.kosmx.player-anim' }
+    }
     // Curios API (also a transitive runtime dep of Ars Nouveau).
     maven {
         name = 'Illusive Soulworks'
@@ -134,9 +141,36 @@ dependencies {
     // run classpath is what makes `runGameTestServer` exercise the Iron's-LESS fallback path;
     // the Iron's-loaded GameTests self-skip on IronsCompat.isLoaded()==false. Pass
     // -PwithIronsRuntimeGameTests to also put Iron's on the run classpath.
+    //
+    // KNOWN GAP in that profile: Iron's declares three mods.toml dependencies that its POM does
+    // not, so adding only irons_spellbooks left mod loading refusing to start. Two of the three
+    // are wired below and resolve. The third, `playeranimator`, publishes NO NeoForge artifact
+    // to any Maven repository - kosmx's maven carries only the common/Fabric/Forge library
+    // variants, and the jar named there has no mods.toml at all. Finishing the profile means
+    // adding the CurseForge coordinate by hand, e.g.
+    //     runtimeOnly "curse.maven:player-animator-<projectId>:<fileId>"
+    // once a 1.21.1 NeoForge file id is known. Until then this profile still fails at load with
+    // one clear "requires playeranimator" error rather than three.
     compileOnly "io.redspace:irons_spellbooks:${irons_spellbooks_version}"
     if (project.hasProperty('withIronsRuntimeGameTests')) {
         runtimeOnly "io.redspace:irons_spellbooks:${irons_spellbooks_version}"
+        // Iron's own mods.toml dependencies. The jar's POM does not declare them, so adding
+        // only irons_spellbooks left mod loading refusing to start with three "requires ..."
+        // errors - which is why this profile had never actually run.
+        //
+        // transitive = false on all three: these are published for multiple loaders and their
+        // POMs name Fabric artifacts (player-animation-lib pulls fabric-loader), which do not
+        // resolve here and are not wanted on a NeoForge run classpath anyway.
+        runtimeOnly("io.redspace:irons_lib:${irons_lib_version}") { transitive = false }
+        runtimeOnly("dev.kosmx.player-anim:player-animation-lib:${player_animation_version}") {
+            transitive = false
+        }
+        // Ars Nouveau pins GeckoLib 4.6.6; Iron's requires 4.7.5.1 or above. 4.7.5.1 is the
+        // lowest version that satisfies Iron's, so it is the smallest possible step away from
+        // what Ars was tested against.
+        runtimeOnly("software.bernie.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_runtime_version}") {
+            transitive = false
+        }
     }
 
     // Curios API only (Ars pulls the full jar transitively at runtime).

@@ -55,7 +55,6 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
             return arsManaCapPresent;
         }
         if (mixinClassName.endsWith("MixinSpellResolverMana")
-            || mixinClassName.endsWith("MixinSpellResolverContext")
             || mixinClassName.endsWith("MixinSpellResolverPreCast")) {
             return arsSpellResolverPresent;
         }
