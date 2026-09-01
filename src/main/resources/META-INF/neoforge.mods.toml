@@ -12,8 +12,17 @@ updateJSONURL = "https://raw.githubusercontent.com/otectus/ars-n-spells/main/upd
 authors = "${mod_authors}"
 description = '''${mod_description}'''
 
+# Two configs on purpose. Ars Nouveau is a REQUIRED dependency, so a mixin failure there
+# means the mod is genuinely broken and should fail loudly. Iron's Spellbooks is OPTIONAL,
+# so a conflict in that half must degrade the integration - a warning and one skipped mixin -
+# rather than aborting startup for every mod in the chain. That is not hypothetical: a
+# @Redirect of ours into a method another mod had overwritten took down twelve mods in a
+# user's pack on the 1.20.1 line.
 [[mixins]]
     config = "ars_n_spells.mixins.json"
+
+[[mixins]]
+    config = "ars_n_spells.compat.mixins.json"
 
 [[dependencies.${mod_id}]]
     modId = "neoforge"

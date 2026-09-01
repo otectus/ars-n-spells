@@ -36,6 +36,22 @@ public final class ModDataComponents {
             .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.STRING_UTF8)
         );
 
+    /**
+     * Schema stamp for ANS-written item data (successor of the 1.20.1 root NBT key
+     * {@code arsnspells:schema_version}).
+     *
+     * <p>Written by {@link com.otectus.arsnspells.spell.irons.CarrierReconciler} once it has
+     * looked an item over, so a later pass can tell "checked, current" from "never seen". It is
+     * the branch point for any future in-place migration of inscribed items: without it, a
+     * migration has no way to know which items it has already handled short of re-deriving that
+     * from the data itself, which is exactly what a version stamp exists to avoid.
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SCHEMA_VERSION =
+        COMPONENTS.registerComponentType("schema_version", b -> b
+            .persistent(com.mojang.serialization.Codec.INT)
+            .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT)
+        );
+
     public static void register(IEventBus bus) {
         COMPONENTS.register(bus);
     }

@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "ars_nouveau:item/ritual_binding"
+    "layer0": "ars_n_spells:item/spellbook_binding"
   }
 }

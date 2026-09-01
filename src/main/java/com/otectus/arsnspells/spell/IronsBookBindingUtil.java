@@ -258,6 +258,9 @@ public final class IronsBookBindingUtil {
         // The cosmetic export marker is ANS-owned too; leaving it behind means the result is
         // not byte-identical to a never-inscribed item and it survives a re-transcribe.
         stack.remove(ModDataComponents.EXPORT_MODE.get());
+        // The schema stamp is ANS-owned as well; leaving it behind means the result is not
+        // byte-identical to a never-inscribed item, which UninscribeTeardownGameTests asserts.
+        stack.remove(ModDataComponents.SCHEMA_VERSION.get());
         return removed;
     }
 

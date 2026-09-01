@@ -52,7 +52,7 @@ import java.util.UUID;
  * Ring LP and Virtue Ring aura in the {@code cost <= 0} branch, because those handlers
  * zero the mana cost during {@code SpellCostCalcEvent} and stash a pending alternate
  * cost. Covenant has no 1.21.1 release, so a zero cost here means only "genuinely free
- * spell". See {@code src/covenant-disabled/README.md}.
+ * spell". Covenant of the Seven has no 1.21.1 release, so that path has no consumer here.
  */
 @Mixin(value = SpellResolver.class, remap = false)
 public abstract class MixinSpellResolverPreCast {

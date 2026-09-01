@@ -8,17 +8,7 @@
     "ars.MixinManaCapability",
     "ars.MixinSpellResolverMana",
     "ars.MixinSpellResolverContext",
-    "ars.MixinSpellResolverPreCast",
-    "irons.MixinIronsSpellDamage",
-    "irons.MixinIronsMagicDataMana",
-    "irons.MagicDataAccessor",
-    "irons.MixinIronsCastValidation",
-    "irons.MixinScrollItem",
-    "irons.MixinInscriptionTableMenu"
-  ],
-  "client": [
-    "irons.MixinAbstractSpellArsIcon",
-    "irons.MixinInscriptionTableScreen"
+    "ars.MixinSpellResolverPreCast"
   ],
   "injectors": {
     "defaultRequire": 1

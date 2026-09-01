@@ -1,0 +1,22 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.otectus.arsnspells.mixin",
+  "plugin": "com.otectus.arsnspells.mixin.ArsNSpellsMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "irons.MagicDataAccessor",
+    "irons.MixinIronsCastValidation",
+    "irons.MixinIronsSpellDamage",
+    "irons.MixinIronsMagicDataMana",
+    "irons.MixinScrollItem",
+    "irons.MixinInscriptionTableMenu"
+  ],
+  "client": [
+    "irons.MixinAbstractSpellArsIcon",
+    "irons.MixinInscriptionTableScreen"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

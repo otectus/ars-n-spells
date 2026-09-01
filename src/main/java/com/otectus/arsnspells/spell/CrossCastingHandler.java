@@ -222,7 +222,7 @@ public class CrossCastingHandler {
         if (CrossSpellType.ARS_NOUVEAU.name().equals(entry.typeName())) {
             castOk = castArsSpell(player, item, entry, attemptId);
         } else if (CrossSpellType.IRONS_SPELLBOOKS.name().equals(entry.typeName())) {
-            castOk = castIronsSpell(player, item, entry);
+            castOk = castIronsSpell(player, item, entry, attemptId);
         } else {
             return false;
         }
@@ -311,6 +311,10 @@ public class CrossCastingHandler {
             }
 
             event.currentCost = Math.max(0, Math.round(arsCost));
+            CrossCastTrace.log(entry.attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.ARS_COST_APPLIED,
+                "mode", "SEPARATE", "unified", true, "base", baseEventCost,
+                "final", event.currentCost, "issSecondary", issCost);
             logDebug("Ars cross-cast (SEPARATE): base={} multiplier={} total={} ars={} iss={}",
                 baseEventCost, multiplier, totalCost, arsCost, issCost);
             return;
@@ -319,6 +323,9 @@ public class CrossCastingHandler {
         // Non-SEPARATE (or unified=false): Ars deducts the full multiplied
         // cost from its own pool. The multiplier is the only adjustment we make.
         event.currentCost = totalCost;
+        CrossCastTrace.log(entry.attemptId, player, CrossCastTrace.Side.S,
+            CrossCastTrace.Stage.ARS_COST_APPLIED,
+            "mode", mode, "unified", unified, "base", baseEventCost, "final", totalCost);
         logDebug("[CrossCasting] Ars cross-cast cost multiplier applied: x{} -> {}", multiplier, event.currentCost);
     }
 
@@ -463,7 +470,8 @@ public class CrossCastingHandler {
      * {@link AbstractSpell#attemptInitiateCast} with the embedded
      * {@link CastSource} (defaults to SCROLL semantics: instant, mana-checked).
      */
-    private static boolean castIronsSpell(Player player, ItemStack stack, CrossModSpell entry) {
+    private static boolean castIronsSpell(Player player, ItemStack stack, CrossModSpell entry,
+                                          java.util.UUID attemptId) {
         if (!IronsCompat.isLoaded()) {
             return false;
         }
@@ -477,6 +485,9 @@ public class CrossCastingHandler {
         if (spell == null) {
             return false;
         }
+        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+            CrossCastTrace.Stage.DESCRIPTOR_VALIDATED,
+            "leg", "IRONS", "spellId", entry.spellId(), "level", entry.level());
         if (player.level().isClientSide()) {
             return true;
         }

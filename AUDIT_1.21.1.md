@@ -436,12 +436,13 @@ backlog. That backlog is still open; see §6.
 
 Things that look wrong and are deliberate. Each has been mistaken for a bug at least once.
 
-- **The 24 Covenant of the Seven config keys with no reader.** Covenant (LP / aura) has no
-  1.21.1 release. The keys stay declared so an existing server's TOML carries over untouched
-  and re-enabling the subsystem is a compile-scope change, not a config migration. The dead-key
-  sweep in §2.25 exempts them by marker, scoped so a *new* dead key cannot hide in the block.
-- **`src/covenant-disabled/` is not a source set.** Same reason. Deliberately excluded from
-  compilation, deliberately kept in tree.
+- ~~**The 24 Covenant of the Seven config keys with no reader.**~~ ~~**`src/covenant-disabled/`
+  is not a source set.**~~ **Both superseded by the 3.2.1 parity pass.** The instruction there
+  was to leave out compatibility with mods that have no 1.21.1 NeoForge build, so the Covenant
+  source was deleted and its 24 config keys went with it. The dead-key sweep no longer has an
+  exemption at all. `VIRTUE_RING_DISCOUNT` survives on purpose: despite the name it is the
+  generic per-curio discount, it has live readers, and renaming the key would silently reset
+  the setting on every server that has tuned it.
 - **`require = 0` on every injection.** This is the safe failure mode, not an oversight. The
   invisibility it causes is addressed by `MixinSelfCheck` (§2.19), not by removing it.
 - **The plain `HashMap`s under the server-main-thread-only invariant.** Not every per-player

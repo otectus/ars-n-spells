@@ -86,6 +86,49 @@ public final class EquipmentIntegration {
         }
     }
 
+    /**
+     * The gear-derived Iron's MAX_MANA bonus: everything modifiers contribute, minus ANS's own.
+     *
+     * <p>Used by {@code ArsManaCalcHandler} to fold Iron's gear into Ars's pool in ARS_PRIMARY.
+     * Reading {@code getAttributeValue} raw would fold Iron's <em>entire</em> pool - its base
+     * value included - on top of Ars's own, which is not a gear bonus at all.
+     *
+     * <p><b>Excluding our own modifier is load-bearing, not tidiness.</b> In ARS_PRIMARY the
+     * LOWEST-priority sync writes ANS's modifier onto MAX_MANA after the calc completes. If
+     * this counted that modifier, the next MaxManaCalcEvent would fold it back into Ars's max,
+     * the sync would raise it again, and the pool would run away. That feedback loop is why
+     * the 1.20.1 line read a per-item gear scan here instead.
+     */
+    public static double ironsGearMaxManaBonus(Player player) {
+        return foreignModifierTotal(player, AttributeRegistry.MAX_MANA, ARS_TO_IRON_MAX_MANA_ID);
+    }
+
+    /** The gear-derived Iron's MANA_REGEN bonus. See {@link #ironsGearMaxManaBonus}. */
+    public static double ironsGearRegenBonus(Player player) {
+        return foreignModifierTotal(player, AttributeRegistry.MANA_REGEN, ARS_TO_IRON_REGEN_ID);
+    }
+
+    /**
+     * {@code getValue() - getBaseValue()}, less the amount contributed by {@code ownId}.
+     *
+     * <p>Exact under the ADD_VALUE model every modifier in this class uses; a third-party
+     * multiply modifier would skew it, which is the same approximation
+     * {@link #syncIronsMaxToArs} already reasons in. Never negative.
+     */
+    private static double foreignModifierTotal(Player player, Holder<Attribute> attribute,
+                                               ResourceLocation ownId) {
+        if (player == null || !IronsCompat.isLoaded()) {
+            return 0.0;
+        }
+        AttributeInstance instance = player.getAttribute(attribute);
+        if (instance == null) {
+            return 0.0;
+        }
+        AttributeModifier own = instance.getModifier(ownId);
+        double ownAmount = own == null ? 0.0 : own.amount();
+        return Math.max(0.0, instance.getValue() - instance.getBaseValue() - ownAmount);
+    }
+
     /** Remove any Ars-derived modifiers from Iron's attributes. */
     public static void clearAll(Player player) {
         if (player == null || !IronsCompat.isLoaded()) {

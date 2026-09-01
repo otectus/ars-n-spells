@@ -83,6 +83,10 @@ public class ArsNSpells {
 
         // ---- Mod-bus listeners ----
         modBus.addListener(this::commonSetup);
+        // Mixin self-check at load-complete, not common setup: inspecting a class loads it,
+        // and loading Iron's classes early can interfere with other mods' mixins that have
+        // not been applied yet. By load-complete every config in the pack is through APPLY.
+        modBus.addListener(this::onLoadComplete);
         modBus.addListener(this::onConfigLoading);
         modBus.addListener(this::onConfigReloading);
         modBus.addListener(PacketHandler::onRegisterPayloadHandlers);
@@ -135,6 +139,18 @@ public class ArsNSpells {
             ModBlockEntities.SPELL_LOOM.get(), (be, side) -> be.getItems());
     }
 
+    /**
+     * Catches silent mixin failures that would otherwise surface only as "nothing happens
+     * when I cast". See {@link com.otectus.arsnspells.util.MixinSelfCheck}.
+     */
+    private void onLoadComplete(final net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent event) {
+        try {
+            com.otectus.arsnspells.util.MixinSelfCheck.run();
+        } catch (Throwable t) {
+            LOGGER.error("[SelfCheck] the self-check itself failed", t);
+        }
+    }
+
     private void commonSetup(final FMLCommonSetupEvent event) {
         try {
             BridgeManager.init(event);
@@ -151,9 +167,7 @@ public class ArsNSpells {
             if (ModPresence.isLoaded(CompatIds.IRONS_SPELLBOOKS)) {
                 event.enqueueWork(SchoolIndex::snapshot);
             }
-            // Announce a mixin whose target has drifted. Every injection uses require = 0 so
-            // load never fails on drift - which also means it never says anything.
-            event.enqueueWork(com.otectus.arsnspells.util.MixinSelfCheck::run);
+
         } catch (Exception e) {
             LOGGER.error("========================================");
             LOGGER.error("CRITICAL: Ars 'n' Spells initialization failed");

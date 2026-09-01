@@ -73,6 +73,7 @@ public final class StateEvictionHandler {
         // world unless they are drained here.
         sweepCounter = 0;
         ScrollLPTracker.clearAll();
+        com.otectus.arsnspells.spell.CastValidationScope.clearAll();
         ResonanceManager.clearAll();
         CrossCastContext.clearAll();
         ArsSpellScalingHandler.clearAll();

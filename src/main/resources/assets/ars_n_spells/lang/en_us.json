@@ -36,6 +36,8 @@
   "commands.ans.info.affinity.none": "Affinity: (none yet)",
   "commands.ans.info.affinity.line": "  %s (%s): %s",
   "commands.ans.info.schools": "Registered Iron's schools: %s",
+  "commands.ans.info.irons_raw_mana": "Iron's raw mana: %s",
+  "commands.ans.info.irons_unavailable": "Iron's: <inspection failed: %s>",
   "commands.ans.mode.current": "Current mana unification mode: %s",
   "commands.ans.mode.set.success": "Mana unification mode set to %s (now active: %s)",
   "commands.ans.mode.set.invalid": "Unknown mode '%s'. Valid: iss_primary, ars_primary, hybrid, separate, disabled",

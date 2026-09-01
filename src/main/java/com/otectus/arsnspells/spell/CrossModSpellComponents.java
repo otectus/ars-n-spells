@@ -49,6 +49,29 @@ public final class CrossModSpellComponents {
      * and cooldown are owned by the delegated Ars cast. Charging Iron's rules against
      * the placeholder double-bills the player and attributes the cast to the wrong school.
      */
+    /**
+     * Current schema for ANS-written item data. Bump when the shape of what this class writes
+     * changes in a way a migration has to notice.
+     */
+    public static final int SCHEMA_VERSION = 1;
+
+    /** The schema an item was last stamped with, or 0 if it has never been stamped. */
+    public static int schemaVersion(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return 0;
+        }
+        Integer stamped = stack.get(ModDataComponents.SCHEMA_VERSION.get());
+        return stamped == null ? 0 : stamped;
+    }
+
+    /** Record that this item has been looked over by the current build. */
+    public static void stampSchemaVersion(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        stack.set(ModDataComponents.SCHEMA_VERSION.get(), SCHEMA_VERSION);
+    }
+
     public static boolean isArsCrossProxyId(String spellId) {
         return spellId != null && spellId.startsWith(PROXY_SPELL_ID_PREFIX);
     }

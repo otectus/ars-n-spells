@@ -68,12 +68,35 @@ class AnsConfigStructureTest {
     }
 
     @Test
-    void arsVirtueAuraMultiplier_exists() {
-        try {
-            Field f = AnsConfig.class.getDeclaredField("ARS_VIRTUE_AURA_MULTIPLIER");
-            assertNotNull(f, "ARS_VIRTUE_AURA_MULTIPLIER must exist after the aura refactor");
-        } catch (NoSuchFieldException e) {
-            fail("AnsConfig.ARS_VIRTUE_AURA_MULTIPLIER must exist (replacement knob for the deleted aura system)");
+    void covenantConfigKeys_areRemoved() {
+        // The whole Covenant of the Seven (LP / aura / ring / blasphemy) key block went with
+        // its source. It had been kept on the grounds that re-enabling was a compile-scope
+        // change; once the source was deleted, the keys were advertising a subsystem that is
+        // not coming back from this repository.
+        //
+        // VIRTUE_RING_DISCOUNT is deliberately NOT in this list: despite the name it is the
+        // generic per-curio discount, it has live readers, and renaming the key would reset
+        // the setting on every server that has tuned it.
+        String[] removed = {
+            "ENABLE_LP_SYSTEM", "LP_SOURCE_MODE", "DEATH_ON_INSUFFICIENT_LP",
+            "SHOW_LP_COST_MESSAGES", "HIDE_MANA_BAR_WITH_RING",
+            "ARS_LP_BASE_MULTIPLIER", "ARS_LP_TIER1_MULTIPLIER", "ARS_LP_TIER2_MULTIPLIER",
+            "ARS_LP_TIER3_MULTIPLIER", "ARS_LP_MINIMUM_COST",
+            "IRONS_LP_BASE_MULTIPLIER", "IRONS_LP_PER_LEVEL_MULTIPLIER", "IRONS_LP_MINIMUM_COST",
+            "IRONS_LP_COMMON_MULTIPLIER", "IRONS_LP_UNCOMMON_MULTIPLIER",
+            "IRONS_LP_RARE_MULTIPLIER", "IRONS_LP_EPIC_MULTIPLIER",
+            "IRONS_LP_LEGENDARY_MULTIPLIER",
+            "ENABLE_VIRTUE_AURA_SYSTEM", "ARS_VIRTUE_AURA_MULTIPLIER", "AURA_FAILURE_MODE",
+            "BLASPHEMY_DISCOUNT", "BLASPHEMY_MATCHING_SCHOOL_BONUS", "BLASPHEMY_LP_DISCOUNT",
+        };
+        for (String name : removed) {
+            try {
+                AnsConfig.class.getDeclaredField(name);
+                fail(name + " belongs to a subsystem this build does not ship and must not be "
+                    + "generated into every server's TOML");
+            } catch (NoSuchFieldException expected) {
+                // good - field is gone
+            }
         }
     }
 
@@ -171,17 +194,18 @@ class AnsConfigStructureTest {
      * being dropped), and {@code read_curio_attribute_modifiers} (port-added, removed because
      * the behaviour it described is unconditional and inseparable).
      *
-     * <p>The Covenant of the Seven (LP / aura) block is exempt by design: Covenant has no
-     * 1.21.1 release, so those keys are deliberately inert and stay declared so an existing
-     * server's TOML carries over untouched. The exemption is scoped to the fields declared
-     * below that block's marker comment, so a new dead key cannot hide inside it.
+     * <p>There are no exemptions. The Covenant of the Seven (LP / aura) block was previously
+     * excluded because re-enabling it was meant to be a compile-scope change; that source has
+     * since been deleted along with the rest of the integrations for mods with no 1.21.1
+     * build, so its 24 keys went with it.
      */
     @Test
     void everyNonCovenantConfigKeyHasAReader() throws IOException {
-        String config = Files.readString(TestPaths.of(CONFIG_SOURCE));
-        int covenantMarker = config.indexOf("---- Covenant of the Seven");
-        assertTrue(covenantMarker > 0, "the Covenant exemption marker must exist");
-        String active = config.substring(0, covenantMarker);
+        // No exemptions any more. The Covenant of the Seven block used to be excluded on the
+        // grounds that re-enabling it was a compile-scope change; its source has since been
+        // deleted, so those keys were advertising a subsystem that is not coming back from
+        // this repository. Every declared key is now expected to have a reader.
+        String active = Files.readString(TestPaths.of(CONFIG_SOURCE));
 
         Set<String> declared = new LinkedHashSet<>();
         Matcher m = Pattern.compile(

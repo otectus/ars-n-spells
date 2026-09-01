@@ -25,22 +25,6 @@ import net.minecraft.world.level.block.Block;
  */
 public final class ModTags {
 
-    /** Rings that trigger the Cursed Ring LP-cost path (Covenant / Enigmatic Legacy by default). */
-    public static final TagKey<Item> CURSED_RINGS =
-        ItemTags.create(ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "cursed_rings"));
-
-    /** Rings that trigger the Virtue Ring aura-cost path. */
-    public static final TagKey<Item> VIRTUE_RINGS =
-        ItemTags.create(ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "virtue_rings"));
-
-    /**
-     * Blasphemy curios granting school discounts. School matching is by item
-     * path suffix {@code <school>_blasphemy} (any namespace), so pack-added
-     * entries school-match by following that naming convention.
-     */
-    public static final TagKey<Item> BLASPHEMY_CURIOS =
-        ItemTags.create(ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "blasphemy_curios"));
-
     /**
      * Items that count as Iron's spell books for binding.
      *

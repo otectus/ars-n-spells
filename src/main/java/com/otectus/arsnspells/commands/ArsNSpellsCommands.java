@@ -187,6 +187,31 @@ public class ArsNSpellsCommands {
                 () -> Component.translatable("commands.ans.info.schools", schoolCount), false);
         }
 
+        // Iron's raw mana: what Iron's natively sees, before any ANS adjustment. This is the
+        // number to look at for "the spell silently does not cast" - if it is below the spell
+        // cost, Iron's refuses at canBeCastedBy with cast_error_mana, before any of this mod's
+        // event handlers get a say.
+        //
+        // Reflection because this command class is loaded on Iron's-less servers too; a direct
+        // import would stop the whole class from loading.
+        if (ModPresence.isLoaded(CompatIds.IRONS_SPELLBOOKS)) {
+            try {
+                Class<?> magicDataClass =
+                    Class.forName("io.redspace.ironsspellbooks.api.magic.MagicData");
+                Object md = magicDataClass
+                    .getMethod("getPlayerMagicData", net.minecraft.world.entity.LivingEntity.class)
+                    .invoke(null, target);
+                final float rawMana = (Float) magicDataClass.getMethod("getMana").invoke(md);
+                context.getSource().sendSuccess(
+                    () -> Component.translatable("commands.ans.info.irons_raw_mana",
+                        String.format("%.1f", rawMana)).withStyle(ChatFormatting.GRAY), false);
+            } catch (Throwable t) {
+                context.getSource().sendSuccess(
+                    () -> Component.translatable("commands.ans.info.irons_unavailable",
+                        t.getClass().getSimpleName()).withStyle(ChatFormatting.RED), false);
+            }
+        }
+
         return 1;
     }
 

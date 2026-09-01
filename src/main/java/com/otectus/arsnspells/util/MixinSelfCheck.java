@@ -11,20 +11,32 @@ import java.util.List;
 /**
  * Startup tripwire for silently-skipped mixins.
  *
- * <p>Every injection in this mod carries {@code require = 0}, deliberately: a target that
- * drifted must not abort mod load and take Ars Nouveau or Iron's Spellbooks down with it.
- * The cost of that choice is that drift is <em>invisible</em> — the feature simply stops
- * working, with nothing in the log. That is not hypothetical here: {@code
- * neoforge.mods.toml} accepts Iron's {@code [1.21.1-3.15.0, 1.21.1-4.0.0)}, eleven published
- * releases, and this mod mixes into Iron's non-API internals
- * ({@code gui.inscription_table.*}, {@code item.Scroll}, {@code MagicData}'s private
- * {@code serverPlayer} field). Only 3.16.3 has ever been verified.
+ * <p>Every injection in this mod carries {@code require = 0}, and the Iron's half now lives in
+ * a {@code "required": false} config — both deliberately, so that a drifted target degrades one
+ * feature instead of aborting mod load for the whole pack. The cost of that choice is that
+ * failure is <em>invisible</em>: the feature simply stops working, with nothing in the log.
  *
- * <p>So this checks, at common setup, that every method a mixin targets still exists on the
- * class it targets, and that the one interface-injecting mixin actually attached. It cannot
- * prove an injection point inside a method still matches — nothing short of running the
- * feature can — but a renamed or removed method is the drift that actually happens across
- * releases, and it is exactly the drift {@code require = 0} hides.
+ * <p><b>What this checks, and why the obvious check is worthless.</b> An earlier version of
+ * this class asked "does the method the mixin targets still exist?". That answers the wrong
+ * question twice over. It cannot see whether the injection actually applied, and for a target
+ * inherited from a superclass — {@code Scroll.use}, inherited from vanilla {@code Item} — a
+ * hierarchy-walking lookup finds the inherited method and reports OK even when the mixin never
+ * applied at all. That is precisely the failure it appeared to cover: on the 1.20.1 line
+ * {@code MixinScrollItem} matched nothing in a released jar and scrolls cast completely free
+ * for several releases, silently.
+ *
+ * <p>So instead this asks the direct question: <b>did our code get merged into the target
+ * class?</b> When a mixin applies, its handler methods are merged into the target, where they
+ * are visible via {@code getDeclaredMethods()}. A target class with no {@code arsnspells$}
+ * member did not receive our mixin, full stop.
+ *
+ * <p>{@code Scroll} gets a second, mapping-independent probe: whether it still overrides
+ * {@code use} at all, matched on the parameter signature rather than the name, since the name
+ * is what differs between a development and a production mapping set.
+ *
+ * <p>Runs at {@code FMLLoadCompleteEvent}, not common setup. Inspecting a class loads it, and
+ * loading Iron's classes early can interfere with other mods' mixins that have not been applied
+ * yet. By load-complete every config in the pack has been through PREPARE and APPLY.
  *
  * <p>Failures are logged, never thrown. A degraded integration is still better than a crash,
  * and the point is to give a user one line to grep for.
@@ -34,119 +46,135 @@ public final class MixinSelfCheck {
 
     private MixinSelfCheck() {}
 
-    /** One mixin's target: the class it injects into and the methods it names. */
-    private record Target(String mixin, String targetClass, String... methods) {}
+    /** A mixin target: the human-facing feature name and the class our code merges into. */
+    private record Probe(String feature, String targetClass) {}
 
-    private static final Target[] ARS_TARGETS = {
-        new Target("MixinManaCapability",
-            "com.hollingsworth.arsnouveau.common.capability.ManaCap",
-            "getCurrentMana", "setMana", "addMana", "removeMana", "getMaxMana", "setMaxMana"),
-        new Target("MixinSpellResolverMana",
-            "com.hollingsworth.arsnouveau.api.spell.SpellResolver", "expendMana"),
-        new Target("MixinSpellResolverContext",
-            "com.hollingsworth.arsnouveau.api.spell.SpellResolver", "canCast"),
-        new Target("MixinSpellResolverPreCast",
-            "com.hollingsworth.arsnouveau.api.spell.SpellResolver", "canCast"),
+    private static final Probe[] ARS_PROBES = {
+        new Probe("ManaCap.bridge", "com.hollingsworth.arsnouveau.common.capability.ManaCap"),
+        new Probe("SpellResolver.cost", "com.hollingsworth.arsnouveau.api.spell.SpellResolver"),
     };
 
-    private static final Target[] IRONS_TARGETS = {
-        new Target("MixinIronsSpellDamage",
-            "io.redspace.ironsspellbooks.api.spells.AbstractSpell", "getSpellPower"),
-        new Target("MixinIronsCastValidation",
-            "io.redspace.ironsspellbooks.api.spells.AbstractSpell", "canBeCastedBy"),
-        new Target("MixinIronsMagicDataMana",
-            "io.redspace.ironsspellbooks.api.magic.MagicData", "getMana", "setMana", "addMana"),
-        new Target("MixinScrollItem",
-            "io.redspace.ironsspellbooks.item.Scroll", "use"),
-        new Target("MixinInscriptionTableMenu",
-            "io.redspace.ironsspellbooks.gui.inscription_table.InscriptionTableMenu",
-            "clickMenuButton", "doInscription"),
+    private static final Probe[] IRONS_PROBES = {
+        new Probe("MagicData.mana", "io.redspace.ironsspellbooks.api.magic.MagicData"),
+        new Probe("AbstractSpell.castGate", "io.redspace.ironsspellbooks.api.spells.AbstractSpell"),
+        new Probe("Scroll.cost", "io.redspace.ironsspellbooks.item.Scroll"),
+        new Probe("InscriptionTable.guard",
+            "io.redspace.ironsspellbooks.gui.inscription_table.InscriptionTableMenu"),
     };
 
     /**
-     * Run the check and log the result. Call once, at common setup — late enough that both
-     * mods' classes are loadable, early enough that the line lands near the rest of this
-     * mod's startup banner.
+     * Run the check and log the result. Call once, from {@code FMLLoadCompleteEvent}.
      */
     public static void run() {
-        List<String> problems = new ArrayList<>();
+        StringBuilder report = new StringBuilder("[SelfCheck] ");
+        List<String> degraded = new ArrayList<>();
 
-        checkAll(ARS_TARGETS, problems);
-        if (IronsCompat.isLoaded()) {
-            checkAll(IRONS_TARGETS, problems);
-            checkMagicDataAccessor(problems);
+        for (Probe probe : ARS_PROBES) {
+            appendProbe(report, degraded, probe);
         }
 
-        if (problems.isEmpty()) {
-            LOGGER.info("[SelfCheck] Mixin targets OK ({} checked{})",
-                ARS_TARGETS.length + (IronsCompat.isLoaded() ? IRONS_TARGETS.length + 1 : 0),
-                IronsCompat.isLoaded() ? "" : ", Iron's absent");
+        if (!IronsCompat.isLoaded()) {
+            report.append(" | Iron's=absent");
+            LOGGER.info(report.toString());
             return;
         }
-        LOGGER.error("========================================");
-        LOGGER.error("[SelfCheck] Mixin targets have drifted - these features are silently OFF:");
-        for (String problem : problems) {
-            LOGGER.error("[SelfCheck]   {}", problem);
+
+        for (Probe probe : IRONS_PROBES) {
+            appendProbe(report, degraded, probe);
         }
-        LOGGER.error("[SelfCheck] This usually means an Ars Nouveau or Iron's Spellbooks version");
-        LOGGER.error("[SelfCheck] outside what this build was tested against. Injections use");
-        LOGGER.error("[SelfCheck] require = 0 so load did not fail, but the features are inert.");
-        LOGGER.error("========================================");
+        appendAccessorProbe(report, degraded);
+        appendScrollUseProbe(report, degraded);
+
+        if (degraded.isEmpty()) {
+            LOGGER.info(report.toString());
+            return;
+        }
+        LOGGER.error(report.toString());
+        LOGGER.error("[SelfCheck] These features are silently OFF: {}", String.join(", ", degraded));
+        LOGGER.error("[SelfCheck] Injections use require = 0 and the Iron's mixins are in a");
+        LOGGER.error("[SelfCheck] non-required config, so load did not fail - but the features are inert.");
+        LOGGER.error("[SelfCheck] The usual cause is another mod's @Overwrite on the same method,");
+        LOGGER.error("[SelfCheck] or an Ars Nouveau / Iron's Spellbooks version outside what this");
+        LOGGER.error("[SelfCheck] build was tested against. Check the early-startup log for");
+        LOGGER.error("[SelfCheck] 'ars_n_spells.compat.mixins.json' warnings.");
     }
 
-    private static void checkAll(Target[] targets, List<String> problems) {
-        for (Target target : targets) {
-            Class<?> clazz;
-            try {
-                clazz = Class.forName(target.targetClass(), false,
-                    MixinSelfCheck.class.getClassLoader());
-            } catch (Throwable notPresent) {
-                problems.add(target.mixin() + ": target class " + target.targetClass()
-                    + " is absent");
-                continue;
-            }
-            for (String method : target.methods()) {
-                if (!hasMethod(clazz, method)) {
-                    problems.add(target.mixin() + ": " + target.targetClass()
-                        + "#" + method + " no longer exists");
+    /** Did any of our handlers get merged into the target class? */
+    private static void appendProbe(StringBuilder report, List<String> degraded, Probe probe) {
+        report.append(" | ").append(probe.feature()).append('=');
+        try {
+            Class<?> target = Class.forName(probe.targetClass(), false,
+                MixinSelfCheck.class.getClassLoader());
+            // getDeclaredMethods, NOT a hierarchy walk: a merged handler lands on the target
+            // class itself, and walking up would let an unrelated superclass member pass.
+            for (Method m : target.getDeclaredMethods()) {
+                if (m.getName().contains("arsnspells$")) {
+                    report.append("OK");
+                    return;
                 }
             }
+            report.append("NOT-APPLIED");
+            degraded.add(probe.feature());
+        } catch (Throwable t) {
+            report.append("ERROR(").append(t.getClass().getSimpleName()).append(')');
+            degraded.add(probe.feature());
         }
     }
 
     /**
-     * The accessor mixin injects an interface onto Iron's {@code MagicData}. If it did not
-     * apply, {@code isAssignableFrom} is false and every cast through it fails at runtime -
-     * which is the one case here that reflection can prove outright.
+     * The accessor mixin injects an interface onto {@code MagicData}. If it did not apply,
+     * {@code isAssignableFrom} is false and every cast through it fails at runtime — the one
+     * case here that reflection can prove outright.
      */
-    private static void checkMagicDataAccessor(List<String> problems) {
+    private static void appendAccessorProbe(StringBuilder report, List<String> degraded) {
+        report.append(" | MagicDataAccessor=");
         try {
             Class<?> magicData = Class.forName("io.redspace.ironsspellbooks.api.magic.MagicData",
                 false, MixinSelfCheck.class.getClassLoader());
             Class<?> accessor = Class.forName(
                 "com.otectus.arsnspells.mixin.irons.MagicDataAccessor",
                 false, MixinSelfCheck.class.getClassLoader());
-            if (!accessor.isAssignableFrom(magicData)) {
-                problems.add("MagicDataAccessor: not attached to MagicData");
+            if (accessor.isAssignableFrom(magicData)) {
+                report.append("OK");
+                return;
             }
+            report.append("NOT-ATTACHED");
+            degraded.add("MagicDataAccessor");
         } catch (Throwable t) {
-            problems.add("MagicDataAccessor: could not verify (" + t.getClass().getSimpleName() + ")");
+            report.append("ERROR(").append(t.getClass().getSimpleName()).append(')');
+            degraded.add("MagicDataAccessor");
         }
     }
 
     /**
-     * Name-only lookup, walking the hierarchy. Descriptors are not compared: a mixin's
-     * {@code method = "name"} form matches by name too, and an overload set that gained or
-     * lost a parameter is drift this check is not trying to adjudicate.
+     * Does {@code Scroll} still override {@code use}?
+     *
+     * <p>{@code MixinScrollItem} injects into that override, and the method's <em>name</em> is
+     * mapping-dependent. Matching on the parameter signature instead keeps the probe valid in
+     * both a development and a production mapping set — which is the difference that let scroll
+     * cost enforcement silently no-op on the 1.20.1 line.
      */
-    private static boolean hasMethod(Class<?> clazz, String name) {
-        for (Class<?> c = clazz; c != null && c != Object.class; c = c.getSuperclass()) {
-            for (Method m : c.getDeclaredMethods()) {
-                if (m.getName().equals(name)) {
-                    return true;
+    private static void appendScrollUseProbe(StringBuilder report, List<String> degraded) {
+        report.append(" | Scroll.use=");
+        try {
+            ClassLoader cl = MixinSelfCheck.class.getClassLoader();
+            Class<?> scroll = Class.forName("io.redspace.ironsspellbooks.item.Scroll", false, cl);
+            Class<?> level = Class.forName("net.minecraft.world.level.Level", false, cl);
+            Class<?> player = Class.forName("net.minecraft.world.entity.player.Player", false, cl);
+            Class<?> hand = Class.forName("net.minecraft.world.InteractionHand", false, cl);
+            for (Method m : scroll.getDeclaredMethods()) {
+                Class<?>[] params = m.getParameterTypes();
+                if (params.length == 3 && params[0] == level && params[1] == player
+                    && params[2] == hand) {
+                    report.append("OK");
+                    return;
                 }
             }
+            report.append("MISSING");
+            degraded.add("Scroll.use (scroll costs are not being charged)");
+        } catch (Throwable t) {
+            report.append("ERROR(").append(t.getClass().getSimpleName()).append(')');
+            degraded.add("Scroll.use");
         }
-        return false;
     }
 }

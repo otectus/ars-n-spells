@@ -166,7 +166,7 @@ test {
     systemProperty 'ans.projectDir', projectDir.absolutePath
 }
 
-// `src/covenant-disabled/` is deliberately NOT a source set. It holds the 1.20.1 Covenant of
+
 // the Seven integration (LP / aura / blasphemy curios), kept as a reference because Covenant has
 // no 1.21.1 release to compile or test against. Nothing there is compiled or shipped; see
 // src/covenant-disabled/README.md for what re-enabling involves. This block exists so the

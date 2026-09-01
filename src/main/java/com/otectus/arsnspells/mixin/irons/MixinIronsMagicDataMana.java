@@ -2,6 +2,7 @@ package com.otectus.arsnspells.mixin.irons;
 
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.config.ManaUnificationMode;
+import com.otectus.arsnspells.spell.CastValidationScope;
 import com.otectus.arsnspells.spell.CrossCastContext;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
 import net.minecraft.server.level.ServerPlayer;
@@ -37,19 +38,49 @@ public abstract class MixinIronsMagicDataMana {
         CrossCastContext.ManaCheckOverride override = CrossCastContext.getManaCheckOverride(player);
         if (override != null) {
             if (override.isUnlimited()) {
-                cir.setReturnValue(Float.MAX_VALUE);
+                cir.setReturnValue(CastValidationScope.apply(this, Float.MAX_VALUE));
                 return;
             }
             if (override.issPercent > 0.0f && Math.abs(override.issPercent - 1.0f) > 1.0e-4f) {
-                cir.setReturnValue(mana / override.issPercent);
+                cir.setReturnValue(CastValidationScope.apply(this, mana / override.issPercent));
                 return;
             }
         }
 
         if (!shouldRedirectToArs()) {
+            // Fall through to the real body. Any cast-gate adjustment is applied by
+            // arsnspells$scaleManaForCastGate on the way out, so that it acts on whatever
+            // the body actually returned - including another mod's overwritten value.
             return;
         }
-        cir.setReturnValue(BridgeManager.getBridge().getMana(player));
+        cir.setReturnValue(CastValidationScope.apply(this, BridgeManager.getBridge().getMana(player)));
+    }
+
+    /**
+     * Applies the cast-gate adjustment to the value the real {@code getMana} body produced.
+     *
+     * <p>This is the second, independent layer of the {@code canBeCastedBy} rewrite. The HEAD
+     * hook above covers the case where ANS supplies the value; this covers the case where the
+     * real body does - including a body another mod has overwritten, which is the situation
+     * {@link CastValidationScope} exists to survive.
+     *
+     * <p>It only runs when {@link #arsnspells$getMana} did <em>not</em> cancel: a cancelling
+     * HEAD callback returns before the body's RETURN instructions are reached, so the two
+     * hooks never both fire for one call and the adjustment is applied exactly once either way.
+     */
+    @Inject(method = "getMana", at = @At("RETURN"), cancellable = true, require = 0)
+    private void arsnspells$scaleManaForCastGate(CallbackInfoReturnable<Float> cir) {
+        if (serverPlayer == null) {
+            return;
+        }
+        if (!CastValidationScope.isActive(this)) {
+            return;
+        }
+        float value = cir.getReturnValueF();
+        float adjusted = CastValidationScope.apply(this, value);
+        if (adjusted != value) {
+            cir.setReturnValue(adjusted);
+        }
     }
 
     @Inject(method = "setMana", at = @At("HEAD"), cancellable = true, require = 0)
@@ -75,8 +106,10 @@ public abstract class MixinIronsMagicDataMana {
         if (!shouldRedirectToArs()) {
             return;
         }
-        float current = BridgeManager.getBridge().getMana(player);
-        BridgeManager.getBridge().setMana(player, current + amount);
+        // Delegate to the bridge's atomic add - do NOT get+set here or we lose any concurrent
+        // regen/buff landing between the read and the write (the exact race
+        // ArsNativeBridge/IronsBridge.addMana were written to avoid).
+        BridgeManager.getBridge().addMana(player, amount);
         this.mana = BridgeManager.getBridge().getMana(player);
         ci.cancel();
     }

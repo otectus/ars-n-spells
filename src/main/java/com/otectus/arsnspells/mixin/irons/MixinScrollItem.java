@@ -47,7 +47,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * not carried here; {@code lp_only} consequently behaves as {@code free}. The
  * {@link ScrollLPTracker} entry still carries {@code lpCost}/{@code deathMode} so
  * re-enabling the subsystem does not need a staging-format change. See
- * {@code src/covenant-disabled/README.md}.
+ * Covenant of the Seven, which has no 1.21.1 release.
  */
 @Mixin(value = io.redspace.ironsspellbooks.item.Scroll.class, remap = false)
 public class MixinScrollItem {

@@ -74,6 +74,13 @@ public final class CarrierReconciler {
         boolean containerRepaired = repairCarrierContainer(stack);
         boolean orphansRemoved = removeOrphanProxySlots(stack);
 
+        if (containerRepaired || orphansRemoved
+            || CrossModSpellComponents.schemaVersion(stack) < CrossModSpellComponents.SCHEMA_VERSION) {
+            // Either we just repaired it, or nothing was wrong with it and it had never been
+            // checked. Either way, record that this build has now seen it.
+            CrossModSpellComponents.stampSchemaVersion(stack);
+        }
+
         if (containerRepaired && orphansRemoved) {
             return Outcome.REPAIRED_BOTH;
         }

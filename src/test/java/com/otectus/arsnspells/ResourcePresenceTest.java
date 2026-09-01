@@ -42,7 +42,6 @@ class ResourcePresenceTest {
             "/data/ars_n_spells/recipe/spell_loom.json",
             "/data/ars_n_spells/tags/item/curio_spell_discount.json",
             "/data/ars_n_spells/tags/item/irons_spell_books.json",
-            "/data/ars_n_spells/tags/entity_type/magical_companions.json",
             "/data/ars_n_spells/loot_table/blocks/spell_loom.json",
             "/data/ars_n_spells/advancement/recipes/misc/spell_loom.json",
             "/assets/ars_n_spells/blockstates/spell_loom.json",
