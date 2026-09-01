@@ -1,6 +1,8 @@
 package com.otectus.arsnspells.spell;
 
+import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.compat.IronsCompat;
+import com.otectus.arsnspells.util.ArsSpellIntegrity;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -199,6 +201,33 @@ public final class IronsBookBindingUtil {
      * "no cap" (still bounded by {@link CrossModSpellComponents#PROXY_POOL_SIZE},
      * the number of distinct native-wheel slots that can exist).
      */
+    /**
+     * True when {@code arsTag} decodes to a spell that can actually be cast: a non-empty
+     * recipe with a cast method, whose glyphs all still resolve.
+     *
+     * <p>Checked before anything is consumed - by the binding ritual, the bind command and
+     * the cast gate - because the failure it guards against is silent. Ars 5.x substitutes
+     * {@code EffectBreak} for a glyph whose mod has been removed, so the payload still
+     * decodes, still passes {@code isValid()}, and casts something the player never built.
+     * See {@link ArsSpellIntegrity}.
+     */
+    public static boolean isCastableArsPayload(CompoundTag arsTag) {
+        if (arsTag == null || arsTag.isEmpty()) {
+            return false;
+        }
+        try {
+            if (!ArsSpellIntegrity.isIntact(arsTag)) {
+                return false;
+            }
+            Spell spell = CrossCastingHandler.decodeArsSpell(arsTag);
+            return spell != null && !spell.isEmpty() && spell.getCastMethod() != null;
+        } catch (Throwable t) {
+            // Throwable: a linkage error from an Ars/addon skew must read as "not castable",
+            // not propagate into a ritual that is about to consume the player's items.
+            return false;
+        }
+    }
+
     public static int effectiveProxyCeiling(int maxCap) {
         if (maxCap < 0) {
             return CrossModSpellComponents.PROXY_POOL_SIZE;

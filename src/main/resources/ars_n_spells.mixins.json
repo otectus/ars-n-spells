@@ -14,10 +14,12 @@
     "irons.MixinIronsMagicDataMana",
     "irons.MagicDataAccessor",
     "irons.MixinIronsCastValidation",
-    "irons.MixinScrollItem"
+    "irons.MixinScrollItem",
+    "irons.MixinInscriptionTableMenu"
   ],
   "client": [
-    "irons.MixinAbstractSpellArsIcon"
+    "irons.MixinAbstractSpellArsIcon",
+    "irons.MixinInscriptionTableScreen"
   ],
   "injectors": {
     "defaultRequire": 1

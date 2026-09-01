@@ -128,5 +128,13 @@
   "advancements.ars_n_spells.bind_spell.title": "A Foreign Chapter",
   "advancements.ars_n_spells.bind_spell.description": "Bind an inscribed scroll into an Iron's spellbook",
   "advancements.ars_n_spells.first_cross_cast.title": "Two Schools, One Voice",
-  "advancements.ars_n_spells.first_cross_cast.description": "Cast an Ars Nouveau spell through Iron's Spellbooks"
+  "advancements.ars_n_spells.first_cross_cast.description": "Cast an Ars Nouveau spell through Iron's Spellbooks",
+  "message.ars_n_spells.crosscast.invalid.missing_glyphs": "Cross-cast failed: this spell uses glyphs that are no longer installed (%1$s). Reinstall the addon that adds them, or rebuild the spell.",
+  "message.ars_n_spells.crosscast.invalid.ars_unreadable": "Cross-cast failed: the bound Ars spell could not be read. Rebind it from a freshly exported scroll.",
+  "ritual.ars_n_spells.spellbook_binding.error.uncastable": "Spellbook Binding: %1$s carries an Ars spell that can't be read (exported on a different Ars Nouveau version, or a glyph's mod was removed?). Re-export the spell and use the new scroll.",
+  "ritual.ars_n_spells.spellbook_binding.error.bind_failed": "Spellbook Binding: %1$s could not accept the spell. The book is unchanged - check the server log for details.",
+  "commands.ans.bind.book_full": "That spell book already holds the maximum of %1$s Ars spells.",
+  "commands.ans.bind.uncastable": "That scroll's Ars spell can't be read (exported on a different Ars Nouveau version, or a glyph's mod was removed?). Re-export the spell and bind the new scroll.",
+  "message.ars_n_spells.inscription.ans_carrier": "This scroll carries an Ars Nouveau spell, which the Inscription Table can't read. Bind it to a spell book with the Spellbook Binding ritual or /ans bind_scroll_to_irons_book.",
+  "message.ars_n_spells.inscription.no_container": "This scroll is missing its spell data and can't be inscribed. It was created by an older version of Ars 'n' Spells - export the spell again at a Spell Loom."
 }

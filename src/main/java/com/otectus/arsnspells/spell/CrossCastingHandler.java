@@ -13,6 +13,7 @@ import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.network.CrossCastRequestPayload;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.util.AdvancementUtil;
+import com.otectus.arsnspells.util.ArsSpellIntegrity;
 import com.otectus.arsnspells.util.CrossCastTrace;
 import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
@@ -366,6 +367,22 @@ public class CrossCastingHandler {
         if (tag.isEmpty()) {
             return false;
         }
+        // Checked BEFORE decoding, because decoding is where the evidence is lost: Ars 5.x
+        // substitutes EffectBreak for any glyph whose mod is gone, so the decoded Spell is the
+        // right length, passes isValid(), casts, and does something the player never built.
+        List<String> missingGlyphs = ArsSpellIntegrity.missingGlyphIds(tag.get());
+        if (!missingGlyphs.isEmpty()) {
+            LOGGER.warn("Cross-mod Ars spell references {} glyph(s) that are no longer registered: {}",
+                missingGlyphs.size(), missingGlyphs);
+            if (player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.displayClientMessage(
+                    Component.translatable("message.ars_n_spells.crosscast.invalid.missing_glyphs",
+                        ArsSpellIntegrity.describeMissing(missingGlyphs))
+                        .withStyle(ChatFormatting.RED), true);
+            }
+            return false;
+        }
+
         Spell spell = decodeArsSpell(tag.get());
         if (spell == null || spell.size() == 0) {
             return false;

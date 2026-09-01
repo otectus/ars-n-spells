@@ -115,6 +115,16 @@ public class SpellbookBindingRitual extends AbstractRitual {
             return;
         }
 
+        // 3.0.3: refuse an unreadable payload BEFORE anything is consumed. Ars 5.x
+        // substitutes EffectBreak for a glyph whose mod is gone, so a stale carrier still
+        // decodes and would bind an entry that casts something the player never built - and
+        // the scroll would already have been eaten by the time anyone noticed.
+        if (!IronsBookBindingUtil.isCastableArsPayload(arsTag)) {
+            RitualFeedback.error(level, pos, LANG_PREFIX + "error.uncastable",
+                scrollStack.getHoverName().getString());
+            return;
+        }
+
         // Validation complete -- mutation begins here. The util allocates a
         // native-wheel proxy slot and mirrors the entry (with the scroll's chosen
         // display name/nature/icon) into Iron's container.

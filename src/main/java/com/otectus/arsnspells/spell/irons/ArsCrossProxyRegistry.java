@@ -85,5 +85,40 @@ public final class ArsCrossProxyRegistry {
 
     public static void register(IEventBus modBus) {
         SPELLS.register(modBus);
+        // LOWEST so anything another listener added is already present to remove.
+        modBus.addListener(net.neoforged.bus.api.EventPriority.LOWEST,
+            ArsCrossProxyRegistry::hideProxyScrollsFromCreativeTabs);
+    }
+
+    /**
+     * Strip generated {@code ars_cross_*} scrolls out of creative tab contents.
+     *
+     * <p>Iron's builds one scroll per enabled spell into its Scrolls tab, and the proxies are
+     * enabled by necessity (the native wheel resolves them by id). That put eight ghost
+     * scrolls in the creative menu and, because both JEI and EMI source their ingredient
+     * lists from creative tabs, in every recipe viewer as well.
+     *
+     * <p>Every tab is swept rather than only Iron's, so a modpack that rehomes scrolls into a
+     * custom tab is covered too. Entries are collected before removal because
+     * {@code getParentEntries()} is an unmodifiable view over the live backing set. Removal
+     * asks for {@code PARENT_AND_SEARCH_TABS}: unlike the ANS items in ModCreativeTabs, these
+     * ghosts have no legitimate home, so they should not survive in the search index either.
+     */
+    private static void hideProxyScrollsFromCreativeTabs(
+            net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent event) {
+        java.util.List<net.minecraft.world.item.ItemStack> ghosts = new java.util.ArrayList<>();
+        for (net.minecraft.world.item.ItemStack stack : event.getParentEntries()) {
+            if (ArsCrossProxyHiding.isProxyOnlyStack(stack)) {
+                ghosts.add(stack);
+            }
+        }
+        for (net.minecraft.world.item.ItemStack stack : event.getSearchEntries()) {
+            if (!ghosts.contains(stack) && ArsCrossProxyHiding.isProxyOnlyStack(stack)) {
+                ghosts.add(stack);
+            }
+        }
+        for (net.minecraft.world.item.ItemStack ghost : ghosts) {
+            event.remove(ghost, net.minecraft.world.item.CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
+        }
     }
 }

@@ -274,6 +274,14 @@ public class ArsNSpellsCommands {
             return 0;
         }
 
+        // 3.0.3: refuse an unreadable payload before the scroll is consumed - same gate the
+        // binding ritual applies. See IronsBookBindingUtil.isCastableArsPayload.
+        if (!com.otectus.arsnspells.spell.IronsBookBindingUtil
+                .isCastableArsPayload(entry.get().arsSpellTag().get())) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.bind.uncastable"));
+            return 0;
+        }
+
         int maxCap = AnsConfig.MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK.get();
         com.otectus.arsnspells.spell.IronsBookBindingUtil.AppendResult result =
             com.otectus.arsnspells.spell.IronsBookBindingUtil.appendArsSpellToBook(
@@ -289,6 +297,11 @@ public class ArsNSpellsCommands {
                 context.getSource().sendFailure(Component.translatable("commands.ans.bind.duplicate"));
                 return 0;
             case BOOK_FULL:
+                // 3.0.3: distinct from FAILED. "the book is full" is actionable; "it failed"
+                // sends the player looking for a bug that is not there.
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.book_full",
+                    com.otectus.arsnspells.spell.IronsBookBindingUtil.effectiveProxyCeiling(maxCap)));
+                return 0;
             case FAILED:
             default:
                 context.getSource().sendFailure(Component.translatable("commands.ans.bind.failed"));
