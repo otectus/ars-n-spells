@@ -1,5 +1,7 @@
 package com.otectus.arsnspells.spell.irons;
 
+import com.otectus.arsnspells.spell.CrossModSpellComponents;
+import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
 import io.redspace.ironsspellbooks.api.spells.SpellData;
 import io.redspace.ironsspellbooks.api.spells.SpellSlot;
@@ -59,6 +61,45 @@ public final class ArsCrossProxyHiding {
             sawProxy = true;
         }
         return sawProxy;
+    }
+
+    /**
+     * Turn a stray proxy-bearing scroll back into a blank Iron's scroll, returning true when
+     * the stack was rewritten.
+     *
+     * <p><b>What these are.</b> Until {@code ArsCrossProxySpell.allowLooting()} existed, the
+     * proxies passed Iron's {@code SpellFilter} and could be rolled into any
+     * {@code randomize_spell} table - chests, scroll pouches, mob drops, wandering trades. The
+     * resulting scroll has no book behind it, so it can never do anything but fail the
+     * carrier lookup in {@code onCast}. Blanking it is the honest outcome: the player is not
+     * left holding a permanent dud, and nothing is destroyed - a container-less
+     * {@code irons_spellbooks:scroll} is the same item Iron's itself shows as "None Scroll".
+     *
+     * <p><b>Lazy, never swept.</b> Callers invoke this only where the stack is already being
+     * decoded for another reason - the scroll-use mixin and the failed proxy cast. Scanning
+     * inventories on a tick to find these would mean an {@code ISpellContainer} codec decode
+     * per scroll per tick, which is exactly the cost {@code CarrierReconciler}'s design note
+     * rules out.
+     *
+     * <p><b>Cannot touch a real item.</b> Three guards must all hold: the stack is an Iron's
+     * scroll, it carries no ANS sidecar (so a genuine ANS carrier is excluded even though its
+     * native container is empty and could never match anyway), and
+     * {@link #isProxyOnlyStack(ItemStack)} agrees that every active slot is a proxy.
+     */
+    public static boolean neutralizeStrayProxyScroll(ItemStack stack) {
+        if (!IronsBookBindingUtil.isIronsScroll(stack)) {
+            return false;
+        }
+        if (CrossModSpellComponents.has(stack)) {
+            return false; // an ANS carrier, not loot debris
+        }
+        // Ordered before isProxyOnlyStack: that reads through ISpellContainer.get, which ends
+        // in DataResult.getOrThrow and throws rather than returning null on a bad decode.
+        if (!IronsScrollFactory.hasReadableContainer(stack) || !isProxyOnlyStack(stack)) {
+            return false;
+        }
+        ISpellContainer.remove(stack);
+        return true;
     }
 
     /**

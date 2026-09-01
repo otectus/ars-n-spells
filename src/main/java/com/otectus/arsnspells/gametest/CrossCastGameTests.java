@@ -5,11 +5,15 @@ import com.otectus.arsnspells.spell.CrossModSpell;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import com.otectus.arsnspells.spell.CrossModSpellList;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.ModDataComponents;
 import com.otectus.arsnspells.spell.irons.ArsCrossProxyHiding;
+import com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry;
 import com.otectus.arsnspells.spell.irons.CarrierReconciler;
 import com.otectus.arsnspells.spell.irons.IronsInscriptionPolicy;
 import com.otectus.arsnspells.spell.irons.IronsProxySlotWriter;
+import com.otectus.arsnspells.spell.irons.IronsScrollFactory;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -180,6 +184,177 @@ public final class CrossCastGameTests {
             return;
         }
         helper.succeed();
+    }
+
+    // ---- Lootability: the proxies must never reach Iron's random-spell rolls ----
+
+    /**
+     * The flag itself. Asserted against {@code allowLooting()} directly rather than through
+     * {@code getDefaultConfig()} - unlike {@code allowCrafting}, this one does not route
+     * through {@code SpellConfigManager}, so there is no server-config seeding to work around
+     * and the live method is the honest thing to check.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_proxies_areNotLootable(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        for (int poolId = 1; poolId <= ArsCrossProxyRegistry.POOL_SIZE; poolId++) {
+            var proxy = ArsCrossProxyRegistry.get(poolId);
+            if (proxy == null) {
+                helper.fail("proxy pool " + poolId + " is not registered");
+                return;
+            }
+            if (proxy.allowLooting()) {
+                helper.fail("ars_cross_" + poolId + " must opt out of looting - the ENDER school "
+                    + "it uses for requiresLearning=false defaults allowLooting to true, which is "
+                    + "how dud proxy scrolls reached chest loot in 3.2.1");
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The behaviour, through Iron's own code. {@code SpellFilter} is what every
+     * {@code irons_spellbooks:randomize_spell} loot function, the wandering-trader scroll
+     * trade and the enhancement-ring imbuer consult, so asking it directly is the test that
+     * actually proves loot is closed - rather than asserting our own flag back to ourselves.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_ironsLootFilter_neverOffersAProxy(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        var applicable = new io.redspace.ironsspellbooks.loot.SpellFilter().getApplicableSpells();
+        if (applicable.isEmpty()) {
+            helper.fail("Iron's unfiltered loot pool came back empty - the filter is not being "
+                + "exercised, so this test would pass for the wrong reason");
+            return;
+        }
+        for (var spell : applicable) {
+            if (ArsCrossProxyRegistry.poolIdOf(spell.getSpellResource()) >= 0) {
+                helper.fail("Iron's loot pool still offers " + spell.getSpellResource()
+                    + "; a randomly generated scroll can therefore still be a dud proxy");
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "platform")
+    public static void ironsLoaded_strayProxyScroll_isBlankedOnContact(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack stray = lootedProxyScroll(1);
+        if (stray.isEmpty()) {
+            helper.fail("could not build the looted-proxy shape to test against");
+            return;
+        }
+        if (!ArsCrossProxyHiding.isProxyOnlyStack(stray)) {
+            helper.fail("the shape RandomizeSpellFunction produces must be recognised as a "
+                + "proxy-only stack, or nothing downstream can clean it up");
+            return;
+        }
+        if (!ArsCrossProxyHiding.neutralizeStrayProxyScroll(stray)) {
+            helper.fail("a stray proxy scroll must be neutralized on contact");
+            return;
+        }
+        if (IronsScrollFactory.hasNativeContainer(stray)) {
+            helper.fail("neutralizing must strip the native container, leaving a blank scroll");
+            return;
+        }
+        if (stray.isEmpty()) {
+            helper.fail("neutralizing must not destroy the player's item");
+            return;
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "platform")
+    public static void ironsLoaded_neutralizer_leavesRealItemsAlone(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        // A genuine Iron's spell scroll - blanking one would delete real player content.
+        ItemStack real = nativeIronsScroll();
+        if (real.isEmpty()) {
+            helper.fail("no non-proxy Iron's spell is registered; the negative control cannot run");
+            return;
+        }
+        if (ArsCrossProxyHiding.neutralizeStrayProxyScroll(real)) {
+            helper.fail("a genuine Iron's spell scroll must never be blanked");
+            return;
+        }
+
+        // An ANS carrier: sidecar payload plus the deliberately empty native container. It can
+        // never match the proxy-only rule, but the sidecar guard must refuse it regardless -
+        // blanking one would strip the container Iron's inscription code dereferences.
+        ItemStack carrier = blankIronsScroll();
+        if (carrier.isEmpty()) {
+            helper.fail("Iron's scroll item is not registered");
+            return;
+        }
+        IronsScrollFactory.initializeCarrierContainer(carrier);
+        CrossModSpellComponents.addArsEntryWithMeta(carrier,
+            CrossModSpellComponents.ARS_PLACEHOLDER_ID, 1, arsPayload("carried"),
+            1, null, null, null);
+        if (ArsCrossProxyHiding.neutralizeStrayProxyScroll(carrier)) {
+            helper.fail("an ANS carrier scroll must survive the neutralizer untouched");
+            return;
+        }
+
+        // A plain book is not a scroll at all; the neutralizer must not reach for its container.
+        if (ArsCrossProxyHiding.neutralizeStrayProxyScroll(new ItemStack(Items.BOOK))) {
+            helper.fail("a non-scroll must never be rewritten");
+            return;
+        }
+        if (ArsCrossProxyHiding.neutralizeStrayProxyScroll(ItemStack.EMPTY)) {
+            helper.fail("an empty stack must never be rewritten");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /** A blank {@code irons_spellbooks:scroll}, or {@link ItemStack#EMPTY} without Iron's. */
+    private static ItemStack blankIronsScroll() {
+        return BuiltInRegistries.ITEM.getOptional(ArsSpellExportUtil.IRONS_SCROLL_ID)
+            .map(ItemStack::new)
+            .orElse(ItemStack.EMPTY);
+    }
+
+    /** A scroll carrying a genuine (non-proxy) Iron's spell, or EMPTY if none is registered. */
+    private static ItemStack nativeIronsScroll() {
+        for (var spell : io.redspace.ironsspellbooks.api.registry.SpellRegistry.getEnabledSpells()) {
+            if (spell == io.redspace.ironsspellbooks.api.registry.SpellRegistry.none()
+                || ArsCrossProxyRegistry.poolIdOf(spell.getSpellResource()) >= 0) {
+                continue;
+            }
+            ItemStack scroll = blankIronsScroll();
+            if (scroll.isEmpty()) {
+                return scroll;
+            }
+            io.redspace.ironsspellbooks.api.spells.ISpellContainer.createScrollContainer(
+                spell, spell.getMinLevel(), scroll);
+            return scroll;
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /** The exact stack shape Iron's {@code RandomizeSpellFunction} produced for a proxy. */
+    private static ItemStack lootedProxyScroll(int poolId) {
+        ItemStack scroll = blankIronsScroll();
+        if (scroll.isEmpty()) {
+            return scroll;
+        }
+        io.redspace.ironsspellbooks.api.spells.ISpellContainer.createScrollContainer(
+            ArsCrossProxyRegistry.get(poolId), 1, scroll);
+        return scroll;
     }
 
     // ---- The reconciler ----

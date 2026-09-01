@@ -3,10 +3,13 @@ package com.otectus.arsnspells.mixin.irons;
 import com.otectus.arsnspells.casting.CastingAuthority;
 import com.otectus.arsnspells.compat.ScrollLPTracker;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.spell.irons.ArsCrossProxyHiding;
+import com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry;
 import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
 import io.redspace.ironsspellbooks.api.spells.SpellData;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
@@ -89,6 +92,19 @@ public class MixinScrollItem {
         // sidecar rather than a native slot. Test for the none spell instead. (Same oversight
         // the 3.1.0 fix documented for Iron's own doInscription.)
         if (spell == null || spell == SpellRegistry.none()) {
+            return;
+        }
+
+        // Loot debris from before ArsCrossProxySpell.allowLooting() existed: a scroll carrying
+        // an ars_cross_* proxy, with no spellbook behind it, so casting it can only ever reach
+        // the "no carrier" failure. Blank it back to a plain scroll and refuse the use. The
+        // container is already decoded above, so recognising it costs nothing, and this sits
+        // ahead of the cost block so a dud can never stage anything in ScrollLPTracker.
+        if (ArsCrossProxyRegistry.poolIdOf(spell.getSpellResource()) >= 0) {
+            ArsCrossProxyHiding.neutralizeStrayProxyScroll(stack);
+            player.displayClientMessage(
+                Component.translatable("message.ars_n_spells.crosscast.proxy.stray_scroll"), true);
+            cir.setReturnValue(InteractionResultHolder.fail(stack));
             return;
         }
 

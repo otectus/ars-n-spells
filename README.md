@@ -1,8 +1,8 @@
-# Ars 'n' Spells (v3.2.0, NeoForge 1.21.1)
+# Ars 'n' Spells (v3.2.2, NeoForge 1.21.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.21.1 on **NeoForge**. It unifies mana, scaling, and progression while keeping each mod playable on its own.
 
-> **Status (v3.2.0, NeoForge 1.21.1).** Feature parity with the Forge 1.20.1 **3.2.0** line,
+> **Status (v3.2.2, NeoForge 1.21.1).** Feature parity with the Forge 1.20.1 **3.2.2** line,
 > with one documented exception (Covenant of the Seven — see *Known gaps* below).
 >
 > This release closes the gap from the 3.0.2 port. Beyond the 3.0.x feature set it adds the
@@ -13,7 +13,10 @@ Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for M
 > overrides; `ISpellbook`-based spellbook detection; JEI/EMI proxy hiding), and the **3.2.0**
 > fixes (the mod's own creative tab; Mana Infusion and the Mana Well finally obtainable; the
 > shared-pool ceiling that stopped a single hybrid-mode cast draining the whole mana pool; the
-> tooltip crash guard).
+> tooltip crash guard), the **3.2.1** parity pass (the `canBeCastedBy` injection reworked so a
+> mod that replaces that method can no longer make mod loading fatal; Iron's mixins moved to a
+> non-required config), and the **3.2.2** fix (the `ars_cross_*` proxy spells no longer appear
+> in Iron's random-spell loot).
 >
 > Compile targets: **Ars Nouveau 5.13.1.1400**, **Iron's Spells 1.21.1-3.16.3**,
 > **NeoForge 21.1.248**.
@@ -229,7 +232,7 @@ With `debug_mode` enabled, `OverlayDiagnostics` logs every rendered GUI layer id
 | `/ans info <player>` | Op 2 | Show mana, resonance, and the player's per-school affinity (plus the registered Iron's school count). |
 | `/ans mode` | — | Show current mana unification mode. |
 
-## Roadmap (deferred past 2.6.1)
+## Roadmap (deferred past 3.2.2)
 
 The 1.21.1 port is functionally complete; the items below are intentionally deferred, not broken. The mana-unification mixins disabled during the early port were repaired and re-enabled in 2.0.1; the cross-cast / rituals / scaling re-attach work tracked as "Phase 3" is done; and 2.6.1 restored the last stubbed pieces (in-game config screen, Ars mana-potion mirroring, mana-only pre-cast validation, debug overlay). The remaining deferral is the **LP/Cursed-Ring and Aura/Virtue-Ring** systems, which depend on Sanctified Legacy / Covenant of the Seven — no NeoForge 1.21.1 build of those exists yet.
 
@@ -250,7 +253,7 @@ Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMa
 
 Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`.
 
-Output jar: `build/libs/ars_n_spells-3.2.0.jar`
+Output jar: `build/libs/ars_n_spells-3.2.2.jar` (version tracks `mod_version` in `gradle.properties`)
 
 ## Changelog
 

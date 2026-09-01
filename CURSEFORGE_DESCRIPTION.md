@@ -4,7 +4,25 @@
 
 Works with **Minecraft 1.21.1** on **NeoForge**.
 
-> **Version note (2.6.1, NeoForge 1.21.1).** Mana unification, cross-cast invocation, rituals, cooldowns, progression, resonance, and equipment scaling are all live. **2.6.1 restores core parity with the Forge 1.20.1 build:** an in-game config screen (Mods → Ars 'n' Spells → Config), Ars mana potions that feed the unified Iron's pool in ISS Primary, a mana-only pre-cast check, and a debug overlay are all functional again (each was stubbed in 2.5.0). 2.5.0 was a correctness release: per-school affinity now covers every Iron's addon school (Cataclysm, Magic From The East, Somake, and friends), the Curios spell-discount applies to both Ars and Iron's casts, and the ritual recipes and curio-discount tag — which had silently broken on the 1.20.1 → 1.21 datapack path change — are restored. The previous **Covenant of the Seven** (Sanctified Legacy) integration — Ring of Seven Curses, Ring of Seven Virtues, Blasphemy curios, LP and aura systems — remains **removed** because Covenant of the Seven has no NeoForge 1.21.1 build. Compile targets are pinned to Ars Nouveau 5.11.1 / Iron's Spells 3.15.6 and run against newer at runtime.
+> **Version note (3.2.2, NeoForge 1.21.1).** This build is at feature parity with the Forge 1.20.1 **3.2.2** line. Mana unification, cross-cast invocation, Ars spells in Iron's native spell wheel, the Spell Loom, rituals, cooldowns, progression, resonance and equipment scaling are all live. The **Covenant of the Seven** (Sanctified Legacy) integration — Ring of Seven Curses, Ring of Seven Virtues, Blasphemy curios, LP and aura systems — remains **removed**, because Covenant of the Seven has no NeoForge 1.21.1 build. Compile targets: Ars Nouveau 5.13.1.1400, Iron's Spells 1.21.1-3.16.3, NeoForge 21.1.248.
+
+---
+
+## What's new in 3.2.2
+
+**If you have found strange "Ars Spell" scrolls in loot chests, this is the release that stops them.** Exploration chests, Mystery Scroll Pouches, magic-mob drops and wandering traders could hand you a spell scroll whose tooltip showed a raw line of code rather than a description, and which did nothing at all when used. Those were Ars 'n' Spells' internal proxy spells — the hidden slots that let an Ars Nouveau spell show up in Iron's spell wheel — and they are meaningless outside a spellbook that carries the matching spell.
+
+Ars 'n' Spells does not modify any loot table and never has. Iron's Spellbooks picks a random spell from its own registry, and a spell is eligible unless it opts out. Ours opted out of the Scroll Forge but never out of loot, and because they are Common rarity they were among the *most* likely things to be rolled. They now opt out properly, so no new one can be generated.
+
+A stray scroll already sitting in your world is not stuck there: right-click it once and it turns into a blank Iron's scroll. Unopened chests were never affected, since loot is decided when a chest is first opened. The eight missing spell descriptions have been added too, so nothing shows a raw translation key any more.
+
+---
+
+## What's new in 3.2.1
+
+**If you run One Mana Bar, this is why your game would not start.** Ars 'n' Spells adjusted the mana value Iron's reads when it decides whether you can cast, and did it by targeting one specific instruction inside that check. One Mana Bar replaces that whole method, so the instruction was gone — and Mixin treats that as fatal rather than something to skip. The adjustment now attaches to the start and end of the method instead, which is allowed even when another mod has replaced it.
+
+Also in this release: mixins targeting Iron's Spellbooks — an optional dependency — moved into a separate, non-required layer, so a future conflict there skips one piece with a warning instead of aborting startup for every mod in the chain. Plus fixes for uninscription leaving unusable entries in the spell wheel, the Spell Transcription ritual destroying stacked source scrolls, ARS_PRIMARY deleting mana above Iron's own ceiling, and three ritual tablets rendering with the wrong art.
 
 ---
 
@@ -14,8 +32,8 @@ Works with **Minecraft 1.21.1** on **NeoForge**.
 |-----|-----------|
 | **Minecraft (NeoForge)** 1.21.1 / 21.1.84+ | Yes |
 | **Java 21** | Yes |
-| **Ars Nouveau** 5.11.1+ | Yes |
-| **Iron's Spells 'n Spellbooks** 1.21.1-3.15.6+ | No — falls back to native Ars behavior if absent |
+| **Ars Nouveau** 5.13+ (built against 5.13.1.1400) | Yes |
+| **Iron's Spells 'n Spellbooks** 1.21.1-3.16.3+ | No — falls back to native Ars behavior if absent |
 
 The mod will not load on Forge or on Minecraft versions other than 1.21.1.
 
@@ -149,13 +167,16 @@ If Covenant of the Seven ships a NeoForge 1.21.1 build, the integration can be r
 ## FAQ / Troubleshooting
 
 **Q: Ars mana isn't changing in ISS Primary mode.**
-A: Make sure Iron's Spells 'n Spellbooks (1.21.1-3.15.6+) is installed. Check logs for mixin load failures.
+A: Make sure Iron's Spells 'n Spellbooks (1.21.1-3.16.3+) is installed. Check logs for mixin load failures.
 
 **Q: I see two mana bars.**
 A: Verify your mana mode is set correctly, and check for overlay conflicts from other UI mods. Ars 'n' Spells hides the redundant bar per mode via NeoForge's `RenderGuiLayerEvent`; in `separate` and `disabled` modes both bars are shown by design.
 
 **Q: Cross-casting an inscribed item does nothing.**
 A: Cross-cast invocation is live — right-click an inscribed item to cast, sneak-right-click to cycle inscriptions. If nothing happens, confirm the item actually carries an inscription (re-run the Transcription ritual) and that the spell's mana cost can be paid from the active pool.
+
+**Q: I found spell scrolls called "Ars Spell" in a loot chest, and their tooltip is a line of code.**
+A: Fixed in 3.2.2. Those were internal proxy spells that should never have been eligible for loot. Update the mod and no new one can generate; right-click one you already have and it becomes a blank Iron's scroll.
 
 **Q: The mod requires Sanctified Legacy and I had a setup using LP.**
 A: The Sanctified Legacy integration is gone for this version because Sanctified Legacy itself hasn't shipped on NeoForge 1.21.1. Stay on the Forge 1.20.1 1.9.0 release if you need that feature.

@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.2.2] - 2026-08-28
+
+Parity with the Forge 1.20.1 **3.2.2** line. The bug below was present identically on both
+trees.
+
+### Fixed: Iron's loot chests could contain fake "Ars 'n' Spells" spell scrolls
+
+- Exploration chests, Mystery Scroll Pouches, magic-mob drops and wandering traders could hand
+  you a spell scroll named after an Ars Nouveau spell whose tooltip read as a raw translation
+  key (`spell.ars_n_spells.ars_cross_1.guide` and similar). These were the mod's eight internal
+  `ars_cross_*` proxy spells - the hidden slots that let an Ars spell appear in Iron's native
+  spell wheel - and they are meaningless outside a spellbook that carries the matching spell.
+  Using one did nothing.
+- Ars 'n' Spells does not modify any loot table, and never did. Iron's Spellbooks picks a random
+  spell out of its own registry, and a spell is eligible unless it opts out with `allowLooting`.
+  The proxies set `allowCrafting=false`, which keeps them out of the Scroll Forge, but Iron's
+  loot never looks at that flag. They now opt out of looting explicitly, so no new one can be
+  generated - by loot, by a wandering trade, or when a looted ring is imbued.
+- They were also the most likely thing to be rolled, not the least: the proxies declare Common
+  rarity, which carries the heaviest weight in Iron's random-spell table.
+- A stray scroll already in your world is repaired the first time you right-click it: it becomes
+  a blank Iron's scroll instead of a permanent dud, and the cast is refused rather than charged.
+  Unopened chests are unaffected - loot is rolled when a chest is first opened, so they were
+  never wrong to begin with.
+- The internal warning logged when a proxy fires with no spellbook behind it is now rate-limited
+  per player. Clicking a dud scroll repeatedly could otherwise flood a server log.
+- Added the eight missing spell-description translations, so a proxy that is still visible
+  anywhere shows readable text rather than a raw key.
+
 ## [3.2.1] - 2026-08-27
 
 Parity with the Forge 1.20.1 **3.2.1** line, plus every gap a full three-way sweep of the two

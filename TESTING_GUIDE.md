@@ -1,10 +1,10 @@
-# Testing Guide — Ars 'n' Spells 2.6.1 (NeoForge 1.21.1)
+# Testing Guide — Ars 'n' Spells 3.2.2 (NeoForge 1.21.1)
 
 This guide covers manual verification scenarios for Ars 'n' Spells **on NeoForge 1.21.1**. It supersedes the pre-port Forge 1.20.1 testing notes (which documented the Sanctified Legacy / Covenant of the Seven ring systems — those integrations are removed in this release; see [README §Removed](README.md#removed-in-the-neoforge-1211-port) and the [CHANGELOG](CHANGELOG.md) for context).
 
 For an at-a-glance description of features and configuration, start with the [README](README.md). For the change history, see [CHANGELOG.md](CHANGELOG.md).
 
-> **Status.** The gameplay systems are live (mana unification, cross-cast, rituals, affinity, progression, resonance, cooldowns, equipment scaling). The build environment runs no Minecraft, so every scenario below is a **manual in-game** check that has not yet been run for 2.6.1. **2.6.1 priorities:** the restored config screen (V11), Ars mana-potion mirroring (V12), the mana-only pre-cast check (V13), and the debug overlay (V14). Carried-over priorities: per-school affinity now covers Iron's addon schools (cast one spell from each addon school → `/ans info` shows a track under its full id); a 2.0.x save migrates its affinity (elemental tracks keep their counts, legacy category buckets are dropped); the ritual apparatus recipes are craftable again and the curio-discount tag applies on both the Ars and Iron's sides.
+> **Status (3.2.2).** The gameplay systems are live (mana unification, cross-cast, Ars spells in Iron's native spell wheel, the Spell Loom, rituals, affinity, progression, resonance, cooldowns, equipment scaling). The build environment runs no Minecraft, so every scenario below is a **manual in-game** check. **3.2.2 priorities:** no `ars_cross_*` proxy scrolls in generated loot (V15), a pre-3.2.2 stray scroll repairing itself (V16), and binding/casting still working afterwards (V17). Carried-over priorities: the config screen (V11), Ars mana-potion mirroring (V12), the mana-only pre-cast check (V13), and the debug overlay (V14).
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ For an at-a-glance description of features and configuration, start with the [RE
 
 The previous Forge 1.20.1 testing guide also referenced Covenant of the Seven (Sanctified Legacy) and Blood Magic. Both prerequisites are gone — see [CHANGELOG §Removed](CHANGELOG.md).
 
-Drop `build/libs/ars_n_spells-2.6.1.jar` into the instance's `mods/` folder alongside the dependencies. The Gradle dev environment exposes `runClient`, `runServer`, `runGameTestServer`, and `runData` tasks.
+Drop `build/libs/ars_n_spells-3.2.2.jar` into the instance's `mods/` folder alongside the dependencies. The Gradle dev environment exposes `runClient`, `runServer`, `runGameTestServer`, and `runData` tasks.
 
 To enable verbose log output during testing, set in `config/ars_n_spells-common.toml`:
 
@@ -34,7 +34,7 @@ Run these gradle tasks against the worktree before any manual scenario. Each gat
 | Gate | Command | Pass criterion |
 | --- | --- | --- |
 | **G1 — Build** | `./gradlew --refresh-dependencies clean build` | `BUILD SUCCESSFUL`, 0 compile errors, no `mods.toml` references. |
-| **G2 — JUnit** | `./gradlew test` | All test classes pass. `CrossModSpellListRoundTripTest` is in place; `InscriptionInputsPredicateTest` is deferred to Phase 3. |
+| **G2 — JUnit** | `./gradlew test` | All test classes pass (281 tests as of 3.2.2). `CrossModSpellListRoundTripTest` is in place; `InscriptionInputsPredicateTest` is deferred to Phase 3. |
 | **G3 — Datagen** | `./gradlew runData` | Task exits 0; `src/generated/resources/` exists. |
 | **G4 — Mixin apply (Ars only)** | `./gradlew runClient` without Iron's | The 3 Ars-only mixins apply (`MixinManaCapability`, `MixinSpellResolverMana`, `MixinSpellResolverContext`); the Iron's mixins skip silently (they need Iron's); no `Mixin apply failed`. |
 | **G5 — Mixin apply (Ars + Iron's)** | `./gradlew runClient` with both pinned | All 5 active mixins apply (the 3 Ars mixins + `MixinIronsSpellDamage` + `MixinIronsMagicDataMana`). |
@@ -338,6 +338,55 @@ now rejected at load rather than silently resolving.
 - `mana_unification_mode = separate` → both bars, by design.
 
 ---
+
+## V15 – V17 — 3.2.2 lootability checks (Iron's required)
+
+**Known gap: these cannot yet be run headlessly on this tree.** The equivalent
+GameTests exist in `CrossCastGameTests` — including one that asks Iron's own
+`SpellFilter.getApplicableSpells()` directly — but the opt-in
+`-PwithIronsRuntimeGameTests` profile cannot boot, because `playeranimator`
+(a hard dependency of Iron's) publishes no NeoForge artifact to any Maven this
+build uses. The same logic is proven on the Forge 1.20.1 tree, where that profile
+does run. Until the profile is fixed, V15–V17 are the only evidence on NeoForge.
+
+### V15 — No proxy scrolls in generated loot
+
+1. New world, with Iron's Spellbooks installed.
+2. `/give @s irons_spellbooks:scroll_pouch` and open a dozen. A pouch is three
+   guaranteed random-spell rolls with no empty entries, so it samples the table
+   fastest.
+3. `/loot give @s loot irons_spellbooks:chests/additional_generic_loot` a few
+   dozen times, and `.../chests/additional_end_city_loot` for the
+   Ender-school-filtered path — the worst affected, since Iron's has only 14
+   Ender spells to dilute eight proxies.
+
+Expected: every scroll names a real Iron's spell. None called "Ars Spell", none
+showing a raw `spell.ars_n_spells.ars_cross_N.guide` tooltip.
+
+4. Check a wandering trader's stock and loot an enhancement ring; both draw from
+   the same filter and were affected identically.
+
+### V16 — A scroll looted before the fix repairs itself
+
+Needs a world saved on **3.2.1 or earlier** containing a proxy scroll.
+
+1. Load it on 3.2.2 and right-click the stray scroll. Expected: it becomes a
+   plain Iron's scroll, the cast is refused rather than charged, and an
+   action-bar line explains why. The item is never deleted.
+2. Right-click repeatedly, then check `logs/latest.log`. Expected: at most one
+   `Ars cross proxy` warning per five seconds — this branch used to log once per
+   click.
+3. Confirm unopened chests in that world are unaffected; loot is rolled when a
+   chest is first opened.
+
+### V17 — Binding and casting still work
+
+The one regression risk: the proxies remain registered and are still resolved by
+id at cast time; only their loot eligibility changed.
+
+1. Inscribe an Ars spell at the Spell Loom, bind it into a spellbook, open Iron's
+   spell wheel. Expected: the entry is present with its chosen icon and casts
+   normally, from the Curios spellbook slot as well as the hand.
 
 ## Removed scenarios
 
