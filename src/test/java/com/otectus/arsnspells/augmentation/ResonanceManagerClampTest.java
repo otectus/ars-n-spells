@@ -125,4 +125,78 @@ class ResonanceManagerClampTest {
         assertEquals(1.0, ResonanceManager.resonanceFor(1.0, -5.0, 5.0), 1.0e-9,
             "a negative strength must not invert the multiplier");
     }
+
+    // ---- The threshold gate ----
+    //
+    // resonance_threshold and resonance_duration described a threshold-gated, lingering
+    // resonance and were read by nothing in either the 1.20.1 or the 1.21.1 line. The gate is
+    // orthogonal to the curve, so it was layered on top rather than the curve being rewritten:
+    // resonanceFor still decides how large the bonus is, gateOpen decides whether it applies.
+    // The default threshold of 0 must leave the gate permanently open, which is what makes
+    // this a live knob rather than a behaviour change for every existing server.
+
+    @Test
+    void gate_isAlwaysOpenAtTheDefaultThresholdOfZero() {
+        for (double percent : new double[] {0.0, 0.01, 0.5, 0.94, 1.0}) {
+            assertTrue(ResonanceManager.gateOpen(percent, 0.0, Long.MAX_VALUE, 0),
+                "threshold 0 must leave the gate open at " + percent + " mana, whatever the "
+                    + "linger state: that is what reproduces the historical always-on "
+                    + "behaviour byte for byte");
+        }
+    }
+
+    @Test
+    void gate_opensAtOrAboveTheThreshold() {
+        assertTrue(ResonanceManager.gateOpen(0.95, 0.95, Long.MAX_VALUE, 100),
+            "the boundary is inclusive: 'at or above'");
+        assertTrue(ResonanceManager.gateOpen(1.0, 0.95, Long.MAX_VALUE, 100));
+    }
+
+    @Test
+    void gate_staysOpenWhileLingering() {
+        assertTrue(ResonanceManager.gateOpen(0.10, 0.95, 0, 100),
+            "the cast that spends the mana must not switch off the bonus it earned");
+        assertTrue(ResonanceManager.gateOpen(0.10, 0.95, 100, 100),
+            "the linger boundary is inclusive");
+    }
+
+    @Test
+    void gate_closesOnceTheLingerExpires() {
+        assertTrue(!ResonanceManager.gateOpen(0.10, 0.95, 101, 100));
+        assertTrue(!ResonanceManager.gateOpen(0.10, 0.95, Long.MAX_VALUE, 100),
+            "a player who has never been above the threshold gets no bonus");
+    }
+
+    @Test
+    void gate_withZeroDurationClosesImmediatelyBelowTheThreshold() {
+        assertTrue(!ResonanceManager.gateOpen(0.94, 0.95, 0, 0),
+            "duration 0 means no linger at all");
+    }
+
+    @Test
+    void gate_treatsAnOutOfRangeThresholdAsClamped() {
+        assertTrue(ResonanceManager.gateOpen(1.0, 5.0, Long.MAX_VALUE, 0),
+            "a threshold above 1 would otherwise be unreachable and disable resonance "
+                + "outright; it clamps to 1, which a full pool satisfies");
+        assertTrue(ResonanceManager.gateOpen(0.0, -1.0, Long.MAX_VALUE, 0),
+            "a negative threshold clamps to 0");
+        assertTrue(ResonanceManager.gateOpen(0.0, Double.NaN, Long.MAX_VALUE, 0),
+            "NaN must not make the comparison false forever and silently kill the feature");
+    }
+
+    @Test
+    void gate_ignoresANegativeElapsedTime() {
+        // Game time is per-level, so a dimension change can hand back a smaller value than the
+        // one recorded. That must not read as "zero ticks ago" and pin the gate open.
+        assertTrue(!ResonanceManager.gateOpen(0.10, 0.95, -50, 100));
+    }
+
+    @Test
+    void clampManaPercent_boundsWhatTheGateCompares() {
+        assertEquals(1.0, ResonanceManager.clampManaPercent(4.0), 1.0e-9,
+            "mana above max is reachable, and an unclamped fraction would satisfy any "
+                + "threshold while also unbounding the curve");
+        assertEquals(0.0, ResonanceManager.clampManaPercent(-1.0), 1.0e-9);
+        assertEquals(0.0, ResonanceManager.clampManaPercent(Double.NaN), 1.0e-9);
+    }
 }

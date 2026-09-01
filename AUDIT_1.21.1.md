@@ -10,7 +10,7 @@ This document covers what the port itself got wrong, and what both lines get wro
 
 ## 0. Verdict
 
-**32 confirmed defects, all fixed.** Five commits, 70 files, +2377/−740.
+**32 confirmed defects, all fixed.** Six commits.
 
 The dominant finding is a class, not an incident: **the port carried the 1.20.1 line's
 behaviour across but dropped its guards.** Twenty-one of the thirty-two are regressions
@@ -30,7 +30,7 @@ The most serious were:
 | **P1** | Ars mana-regen potions counted twice | port-added |
 | **P1** | Four per-player maps never evicted a key | regression |
 
-Verified green: `build` (**26 classes / 178 tests, 0 failures**) and `runGameTestServer` on
+Verified green: `build` (**26 classes / 187 tests, 0 failures**) and `runGameTestServer` on
 the Iron's-less profile (**12/12 required tests passed**, zero mixin failures). Every fix that
 could carry a regression test does, and the ones marked *fail-before verified* below were
 demonstrated failing against the pre-fix sources and passing after — in that order, not
@@ -354,18 +354,38 @@ a knob they do not have.
 | `max_damage_multiplier` | R | wired — it is the resonance cap (§2.11) |
 | `enable_ars_resonance` | I | wired — gates `SpellScalingUtil` |
 | `enable_irons_resonance` | I | wired — gates `MixinIronsSpellDamage` |
-| `resonance_threshold` | I | **removed** — see below |
-| `resonance_duration` | I | **removed** — see below |
+| `resonance_threshold` | I | **wired as a gate** — see below |
+| `resonance_duration` | I | **wired as a gate** — see below |
 | `read_curio_attribute_modifiers` | P | **removed** — the behaviour is unconditional |
 
-**The two removals are a judgement call, and it is yours to overrule.**
+**The threshold pair deserves its own note, because my first answer was wrong.**
 `resonance_threshold` documents *"mana percentage required to trigger resonance"* and
 `resonance_duration` *"how long resonance lasts after dropping below threshold"*. **No such
-behaviour has ever existed in either line** — `resonanceFor` scales linearly from 0% mana and
-is recomputed every interval, so there is nothing to gate and nothing to linger. Implementing
-them as written would change how resonance behaves on every existing server, which is a design
-decision, not a bug fix. I removed the false advertising instead. Say the word and I will build
-the documented behaviour.
+behaviour has ever existed in either line** — `resonanceFor` scales linearly from 0% mana with
+no gate at all. I initially removed both keys as false advertising, on the grounds that
+implementing them as written would change resonance on every existing server.
+
+That framed it as a choice between two bad options, and it is not one. **The gate and the
+curve are orthogonal.** `resonanceFor` decides *how large* the bonus is; a gate decides
+*whether* it is granted. Layering the second on the first costs the curve nothing:
+
+- `ResonanceManager.gateOpen(manaPercent, threshold, ticksSinceAbove, duration)` — the bonus
+  applies at or above the threshold, or within `duration` ticks of last having been.
+- **The default `threshold` is 0**, not the historical 0.95. Any clamped mana fraction is at or
+  above 0, so the gate is permanently open and the mod behaves exactly as it always has. No
+  existing server's damage numbers move.
+- Set it to 0.95 and resonance becomes the burst window the config text has always described:
+  top the pool off, get roughly five seconds of boosted casting.
+
+The linger is what makes a raised threshold playable at all — spending mana to cast
+necessarily drops you below the threshold, so without it the bonus would switch off on the
+very cast that earned it.
+
+Both keys are now live knobs, the config text is true, and nothing changed for anyone who does
+not opt in. The default is load-bearing enough to have its own guard
+(`resonanceThreshold_defaultsToZeroSoTheGateIsOpen`): shipping the historical 0.95 would turn a
+passive trickle into a burst window on every world that updates — a balance change disguised
+as a bug fix.
 
 `read_curio_attribute_modifiers` is different: what it describes is not missing, it is
 *unconditional and inseparable*. Curios applies its modifiers to the **player's** attributes,
@@ -375,6 +395,9 @@ the bridge, with no per-item scan and no toggle to honour.
 
 **Acceptance:** `AnsConfigStructureTest.everyNonCovenantConfigKeyHasAReader` sweeps every
 declared key against every reader. *Fail-before verified:* it reports exactly those five.
+The gate itself carries 8 tests in `ResonanceManagerClampTest`, the first of which pins that
+threshold 0 leaves the gate open at every mana level and whatever the linger state — the
+no-behaviour-change guarantee, asserted rather than assumed.
 
 ### 2.26 Smaller confirmed defects
 
@@ -395,14 +418,14 @@ declared key against every reader. *Fail-before verified:* it reports exactly th
 |---|---|---|
 | `UninscribeTeardownGameTests` | 3 | §2.1 — *fail-before verified* |
 | `SpellLoomLayoutTest` | 3 | §2.2, §2.3 — *fail-before verified* |
-| `ResonanceManagerClampTest` | 13 | §2.11 |
+| `ResonanceManagerClampTest` | 21 | §2.11, §2.25 |
 | `PayloadBoundsTest` | 16 | §2.12, §2.20 |
 | `AffinityDataMigrationTest` (added) | 3 | §2.8 — *fail-before verified* |
-| `AnsConfigStructureTest` (added) | 1 | §2.25 — *fail-before verified* |
+| `AnsConfigStructureTest` (added) | 2 | §2.25 — dead-key sweep *fail-before verified* |
 | `ArsNSpellsMixinPluginGatingTest` (replaced) | 1 | §2.9 |
 | `ManaBarControllerOverlayMatchTest` | 4 | the mana-bar P1 (`5d7b5fe`) |
 
-**26 classes / 178 unit tests, 0 failures. 12/12 GameTests.**
+**26 classes / 187 unit tests, 0 failures. 12/12 GameTests.**
 
 Per the agreed scope, only the tests that guard a fix were ported — not the whole 34-class
 backlog. That backlog is still open; see §6.
@@ -455,13 +478,16 @@ Nothing below is a defect I found and declined to fix. These are limits of what 
 could establish.
 
 **The client surface is still unverified.** Everything here was validated headlessly plus one
-earlier `runClient` session that found the mana-bar P1. These need a human at `runClient`:
+earlier `runClient` session that found the mana-bar P1 — which is the whole argument for doing
+this: the last time client code here was checked by reasoning alone, the first real run found a
+P1 inside a minute.
 
-- The rebuilt Spell Loom screen (§2.2, §2.3) — geometry, the disabled-Inscribe tooltips, the
-  icon preview, slot tooltips.
-- The wheel icon/name for a Curios-equipped spellbook (§2.18).
-- `enable_ars_resonance` / `enable_irons_resonance` toggled independently (§2.25).
-- The mana bar in HYBRID with `hybrid_mana_bar` set both ways (§2.26b).
+Written up as **C1–C6** in [`TESTING_GUIDE.md`](TESTING_GUIDE.md), roughly ten minutes with
+Iron's installed. It covers the failure classes static analysis categorically cannot reach: the
+9-argument `blit` sampling the icon with the wrong texture dimensions, whether a `Tooltip` on an
+*inactive* Button renders at all, tooltips clipping at the new 208px height, the `EditBox`
+surviving a resize, and whether the Curios wheel-icon lookup fires on its client-only render
+path.
 
 **Iron's compatibility is verified at exactly one version.** The declared floor is now 3.16.3,
 which is honest rather than optimistic. Widening it again should mean actually testing the

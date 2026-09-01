@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -164,10 +165,11 @@ class AnsConfigStructureTest {
      * 1.21.1 audit found five such keys - {@code max_damage_multiplier} (a port regression,
      * now honoured as the resonance cap), {@code enable_ars_resonance} and
      * {@code enable_irons_resonance} (inherited, now wired as the per-direction toggles),
-     * {@code resonance_threshold} and {@code resonance_duration} (inherited, describing
-     * threshold-gated lingering resonance that has never existed in either line, removed
-     * rather than invented), and {@code read_curio_attribute_modifiers} (port-added, removed
-     * because the behaviour it described is unconditional).
+     * {@code resonance_threshold} and {@code resonance_duration} (inherited, describing a
+     * threshold gate and linger that had never existed in either line - the gate turned out
+     * to be orthogonal to the bonus curve, so it was layered on top rather than either key
+     * being dropped), and {@code read_curio_attribute_modifiers} (port-added, removed because
+     * the behaviour it described is unconditional and inseparable).
      *
      * <p>The Covenant of the Seven (LP / aura) block is exempt by design: Covenant has no
      * 1.21.1 release, so those keys are deliberately inert and stay declared so an existing
@@ -209,5 +211,26 @@ class AnsConfigStructureTest {
             fail("config keys generated into every server TOML that nothing reads - either "
                 + "wire them or remove them: " + unread);
         }
+    }
+
+    /**
+     * The shipped default of {@code resonance_threshold} must be 0.
+     *
+     * <p>This is the whole no-behaviour-change guarantee, not a style preference. The key
+     * gates whether the resonance bonus applies at all; at 0 the gate is permanently open and
+     * the mod behaves exactly as it always has, so adding the knob costs no existing server
+     * anything. Shipping the historical 0.95 default instead would silently turn resonance
+     * from an always-on trickle into a burst window on every world that updates - a balance
+     * change disguised as a bug fix.
+     */
+    @Test
+    void resonanceThreshold_defaultsToZeroSoTheGateIsOpen() throws IOException {
+        String config = Files.readString(TestPaths.of(CONFIG_SOURCE));
+        Matcher m = Pattern.compile(
+            "defineInRange\\(\"resonance_threshold\", *([0-9.]+) *,").matcher(config);
+        assertTrue(m.find(), "resonance_threshold must be declared with defineInRange");
+        assertEquals(0.0, Double.parseDouble(m.group(1)), 1.0e-9,
+            "resonance_threshold must default to 0 so the gate is open and existing servers "
+                + "see no behaviour change");
     }
 }

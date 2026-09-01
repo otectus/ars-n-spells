@@ -38,14 +38,15 @@ public class AnsConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_ARS_RESONANCE;
     public static final ModConfigSpec.BooleanValue ENABLE_IRONS_RESONANCE;
     public static final ModConfigSpec.DoubleValue RESONANCE_STRENGTH;
-    // resonance_threshold and resonance_duration were removed in the 1.21.1 audit. They
-    // described a threshold-gated, lingering resonance ("boosts damage above this mana
-    // fraction", "how long it lasts after dropping below"). No such behaviour has ever
-    // existed in either line: ResonanceManager.resonanceFor scales linearly from 0% mana and
-    // is recomputed every interval, so there is nothing to gate and nothing to linger. Both
-    // keys were read by nothing. Advertising behaviour the mod does not have is worse than
-    // not offering the knob, and implementing them as written would silently change how
-    // resonance behaves on every existing server.
+    // These two describe a threshold-gated, lingering resonance and were read by nothing in
+    // either line - the value has always scaled linearly from 0% mana with no gate at all.
+    // The gate and the curve are orthogonal, though, so rather than removing the keys or
+    // rewriting the curve, the gate is now layered on top: the existing proportional bonus
+    // applies only while the pool is at or above resonance_threshold, or within
+    // resonance_duration ticks of last having been. The default threshold of 0 leaves the
+    // gate permanently open, which reproduces the historical behaviour exactly.
+    public static final ModConfigSpec.DoubleValue RESONANCE_THRESHOLD;
+    public static final ModConfigSpec.IntValue RESONANCE_DURATION;
     public static final ModConfigSpec.DoubleValue MAX_DAMAGE_MULTIPLIER;
 
     // ========================================
@@ -320,6 +321,26 @@ public class AnsConfig {
             .comment("Global multiplier for all resonance bonuses")
             .defineInRange("resonance_strength", 1.0, 0.0, 10.0);
         
+        RESONANCE_THRESHOLD = BUILDER
+            .comment("Mana fraction at or above which resonance applies (0.95 = 95% full).",
+                     "The bonus itself still scales with how full the pool is; this only",
+                     "gates whether it applies at all.",
+                     "0.0 (the default) leaves the gate open at any mana level, which is how",
+                     "resonance has always behaved. Raise it to make resonance a burst window",
+                     "you top the pool off for, rather than a passive trickle.")
+            .defineInRange("resonance_threshold", 0.0, 0.0, 1.0);
+
+        RESONANCE_DURATION = BUILDER
+            .comment("How long resonance keeps applying after the pool drops below",
+                     "resonance_threshold, in ticks (20 = 1 second).",
+                     "This is what makes a raised threshold playable: spending mana to cast",
+                     "necessarily drops you below it, so without a linger the bonus would",
+                     "switch off on the very cast that earned it.",
+                     "Has no effect while resonance_threshold is 0.",
+                     "Resolution is the recompute interval (40 ticks), so the effective",
+                     "linger is this value give or take one interval.")
+            .defineInRange("resonance_duration", 100, 0, 1200);
+
         MAX_DAMAGE_MULTIPLIER = BUILDER
             .comment("Maximum damage multiplier from resonance")
             .defineInRange("max_damage_multiplier", 5.0, 1.0, 100.0);

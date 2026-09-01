@@ -229,6 +229,116 @@ Pass: two distinct wheel entries show simultaneously (dedup-by-id check — each
 
 Remove Iron's Spellbooks from the instance. Pass: client and dedicated server boot clean (no `ClassMetadataNotFoundException` from the icon mixin, no proxy-registry classload), the Spell Loom places and opens but Inscribe reports *Iron's Spellbooks is not installed*, the binding tablet/recipes are absent, and the `#ars_n_spells:irons_spell_books` tag loads without errors (`required: false`).
 
+## C1 – C6 — post-audit client verification
+
+Everything in [`AUDIT_1.21.1.md`](AUDIT_1.21.1.md) was validated headlessly: `build`,
+`runGameTestServer`, and structural tests. **The client surface was not.** That matters more
+here than it usually would, because the last time this codebase's client code was verified by
+reasoning alone, the first `runClient` session found a P1 inside a minute (both mana bars
+rendering, from hardcoded layer ids).
+
+These six checks cover what static analysis categorically cannot reach. Budget ~10 minutes.
+Run with Iron's Spellbooks installed unless a check says otherwise.
+
+```
+./gradlew runClient
+```
+
+### C1 — Spell Loom screen geometry (the rebuild)
+
+`SpellLoomScreen` went from 125 lines to ~270 and **has never been rendered**.
+`SpellLoomLayoutTest` proves the numbers are internally consistent; it cannot prove the screen
+looks right.
+
+Place a Spell Loom, open it. Pass:
+
+- The panel is 176x208 — noticeably taller than a chest — and nothing overlaps.
+- **The Inscribe button is fully clickable**, and so is every one of the 27 inventory slots
+  directly under it. This is the specific regression: at the old 166px height the button and
+  the inventory's top row shared nine pixels, so items painted over the button and those slots
+  ate clicks.
+- The "Spell Loom" and "Inventory" labels are legible — white with a shadow, not the dark grey
+  that vanilla defaults to and that disappears into the purple panel.
+- All 39 slots have a vanilla-style bevel (grey inner, dark top-left, light bottom-right).
+
+### C2 — Inscribe enablement and its tooltips
+
+The client-side validation mirror is new. Hover the **disabled** Inscribe button after each
+step and read the tooltip — a `Tooltip` on an inactive `Button` is the part most likely to
+silently not render.
+
+| State | Expected tooltip |
+|---|---|
+| Empty loom | *Place an Ars spell source…* |
+| Source in, no scroll | *Place a blank Iron's scroll.* |
+| Both in, output slot occupied | *Clear the output slot first.* |
+| Both in, output clear | button **enabled**, tooltip *Inscribe the Ars spell onto the blank scroll* |
+
+Also: type a name, then resize the game window. **The typed name must survive** — `init()`
+rebuilds the `EditBox`, and `resize()` re-seeds it.
+
+Fail signals: a tooltip that never appears, one that renders as a raw lang key
+(`ars_n_spells.spell_loom.tooltip.…`), or one that runs off the bottom of the screen at the
+new taller layout.
+
+### C3 — Icon preview and slot tooltips
+
+Still in the loom. Cycle the **Icon** button through all eight symbols.
+
+- The preview square at the right of the recipe row must show the **actual 16x16 wheel icon**
+  over the nature tint — not a blank colour square, not a purple-and-black missing-texture
+  checkerboard, and not a smeared fragment of some other texture. A smear or blank means the
+  9-argument `blit` is sampling with the wrong texture dimensions, which is invisible to every
+  test that exists.
+- Hover the preview: *Spell wheel preview — Nature: …, Icon: …*, updating as you cycle.
+- Hover each of the three **empty** working slots: each gives its own tooltip. Neither this nor
+  the preview tooltip should double-draw over a vanilla item tooltip.
+
+### C4 — Wheel icon for a Curios-equipped spellbook (the headline fix)
+
+The wheel-icon lookup previously checked both hands and nothing else — but a bound book
+normally sits in the **Curios spellbook slot** while its entries render, so the wheel fell back
+to the default icon and name.
+
+1. Bind an Ars spell into an Iron's spellbook (W18).
+2. Put that book in the **Curios spellbook slot**, not a hand.
+3. Open the spell wheel.
+
+Pass: the ANS entry shows its custom name and its chosen icon. Fail: it shows the generic
+default icon or a placeholder name — meaning `Utils.getPlayerSpellbookStack` is not resolving.
+
+### C5 — Resonance direction toggles and the new threshold gate
+
+`enable_ars_resonance` / `enable_irons_resonance` were dead keys and are now live.
+`resonance_threshold` is new as a working gate and **defaults to 0, which must reproduce the
+old always-on behaviour exactly**.
+
+1. Leave the config at defaults. Cast at full mana and at ~10% mana. Damage should differ
+   slightly (roughly 1.2x vs 1.0x at stock `resonance_strength`) — this is unchanged behaviour
+   and is the baseline for the rest of this check.
+2. Set `enable_irons_resonance = false`. Iron's spell damage stops varying with mana; **Ars
+   spells still do**.
+3. Set `enable_ars_resonance = false` and Iron's back to `true`. The reverse.
+4. Both `true`, set `resonance_threshold = 0.95` and `resonance_duration = 100`. Now the bonus
+   applies only near a full pool, and **lingers about five seconds** after you spend down.
+   Cast twice quickly from full: both should be boosted. Wait ten seconds at low mana and cast
+   again: not boosted.
+
+`/ans debug` toggles `debug_mode` if you want the values in the log.
+
+### C6 — Mana bar, both `hybrid_mana_bar` values
+
+The bar-hiding fix shipped in `5d7b5fe`; the config key is newly validated, so a bad value is
+now rejected at load rather than silently resolving.
+
+- `mana_unification_mode = hybrid`, `hybrid_mana_bar = irons` → **only** Iron's cyan bar.
+- `hybrid_mana_bar = ars` → **only** the Ars purple bar.
+- `hybrid_mana_bar = nonsense` → rejected at load, falls back to `irons`, and the server log
+  says the value was corrected. It must **not** silently pick a bar.
+- `mana_unification_mode = separate` → both bars, by design.
+
+---
+
 ## Removed scenarios
 
 The following scenarios from the Forge 1.20.1 testing guide are no longer applicable:
@@ -249,7 +359,7 @@ If a future Curios integration in Phase 6 reintroduces curio-driven discounts, e
 - **Cooldowns blocking spells from the "wrong" mod**: this is intentional. Cooldowns are global per category by design; see [README §Cooldowns](README.md#cooldowns).
 - **Cast nothing-happens on inscribed item**: confirm the item actually carries an inscription (`/data get entity @s` should show `ars_n_spells:cross_spells`), that the source mod of the inscribed spell is installed, and that you are not mid cross-cast cooldown. [`CrossCastingHandler`](src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java) handles the right-click cast, sneak-cycle between inscriptions, and the cross-cast cost multiplier; a malformed inscription shows a red rejection message rather than silently no-casting.
 - **Recipes failing to load with `Unknown tag c:logs/archwood`**: confirm Ars Nouveau 5.11.1+ is installed — it ships the `c:` namespace common tag set. If Ars's tag still uses `forge:logs/archwood` on your specific build, fall back to `forge:logs/archwood` temporarily.
-- **Two mana bars showing**: bar hiding is done natively by [`ManaBarController`](src/main/java/com/otectus/arsnspells/client/ManaBarController.java) (it cancels `RenderGuiLayerEvent.Pre` per mode), not by a mixin on Iron's overlay. In `separate` / `disabled` both bars show by design; otherwise confirm the layer ids `ars_nouveau:mana_bar` / `irons_spellbooks:mana_bar` are what render (enable `debug_mode` and read the `[OVERLAY]` log lines from V14).
+- **Two mana bars showing**: bar hiding is done natively by [`ManaBarController`](src/main/java/com/otectus/arsnspells/client/ManaBarController.java) (it cancels `RenderGuiLayerEvent.Pre` per mode), not by a mixin on Iron's overlay. In `separate` / `disabled` both bars show by design; otherwise confirm which layer ids actually render (enable `debug_mode` and read the `[OVERLAY]` log lines from V14). Note the real ids are **`ars_nouveau:mana_hud`** and **`irons_spellbooks:mana_overlay`** — this guide previously named them `*:mana_bar`, which is the guess that shipped in the controller and is exactly why both bars rendered: neither matcher ever fired. The controller now matches on namespace plus a `mana` substring rather than on hardcoded ids.
 
 ## Reporting issues
 
