@@ -1,8 +1,8 @@
-# Testing Guide — Ars 'n' Spells 3.1.0
+# Testing Guide — Ars 'n' Spells 3.2.2
 
 This guide covers manual verification scenarios for the cross-cast pipeline
 (introduced in 2.0.0), the native-wheel/Spell Loom export systems (3.0.0),
-and the 3.0.x / 3.1.0 hardening fixes. It supersedes the pre-1.8 testing notes.
+and the 3.0.x / 3.1.x / 3.2.x hardening fixes. It supersedes the pre-1.8 testing notes.
 
 **Read this first: much of what used to be manual is now automated.** The
 scenarios below are for what a human still has to look at — rendering, feel,
@@ -47,7 +47,7 @@ prefixes to most event paths.
 Run these before any manual pass.
 
 ```bash
-./gradlew test                                                   # 213 JUnit tests
+./gradlew test                                                   # 256 JUnit tests
 ./gradlew runGameTestServer                                      # Iron's-absent boot + fallback
 rm -rf run/world && ./gradlew runGameTestServer -PwithIronsRuntimeGameTests
 rm -rf run/world && ./gradlew runGameTestServer -PwithArsElemental
@@ -74,7 +74,11 @@ export → bind → cast from the Curios spellbook slot, main hand and offhand;
 unbind removing both sidecar and native wheel slot; the Inscription Table guard
 on client and server; legacy carrier repair; bind rejection of unreadable and
 missing-glyph payloads; proxy hiding from recipe viewers; school resolution
-including filter glyphs and multi-school glyphs; and addon glyph round-trips.
+including filter glyphs and multi-school glyphs; addon glyph round-trips;
+loss-exact mana deduction on hybrid mode with the shared-pool ceiling deliberately
+knocked out; the cross-spell tooltip surviving corrupt, foreign and unreadable
+payloads; every ritual having a tablet the brazier can resolve; and the
+`ars_cross_*` proxies being absent from Iron's own loot filter.
 
 What still needs a human: anything visual (wheel icons, names, mana bars, the
 Spell Loom screen under shaders), anything about *feel* (costs, cooldowns,
@@ -273,6 +277,127 @@ With Ars Elemental installed, cast a few of its elemental spells and confirm the
 school ANS reports (affinity gain, elemental scaling) matches the element you
 would expect. If one disagrees, it is a mapping opinion rather than a bug — fix
 it from a datapack, see the README's *Spell schools* section.
+
+---
+
+## 3.2.0 — what automation cannot reach
+
+The mechanisms below are covered headlessly (`SharedPoolManaGameTests`,
+`CrossSpellTooltipGameTests`, `RitualTabletGameTests`, `ItemAssetCompletenessTest`).
+What is left needs a real client — the drain was reported by a player watching a
+mana bar, the crash needs a render loop, and a dedicated server never loads the
+item textures at all.
+
+### X9 — Hybrid mana: a spell costs its cost
+
+The headless proof is `SharedPoolManaGameTests` under
+`-PwithIronsRuntimeGameTests`; this is the same thing with a real player and a
+real spell book, and it is the scenario a player reported.
+
+1. Set `mana_unification_mode = hybrid` (`/ans mode set hybrid` applies it live).
+2. Get a pool clearly larger than Iron's default — a tiered Ars spell book plus
+   a few glyph-bonus upgrades. Let the bar fill.
+3. Note the exact number, then cast a mid-cost Ars spell from the spell book.
+
+Expected: the bar drops by the spell's cost and no more. Before this fix the
+whole pool collapsed, and the smaller your spell the more obvious it was.
+
+4. Repeat immediately after a **Nether round trip**, and again right after
+   swapping a piece of mana gear. Both used to drop the ceiling that governs
+   mana writes, so the next cast — of any cost — ate everything above it.
+5. Check `logs/latest.log` for `casting for … cost … but the pool fell from`.
+   That warning should never appear; if it does, capture it with your mana mode
+   and gear, because it names the ceiling that was wrong.
+
+### X10 — Spell Loom scroll tooltip
+
+1. Weave a spell at the Spell Loom.
+2. Hover the output slot, then hover the scroll in your inventory, then in a
+   chest. Try it with and without advanced tooltips (F3+H).
+3. Repeat with a carrier exported by **3.0.3 or earlier** if you still have one.
+
+Expected: no crash, and the scroll shows its *Inscribed Spells* lines. If a
+tooltip line is missing, that is now the failure mode instead of a crash — check
+`logs/latest.log` for `cross-spell tooltip failed for`, which logs the item and
+the payload that caused it.
+
+### X11 — Ritual tablets render, and the mana rituals are reachable
+
+1. Craft all five tablets on the Enchanting Apparatus: Spell Transcription,
+   Spellbook Binding, Spell Uninscription, Mana Infusion, Mana Well.
+2. Look at each in the inventory and placed on a Ritual Brazier.
+
+Expected: five distinct grey stone tablets with coloured glyphs, matching Ars
+Nouveau's own tablets in style. No purple-and-black checkerboard anywhere. Three
+of these shipped with no model or texture at all from 3.0.0 to 3.0.3.
+
+3. Run Mana Infusion on a brazier. Expected: the nearest player gains
+   `ritual_mana_infusion_amount` mana.
+4. Run Mana Well and stand inside `mana_well_range`. Expected: mana regenerates
+   for its duration. Neither ritual could be started at all before 3.2.0 — they
+   had no tablet.
+5. Bind an Ars spell into a spell book and open Iron's spell wheel. Expected: the
+   entry shows the icon chosen at the loom, never a checkerboard.
+
+---
+
+## 3.2.2 — what automation cannot reach
+
+The lootability fix is proven headlessly: `CrossCastGameTests` asks Iron's own
+`SpellFilter.getApplicableSpells()` — the exact call every `randomize_spell` loot
+function, the wandering-trader scroll trade and the enhancement-ring imbuer make —
+and asserts no `ars_cross_*` spell comes back. What that cannot show is a real
+chest in a real world, or what happens to a scroll a player already looted.
+
+### X12 — No proxy scrolls in generated loot
+
+1. New world, with Iron's Spellbooks installed.
+2. `/give @s irons_spellbooks:scroll_pouch` and open a dozen. A pouch is three
+   guaranteed random-spell rolls with no empty entries, so it is by far the
+   fastest way to sample the table.
+3. `/loot give @s loot irons_spellbooks:chests/additional_generic_loot` a few
+   dozen times for the vanilla-chest path, and
+   `.../chests/additional_end_city_loot` for the Ender-school-filtered path —
+   that one was the worst affected, because Iron's has only 14 Ender spells to
+   dilute eight proxies.
+
+Expected: every scroll names a real Iron's spell. Not one should be called
+"Ars Spell" or show a raw `spell.ars_n_spells.ars_cross_N.guide` tooltip. On
+3.2.1 these turned up quickly — the proxies are Common rarity, which carries the
+heaviest weight in Iron's table.
+
+4. Find a wandering trader and check its stock, and loot an enhancement ring.
+   Both draw from the same filter and were affected identically.
+
+### X13 — A scroll looted before the fix repairs itself
+
+Needs a world saved on **3.2.1 or earlier** that contains a proxy scroll.
+
+1. Load that world on 3.2.2 and right-click the stray scroll.
+
+Expected: it becomes a plain Iron's scroll, the cast is refused rather than
+charged, and an action-bar line explains what happened. The item is never
+deleted.
+
+2. Right-click it repeatedly, then check `logs/latest.log`.
+
+Expected: at most one `Ars cross proxy` warning per five seconds. Before the fix
+this branch logged once per click, so a player fiddling with a dud could flood a
+server log.
+
+3. Confirm unopened chests in that same world are unaffected — loot is rolled
+   when a chest is first opened, so anything still sealed was never wrong.
+
+### X14 — The fix did not break binding or casting
+
+The one regression risk: the proxies are still registered and still resolved by
+id at cast time, and only their loot eligibility changed.
+
+1. Inscribe an Ars spell onto a scroll at the Spell Loom, bind it into a
+   spellbook, and open Iron's spell wheel.
+
+Expected: the entry is present with its chosen icon and casts normally, from the
+Curios spellbook slot as well as from the hand.
 
 ---
 

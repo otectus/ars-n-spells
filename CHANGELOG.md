@@ -2,7 +2,180 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.1.0] - unreleased
+## [3.2.2] - 2026-08-28
+
+### Fixed: Iron's loot chests could contain fake "Ars 'n' Spells" spell scrolls
+
+- Exploration chests, Mystery Scroll Pouches, magic-mob drops and wandering traders could hand
+  you a spell scroll named after an Ars Nouveau spell whose tooltip read as a raw translation
+  key (`spell.ars_n_spells.ars_cross_1.guide` and similar). These were the mod's eight internal
+  `ars_cross_*` proxy spells - the hidden slots that let an Ars spell appear in Iron's native
+  spell wheel - and they are meaningless outside a spellbook that carries the matching spell.
+  Using one did nothing.
+- Ars 'n' Spells does not modify any loot table, and never did. Iron's Spellbooks picks a random
+  spell out of its own registry, and a spell is eligible unless it opts out with `allowLooting`.
+  The proxies set `allowCrafting=false`, which keeps them out of the Scroll Forge, but Iron's
+  loot never looks at that flag. They now opt out of looting explicitly, so no new one can be
+  generated - by loot, by a wandering trade, or when a looted ring is imbued.
+- They were also the most likely thing to be rolled, not the least: the proxies declare Common
+  rarity, which carries the heaviest weight in Iron's random-spell table.
+- A stray scroll already in your world is repaired the first time you right-click it: it becomes
+  a blank Iron's scroll instead of a permanent dud, and the cast is refused rather than charged.
+  Unopened chests are unaffected - loot is rolled when a chest is first opened, so they were
+  never wrong to begin with.
+- The internal warning logged when a proxy fires with no spellbook behind it is now rate-limited
+  per player. Clicking a dud scroll repeatedly could otherwise flood a server log.
+- Added the eight missing spell-description translations, so a proxy that is still visible
+  anywhere shows readable text rather than a raw key.
+
+## [3.2.1] - 2026-08-25
+
+### Fixed: a mixin conflict that stopped an entire modpack from loading
+
+- Installing Ars 'n' Spells alongside **One Mana Bar** made the game fail to start, taking
+  **twelve mods down with it** — Iron's Spellbooks itself, ISS: Magic From The East, Construct's
+  Casting, Grimoire of Gaia Spells, Fallen Gems & Affixes, Iron's Spell's Delight, Additional
+  Attributes, Interlace SpellWeaves, Farmers Spell, Apprentice's Codex, Iron's Botany, and ANS.
+- The cause was ours. We adjusted the mana value Iron's reads inside
+  `AbstractSpell.canBeCastedBy` with a `@Redirect` aimed at one specific instruction in that
+  method. One Mana Bar replaces the whole method, so the instruction was gone — and Mixin
+  treats that as a fatal error rather than skipping the injection. `require = 0` does not help:
+  the check runs before the requirement count is ever consulted.
+- The adjustment now uses only `HEAD` and `RETURN` injection points, which Mixin permits into a
+  replaced method by design. The ring bypass and ARS_PRIMARY mana conversion behave exactly as
+  before, and they now keep working even when another mod rewrites that method.
+- A second, independent safeguard covers the case where a replacing mod does not read mana the
+  way Iron's does: if a Ring of Seven Curses/Virtues wearer is refused a cast for insufficient
+  mana, that refusal is overturned. In the normal path this never triggers.
+
+### Fixed: mixin failures can no longer abort mod loading for the whole pack
+
+- Mixins targeting Iron's Spellbooks and Covenant of the Seven — both **optional**
+  dependencies — moved into a separate, non-required mixin config. A conflict there now logs a
+  warning and skips that one mixin instead of aborting startup for every mod in the chain.
+- Mixins targeting Ars Nouveau stay required. Ars is a hard dependency, so a failure there
+  means the mod is genuinely broken and should fail loudly rather than half-work.
+- The startup self-check was reporting `OK` unconditionally: it verified our mixin classes were
+  loadable, which they always are, rather than whether they had actually applied. It now
+  inspects the Iron's classes themselves and names any degraded feature in one greppable log
+  line. It also runs later in startup, so it no longer forces Iron's classes to load early —
+  which could break other mods' mixins.
+
+### Fixed: Iron's scrolls have been casting completely free
+
+- **This one is a nerf, and it will be noticeable.** `MixinScrollItem` targeted `use` without
+  requesting name remapping, but in a released jar that method is renamed to `m_7203_`. The
+  injection therefore matched nothing and failed silently, in **every released build**. Scrolls
+  have been casting with no mana, no LP and no aura cost the entire time.
+- Scrolls now cost what `scroll_cost_mode` says they cost. The default is unchanged (`full` —
+  the same cost as casting the spell normally); set it to `lp_only` or `free` if you prefer the
+  old behaviour.
+- The build now fails if any remapped injection stops producing a mapping, so this class of
+  silent breakage cannot ship again.
+
+## [3.2.0] - 2026-08-21
+
+### Added: a dedicated creative tab
+
+- Every Ars 'n' Spells item now lives in one **Ars 'n' Spells** creative tab, keyed by the
+  Spell Loom. Previously the mod owned no tab and its items borrowed other mods': the Spell
+  Loom was pushed into vanilla **Functional Blocks**, and the five ritual tablets surfaced
+  inside the **Ars Nouveau** tab.
+- The tablets were never placed there deliberately. ANS has to splice its tablets into Ars
+  Nouveau's ritual item map so Ritual Braziers and JEI can resolve a tablet back to its ritual,
+  and Ars's tab generator enumerates that same map. The splice is untouched — braziers and JEI
+  work exactly as before — but the tablets no longer appear in Ars's tab.
+- **Where things moved:** the Spell Loom is no longer in Functional Blocks, and the Spell
+  Transcription, Spellbook Binding, Spell Uninscription, Mana Infusion and Mana Well tablets
+  are no longer in the Ars Nouveau tab. All six are in the new tab, and all six remain findable
+  in the creative **Search** tab and in JEI/EMI.
+- The tab is not gated on Iron's Spellbooks. Without Iron's it holds the Spell Loom and the
+  Spell Uninscription tablet; the four Iron's-gated tablets are absent, as they already were.
+
+### Added: the Mana Infusion and Mana Well rituals are obtainable
+
+- Both have existed as registered rituals since 1.x with **no tablet item whatsoever**, so
+  neither could ever be placed on a Ritual Brazier — two documented, configurable features
+  that no player could reach. The README said as much and left them pending a keep-or-remove
+  decision; they are now kept and finished.
+- Each gets a tablet item, artwork, lang entries, and an Enchanting Apparatus recipe. Mana
+  Infusion: blank parchment reagent, plus a source gem block, a source gem, an Iron's arcane
+  essence and an archwood log, 1500 source. Mana Well: the same minus the source gem, plus a
+  water bucket, 2000 source. Both are Iron's-gated, like the rituals themselves.
+- Behaviour is unchanged from what the config keys always described: Mana Infusion grants
+  `ritual_mana_infusion_amount` once to the nearest player on completion; Mana Well regenerates
+  `mana_well_regen_rate` per tick to everyone inside `mana_well_range` for its duration. Both
+  pay into whichever pool the active mana unification mode treats as primary.
+
+### Fixed: one Ars spell drained the whole mana pool on hybrid mode
+
+- Iron's `MagicData.setMana` clamps **every** write down to the player's `max_mana` attribute,
+  and `addMana` is just `setMana(mana + delta)` (verified identical in Iron's 3.15.0 and
+  3.16.3). A ceiling below the current pool therefore does not cap mana — it deletes the
+  difference on the next write, whatever that write happens to be.
+- In HYBRID, ANS never put Ars's real max into that attribute. Only the *gear-derived* slice
+  was carried across, so a spell book tier or glyph bonus raised the pool the player was shown
+  without raising the ceiling that governs writes, and the first cast — of any cost — collapsed
+  the pool. `CHANGELOG.md` for 3.0.x claimed this was handled "in all shared-pool modes"; only
+  `ARS_PRIMARY` actually did it.
+- The shared pool now has a single ceiling, driven to `max(Ars max, Iron's own max)`. The
+  shortfall is measured against Iron's max with the ANS modifier removed, so Iron's own gear
+  and upgrade orbs are neither voided nor double-counted. `respect_armor_bonuses` no longer
+  suppresses it in HYBRID: that toggle governs bonuses, and this is the difference between
+  limiting mana and destroying it.
+- The ceiling modifier is transient, so it was silently lost whenever the `ServerPlayer` was
+  rebuilt. Dimension changes now re-apply it (every other lifecycle handler in the mod already
+  listened for that event; this one did not), and a cheap check immediately before any
+  deduction re-applies it if it has drifted — so a cast can never destroy mana even if some
+  other recompute lagged.
+- `IronsBridge.consumeMana` now verifies its own arithmetic and logs once at WARN if a
+  deduction ever loses more than its cost, naming the ceiling. It previously had no way to
+  tell a correct deduction from a wipe.
+- The Ars-side cost was validated with `(float)(cost × rate)` and charged with
+  `(int) Math.round(cost × rate)`. Both now go through one helper, so the amount charged is
+  the amount checked — and at the config's 0.01 rate floor, spells under 50 mana are no longer
+  rounded down to free.
+
+### Fixed: ritual tablets rendered as the missing-texture checkerboard
+
+- The three ritual tablets have shipped with **no item model and no texture at all** since the
+  1.20.1 line was reconstructed at 3.0.0: `models/item/` held only the Spell Loom, and
+  `textures/item/` did not exist. All three are craftable, so players could obtain items that
+  render as purple-and-black in the inventory and on the brazier. Nothing failed at build time
+  and nothing logged an error.
+- Five 16×16 tablet textures are now shipped, drawn to sit alongside Ars Nouveau's own tablets
+  (a chamfered grey plaque carrying one coloured glyph) and generated reproducibly by
+  `tools/gen_ritual_tablets.py`.
+- The eight `ars_cross_*` spell-wheel icons Iron's resolves by convention
+  (`textures/gui/spell_icons/ars_cross_<k>.png`) are now shipped as a fallback. The mixin that
+  overrides them is declared `require = 0`, so a signature change on Iron's side would have
+  silently produced eight checkerboards in the wheel with no error at all.
+- A test now walks every registered item and fails the build if its model or texture is
+  missing, and a GameTest asserts every ritual has a tablet the brazier can resolve.
+
+### Fixed: hovering a Spell Loom scroll could crash the client
+
+- `CrossSpellTooltipHandler` runs on every hover of an ANS-inscribed item and was the only
+  event handler in the mod with no top-level exception guard. A throw there does not degrade to
+  a missing tooltip line — it propagates out of `ItemStack.getTooltipLines` into the render loop
+  and takes the client down. Its inner guard also caught only `Exception`, which sails past the
+  realistic failure in a large modpack: a linkage `Error` from an Ars Nouveau version or
+  addon-glyph skew reached through `Spell.fromTag`. It now catches `Throwable`, skips the lines,
+  and logs once with the offending item and payload.
+- `IronsScrollFactory` treated "the container key is present" as "the container is valid", while
+  `ISpellContainer.get` bottoms out in `DataResult.getOrThrow`. A carrier whose container existed
+  but did not decode would have been declared healthy and then thrown on every read Iron's made
+  of it. Validity is now established by decoding, and the legacy repair path uses the same test.
+- `MixinScrollItem`'s `spell == null` guard was unreachable — an empty container yields
+  `SpellData.EMPTY`, whose `getSpell()` is a real `SpellRegistry.none()`. Right-clicking an ANS
+  carrier therefore ran Iron's whole scroll cost/LP path against `NoneSpell`. It now tests for
+  the none spell, the same oversight this release already documented for `doInscription`.
+- Note on scope: Iron's own scroll-tooltip path is guarded in both 3.15.0 and 3.16.3, so the
+  carrier's container state is not what crashed there. The exact throw could not be reproduced
+  from code alone without the reporter's crash log, so the fix hardens every ANS dereference on
+  that path and turns any remaining occurrence into a log line plus a reproducible GameTest.
+
+## [3.1.0] - 2026-08-13
 
 ### Fixed: Iron's Inscription Table crashed on ANS-exported scrolls
 

@@ -1,6 +1,9 @@
 {
   "homepage": "https://github.com/otectus/ars-n-spells",
   "1.20.1": {
+    "3.2.2": "Fixes fake \"Ars 'n' Spells\" spell scrolls turning up in Iron's Spellbooks loot - exploration chests, Mystery Scroll Pouches, magic-mob drops and wandering traders. These were the mod's internal ars_cross_* proxy spells, which do nothing outside a spellbook that carries the matching Ars spell. Ars 'n' Spells does not modify any loot table; the proxies simply never opted out of Iron's random-spell pool, and now do. A stray scroll already in your world becomes a blank Iron's scroll the first time you right-click it, and the eight missing spell-description translations have been added.",
+    "3.2.1": "Fixes a mixin conflict that stopped the game from loading at all when One Mana Bar was installed, taking twelve mods down with it. Failures in the optional Iron's and Covenant integrations now degrade to a warning instead of aborting startup for the whole pack. Iron's scrolls have been casting completely free in every previous build - scroll cost enforcement now actually applies, so scrolls cost whatever scroll_cost_mode says (default: the same as casting normally).",
+    "3.2.0": "Fixes one Ars spell draining the entire mana pool on hybrid mode, ritual tablets rendering as the missing-texture checkerboard, and a client crash when hovering a Spell Loom scroll. Adds the Mana Infusion and Mana Well ritual tablets, which had no item and could never be placed on a brazier.",
     "3.1.0": "Fixes the Iron's Inscription Table crash on exported scrolls (client AND server), orphan wheel entries left by unbinding, free Ars casts when the Virtue Ring system is disabled, and ars_cross_* ghosts in JEI/EMI. Spell schools now come from Ars Nouveau's own metadata, and removing an addon fails loudly instead of silently changing a bound spell.",
     "3.0.3": "Cross-cast fixes: a bound Ars spell equipped in the Curios spellbook slot now casts (it silently did nothing), binding rolls back instead of half-succeeding, Iron's affinity/cooldown/LP/progression no longer double-bill proxy casts, and unreadable payloads are refused before anything is consumed.",
     "3.0.2": "Affinity decay curve fix (~20x too fast), datapack tags for rings/blasphemies/source jars, Spell Loom advancement chain and screen readability, aura_failure_mode, config-driven progression curve.",
@@ -8,7 +11,7 @@
     "3.0.0": "Cross-cast inscription: export Ars spells onto Iron's scrolls and bind them into Iron's spellbooks via the Spell Loom."
   },
   "promos": {
-    "1.20.1-latest": "3.1.0",
-    "1.20.1-recommended": "3.1.0"
+    "1.20.1-latest": "3.2.2",
+    "1.20.1-recommended": "3.2.2"
   }
 }

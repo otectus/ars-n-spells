@@ -755,6 +755,139 @@ public final class CrossCastGameTests {
         helper.succeed();
     }
 
+    /**
+     * Proxies must also declare themselves unlootable.
+     *
+     * <p>Unlike {@code allowCrafting} above, {@code allowLooting()} does not route through
+     * {@code SpellConfigManager} — its base implementation reads the school's flag directly —
+     * so the live method can be asserted here with no config-plumbing caveat.
+     *
+     * <p>This is the flag Iron's loot actually consults. The ENDER school the proxies use for
+     * {@code requiresLearning == false} defaults {@code allowLooting} to true, which is how
+     * {@code ars_cross_*} scrolls reached chest loot, scroll pouches and wandering traders in
+     * 3.2.1.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_proxies_declareUnlootable(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        for (int poolId = 1;
+                poolId <= com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry.POOL_SIZE;
+                poolId++) {
+            var proxy = com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry.get(poolId);
+            if (proxy == null) {
+                helper.fail("proxy pool " + poolId + " is not registered");
+                return;
+            }
+            if (proxy.allowLooting()) {
+                helper.fail("ars_cross_" + poolId + " must opt out of looting; otherwise Iron's "
+                    + "random-spell rolls can hand the player an uncastable scroll");
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The behavioural half, through Iron's own code. {@code SpellFilter} is what every
+     * {@code irons_spellbooks:randomize_spell} loot function, the wandering-trader scroll trade
+     * and the enhancement-ring imbuer consult, so asking it directly is what actually proves
+     * loot is closed — rather than asserting ANS's own flag back to itself.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_ironsLootFilter_neverOffersAProxy(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        var applicable = new io.redspace.ironsspellbooks.loot.SpellFilter().getApplicableSpells();
+        if (applicable.isEmpty()) {
+            helper.fail("Iron's unfiltered loot pool came back empty — the filter is not being "
+                + "exercised, so this test would pass for the wrong reason");
+            return;
+        }
+        for (var spell : applicable) {
+            if (com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry
+                    .poolIdOf(spell.getSpellResource()) >= 0) {
+                helper.fail("Iron's loot pool still offers " + spell.getSpellResource()
+                    + "; a randomly generated scroll can therefore still be a dud proxy");
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Loot debris already in a player's world is blanked the first time it is touched.
+     * {@link IronsProxyCastDriver#makeProxyScroll} builds the same stack shape Iron's
+     * {@code RandomizeSpellFunction} produced.
+     */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_strayProxyScroll_isBlankedOnContact(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        ItemStack stray = IronsProxyCastDriver.makeProxyScroll(1);
+        if (!ArsCrossProxyHiding.neutralizeStrayProxyScroll(stray)) {
+            helper.fail("a stray proxy scroll must be neutralized on contact");
+            return;
+        }
+        if (IronsScrollFactory.hasNativeContainer(stray)) {
+            helper.fail("neutralizing must strip the native container, leaving a blank scroll");
+            return;
+        }
+        if (stray.isEmpty()) {
+            helper.fail("neutralizing must not destroy the player's item");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /** The negative control: real items must survive the neutralizer untouched. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_neutralizer_leavesRealItemsAlone(GameTestHelper helper) {
+        if (!IronsCompat.isLoaded()) {
+            helper.succeed();
+            return;
+        }
+        // A genuine Iron's spell scroll — blanking one would delete real player content.
+        ItemStack real = IronsProxyCastDriver.makeNativeScroll();
+        if (real.isEmpty()) {
+            helper.fail("no non-proxy Iron's spell is registered; the negative control cannot run");
+            return;
+        }
+        if (ArsCrossProxyHiding.neutralizeStrayProxyScroll(real)) {
+            helper.fail("a genuine Iron's spell scroll must never be blanked");
+            return;
+        }
+
+        // An ANS carrier: sidecar payload plus the deliberately empty native container. The
+        // sidecar guard must refuse it — stripping that container recreates the Inscription
+        // Table NPE that IronsScrollFactory exists to prevent.
+        ItemStack carrier = ArsSpellExportUtil.createIronsScrollCarrier(
+            new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE));
+        if (carrier == null || carrier.isEmpty()) {
+            helper.fail("could not build an ANS carrier scroll for the negative control");
+            return;
+        }
+        if (ArsCrossProxyHiding.neutralizeStrayProxyScroll(carrier)) {
+            helper.fail("an ANS carrier scroll must survive the neutralizer untouched");
+            return;
+        }
+        if (ArsCrossProxyHiding.neutralizeStrayProxyScroll(new ItemStack(Items.BOOK))) {
+            helper.fail("a non-scroll must never be rewritten");
+            return;
+        }
+        if (ArsCrossProxyHiding.neutralizeStrayProxyScroll(ItemStack.EMPTY)) {
+            helper.fail("an empty stack must never be rewritten");
+            return;
+        }
+        helper.succeed();
+    }
+
     // ------------------------------------------------------------------
     // Legacy repair. Items written by older builds already exist in worlds and
     // cannot be reached by a fix at the creation site, so they are repaired when

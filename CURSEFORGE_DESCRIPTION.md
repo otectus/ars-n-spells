@@ -6,6 +6,41 @@ Works with **Minecraft 1.20.1** on **Forge**.
 
 ---
 
+## What's new in 3.2.2
+
+**If you have found strange "Ars Spell" scrolls in loot chests, this is the release that stops them.** Exploration chests, Mystery Scroll Pouches, magic-mob drops and wandering traders could hand you a spell scroll whose tooltip showed a raw line of code rather than a description, and which did nothing at all when used. Those were Ars 'n' Spells' internal proxy spells — the hidden slots that let an Ars Nouveau spell show up in Iron's spell wheel — and they are meaningless outside a spellbook that carries the matching spell.
+
+Ars 'n' Spells does not modify any loot table and never has. Iron's Spellbooks picks a random spell from its own registry, and a spell is eligible unless it opts out. Ours opted out of the Scroll Forge but never out of loot, and because they are Common rarity they were among the *most* likely things to be rolled. They now opt out properly, so no new one can be generated — by loot, by a wandering trade, or when a looted ring is imbued.
+
+A stray scroll already sitting in your world is not stuck there: right-click it once and it turns into a blank Iron's scroll, rather than staying a permanent dud. Unopened chests were never affected, since loot is decided when a chest is first opened. The eight missing spell descriptions have been added too, so nothing shows a raw translation key any more.
+
+---
+
+## What's new in 3.2.1
+
+**If you run One Mana Bar, this release is why your game would not start.** Installing Ars 'n' Spells alongside it made mod loading fail outright and took twelve other mods down with it, Iron's Spellbooks among them. The fault was ours: we adjusted the mana value Iron's reads when it decides whether you can cast, and we did it by targeting one specific instruction inside that check. One Mana Bar replaces that whole method, so the instruction was gone, and Mixin treats that as a fatal error rather than something to skip. The adjustment now attaches to the start and end of the method instead, which is allowed even when another mod has replaced it — so both mods can now coexist.
+
+Also in this release:
+
+- **Iron's scrolls have been casting completely free.** Scroll cost enforcement has never once worked in a released build: it hooked a method by a name that only exists in a development environment, so in the jar you actually download it quietly matched nothing and did nothing. Scrolls now cost what `scroll_cost_mode` says they cost. **This is a nerf and you will notice it** — the default is `full`, the same cost as casting the spell normally. Set it to `lp_only` or `free` if you would rather keep the old behaviour.
+- **A broken integration can no longer take your whole pack down.** Iron's Spellbooks and Covenant of the Seven are optional dependencies, so their integrations now live in a separate, non-required layer. If a future mod conflicts with one of them, that single piece is skipped with a warning in the log and everything else still loads.
+- **The startup self-check now tells the truth.** It previously reported success no matter what, because it was checking whether its own classes existed rather than whether the integration had actually attached. It now inspects Iron's own classes and names any degraded feature in one line you can search the log for.
+
+---
+
+## What's new in 3.2.0
+
+**If you play on `hybrid` mana mode, update.** One Ars spell could drain your entire mana pool. Iron's clamps every change to your mana down to its max-mana attribute, and hybrid mode only ever carried the *gear* part of your Ars maximum across — so a tiered spell book or glyph upgrades raised the pool you could see without raising the ceiling that actually governs it, and the next cast, whatever it cost, ate everything above that ceiling. The shared pool now has a single ceiling, kept at whichever of the two maximums is larger, re-applied when you change dimension and re-checked right before any mana is spent.
+
+Also in this release:
+
+- **Ritual tablets have artwork again.** Spell Transcription, Spellbook Binding and Spell Uninscription have had no model or texture at all since 3.0.0 and showed up as the purple-and-black missing-texture block in your inventory and on the brazier. All three now have proper tablet art in Ars Nouveau's style.
+- **Two rituals you have never been able to use.** **Mana Infusion** and **Mana Well** were registered as rituals with no tablet item, so there was no way to put either on a brazier. Both now have a tablet, art, and an Enchanting Apparatus recipe. Mana Infusion grants a burst of mana on completion; Mana Well regenerates mana for everyone in range while it runs.
+- **Hovering a Spell Loom scroll can no longer crash your game.** The tooltip is now fully guarded, and if it ever does hit something it cannot read it drops a line and writes the details to the log instead of taking the client down.
+- **Spell-wheel icons have a fallback.** The `ars_cross_*` entries could have shown as checkerboards if Iron's ever changed the method ANS overrides. They now ship real fallback icons.
+
+---
+
 ## What's new in 3.1.0
 
 **If you export Ars spells onto Iron's scrolls, update.** Putting one of those scrolls into Iron's **Inscription Table** and pressing Inscribe used to crash — and on a dedicated server it crashed the *server*, not just the player who did it. That is fixed, scrolls made by older versions are repaired automatically, and the table now politely tells you to use the Spellbook Binding workflow instead of eating your scroll.
@@ -177,7 +212,7 @@ Discounts stack multiplicatively with ring costs, and a matching Blasphemy also 
 
 ## Scroll Cost Enforcement
 
-Iron's Spellbooks scrolls respect your resource costs:
+Iron's Spellbooks scrolls respect your resource costs. **This has only actually worked since 3.2.1** — in every earlier build the enforcement silently did nothing and scrolls cast for free.
 
 | Mode | Behavior |
 |------|----------|

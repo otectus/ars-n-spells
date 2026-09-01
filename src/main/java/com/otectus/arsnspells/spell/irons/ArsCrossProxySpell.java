@@ -3,6 +3,7 @@ package com.otectus.arsnspells.spell.irons;
 import com.otectus.arsnspells.spell.CrossCastNbt;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.util.CrossCastTrace;
+import com.otectus.arsnspells.util.LogThrottle;
 import io.redspace.ironsspellbooks.api.config.DefaultConfig;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
 import io.redspace.ironsspellbooks.api.registry.SchoolRegistry;
@@ -46,6 +47,9 @@ import java.util.UUID;
 public class ArsCrossProxySpell extends AbstractSpell {
     private static final Logger LOGGER = LoggerFactory.getLogger(ArsCrossProxySpell.class);
 
+    /** At most one failed-cast WARN per player per this many ms. */
+    private static final long STRAY_LOG_WINDOW_MS = 5_000L;
+
     private final int poolId;
     private final ResourceLocation spellResource;
     private final DefaultConfig defaultConfig;
@@ -71,6 +75,9 @@ public class ArsCrossProxySpell extends AbstractSpell {
             // Forge (and the Scroll Forge recipes it feeds to JEI) on this flag and nothing
             // else — casting, the spell wheel and the inscription table are unaffected — so
             // this removes a nonsense craft without disabling the spell itself.
+            //
+            // Crafting and looting are two independent gates in Iron's, and this one does not
+            // cover loot. See allowLooting() below for the other half.
             .setAllowCrafting(false)
             .build();
     }
@@ -101,6 +108,34 @@ public class ArsCrossProxySpell extends AbstractSpell {
         return 0;
     }
 
+    /**
+     * Never a candidate for random loot, wandering trades or ring imbuing.
+     *
+     * <p>Iron's has two independent opt-out gates and this class used to set only one.
+     * {@code allowCrafting=false} covers the Scroll Forge; loot goes through
+     * {@code SpellFilter#isSpellAllowed}, whose entire body is
+     * {@code isEnabled() && (force || allowLooting())} — it never looks at crafting. The base
+     * implementation returns {@code getSchoolType().allowLooting}, and the ENDER school the
+     * constructor picks for its {@code requiresLearning == false} is built with the seven-arg
+     * {@code SchoolType} constructor, which hardcodes {@code allowLooting = true}.
+     *
+     * <p>So without this override every proxy was a live candidate in each
+     * {@code irons_spellbooks:randomize_spell} roll, at {@code COMMON} — the heaviest rarity
+     * weight Iron's assigns — and turned up as an uncastable scroll in vanilla chests, scroll
+     * pouches, mob drops and wandering-trader stock, which is exactly what was reported
+     * against 3.2.1.
+     *
+     * <p>Overriding the method is the only mechanism available: {@code DefaultConfig} has no
+     * {@code setAllowLooting}. Switching school is not an alternative — the one school with
+     * {@code allowLooting == false} is Eldritch, which also sets {@code requiresLearning =
+     * true}, precisely the cast gate the ENDER choice exists to avoid. Disabling the spell is
+     * not an alternative either: already-bound books resolve their wheel slots by id.
+     */
+    @Override
+    public boolean allowLooting() {
+        return false;
+    }
+
     @Override
     public void onCast(Level level, int spellLevel, LivingEntity entity, CastSource castSource,
                        MagicData playerMagicData) {
@@ -111,23 +146,37 @@ public class ArsCrossProxySpell extends AbstractSpell {
         if (carrier == null) {
             // Previously a silent return: the wheel slot selected and nothing happened,
             // with no way for a player or a log reader to tell why.
-            LOGGER.warn("Ars cross proxy {} cast by {} (source={}, equipmentSlot={}) but no carried "
-                    + "spellbook holds a sidecar entry for pool {} — the native wheel slot is desynced "
-                    + "from the {} sidecar, or the book was unequipped mid-cast",
-                spellResource, player.getGameProfile().getName(), castSource,
-                playerMagicData.getCastingEquipmentSlot(), poolId, CrossCastNbt.TAG_CROSS_MOD_SPELLS);
-            player.displayClientMessage(
-                Component.translatable("arsnspells.crosscast.proxy.book_missing", poolId), true);
+            //
+            // Throttled because this branch is reachable from a stray loot scroll, not only
+            // from a genuine book desync: a player clicking a dud once per tick would
+            // otherwise write a WARN line per click for as long as they kept clicking.
+            if (LogThrottle.allow(player.getUUID(), STRAY_LOG_WINDOW_MS)) {
+                LOGGER.warn("Ars cross proxy {} cast by {} (source={}, equipmentSlot={}) but no carried "
+                        + "spellbook holds a sidecar entry for pool {} — the native wheel slot is desynced "
+                        + "from the {} sidecar, the book was unequipped mid-cast, or this is a stray "
+                        + "scroll from before the proxies were made unlootable",
+                    spellResource, player.getGameProfile().getName(), castSource,
+                    playerMagicData.getCastingEquipmentSlot(), poolId, CrossCastNbt.TAG_CROSS_MOD_SPELLS);
+            }
+            if (neutralizeStrayCarrier(player, playerMagicData)) {
+                player.displayClientMessage(
+                    Component.translatable("arsnspells.crosscast.proxy.stray_scroll"), true);
+            } else {
+                player.displayClientMessage(
+                    Component.translatable("arsnspells.crosscast.proxy.book_missing", poolId), true);
+            }
             return;
         }
         ItemStack book = carrier.book();
         CompoundTag entry = carrier.entry();
         if (!entry.contains(CrossCastNbt.TAG_ARS_SPELL, Tag.TAG_COMPOUND)) {
-            LOGGER.warn("Ars cross proxy {} cast by {} resolved book {} for pool {} but that entry "
-                    + "carries no {} payload ({} Ars entries present)",
-                spellResource, player.getGameProfile().getName(),
-                ForgeRegistries.ITEMS.getKey(book.getItem()), poolId,
-                CrossCastNbt.TAG_ARS_SPELL, CrossCastNbt.countArsEntries(book.getTag()));
+            if (LogThrottle.allow(player.getUUID(), STRAY_LOG_WINDOW_MS)) {
+                LOGGER.warn("Ars cross proxy {} cast by {} resolved book {} for pool {} but that entry "
+                        + "carries no {} payload ({} Ars entries present)",
+                    spellResource, player.getGameProfile().getName(),
+                    ForgeRegistries.ITEMS.getKey(book.getItem()), poolId,
+                    CrossCastNbt.TAG_ARS_SPELL, CrossCastNbt.countArsEntries(book.getTag()));
+            }
             player.displayClientMessage(
                 Component.translatable("arsnspells.crosscast.proxy.entry_missing", poolId), true);
             return;
@@ -165,6 +214,27 @@ public class ArsCrossProxySpell extends AbstractSpell {
         }
         carrier = carrierOf(player.getMainHandItem());
         return carrier != null ? carrier : carrierOf(player.getOffhandItem());
+    }
+
+    /**
+     * Blank whichever carried stack fired this proxy, when it turns out to be a stray scroll
+     * rather than a bound book. Returns true when something was rewritten.
+     *
+     * <p>Reaching {@code onCast} with no book that owns the pool id is the signature of loot
+     * debris from before {@link #allowLooting()} existed. The scroll can never do anything but
+     * fail this way, so the honest outcome is to blank it back to a plain Iron's scroll the
+     * first time the player tries it, rather than leave a permanent dud in their inventory.
+     *
+     * <p>A proxy imbued into a spellbook or an enhancement ring is deliberately left alone —
+     * {@link ArsCrossProxyHiding#neutralizeStrayProxyScroll} refuses anything that is not a
+     * scroll. Rewriting a player's book is a gameplay-visible change that should not happen
+     * silently, the same reasoning {@code CarrierReconciler} documents for its inverse case,
+     * and {@link #allowLooting()} stops any of these being generated in the first place.
+     */
+    private boolean neutralizeStrayCarrier(ServerPlayer player, MagicData magicData) {
+        return ArsCrossProxyHiding.neutralizeStrayProxyScroll(magicData.getPlayerCastingItem())
+            || ArsCrossProxyHiding.neutralizeStrayProxyScroll(player.getMainHandItem())
+            || ArsCrossProxyHiding.neutralizeStrayProxyScroll(player.getOffhandItem());
     }
 
     /** The carrier view of {@code stack}, or null when it holds no entry for this pool id. */
