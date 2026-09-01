@@ -6,6 +6,7 @@ import com.otectus.arsnspells.cooldown.SpellCategorizer;
 import com.otectus.arsnspells.cooldown.UnifiedCooldownManager;
 import com.otectus.arsnspells.network.CooldownSyncPayload;
 import com.otectus.arsnspells.network.PacketHandler;
+import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import io.redspace.ironsspellbooks.api.events.SpellPreCastEvent;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -13,6 +14,13 @@ import net.neoforged.bus.api.SubscribeEvent;
 public class IronsCooldownHandler {
     @SubscribeEvent
     public void onIronsSpellCast(SpellPreCastEvent event) {
+        // ANS cross-cast proxies carry a 0s cooldown of their own; the delegated Ars
+        // cast applies the real category cooldown. Running the unified cooldown here
+        // would gate the wheel slot on a cooldown the Ars spell also charges.
+        if (CrossModSpellComponents.isArsCrossProxyId(event.getSpellId())) {
+            return;
+        }
+
         // CRITICAL FIX: Do NOT apply unified cooldowns to Iron's Spellbooks
         // Iron's has its own internal cooldown system that should not be interfered with
         // Only apply unified cooldowns if explicitly configured for cross-mod cooldowns

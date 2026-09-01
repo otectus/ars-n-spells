@@ -10,6 +10,10 @@ import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
+import com.otectus.arsnspells.network.CrossCastRequestPayload;
+import com.otectus.arsnspells.network.PacketHandler;
+import com.otectus.arsnspells.util.AdvancementUtil;
+import com.otectus.arsnspells.util.CrossCastTrace;
 import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import io.redspace.ironsspellbooks.api.spells.CastSource;
@@ -31,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Cross-cast item right-click flow + Ars spell-cost interception.
@@ -111,71 +116,118 @@ public class CrossCastingHandler {
 
     @SubscribeEvent
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
-        if (event.getHand() != InteractionHand.MAIN_HAND) {
+        InteractionHand hand = event.getHand();
+        // Only process main hand to avoid double-casting.
+        if (hand != InteractionHand.MAIN_HAND) {
             return;
         }
         ItemStack stack = event.getItemStack();
+        // Payload gate: cross-cast availability is decoupled from mana unification.
+        // Disabled mode still permits inscribed items to cast; only mana sharing is
+        // suppressed there.
         if (!CrossModSpellComponents.has(stack)) {
             return;
         }
         // 3.0.0: Iron's spellbooks cast their bound Ars entries through Iron's own
         // right-click flow (native wheel -> ars_cross proxy spell -> castArsSpell).
         // Hijacking the click here would suppress Iron's native casting entirely.
+        // isIronsSpellBook returns false when Iron's is absent, so this gate is safe
+        // on Iron's-less installs.
         if (IronsBookBindingUtil.isIronsSpellBook(stack)) {
             return;
         }
         Player player = event.getEntity();
 
-        CrossModSpellList list = CrossModSpellComponents.get(stack);
+        if (player.level().isClientSide()) {
+            // Client: announce intent via payload, then cancel local use prediction so
+            // vanilla item-use animations and side-effects do not race with the
+            // server-authoritative cast. The client resolves NOTHING itself.
+            UUID clientAttempt = UUID.randomUUID();
+            CrossCastRequestPayload.Action action = player.isCrouching()
+                ? CrossCastRequestPayload.Action.CYCLE
+                : CrossCastRequestPayload.Action.CAST;
+            int clientIndex = CrossModSpellComponents.get(stack).normalizedIndex();
+            PacketHandler.sendToServer(
+                new CrossCastRequestPayload(hand, action, clientIndex, clientAttempt));
+            CrossCastTrace.log(clientAttempt, player, CrossCastTrace.Side.C,
+                CrossCastTrace.Stage.REQUEST_SENT,
+                "hand", hand, "action", action, "index", clientIndex);
+            event.setCanceled(true);
+            return;
+        }
+
+        // Server-side: suppress vanilla right-click. The payload path executes the
+        // cast; this cancel only stops native item-use running alongside it. When the
+        // client cancels before sending the vanilla use packet this branch never
+        // fires — it is defensive coverage for automation / NPC use / future
+        // server-side triggers.
+        event.setCanceled(true);
+    }
+
+    /**
+     * Server-authoritative cross-cast entry point. Invoked exclusively from
+     * {@link CrossCastRequestPayload#handleOnServer}. Re-reads the stack from the
+     * sender's hand (no client trust), validates the payload, then dispatches to the
+     * upstream runtime.
+     *
+     * @return true if the cast was attempted (handed off to upstream), false if the
+     *         payload was empty, invalid, or rejected before handoff
+     */
+    public static boolean serverHandleCast(ServerPlayer player, ItemStack item, InteractionHand hand,
+                                           CrossCastRequestPayload.Action action, UUID attemptId) {
+        if (player == null || item == null || item.isEmpty()) {
+            return false;
+        }
+        CrossModSpellList list = CrossModSpellComponents.get(item);
         if (list.isEmpty()) {
-            return;
+            return false;
         }
 
-        // Sneak-right-click cycles the selected inscription index.
-        if (player.isShiftKeyDown() && list.size() > 1) {
-            int next = (list.normalizedIndex() + 1) % list.size();
-            CrossModSpellComponents.setSelectedIndex(stack, next);
-            CrossModSpell entry = list.spells().get(next);
-            if (!player.level().isClientSide()) {
-                player.displayClientMessage(
-                    Component.literal("Selected spell " + (next + 1) + "/" + list.size() + ": " + entry.spellId())
-                        .withStyle(ChatFormatting.AQUA),
-                    true
-                );
+        int index = list.normalizedIndex();
+
+        if (action == CrossCastRequestPayload.Action.CYCLE) {
+            if (list.size() <= 1) {
+                return false;
             }
-            event.setCanceled(true);
-            return;
+            int nextIndex = (index + 1) % list.size();
+            CrossModSpellComponents.setSelectedIndex(item, nextIndex);
+            player.displayClientMessage(
+                Component.translatable("arsnspells.crosscast.selected", nextIndex + 1, list.size())
+                    .withStyle(ChatFormatting.AQUA),
+                true);
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.CYCLE_APPLIED,
+                "from", index, "to", nextIndex, "size", list.size());
+            return true;
         }
 
-        // Non-shift right-click casts the selected entry.
-        CrossModSpell entry = list.spells().get(list.normalizedIndex());
-
-        // Validate before dispatch: a malformed / empty / unresolvable inscription now
-        // tells the player why instead of silently no-casting. Runs on both sides
-        // (deterministic) to cancel the use; the message is sent server-side only.
-        CrossCastValidator.ValidationResult validation =
-            CrossCastValidator.validate(entry, list.normalizedIndex(), list.size());
-        if (!validation.ok()) {
-            if (!player.level().isClientSide()) {
-                player.displayClientMessage(
-                    Component.translatable(validation.reasonKey()).withStyle(ChatFormatting.RED), true);
-            }
-            event.setCanceled(true);
-            return;
+        CrossModSpell entry = list.spells().get(index);
+        CrossCastValidator.ValidationResult vr =
+            CrossCastValidator.validate(entry, index, list.size());
+        if (!vr.ok()) {
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.DESCRIPTOR_REJECTED,
+                "reason", vr.reasonKey(), "index", index);
+            player.displayClientMessage(
+                Component.translatable(vr.reasonKey()).withStyle(ChatFormatting.RED), true);
+            return false;
         }
+        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+            CrossCastTrace.Stage.DESCRIPTOR_VALIDATED,
+            "type", entry.typeName(), "index", index, "spellId", entry.spellId());
 
-        boolean cast;
+        boolean castOk;
         if (CrossSpellType.ARS_NOUVEAU.name().equals(entry.typeName())) {
-            cast = castArsSpell(player, stack, entry);
+            castOk = castArsSpell(player, item, entry, attemptId);
         } else if (CrossSpellType.IRONS_SPELLBOOKS.name().equals(entry.typeName())) {
-            cast = castIronsSpell(player, stack, entry);
+            castOk = castIronsSpell(player, item, entry);
         } else {
-            cast = false;
+            return false;
         }
-
-        if (cast) {
-            event.setCanceled(true);
+        if (castOk) {
+            AdvancementUtil.grant(player, "first_cross_cast");
         }
+        return castOk;
     }
 
     @SubscribeEvent
@@ -300,6 +352,16 @@ public class CrossCastingHandler {
      * {@code onCast} into the exact same cost/multiplier/context pipeline.
      */
     public static boolean castArsSpell(Player player, ItemStack stack, CrossModSpell entry) {
+        return castArsSpell(player, stack, entry, null);
+    }
+
+    /**
+     * As {@link #castArsSpell(Player, ItemStack, CrossModSpell)}, carrying the trace
+     * attempt id minted at payload receipt so the resolve stages can be correlated with
+     * the request that started them. The proxy-spell path passes {@code null}: a
+     * native-wheel cast has no cross-cast request behind it.
+     */
+    public static boolean castArsSpell(Player player, ItemStack stack, CrossModSpell entry, UUID attemptId) {
         Optional<CompoundTag> tag = entry.arsSpellTag();
         if (tag.isEmpty()) {
             return false;
@@ -317,11 +379,18 @@ public class CrossCastingHandler {
             CrossCastContext.Entry ctxEntry = CrossCastContext.peek(player);
             if (ctxEntry != null) {
                 ctxEntry.spellId = entry.spellId().toString();
+                ctxEntry.attemptId = attemptId;
             }
             SpellContext context = SpellContext.fromEntity(spell, player, stack);
             SpellResolver resolver = new SpellResolver(context);
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.RESOURCE_CHECK, "spell", entry.spellId());
             if (resolver.canCast(player)) {
+                CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                    CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "spell", entry.spellId());
                 resolver.onCast(stack, player.level());
+                CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                    CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "spell", entry.spellId());
                 return true;
             }
             refundPrepaidIronsShare(player);

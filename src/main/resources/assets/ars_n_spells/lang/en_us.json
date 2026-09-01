@@ -114,5 +114,6 @@
   "ars_n_spells.icon.star": "Star",
   "ars_n_spells.icon.eye": "Eye",
   "ars_n_spells.icon.drop": "Drop",
-  "ars_n_spells.icon.moon": "Moon"
+  "ars_n_spells.icon.moon": "Moon",
+  "arsnspells.crosscast.selected": "Cross spell selected: %1$s/%2$s"
 }

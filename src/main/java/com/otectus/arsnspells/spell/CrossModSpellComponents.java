@@ -31,6 +31,28 @@ public final class CrossModSpellComponents {
      */
     public static final int PROXY_POOL_SIZE = 8;
 
+    /** Registry-path prefix shared by every {@code ars_cross_k} proxy spell. */
+    public static final String PROXY_ID_PATH_PREFIX = "ars_cross_";
+
+    /**
+     * Fully-qualified id prefix of the proxy spells. Declared here (Iron's-free) so
+     * the Iron's event handlers can recognize a proxy cast from the event's spell-id
+     * string without classloading {@code ArsCrossProxyRegistry}.
+     */
+    public static final String PROXY_SPELL_ID_PREFIX = "ars_n_spells:" + PROXY_ID_PATH_PREFIX;
+
+    /**
+     * True when {@code spellId} names one of ANS's own native-wheel proxy spells.
+     *
+     * <p>Iron's-side accounting (affinity, cooldown, LP, progression, mana) must skip
+     * these: the proxy is a zero-cost ENDER-school placeholder whose real cost, school
+     * and cooldown are owned by the delegated Ars cast. Charging Iron's rules against
+     * the placeholder double-bills the player and attributes the cast to the wrong school.
+     */
+    public static boolean isArsCrossProxyId(String spellId) {
+        return spellId != null && spellId.startsWith(PROXY_SPELL_ID_PREFIX);
+    }
+
     /**
      * Canonical symbol keys the Spell Loom can stamp into an entry's icon field.
      * Each maps to a shipped {@code textures/gui/icons/spell/icon_<key>.png}; the
@@ -206,6 +228,61 @@ public final class CrossModSpellComponents {
     /** Stack overload of {@link #findEntryByProxyPoolId(CrossModSpellList, int)}. */
     public static Optional<CrossModSpell> findEntryByProxyPoolId(ItemStack stack, int poolId) {
         return findEntryByProxyPoolId(get(stack), poolId);
+    }
+
+    /**
+     * Drop the entry owning {@code poolId} from the list, returning the new list.
+     * Returns the input unchanged when no entry owns that id.
+     *
+     * <p>Used for two things (3.0.3 / 3.1.0): rolling the sidecar back when the
+     * native container write fails midway through binding, and tearing an entry
+     * down on unbind. Teardown must remove the native slot <em>before</em> calling
+     * this — clearing the sidecar first leaves an orphan slot in Iron's wheel with
+     * nothing to resolve.
+     */
+    public static CrossModSpellList withoutProxyPoolId(CrossModSpellList list, int poolId) {
+        if (poolId == NO_PROXY_POOL_ID || list.isEmpty()) {
+            return list;
+        }
+        List<CrossModSpell> next = new ArrayList<>(list.spells().size());
+        boolean removed = false;
+        for (CrossModSpell entry : list.spells()) {
+            if (!removed && entry.proxyPoolId() == poolId) {
+                removed = true;
+                continue;
+            }
+            next.add(entry);
+        }
+        if (!removed) {
+            return list;
+        }
+        if (next.isEmpty()) {
+            return CrossModSpellList.EMPTY;
+        }
+        // Keep the cycle index in range after the shrink.
+        int index = Math.max(0, Math.min(list.selectedIndex(), next.size() - 1));
+        return new CrossModSpellList(List.copyOf(next), index);
+    }
+
+    /**
+     * Stack overload of {@link #withoutProxyPoolId(CrossModSpellList, int)}. Removes
+     * the component outright once the last entry goes, so an emptied carrier is
+     * byte-identical to a never-inscribed one.
+     *
+     * @return true when an entry was actually removed
+     */
+    public static boolean removeEntryByProxyPoolId(ItemStack stack, int poolId) {
+        CrossModSpellList current = get(stack);
+        CrossModSpellList next = withoutProxyPoolId(current, poolId);
+        if (next == current) {
+            return false;
+        }
+        if (next.isEmpty()) {
+            clear(stack);
+        } else {
+            stack.set(ModDataComponents.CROSS_SPELLS.get(), next);
+        }
+        return true;
     }
 
     /** Count of Ars-type entries (those carrying an {@code arsSpellTag} payload). */

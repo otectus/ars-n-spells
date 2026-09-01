@@ -5,14 +5,12 @@ import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.bridge.IManaBridge;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.registry.ModTags;
 import com.otectus.arsnspells.util.ChunkScanUtil;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -199,9 +197,10 @@ public final class RegenSynergyHandler {
         BlockPos min = new BlockPos(pos.getX() - radius, minY, pos.getZ() - radius);
         BlockPos max = new BlockPos(pos.getX() + radius, maxY, pos.getZ() + radius);
         for (BlockPos checkPos : BlockPos.betweenClosed(min, max)) {
-            Block block = level.getBlockState(checkPos).getBlock();
-            ResourceLocation blockKey = BuiltInRegistries.BLOCK.getKey(block);
-            if (blockKey != null && blockKey.getPath().contains("source_jar")) {
+            // Audit F-2: tag-driven (ars_n_spells:source_jars, datapack-extensible)
+            // instead of a per-block registry-key lookup + substring match — also
+            // cheaper: BlockState.is(TagKey) is a set lookup with no allocation.
+            if (level.getBlockState(checkPos).is(ModTags.SOURCE_JARS)) {
                 return true;
             }
         }

@@ -19,8 +19,16 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * when the relevant integration is absent.
  */
 public final class PacketHandler {
-    /** Bumped on protocol-breaking changes. "2" for the 3.0.x line (loom payload added). */
-    public static final String PROTOCOL_VERSION = "2";
+    /**
+     * Bumped on protocol-breaking changes. Server and client must match exactly:
+     * a mismatch fails channel negotiation and refuses the connection, which is the
+     * intended behaviour — a partial payload set would desync silently instead.
+     *
+     * <p>History: "2" = 3.0.x line (loom payload added).
+     * "3" = 3.2.0 parity pass — cross_cast_request added, restoring the
+     * server-authoritative cast path from the 1.20.1 build.
+     */
+    public static final String PROTOCOL_VERSION = "3";
 
     private PacketHandler() {}
 
@@ -35,6 +43,8 @@ public final class PacketHandler {
             ResonanceSyncPayload::handleOnClient);
         reg.playToServer(SpellLoomExportPayload.TYPE, SpellLoomExportPayload.STREAM_CODEC,
             SpellLoomExportPayload::handleOnServer);
+        reg.playToServer(CrossCastRequestPayload.TYPE, CrossCastRequestPayload.STREAM_CODEC,
+            CrossCastRequestPayload::handleOnServer);
 
         ArsNSpells.LOGGER.info("Registered payload handlers (protocol={})", PROTOCOL_VERSION);
     }

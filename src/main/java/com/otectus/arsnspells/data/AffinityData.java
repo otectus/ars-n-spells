@@ -33,12 +33,21 @@ import java.util.function.Function;
 public class AffinityData {
 
     /** Bump when the {@code levels} key convention or record fields change. */
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
-    /** Current shape: {@code {schema_version:int, levels:{id->level}}}. */
+    /**
+     * Current shape: {@code {schema_version:int, levels:{id->level},
+     * decay_remainders:{id->double}}}.
+     *
+     * <p>{@code decay_remainders} is optional so a v1 save (which predates the
+     * fractional-decay residual) decodes with an empty accumulator instead of
+     * failing over to the legacy bare-map codec.
+     */
     private static final Codec<AffinityData> CURRENT_CODEC = RecordCodecBuilder.create(inst -> inst.group(
         Codec.INT.fieldOf("schema_version").forGetter(d -> SCHEMA_VERSION),
-        Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("levels").forGetter(AffinityData::getAllLevels)
+        Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("levels").forGetter(AffinityData::getAllLevels),
+        DecayAccumulator.CODEC.optionalFieldOf("decay_remainders", new DecayAccumulator())
+            .forGetter(AffinityData::getDecayAccumulator)
     ).apply(inst, AffinityData::fromCurrent));
 
     /** Legacy shape: a bare {@code Map<enumName->level>} written by 2.0.x and earlier. */
@@ -57,6 +66,13 @@ public class AffinityData {
 
     private final Map<String, Integer> levels = new HashMap<>();
 
+    /**
+     * Sub-point decay carried between intervals. Without it the decay handler's
+     * integer floor strips a flat 1 point per interval, roughly 20x the
+     * documented proportional rate (audit D1).
+     */
+    private final DecayAccumulator decay = new DecayAccumulator();
+
     private static int clamp(Integer level) {
         if (level == null) {
             return 0;
@@ -64,7 +80,7 @@ public class AffinityData {
         return Math.max(0, Math.min(100, level));
     }
 
-    private static AffinityData fromCurrent(int version, Map<String, Integer> levels) {
+    private static AffinityData fromCurrent(int version, Map<String, Integer> levels, DecayAccumulator decay) {
         // version is read for forward-compat; v1 levels are already canonical ids.
         AffinityData d = new AffinityData();
         levels.forEach((k, v) -> {
@@ -72,6 +88,9 @@ public class AffinityData {
                 d.levels.merge(k, clamp(v), Math::max);
             }
         });
+        if (decay != null) {
+            decay.snapshot().forEach((k, r) -> d.decay.accrue(k, r));
+        }
         return d;
     }
 
@@ -105,5 +124,13 @@ public class AffinityData {
     /** A copy of every tracked school's level. Safe to iterate while mutating the original. */
     public Map<String, Integer> getAllLevels() {
         return new HashMap<>(levels);
+    }
+
+    /**
+     * The live fractional-decay carrier. Mutated in place by the decay handler;
+     * persisted as part of this attachment so residuals survive relogs.
+     */
+    public DecayAccumulator getDecayAccumulator() {
+        return decay;
     }
 }

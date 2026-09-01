@@ -6,6 +6,7 @@ import com.otectus.arsnspells.data.AffinityData;
 import com.otectus.arsnspells.data.AttachmentTypes;
 import com.otectus.arsnspells.network.AffinitySyncPayload;
 import com.otectus.arsnspells.network.PacketHandler;
+import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import io.redspace.ironsspellbooks.api.events.SpellOnCastEvent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -29,6 +30,12 @@ public class IronsAffinityHandler {
 
     @SubscribeEvent
     public void onIronsSpellCast(SpellOnCastEvent event) {
+        // ANS cross-cast proxies are zero-cost ENDER-school placeholders; the delegated
+        // Ars cast owns affinity for its real school. Crediting the placeholder would
+        // grant Ender affinity for every Ars spell cast through the native wheel.
+        if (CrossModSpellComponents.isArsCrossProxyId(event.getSpellId())) {
+            return;
+        }
         if (!AnsConfig.ENABLE_AFFINITY_SYSTEM.get()) {
             return;
         }

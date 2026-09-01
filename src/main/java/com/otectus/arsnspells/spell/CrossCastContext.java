@@ -46,6 +46,20 @@ public final class CrossCastContext {
         ACTIVE_CASTS.put(player.getUUID(), entry);
     }
 
+    /**
+     * As {@link #begin(Player, CrossSpellType, long, float, float, String)}, additionally
+     * recording the trace attempt id so the Iron's-side cost stage can be correlated with
+     * the request that started it.
+     */
+    public static void begin(Player player, CrossSpellType type, long gameTime, float arsCost, float issCost,
+        String spellId, java.util.UUID attemptId) {
+        begin(player, type, gameTime, arsCost, issCost, spellId);
+        Entry entry = ACTIVE_CASTS.get(player == null ? null : player.getUUID());
+        if (entry != null) {
+            entry.attemptId = attemptId;
+        }
+    }
+
     public static Entry peek(Player player) {
         if (player == null) {
             return null;
@@ -119,6 +133,14 @@ public final class CrossCastContext {
     public static final class Entry {
         public final CrossSpellType type;
         private final long expiresAt;
+        /**
+         * Server-side attempt id minted by {@code CrossCastRequestPayload.handleOnServer},
+         * threaded through every {@link com.otectus.arsnspells.util.CrossCastTrace} stage so
+         * one multiplayer failure can be grepped end to end. Null for casts that did not
+         * originate from a cross-cast request (e.g. a native-wheel proxy cast); the trace
+         * logger substitutes the nil UUID.
+         */
+        public volatile java.util.UUID attemptId;
         public float arsCost;
         public float issCost;
         public boolean costsReady;

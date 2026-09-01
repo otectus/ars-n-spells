@@ -3,6 +3,7 @@ package com.otectus.arsnspells.events;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.data.AffinityData;
 import com.otectus.arsnspells.data.AttachmentTypes;
+import com.otectus.arsnspells.data.DecayAccumulator;
 import com.otectus.arsnspells.network.AffinitySyncPayload;
 import com.otectus.arsnspells.network.PacketHandler;
 import net.minecraft.server.level.ServerPlayer;
@@ -53,17 +54,31 @@ public class AffinityDecayHandler {
         }
 
         AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
+        DecayAccumulator accumulator = data.getDecayAccumulator();
         // getAllLevels() returns a copy, so mutating the original via setLevel
         // inside the loop is safe (no ConcurrentModificationException).
         for (Map.Entry<String, Integer> entry : data.getAllLevels().entrySet()) {
             int level = entry.getValue() == null ? 0 : entry.getValue();
             if (level <= 0) {
+                accumulator.clear(entry.getKey());
                 continue;
             }
-            int decay = (int) Math.max(1, Math.floor(level * perInterval));
+            // Audit D1: accrue the fractional loss and only strip whole points once a
+            // full point has accumulated. The previous `Math.max(1, floor(...))` floored
+            // every interval up to one point, which with the documented defaults decays
+            // roughly 20x faster than advertised: level*0.01*(1200/24000) is 0.05 points
+            // per interval at level 100, so the floor turned ~100 in-game days of
+            // inactivity into ~5.
+            int decay = accumulator.accrue(entry.getKey(), level * perInterval);
+            if (decay <= 0) {
+                continue;
+            }
             int newLevel = Math.max(0, level - decay);
             if (newLevel != level) {
                 data.setLevel(entry.getKey(), newLevel);
+                if (newLevel == 0) {
+                    accumulator.clear(entry.getKey());
+                }
                 PacketHandler.sendToClient(new AffinitySyncPayload(entry.getKey(), newLevel), player);
             }
         }
