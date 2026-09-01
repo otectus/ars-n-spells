@@ -15,7 +15,6 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
     private boolean ironsPresent;
     private boolean arsManaCapPresent;
     private boolean arsSpellResolverPresent;
-    private boolean arsManaCapEventsPresent;
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -28,7 +27,6 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         arsManaCapPresent = resourceExists("com/hollingsworth/arsnouveau/common/capability/ManaCap.class")
             && resourceExists("com/hollingsworth/arsnouveau/common/capability/ManaData.class");
         arsSpellResolverPresent = resourceExists("com/hollingsworth/arsnouveau/api/spell/SpellResolver.class");
-        arsManaCapEventsPresent = resourceExists("com/hollingsworth/arsnouveau/common/event/ManaCapEvents.class");
     }
 
     @Override
@@ -60,10 +58,6 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.endsWith("MixinSpellResolverContext")
             || mixinClassName.endsWith("MixinSpellResolverPreCast")) {
             return arsSpellResolverPresent;
-        }
-        if (mixinClassName.endsWith("MixinArsPotionEffects")) {
-            // Targets Ars's ManaCapEvents AND uses Iron's AttributeRegistry — gate on both.
-            return arsManaCapEventsPresent && ironsPresent;
         }
         return true;
     }

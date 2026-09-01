@@ -343,7 +343,10 @@ public class CrossCastingHandler {
 
     @SubscribeEvent
     public static void onPlayerTickPost(PlayerTickEvent.Post event) {
-        if (!(event.getEntity() instanceof Player player)) {
+        // ServerPlayer, not Player: CrossCastContext is server-side state keyed by UUID, and
+        // on an integrated server both logical sides share the map. Ticking it for the client
+        // player evicted the server player's own in-flight context using client game time.
+        if (!(event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)) {
             return;
         }
         if (player.tickCount % 20 != 0) {

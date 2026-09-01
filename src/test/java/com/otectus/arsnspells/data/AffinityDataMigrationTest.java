@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -93,5 +94,49 @@ class AffinityDataMigrationTest {
         d.setLevel("y", -5);
         assertEquals(100, d.getLevel("x"));
         assertEquals(0, d.getLevel("y"));
+    }
+
+    // ---- Malformed-field tolerance ----
+
+    @Test
+    void malformedDecayRemaindersDoNotDestroyLevels() {
+        // The two payload fields used to be strict, so one bad field failed the whole record,
+        // the legacy fallback failed too, and NeoForge silently DROPPED the attachment - every
+        // school's affinity gone, nothing in the log.
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("schema_version", AffinityData.SCHEMA_VERSION);
+        CompoundTag levels = new CompoundTag();
+        levels.putInt("irons_spellbooks:fire", 7);
+        tag.put("levels", levels);
+        tag.putString("decay_remainders", "not a map");
+
+        AffinityData decoded = AffinityData.CODEC.parse(NbtOps.INSTANCE, tag).getOrThrow();
+        assertEquals(7, decoded.getLevel("irons_spellbooks:fire"),
+            "a malformed decay field must not cost the levels map");
+    }
+
+    @Test
+    void malformedLevelsStillYieldsUsableData() {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("schema_version", AffinityData.SCHEMA_VERSION);
+        tag.putString("levels", "not a map");
+
+        AffinityData decoded = AffinityData.CODEC.parse(NbtOps.INSTANCE, tag).getOrThrow();
+        assertEquals(0, decoded.getLevel("irons_spellbooks:fire"));
+    }
+
+    @Test
+    void decayAccumulatorIsNotSharedBetweenDecodes() {
+        // The default used to be one instance built at class-init and handed to every decode
+        // that lacked the field. DecayAccumulator is mutable, so two players could share one.
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("schema_version", AffinityData.SCHEMA_VERSION);
+        tag.put("levels", new CompoundTag());
+
+        AffinityData first = AffinityData.CODEC.parse(NbtOps.INSTANCE, tag).getOrThrow();
+        AffinityData second = AffinityData.CODEC.parse(NbtOps.INSTANCE, tag).getOrThrow();
+
+        assertNotSame(first.getDecayAccumulator(), second.getDecayAccumulator(),
+            "each decode must get its own mutable accumulator");
     }
 }

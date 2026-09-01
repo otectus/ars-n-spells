@@ -11,11 +11,23 @@ import java.util.Map;
  * survives respawn).
  */
 public class ProgressionData {
+    /**
+     * Cast counts are a monotonic tally, so anything off disk that is not a non-negative count
+     * under a non-empty key is garbage rather than data. Sanitizing on the way in matters
+     * because {@link #getBonusForSchool} multiplies the count by a per-cast rate: a negative
+     * count becomes a negative attribute bonus, and there is no floor downstream to catch it.
+     * The previous {@code putAll} copied whatever was there straight through.
+     */
     public static final Codec<ProgressionData> CODEC = Codec.unboundedMap(Codec.STRING, Codec.INT)
         .xmap(
             raw -> {
                 ProgressionData d = new ProgressionData();
-                d.schoolCastCounts.putAll(raw);
+                raw.forEach((school, count) -> {
+                    if (school == null || school.isEmpty() || count == null || count <= 0) {
+                        return;
+                    }
+                    d.schoolCastCounts.put(school, count);
+                });
                 return d;
             },
             d -> new HashMap<>(d.schoolCastCounts)

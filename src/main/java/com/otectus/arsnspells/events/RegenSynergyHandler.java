@@ -94,12 +94,22 @@ public final class RegenSynergyHandler {
         double threshold = AnsConfig.SOURCE_JAR_CACHE_MOVE_THRESHOLD.get();
         double thresholdSq = threshold * threshold;
 
-        boolean needsScan = cached == null
-            || !cached.dimension.equals(level.dimension())
-            || pos.distSqr(cached.scanPosition) > thresholdSq;
+        boolean sameDimension = cached != null && cached.dimension.equals(level.dimension());
+        boolean needsScan = !sameDimension || pos.distSqr(cached.scanPosition) > thresholdSq;
 
         // Defensive clamp even though the config spec already enforces 1..8.
         int radius = Math.min(8, Math.max(1, AnsConfig.SOURCE_JAR_SCAN_RADIUS.get()));
+
+        // Before paying for the full sweep, re-check the one block the last scan actually
+        // found. While the player is working near their jars — which is the whole point of
+        // the feature — that single read answers the question and the cache is simply
+        // re-centred on the new position.
+        if (needsScan && sameDimension
+            && cachedJarStillValid(level, cached.jarPosition, pos, radius)) {
+            cached = new SourceJarCache(pos, cached.jarPosition, level.dimension());
+            sourceJarCacheMap.put(playerId, cached);
+            needsScan = false;
+        }
 
         boolean nearSource;
         if (needsScan) {
@@ -111,7 +121,8 @@ public final class RegenSynergyHandler {
             // scan is behaviourally identical to skip-and-retry.
             if (areScanChunksLoaded(level, pos, radius)) {
                 long startNanos = System.nanoTime();
-                nearSource = scanForSourceJar(level, pos, radius);
+                BlockPos jar = findSourceJar(level, pos, radius);
+                nearSource = jar != null;
                 long elapsed = System.nanoTime() - startNanos;
                 scansRun.incrementAndGet();
                 if (nearSource) {
@@ -121,7 +132,7 @@ public final class RegenSynergyHandler {
                     LOGGER.warn("[ANS] SourceJar scan took {} ms (radius {})",
                         elapsed / 1_000_000L, radius);
                 }
-                sourceJarCacheMap.put(playerId, new SourceJarCache(pos, nearSource, level.dimension()));
+                sourceJarCacheMap.put(playerId, new SourceJarCache(pos, jar, level.dimension()));
             } else {
                 scansSkippedUnloaded.incrementAndGet();
                 nearSource = false;
@@ -193,7 +204,17 @@ public final class RegenSynergyHandler {
             scansRun.getAndSet(0), scansSkippedUnloaded.getAndSet(0), jarsFound.getAndSet(0));
     }
 
-    private static boolean scanForSourceJar(Level level, BlockPos pos, int radius) {
+    /**
+     * First Source Jar in the scan volume, or null.
+     *
+     * <p>Returns the position rather than a boolean so the cache can remember it. The scan
+     * covers {@code radius} horizontally and y-1..y+2, which at the default radius of 4 is
+     * 324 block reads — and the cache is invalidated by moving
+     * {@code source_jar_cache_move_threshold} blocks, which also defaults to 4. A walking
+     * player clears that every interval, so the cached answer almost never survived and the
+     * full sweep ran on essentially every scan.
+     */
+    private static BlockPos findSourceJar(Level level, BlockPos pos, int radius) {
         int minY = Math.max(pos.getY() - 1, level.getMinBuildHeight());
         int maxY = Math.min(pos.getY() + 2, level.getMaxBuildHeight() - 1);
         BlockPos min = new BlockPos(pos.getX() - radius, minY, pos.getZ() - radius);
@@ -203,20 +224,43 @@ public final class RegenSynergyHandler {
             // instead of a per-block registry-key lookup + substring match — also
             // cheaper: BlockState.is(TagKey) is a set lookup with no allocation.
             if (level.getBlockState(checkPos).is(ModTags.SOURCE_JARS)) {
-                return true;
+                return checkPos.immutable();
             }
         }
-        return false;
+        return null;
+    }
+
+    /**
+     * True when the jar the last scan found is still a jar and still inside the scan volume
+     * around {@code pos}. One block read instead of the full sweep.
+     *
+     * <p>Only ever used to shortcut a <em>positive</em> answer: a jar that has been broken,
+     * or that the player has walked away from, falls through to the full scan rather than
+     * being reported as absent, so this cannot manufacture a false negative either.
+     */
+    private static boolean cachedJarStillValid(Level level, BlockPos jar, BlockPos pos, int radius) {
+        if (jar == null) {
+            return false;
+        }
+        if (Math.abs(jar.getX() - pos.getX()) > radius
+            || Math.abs(jar.getZ() - pos.getZ()) > radius
+            || jar.getY() < pos.getY() - 1 || jar.getY() > pos.getY() + 2) {
+            return false;
+        }
+        return level.getBlockState(jar).is(ModTags.SOURCE_JARS);
     }
 
     private static final class SourceJarCache {
         final BlockPos scanPosition;
         final boolean nearSource;
         final ResourceKey<Level> dimension;
+        /** Where the jar was, when one was found. Null when the scan came up empty. */
+        final BlockPos jarPosition;
 
-        SourceJarCache(BlockPos scanPosition, boolean nearSource, ResourceKey<Level> dimension) {
+        SourceJarCache(BlockPos scanPosition, BlockPos jarPosition, ResourceKey<Level> dimension) {
             this.scanPosition = scanPosition.immutable();
-            this.nearSource = nearSource;
+            this.jarPosition = jarPosition;
+            this.nearSource = jarPosition != null;
             this.dimension = dimension;
         }
     }

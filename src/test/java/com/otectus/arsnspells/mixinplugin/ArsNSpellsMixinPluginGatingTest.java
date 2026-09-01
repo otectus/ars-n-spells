@@ -1,5 +1,6 @@
 package com.otectus.arsnspells.mixinplugin;
 
+import com.otectus.arsnspells.TestPaths;
 import com.otectus.arsnspells.mixin.ArsNSpellsMixinPlugin;
 
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,6 @@ class ArsNSpellsMixinPluginGatingTest {
         set(plugin, "ironsPresent", ironsPresent);
         set(plugin, "arsManaCapPresent", arsPresent);
         set(plugin, "arsSpellResolverPresent", arsPresent);
-        set(plugin, "arsManaCapEventsPresent", arsPresent);
         return plugin;
     }
 
@@ -138,27 +138,40 @@ class ArsNSpellsMixinPluginGatingTest {
         }
     }
 
+    /**
+     * {@code MixinArsPotionEffects} must stay deleted.
+     *
+     * <p>It mirrored the Ars {@code mana_regen} / {@code mana_boost} effects onto Iron's
+     * attributes. Both halves were wrong against Ars 5.x: {@code ars_nouveau:mana_boost} is
+     * not a registered {@code MobEffect} at all (only {@code MANA_REGEN_EFFECT} exists), so
+     * the max-mana half could never fire; and {@code MANA_REGEN_EFFECT} already applies a
+     * modifier to {@code PerkAttributes.MANA_REGEN_BONUS}, which
+     * {@code EquipmentIntegration} reads and mirrors onto Iron's {@code MANA_REGEN} once per
+     * second — so the mixin added the same potion's regen a second time. Its {@code @Inject}
+     * also sat at the HEAD of {@code ManaCapEvents.playerOnTick}, ahead of Ars's own
+     * {@code ServerPlayer} and interval guards, so it ran at 20 Hz on both logical sides.
+     *
+     * <p>The mod's own changelog already recorded the 1 Hz refresh as "replacing the old
+     * MixinArsPotionEffects with no double-counting". The port shipped both.
+     */
     @Test
-    void mixinArsPotionEffects_isGatedOnIronsAbsence() throws Exception {
-        // ANS 3.0.1: targets an Ars class but its bytecode references Iron's
-        // AttributeRegistry — un-gated it crashed Iron's-less servers at boot
-        // (ClassMetadataNotFoundException while transforming ManaCapEvents,
-        // taking Ars Nouveau down with it). The inject is only meaningful when
-        // Iron's is primary, so nothing is lost by gating.
-        ArsNSpellsMixinPlugin plugin = newPluginWithIronsPresent(false);
-        assertFalse(plugin.shouldApplyMixin(
-                "com.hollingsworth.arsnouveau.common.event.ManaCapEvents",
-                "com.otectus.arsnspells.mixin.ars.MixinArsPotionEffects"),
-            "MixinArsPotionEffects must NOT apply when Iron's is absent");
+    void mixinArsPotionEffects_staysDeleted() {
+        assertFalse(TestPaths.of(
+                "src/main/java/com/otectus/arsnspells/mixin/ars/MixinArsPotionEffects.java")
+                .toFile().exists(),
+            "MixinArsPotionEffects double-counts Ars mana regen against EquipmentIntegration");
+        assertFalse(
+            io_readMixinManifest().contains("MixinArsPotionEffects"),
+            "MixinArsPotionEffects is still listed in ars_n_spells.mixins.json");
     }
 
-    @Test
-    void mixinArsPotionEffects_appliesWhenIronsPresent() throws Exception {
-        ArsNSpellsMixinPlugin plugin = newPluginWithIronsPresent(true);
-        assertTrue(plugin.shouldApplyMixin(
-                "com.hollingsworth.arsnouveau.common.event.ManaCapEvents",
-                "com.otectus.arsnspells.mixin.ars.MixinArsPotionEffects"),
-            "MixinArsPotionEffects must apply when Iron's is present");
+    private static String io_readMixinManifest() {
+        try {
+            return java.nio.file.Files.readString(
+                TestPaths.of("src/main/resources/ars_n_spells.mixins.json"));
+        } catch (java.io.IOException e) {
+            throw new AssertionError("could not read the mixin manifest", e);
+        }
     }
 
     @Test

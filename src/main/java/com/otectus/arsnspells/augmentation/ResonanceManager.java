@@ -104,26 +104,37 @@ public class ResonanceManager {
         return Math.min(effectiveCap, Math.min(MAX_RESONANCE, resonance));
     }
 
-    public static void computeResonance(Player player) {
+    /**
+     * Recompute and cache this player's resonance.
+     *
+     * @return true if the cached value changed, so the caller can skip the sync packet when
+     *         it did not. Resonance only moves when the mana fraction moves, which for an
+     *         idle player is never - and the sync ran unconditionally once per second per
+     *         player, which is a packet per player per second of pure noise.
+     */
+    public static boolean computeResonance(Player player) {
         try {
             if (player == null || !AnsConfig.flag(AnsConfig.ENABLE_RESONANCE_SYSTEM, false)) {
-                return;
+                return false;
             }
             if (!ModList.get().isLoaded("irons_spellbooks")) {
-                return;
+                return false;
             }
             MagicData data = MagicData.getPlayerMagicData(player);
             if (data == null) {
-                return;
+                return false;
             }
             double maxMana = player.getAttributeValue(AttributeRegistry.MAX_MANA);
             double rawPercent = data.getMana() / Math.max(1.0, maxMana);
             double strength = AnsConfig.RESONANCE_STRENGTH.get();
             double cap = AnsConfig.MAX_DAMAGE_MULTIPLIER.get();
 
-            resonanceCache.put(player.getUUID(), resonanceFor(rawPercent, strength, cap));
+            double next = resonanceFor(rawPercent, strength, cap);
+            Double previous = resonanceCache.put(player.getUUID(), next);
+            return previous == null || previous.doubleValue() != next;
         } catch (Exception e) {
             // Silently fail if Iron's API is unavailable
+            return false;
         }
     }
 

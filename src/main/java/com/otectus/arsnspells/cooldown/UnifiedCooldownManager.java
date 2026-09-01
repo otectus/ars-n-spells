@@ -11,6 +11,14 @@ import org.slf4j.LoggerFactory;
  * Manages unified cooldowns across both Ars Nouveau and Iron's Spells 'n Spellbooks.
  * Tracks cooldowns per category per player to prevent spell spam.
  * Uses Capability-based storage for persistence.
+ *
+ * <p><b>Cooldowns are global per category</b> - they intentionally span both mods. A spell on
+ * cooldown in {@link CooldownCategory#OFFENSIVE} blocks any other OFFENSIVE spell regardless
+ * of which mod cast first. This class used to accept a {@code modNamespace} parameter that
+ * suggested per-mod isolation, but it was never part of the storage key - only the debug log,
+ * so callers passing "ars" and "irons" shared one cooldown while the signature said otherwise.
+ * Upstream removed the parameter in 1.9.0 to make the surface match the behaviour; the port
+ * had reintroduced it.
  */
 public class UnifiedCooldownManager {
 
@@ -24,17 +32,6 @@ public class UnifiedCooldownManager {
      * @return True if the category is on cooldown
      */
     public static boolean isOnCooldown(Player player, CooldownCategory category) {
-        return isOnCooldown(player, category, "global");
-    }
-
-    /**
-     * Check if a spell category is on cooldown for a player with mod namespace.
-     * @param player The player to check
-     * @param category The cooldown category
-     * @param modNamespace The mod namespace ("ars", "irons", or "global")
-     * @return True if the category is on cooldown
-     */
-    public static boolean isOnCooldown(Player player, CooldownCategory category, String modNamespace) {
         if (!isEnabled()) {
             return false;
         }
@@ -89,59 +86,21 @@ public class UnifiedCooldownManager {
      * @param isCrossModSpell True if this spell is from the other mod
      */
     public static void applyCooldown(Player player, CooldownCategory category, boolean isCrossModSpell) {
-        applyCooldown(player, category, isCrossModSpell, "global");
-    }
-
-    /**
-     * Apply cooldown to a category for a player with mod namespace.
-     * @param player The player
-     * @param category The cooldown category
-     * @param isCrossModSpell True if this spell is from the other mod
-     * @param modNamespace The mod namespace ("ars", "irons", or "global")
-     */
-    public static void applyCooldown(Player player, CooldownCategory category, boolean isCrossModSpell, String modNamespace) {
-        if (!isEnabled()) {
-            return;
-        }
-
-        if (player == null || category == null) {
-            return;
-        }
-
-        int baseDuration = AnsConfig.COOLDOWN_CATEGORY_DURATION.get();
-        double multiplier = isCrossModSpell ? AnsConfig.CROSS_MOD_COOLDOWN_MULTIPLIER.get() : 1.0;
-        long duration = (long) (baseDuration * multiplier);
-
-        long currentTime = player.level().getGameTime();
-        long cooldownEnd = currentTime + duration;
-
-        if (player.level().isClientSide()) {
-            CLIENT_TRACKER.setLastCastTime(category, cooldownEnd);
-        } else {
-            player.getData(AttachmentTypes.COOLDOWN.get()).setLastCast(category, cooldownEnd);
-        }
-
-        logDebug("Applied cooldown to {} for {} (namespace: {}): {} ticks (cross-mod: {})",
-                player.getName().getString(), category.getDisplayName(), modNamespace, duration, isCrossModSpell);
+        applyCooldownAndGetEnd(player, category, isCrossModSpell);
     }
 
     /**
      * Apply cooldown and return the cooldown end tick.
      */
     public static long applyCooldownAndGetEnd(Player player, CooldownCategory category, boolean isCrossModSpell) {
-        return applyCooldownAndGetEnd(player, category, isCrossModSpell, "global");
-    }
-
-    /**
-     * Apply cooldown and return the cooldown end tick with mod namespace.
-     */
-    public static long applyCooldownAndGetEnd(Player player, CooldownCategory category, boolean isCrossModSpell, String modNamespace) {
         if (!isEnabled() || player == null || category == null) {
             return 0L;
         }
+
         int baseDuration = AnsConfig.COOLDOWN_CATEGORY_DURATION.get();
         double multiplier = isCrossModSpell ? AnsConfig.CROSS_MOD_COOLDOWN_MULTIPLIER.get() : 1.0;
         long duration = (long) (baseDuration * multiplier);
+
         long currentTime = player.level().getGameTime();
         long cooldownEnd = currentTime + duration;
 
@@ -151,8 +110,8 @@ public class UnifiedCooldownManager {
             player.getData(AttachmentTypes.COOLDOWN.get()).setLastCast(category, cooldownEnd);
         }
 
-        logDebug("Applied cooldown to {} for {} (namespace: {}): {} ticks (cross-mod: {})",
-            player.getName().getString(), category.getDisplayName(), modNamespace, duration, isCrossModSpell);
+        logDebug("Applied cooldown to {} for {}: {} ticks (cross-mod: {})",
+                player.getName().getString(), category.getDisplayName(), duration, isCrossModSpell);
 
         return cooldownEnd;
     }

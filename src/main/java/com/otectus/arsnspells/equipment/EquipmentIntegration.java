@@ -154,10 +154,30 @@ public final class EquipmentIntegration {
         if (instance == null) {
             return;
         }
+        // OPT-008: decide whether anything needs to change BEFORE touching the modifier map.
+        // This runs once per second per player from EquipmentHandler's tick, and removing a
+        // modifier marks the attribute dirty whether or not the value changed - which the
+        // server drains into a ClientboundUpdateAttributesPacket at the end of the tick. The
+        // steady state is by far the common case, and it should cost one read.
+        //
+        // The check is exact by construction: applying modifierAmount() leaves the attribute
+        // at max(ironsOwnMax, arsMax), so with our modifier present the ceiling is correct
+        // iff getValue() == arsMax, and with it absent iff getValue() >= arsMax. Any drift in
+        // either input moves getValue() off that equality and falls through to the recompute.
+        AttributeModifier existing = instance.getModifier(ARS_TO_IRON_MAX_MANA_ID);
+        double current = instance.getValue();
+        if (existing == null) {
+            if (current >= arsMax) {
+                return;
+            }
+        } else if (Math.abs(current - arsMax) < CEILING_EPSILON) {
+            return;
+        }
+
         // Drop our own modifier first so getValue() reports Iron's own max, whatever
         // operations other mods' modifiers use. Nothing writes mana in between, so the
         // momentarily lower ceiling cannot clamp anything.
-        if (instance.getModifier(ARS_TO_IRON_MAX_MANA_ID) != null) {
+        if (existing != null) {
             instance.removeModifier(ARS_TO_IRON_MAX_MANA_ID);
         }
         double ironsOwnMax = instance.getValue();
@@ -167,6 +187,14 @@ public final class EquipmentIntegration {
                 ARS_TO_IRON_MAX_MANA_ID, needed, AttributeModifier.Operation.ADD_VALUE));
         }
     }
+
+    /**
+     * Tolerance for the ceiling-is-already-correct check. The modifier amount is a double
+     * difference, so {@code ironsOwnMax + (arsMax - ironsOwnMax)} need not reproduce
+     * {@code arsMax} bit-for-bit. Mana values run from tens to thousands, so a 1e-4 window is
+     * far below anything that matters and far above the representation error.
+     */
+    private static final double CEILING_EPSILON = 1.0e-4;
 
     /**
      * Re-apply the shared-pool ceiling if it has drifted below Ars's real max.

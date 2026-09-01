@@ -42,10 +42,10 @@ public class IronsCooldownHandler {
         CooldownCategory category = SpellCategorizer.categorizeIronsSpell(event.getSchoolType().getId());
         
         // CRITICAL FIX: Only check IRONS-namespaced cooldowns
-        if (UnifiedCooldownManager.isOnCooldown(player, category, "irons")) {
+        if (UnifiedCooldownManager.isOnCooldown(player, category)) {
             event.setCanceled(true);
         } else {
-            long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false, "irons");
+            long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);
             if (!player.level().isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
                 PacketHandler.sendToClient(new CooldownSyncPayload(category, cooldownEnd), serverPlayer);
             }

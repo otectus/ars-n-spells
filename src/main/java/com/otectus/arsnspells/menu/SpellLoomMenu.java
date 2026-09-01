@@ -73,6 +73,14 @@ public class SpellLoomMenu extends AbstractContainerMenu {
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
         ItemStack result = ItemStack.EMPTY;
+        // Audit E5 (defensive): if the client-side BE lookup failed, no working slots were
+        // added and this.slots holds only the 36 player slots - the index math below would
+        // then misclassify player slots 0-2 as loom slots and shift-click would move the
+        // wrong stacks. Unreachable on the authoritative server (createMenu always passes a
+        // BE), which is exactly why it needs to be handled rather than assumed away.
+        if (this.slots.size() < SpellLoomBlockEntity.SLOT_COUNT + 36) {
+            return result;
+        }
         Slot slot = this.slots.get(index);
         if (slot == null || !slot.hasItem()) {
             return result;

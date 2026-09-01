@@ -151,6 +151,9 @@ public class ArsNSpells {
             if (ModPresence.isLoaded(CompatIds.IRONS_SPELLBOOKS)) {
                 event.enqueueWork(SchoolIndex::snapshot);
             }
+            // Announce a mixin whose target has drifted. Every injection uses require = 0 so
+            // load never fails on drift - which also means it never says anything.
+            event.enqueueWork(com.otectus.arsnspells.util.MixinSelfCheck::run);
         } catch (Exception e) {
             LOGGER.error("========================================");
             LOGGER.error("CRITICAL: Ars 'n' Spells initialization failed");

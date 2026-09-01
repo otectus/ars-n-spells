@@ -7,6 +7,7 @@ import com.otectus.arsnspells.affinity.AffinityType;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -44,10 +45,25 @@ public class AffinityData {
      * failing over to the legacy bare-map codec.
      */
     private static final Codec<AffinityData> CURRENT_CODEC = RecordCodecBuilder.create(inst -> inst.group(
+        // schema_version stays strict: its absence is the signal that this is a legacy save,
+        // and the Either below depends on the current codec failing so the fallback runs.
         Codec.INT.fieldOf("schema_version").forGetter(d -> SCHEMA_VERSION),
-        Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("levels").forGetter(AffinityData::getAllLevels),
-        DecayAccumulator.CODEC.optionalFieldOf("decay_remainders", new DecayAccumulator())
-            .forGetter(AffinityData::getDecayAccumulator)
+        // The two payload fields are optional-with-default so that one malformed field costs
+        // only that field. As strict fields, a single bad entry failed the record, the legacy
+        // fallback failed too, and NeoForge's AttachmentHolder.deserializeAttachments catches
+        // the resulting error and SILENTLY DROPS the whole attachment - so a garbled decay
+        // remainder erased every school's affinity with nothing in the log.
+        // orElse, not just optionalFieldOf: optionalFieldOf covers an ABSENT field, but a
+        // field that is present and malformed still fails the record. orElse is the piece
+        // that turns a decode error into the default.
+        Codec.unboundedMap(Codec.STRING, Codec.INT).orElseGet(Map::of)
+            .optionalFieldOf("levels", Map.of())
+            .forGetter(AffinityData::getAllLevels),
+        // Optional-of, not a shared default instance: a default built once at class-init is
+        // handed to every player that lacks the field, and DecayAccumulator is mutable.
+        DecayAccumulator.CODEC.orElseGet(DecayAccumulator::new)
+            .optionalFieldOf("decay_remainders")
+            .forGetter(d -> Optional.of(d.getDecayAccumulator()))
     ).apply(inst, AffinityData::fromCurrent));
 
     /** Legacy shape: a bare {@code Map<enumName->level>} written by 2.0.x and earlier. */
@@ -80,7 +96,8 @@ public class AffinityData {
         return Math.max(0, Math.min(100, level));
     }
 
-    private static AffinityData fromCurrent(int version, Map<String, Integer> levels, DecayAccumulator decay) {
+    private static AffinityData fromCurrent(int version, Map<String, Integer> levels,
+                                            Optional<DecayAccumulator> decay) {
         // version is read for forward-compat; v1 levels are already canonical ids.
         AffinityData d = new AffinityData();
         levels.forEach((k, v) -> {
@@ -88,9 +105,7 @@ public class AffinityData {
                 d.levels.merge(k, clamp(v), Math::max);
             }
         });
-        if (decay != null) {
-            decay.snapshot().forEach((k, r) -> d.decay.accrue(k, r));
-        }
+        decay.ifPresent(acc -> acc.snapshot().forEach((k, r) -> d.decay.accrue(k, r)));
         return d;
     }
 

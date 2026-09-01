@@ -55,7 +55,7 @@ Ars and Iron's gear bonuses are routed to the active mana source:
 
 ### Mana potions
 
-When Iron's is the primary pool (`iss_primary`), Ars mana potions feed the unified pool instead of the now-unread Ars pool: the `ars_nouveau:mana_regen` and `ars_nouveau:mana_boost` effects are mirrored onto Iron's `MANA_REGEN` and `MAX_MANA` attributes (`MixinArsPotionEffects`), so drinking a Potion of Mana actually raises the pool you cast from. Removing the effect reverts the bonus. Requires Iron's installed; no-op in the other modes (Ars handles its own pool natively there).
+When Iron's is the primary pool (`iss_primary`), Ars mana potions feed the unified pool instead of the now-unread Ars pool. Ars 5.x expresses the `ars_nouveau:mana_regen` effect as a modifier on `PerkAttributes.MANA_REGEN_BONUS`, and `EquipmentIntegration` mirrors that aggregate onto Iron's `MANA_REGEN` on a 1 Hz refresh, so drinking a Potion of Mana raises the pool you cast from and removing the effect reverts the bonus - with no separate potion code to double-count it. Requires Iron's installed; no-op in the other modes (Ars handles its own pool natively there).
 
 ### Pre-cast validation
 

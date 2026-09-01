@@ -21,10 +21,10 @@ public class CooldownHandler {
             CooldownCategory category = SpellAnalysis.analyze(event.spell).category();
             
             // CRITICAL FIX: Only check ARS-namespaced cooldowns
-            if (UnifiedCooldownManager.isOnCooldown(player, category, "ars")) {
+            if (UnifiedCooldownManager.isOnCooldown(player, category)) {
                 event.setCanceled(true);
             } else {
-                long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false, "ars");
+                long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);
                 // Logic: High-fidelity sync ensuring the client HUD mirrors the lockout
                 PacketHandler.sendToClient(new CooldownSyncPayload(category, cooldownEnd), player);
             }

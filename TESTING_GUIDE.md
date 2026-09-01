@@ -36,8 +36,8 @@ Run these gradle tasks against the worktree before any manual scenario. Each gat
 | **G1 — Build** | `./gradlew --refresh-dependencies clean build` | `BUILD SUCCESSFUL`, 0 compile errors, no `mods.toml` references. |
 | **G2 — JUnit** | `./gradlew test` | All test classes pass. `CrossModSpellListRoundTripTest` is in place; `InscriptionInputsPredicateTest` is deferred to Phase 3. |
 | **G3 — Datagen** | `./gradlew runData` | Task exits 0; `src/generated/resources/` exists. |
-| **G4 — Mixin apply (Ars only)** | `./gradlew runClient` without Iron's | The 3 Ars-only mixins apply (`MixinManaCapability`, `MixinSpellResolverMana`, `MixinSpellResolverContext`); `MixinArsPotionEffects` and the Iron's mixins skip silently (they need Iron's); no `Mixin apply failed`. |
-| **G5 — Mixin apply (Ars + Iron's)** | `./gradlew runClient` with both pinned | All 6 active mixins apply (the 3 Ars mixins + `MixinArsPotionEffects` + `MixinIronsSpellDamage` + `MixinIronsMagicDataMana`). |
+| **G4 — Mixin apply (Ars only)** | `./gradlew runClient` without Iron's | The 3 Ars-only mixins apply (`MixinManaCapability`, `MixinSpellResolverMana`, `MixinSpellResolverContext`); the Iron's mixins skip silently (they need Iron's); no `Mixin apply failed`. |
+| **G5 — Mixin apply (Ars + Iron's)** | `./gradlew runClient` with both pinned | All 5 active mixins apply (the 3 Ars mixins + `MixinIronsSpellDamage` + `MixinIronsMagicDataMana`). |
 | **G6 — Dedicated server (Ars only)** | `./gradlew runServer` without Iron's | Server reaches `Done (…)! For help, type 'help'`, 0 stack traces, 0 `NoClassDefFoundError` for `io.redspace.*`. |
 | **G7 — Dedicated server (Ars + Iron's)** | `./gradlew runServer` with Iron's pinned | Same; payload registration log line visible for `affinity_sync`, `cooldown_sync`, `resonance_sync`. |
 
@@ -141,7 +141,7 @@ Pass: the screen opens **with no blur over the options** (3.0.2: opaque dark bac
 2. `/effect give @s ars_nouveau:mana_boost 999 1` (and/or `ars_nouveau:mana_regen`).
 3. Re-read the attributes; then `/effect clear @s` and read again.
 
-Pass: the Iron's `MAX_MANA` (from `mana_boost`) and `MANA_REGEN` (from `mana_regen`) values rise while the effect is active and revert when cleared — the Ars potion now raises the pool you cast from. [`MixinArsPotionEffects`](src/main/java/com/otectus/arsnspells/mixin/ars/MixinArsPotionEffects.java) targets `ManaCapEvents.playerOnTick(PlayerTickEvent.Pre)`; watch the log for **no** "mixin apply failed" on that target.
+Pass: the Iron's `MANA_REGEN` value rises while `ars_nouveau:mana_regen` is active and reverts within a second of it clearing — the Ars potion raises the pool you cast from. The mirror is [`EquipmentIntegration`](src/main/java/com/otectus/arsnspells/equipment/EquipmentIntegration.java)'s 1 Hz refresh reading `PerkAttributes.MANA_REGEN_BONUS`, not a mixin. There is no `mana_boost` case to test: Ars 5.x registers no such `MobEffect`.
 
 ### V13 — Pre-cast mana validation — should pass now
 

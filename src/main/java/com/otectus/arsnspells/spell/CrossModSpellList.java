@@ -21,9 +21,21 @@ public record CrossModSpellList(List<CrossModSpell> spells, int selectedIndex) {
         Codec.INT.optionalFieldOf("index", 0).forGetter(CrossModSpellList::selectedIndex)
     ).apply(i, CrossModSpellList::new));
 
+    /**
+     * Wire ceiling on the entry list.
+     *
+     * <p>Bounded because the unbounded {@code ByteBufCodecs.list()} lets a peer declare any
+     * element count and have the receiver allocate for it before a single element is read.
+     * The real ceiling is {@link CrossModSpellComponents#PROXY_POOL_SIZE} entries per item;
+     * this is deliberately slack above that so a future pool-size increase does not silently
+     * truncate a legitimate item, while still being a bound.
+     */
+    private static final int MAX_WIRE_ENTRIES = 64;
+
     public static final StreamCodec<RegistryFriendlyByteBuf, CrossModSpellList> STREAM_CODEC =
         StreamCodec.composite(
-            CrossModSpell.STREAM_CODEC.apply(ByteBufCodecs.list()), CrossModSpellList::spells,
+            CrossModSpell.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_WIRE_ENTRIES)),
+                                                                    CrossModSpellList::spells,
             ByteBufCodecs.VAR_INT,                                  CrossModSpellList::selectedIndex,
             CrossModSpellList::new
         );
