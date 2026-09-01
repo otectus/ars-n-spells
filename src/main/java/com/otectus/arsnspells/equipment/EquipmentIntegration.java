@@ -4,8 +4,10 @@ import com.google.common.collect.Multimap;
 import com.hollingsworth.arsnouveau.api.mana.IManaEquipment;
 import com.hollingsworth.arsnouveau.api.perk.PerkAttributes;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.bridge.SharedPoolCeiling;
 import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.config.ManaUnificationMode;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -97,6 +99,24 @@ public class EquipmentIntegration {
         applyAttributeModifier(player, AttributeRegistry.MAX_MANA.get(), ARS_TO_IRON_MAX_MANA_ID,
             "Ars Gear Max Mana", maxManaBonus);
 
+        applyArsRegenBonusToIrons(player, conversionRate);
+    }
+
+    /**
+     * Apply only the regen half of {@link #applyArsBonusesToIrons}.
+     *
+     * <p>Split out for HYBRID, where the max-mana half is owned by
+     * {@link #syncIronsMaxToArs}: Ars's real max already includes its gear bonuses, so
+     * adding the gear bonus a second time under a different modifier would double-count it.
+     */
+    public static void applyArsRegenBonusToIrons(Player player, double conversionRate) {
+        if (player == null || player.level().isClientSide()) {
+            return;
+        }
+        if (!ModList.get().isLoaded("irons_spellbooks")) {
+            return;
+        }
+        ManaBonus arsBonus = getArsManaBonuses(player);
         // Ars regen is absolute mana/sec; Iron's MANA_REGEN is a percentage-of-pool
         // multiplier. Direct assignment is a unit-mismatch bug — go through the bridge.
         double absRegenPerSec = arsBonus.manaRegen * conversionRate;
@@ -106,8 +126,17 @@ public class EquipmentIntegration {
     }
 
     /**
-     * Sync Iron's MAX_MANA attribute to match Ars's actual max mana.
-     * Used in ARS_PRIMARY mode to prevent Iron's tick from clamping Ars mana.
+     * Sync Iron's MAX_MANA attribute so it covers Ars's actual max mana.
+     *
+     * <p>Used by every shared-pool mode. The shortfall is measured against Iron's max
+     * <em>with the ANS modifier removed</em>, so the result is exactly
+     * {@code max(Ars max, Iron's own max)}: nothing Iron's contributes is voided, and the
+     * pool is not inflated past what either system intends. (Measuring against the bare
+     * base value, as this used to, re-added the shortfall on top of Iron's own gear.)
+     *
+     * <p>This is not cosmetic. Iron's {@code MagicData.setMana} clamps <em>every</em> write
+     * down to this attribute, so a ceiling below the current pool does not limit mana — it
+     * deletes it, on the next write, whatever that write happens to be.
      */
     public static void syncIronsMaxToArs(Player player, float arsMax) {
         if (player == null || player.level().isClientSide()) {
@@ -116,10 +145,78 @@ public class EquipmentIntegration {
         if (!ModList.get().isLoaded("irons_spellbooks")) {
             return;
         }
-        double ironsBase = player.getAttributeBaseValue(AttributeRegistry.MAX_MANA.get());
-        double needed = Math.max(0, arsMax - ironsBase);
-        applyAttributeModifier(player, AttributeRegistry.MAX_MANA.get(), ARS_TO_IRON_MAX_MANA_ID,
-            "Ars Max Mana Sync", needed);
+        AttributeInstance instance = player.getAttribute(AttributeRegistry.MAX_MANA.get());
+        if (instance == null) {
+            return;
+        }
+        // Drop our own modifier first so getValue() reports Iron's own max, whatever
+        // operations other mods' modifiers use. Nothing writes mana in between, so the
+        // momentarily lower ceiling cannot clamp anything.
+        if (instance.getModifier(ARS_TO_IRON_MAX_MANA_ID) != null) {
+            instance.removeModifier(ARS_TO_IRON_MAX_MANA_ID);
+        }
+        double ironsOwnMax = instance.getValue();
+        double needed = SharedPoolCeiling.modifierAmount(ironsOwnMax, arsMax);
+        if (needed != 0.0) {
+            instance.addTransientModifier(new AttributeModifier(
+                ARS_TO_IRON_MAX_MANA_ID, "Ars Max Mana Sync", needed,
+                AttributeModifier.Operation.ADDITION));
+        }
+    }
+
+    /**
+     * Ars's own computed max mana: config base + glyph bonus + book tier + Ars perk
+     * attributes, less any reserve.
+     *
+     * <p>Read straight from Ars's calculator rather than from {@code ManaCap.getMaxMana()},
+     * which ANS's own {@code MixinManaCapability} intercepts — going through the capability
+     * would make the ceiling sync depend on the value it is supposed to produce.
+     */
+    public static float arsRealMaxMana(Player player) {
+        if (player == null) {
+            return 0.0f;
+        }
+        try {
+            return com.hollingsworth.arsnouveau.api.util.ManaUtil.calcMaxMana(player).getRealMax();
+        } catch (Throwable t) {
+            LOGGER.debug("Could not read Ars max mana for {}", player.getName().getString(), t);
+            return 0.0f;
+        }
+    }
+
+    /**
+     * Re-apply the shared-pool ceiling if it has drifted below Ars's real max.
+     *
+     * <p>The ceiling is a <em>transient</em> attribute modifier, so it is lost whenever the
+     * {@code ServerPlayer} is rebuilt and is otherwise only refreshed on equipment change,
+     * login and respawn. This is the cheap last line of defence on the hot path: one
+     * attribute read, and a re-apply only when the ceiling actually cannot hold the pool.
+     * Calling it immediately before a deduction is what makes "a cast can never destroy
+     * mana" true regardless of what else lagged.
+     */
+    public static void ensureSharedPoolCeiling(Player player) {
+        if (player == null || player.level().isClientSide()) {
+            return;
+        }
+        if (!ModList.get().isLoaded("irons_spellbooks")) {
+            return;
+        }
+        ManaUnificationMode mode = BridgeManager.getCurrentMode();
+        // ARS_PRIMARY already drives this attribute from its own MaxManaCalcEvent path;
+        // ISS_PRIMARY makes Iron's the pool outright, so its ceiling is correct by
+        // construction. HYBRID is the mode where the two maxima can disagree.
+        if (mode == null || !mode.isHybrid()) {
+            return;
+        }
+        float arsMax = arsRealMaxMana(player);
+        if (arsMax <= 0.0f) {
+            return;
+        }
+        AttributeInstance instance = player.getAttribute(AttributeRegistry.MAX_MANA.get());
+        if (instance == null || instance.getValue() >= arsMax) {
+            return;
+        }
+        syncIronsMaxToArs(player, arsMax);
     }
 
     /**
@@ -133,6 +230,18 @@ public class EquipmentIntegration {
             return;
         }
         removeAttributeModifier(player, AttributeRegistry.MAX_MANA.get(), ARS_TO_IRON_MAX_MANA_ID);
+        removeAttributeModifier(player, AttributeRegistry.MANA_REGEN.get(), ARS_TO_IRON_REGEN_ID);
+    }
+
+    /**
+     * Drop only the Ars-derived regen modifier, leaving the shared-pool ceiling in place.
+     * Used when {@code respect_armor_bonuses} is off in HYBRID: the gear-derived regen is a
+     * bonus the player opted out of, but the ceiling is a correctness invariant.
+     */
+    public static void clearArsRegenBonusFromIrons(Player player) {
+        if (player == null || !ModList.get().isLoaded("irons_spellbooks")) {
+            return;
+        }
         removeAttributeModifier(player, AttributeRegistry.MANA_REGEN.get(), ARS_TO_IRON_REGEN_ID);
     }
     

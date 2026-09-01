@@ -88,10 +88,17 @@ public final class CarrierReconciler {
         return orphansRemoved ? Outcome.ORPHANS_REMOVED : Outcome.UNCHANGED;
     }
 
-    /** Give a legacy carrier scroll the native container it was created without. */
+    /**
+     * Give a legacy carrier scroll the native container it was created without.
+     *
+     * <p>Gated on {@code hasReadableContainer}, not on mere key presence: a container that is
+     * present but does not decode throws out of {@code ISpellContainer.get} on every read Iron's
+     * makes — including the scroll tooltip — and a presence check would have declared such a
+     * carrier healthy and left it broken forever.
+     */
     private static boolean repairCarrierContainer(ItemStack stack) {
         if (!IronsBookBindingUtil.isIronsScroll(stack)
-            || IronsScrollFactory.hasNativeContainer(stack)) {
+            || IronsScrollFactory.hasReadableContainer(stack)) {
             return false;
         }
         boolean ok = IronsScrollFactory.initializeCarrierContainer(stack);

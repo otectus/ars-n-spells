@@ -1,0 +1,26 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.otectus.arsnspells.mixin",
+  "plugin": "com.otectus.arsnspells.mixin.ArsNSpellsMixinPlugin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "ars_n_spells.refmap.json",
+  "mixins": [
+    "ars.MixinArsPotionEffects",
+    "irons.MagicDataAccessor",
+    "irons.MixinIronsCastValidation",
+    "irons.MixinIronsSpellDamage",
+    "irons.MixinIronsMagicDataMana",
+    "irons.MixinScrollItem",
+    "irons.MixinInscriptionTableMenu",
+    "sanctified.MixinSanctifiedAbstractSpell"
+  ],
+  "client": [
+    "irons.MixinAbstractSpellArsIcon",
+    "irons.MixinInscriptionTableScreen",
+    "covenant.MixinResourceBarOverlay"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

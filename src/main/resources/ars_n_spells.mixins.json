@@ -8,20 +8,7 @@
   "mixins": [
     "ars.MixinManaCapability",
     "ars.MixinSpellResolverMana",
-    "ars.MixinSpellResolverPreCast",
-    "ars.MixinArsPotionEffects",
-    "irons.MagicDataAccessor",
-    "irons.MixinIronsCastValidation",
-    "irons.MixinIronsSpellDamage",
-    "irons.MixinIronsMagicDataMana",
-    "irons.MixinScrollItem",
-    "irons.MixinInscriptionTableMenu",
-    "sanctified.MixinSanctifiedAbstractSpell"
-  ],
-  "client": [
-    "irons.MixinAbstractSpellArsIcon",
-    "irons.MixinInscriptionTableScreen",
-    "covenant.MixinResourceBarOverlay"
+    "ars.MixinSpellResolverPreCast"
   ],
   "injectors": {
     "defaultRequire": 1

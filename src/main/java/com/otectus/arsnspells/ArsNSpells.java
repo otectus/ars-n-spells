@@ -12,6 +12,7 @@ import com.otectus.arsnspells.events.*;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.registry.ModBlockEntities;
 import com.otectus.arsnspells.registry.ModBlocksRegistry;
+import com.otectus.arsnspells.registry.ModCreativeTabs;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
 import com.otectus.arsnspells.registry.ModMenus;
 import com.otectus.arsnspells.rituals.RitualRegistryHandler;
@@ -51,6 +52,13 @@ public class ArsNSpells {
         modEventBus.addListener(this::registerCaps);
         modEventBus.addListener(this::onConfigLoading);
         modEventBus.addListener(this::onConfigReloading);
+        // The Iron's integration self-check probes Iron's classes reflectively, which
+        // classloads them. Doing that during mod construction or config load would
+        // force AbstractSpell/Scroll to transform before other mods' mixin configs are
+        // ready - the same MixinTargetAlreadyLoadedException hazard documented in
+        // ArsNSpellsMixinPlugin. FMLLoadCompleteEvent is after every registry pass, so
+        // the targets are already loaded and the probe merely observes them.
+        modEventBus.addListener(this::onLoadComplete);
 
         // Common items (uninscribe tablet) are registered unconditionally so
         // they remain available for cleanup if Iron's Spellbooks is later
@@ -70,6 +78,12 @@ public class ArsNSpells {
         ModBlocksRegistry.register(modEventBus);
         ModBlockEntities.register(modEventBus);
         ModMenus.register(modEventBus);
+
+        // 3.2.0: the mod's own creative tab. Not Iron's-gated — the Spell Loom and the
+        // uninscribe tablet are registered unconditionally, so the tab always has content.
+        // Registration order does not matter here: the icon and display-item suppliers
+        // dereference their RegistryObjects lazily, when the tab is built.
+        ModCreativeTabs.register(modEventBus);
 
         // 3.0.0: register the Ars cross-cast proxy-spell pool (ars_cross_1..N)
         // into Iron's spell registry so Ars spells can appear as native entries
@@ -213,12 +227,6 @@ public class ArsNSpells {
             LOGGER.error("FAILED to initialize Sanctified Legacy compatibility", e);
         }
 
-        // Ring/Iron's integration self-check. Catches silent mixin or registration
-        // failures that would otherwise produce "nothing happens when I cast".
-        if (ModList.get().isLoaded("irons_spellbooks")) {
-            runRingIntegrationSelfCheck();
-        }
-
         LOGGER.info("========================================");
         LOGGER.info("OK Ars 'n' Spells initialization complete");
         LOGGER.info("========================================");
@@ -243,14 +251,41 @@ public class ArsNSpells {
     }
 
     /**
-     * Verify that the mixins and event subscribers required for the ring/Iron's
-     * integration actually applied at classload. Mixin only WARNs on @Redirect
-     * conflicts — a downstream silent failure ("nothing happens when casting")
-     * is the usual symptom. Logging at startup gives the user a single line to
-     * grep for if the integration ever silently breaks.
+     * Ring/Iron's integration self-check. Catches silent mixin failures that would
+     * otherwise surface only as "nothing happens when I cast".
+     */
+    private void onLoadComplete(final net.minecraftforge.fml.event.lifecycle.FMLLoadCompleteEvent event) {
+        if (!ModList.get().isLoaded("irons_spellbooks")) {
+            return;
+        }
+        try {
+            runRingIntegrationSelfCheck();
+        } catch (Throwable t) {
+            LOGGER.error("[SelfCheck] Iron's integration self-check itself failed", t);
+        }
+    }
+
+    /**
+     * Verify that the mixins the Iron's integration depends on actually applied at
+     * classload.
+     *
+     * <p>Every injector into Iron's carries {@code require = 0}, and the compat mixin
+     * config is {@code "required": false}, so a conflict or an upstream rename
+     * degrades quietly by design — that is what stops one third-party
+     * {@code @Overwrite} from aborting mod loading for an entire pack. The cost of
+     * that safety is that the failure is silent, so this check exists to make it
+     * greppable in a single log line.
+     *
+     * <p>The probes below introspect the <em>target</em> classes, not our own. An
+     * earlier version called {@code Class.forName} on our mixin classes, which always
+     * succeeds — they ship in our jar whether or not they were ever applied — so it
+     * could never detect the degradation it was written to catch. Mixin merges handler
+     * methods into the target under their own names, so the presence of an
+     * {@code arsnspells$}-prefixed member on an Iron's class is direct evidence that
+     * our mixin applied to it.
      */
     private static void runRingIntegrationSelfCheck() {
-        StringBuilder report = new StringBuilder("[SelfCheck] Iron's ring integration: ");
+        StringBuilder report = new StringBuilder("[SelfCheck] Iron's integration: ");
         boolean ok = true;
 
         // 1. Is the MagicDataAccessor interface attached to Iron's MagicData?
@@ -258,29 +293,91 @@ public class ArsNSpells {
             Class<?> magicData = Class.forName("io.redspace.ironsspellbooks.api.magic.MagicData");
             Class<?> accessor = Class.forName("com.otectus.arsnspells.mixin.irons.MagicDataAccessor");
             boolean attached = accessor.isAssignableFrom(magicData);
-            report.append("MagicDataAccessor=").append(attached ? "OK" : "MISSING ");
+            report.append("MagicDataAccessor=").append(attached ? "OK" : "MISSING");
             if (!attached) ok = false;
         } catch (Throwable t) {
-            report.append("MagicDataAccessor=ERROR(").append(t.getClass().getSimpleName()).append(") ");
+            report.append("MagicDataAccessor=ERROR(").append(t.getClass().getSimpleName()).append(")");
             ok = false;
         }
 
-        // 2. Is IronsLPHandler registered on the EVENT_BUS?
+        // 2. Did the mana + cast-gate mixins merge into their Iron's targets?
+        ok &= appendMixinProbe(report, "MagicData.mana",
+            "io.redspace.ironsspellbooks.api.magic.MagicData");
+        ok &= appendMixinProbe(report, "AbstractSpell.castGate",
+            "io.redspace.ironsspellbooks.api.spells.AbstractSpell");
+        ok &= appendMixinProbe(report, "Scroll.cost",
+            "io.redspace.ironsspellbooks.item.Scroll");
+
+        // 3. Does Scroll still override Item.use? MixinScrollItem injects into that
+        // override, and its name is mapping-dependent (`use` in dev, `m_7203_` in
+        // production) — which is exactly how a missing `remap = true` let scroll cost
+        // enforcement silently no-op for several releases. Match on signature instead
+        // of name so the probe is mapping-independent.
+        boolean scrollUsePresent = scrollOverridesUse();
+        report.append(" | Scroll.use=").append(scrollUsePresent ? "OK" : "MISSING");
+        if (!scrollUsePresent) ok = false;
+
+        // 4. Is IronsLPHandler registered on the EVENT_BUS?
         // We can't introspect the bus's listener list directly without API access,
         // so we just verify the classes were loaded (which happens lazily when
         // ArsNSpells.<init> registered them). IronsAuraHandler was deleted as part of
         // the aura-subsystem cleanup — Covenant owns Iron's-spell aura now.
-        report.append("| IronsLPHandler=")
-            .append(canLoad("com.otectus.arsnspells.events.IronsLPHandler") ? "OK" : "MISSING ");
-        report.append("| MixinIronsCastValidation=")
-            .append(canLoad("com.otectus.arsnspells.mixin.irons.MixinIronsCastValidation") ? "OK" : "MISSING ");
+        report.append(" | IronsLPHandler=")
+            .append(canLoad("com.otectus.arsnspells.events.IronsLPHandler") ? "OK" : "MISSING");
 
         if (ok) {
             LOGGER.info(report.toString());
         } else {
             LOGGER.error(report.toString());
-            LOGGER.error("[SelfCheck] Ring/Iron's integration is degraded — casts may silently fail.");
-            LOGGER.error("[SelfCheck] Check the early-startup log for '@Redirect conflict' or '@Mixin' warnings.");
+            LOGGER.error("[SelfCheck] Iron's integration is degraded - casts may silently ignore ANS costs.");
+            LOGGER.error("[SelfCheck] Check the early-startup log for 'ars_n_spells.compat.mixins.json' warnings;");
+            LOGGER.error("[SelfCheck] a conflicting mod's @Overwrite on an Iron's method is the usual cause.");
+        }
+    }
+
+    /**
+     * Report whether any of our mixins merged a member into {@code targetClassName}.
+     *
+     * @return true if the probe passed, so callers can fold it into an overall status
+     */
+    private static boolean appendMixinProbe(StringBuilder report, String label, String targetClassName) {
+        report.append(" | ").append(label).append('=');
+        try {
+            Class<?> target = Class.forName(targetClassName);
+            for (java.lang.reflect.Method m : target.getDeclaredMethods()) {
+                if (m.getName().contains("arsnspells$")) {
+                    report.append("OK");
+                    return true;
+                }
+            }
+            report.append("NOT-APPLIED");
+            return false;
+        } catch (Throwable t) {
+            report.append("ERROR(").append(t.getClass().getSimpleName()).append(')');
+            return false;
+        }
+    }
+
+    /**
+     * Whether Iron's {@code Scroll} still overrides {@code Item.use}. Matched by
+     * signature because the method name differs between the dev and production
+     * mappings.
+     */
+    private static boolean scrollOverridesUse() {
+        try {
+            Class<?> scroll = Class.forName("io.redspace.ironsspellbooks.item.Scroll");
+            Class<?> level = Class.forName("net.minecraft.world.level.Level");
+            Class<?> player = Class.forName("net.minecraft.world.entity.player.Player");
+            Class<?> hand = Class.forName("net.minecraft.world.InteractionHand");
+            for (java.lang.reflect.Method m : scroll.getDeclaredMethods()) {
+                Class<?>[] params = m.getParameterTypes();
+                if (params.length == 3 && params[0] == level && params[1] == player && params[2] == hand) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Throwable t) {
+            return false;
         }
     }
 

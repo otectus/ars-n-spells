@@ -44,18 +44,48 @@ public final class IronsScrollFactory {
         if (scroll == null || scroll.isEmpty()) {
             return false;
         }
-        if (hasNativeContainer(scroll)) {
+        if (hasReadableContainer(scroll)) {
             return true;
         }
         ISpellContainer.set(scroll, ISpellContainer.create(1, false, false));
         // Verify rather than assume: `set` goes through a codec, and a silent encode
         // failure here would recreate the exact defect we are guarding against.
-        return hasNativeContainer(scroll);
+        return hasReadableContainer(scroll);
     }
 
-    /** True when {@code stack} carries a native container Iron's can read (modern or legacy). */
+    /**
+     * True when {@code stack} carries container NBT under a key Iron's recognises.
+     *
+     * <p>This is only a <em>presence</em> test — it is what Iron's own
+     * {@code ISpellContainer.isSpellContainer} does, namely
+     * {@code CodecHelper.hasWithLegacy(stack, "irons_spellbooks:spell_container", "ISB_Spells")},
+     * a bare {@code CompoundTag.contains(key)}. Use it to answer "would Iron's take this
+     * branch?", never to answer "is this carrier safe to hand out".
+     */
     public static boolean hasNativeContainer(ItemStack stack) {
         return stack != null && !stack.isEmpty() && ISpellContainer.isSpellContainer(stack);
+    }
+
+    /**
+     * True when the container NBT is not merely present but actually <em>decodes</em>.
+     *
+     * <p>The distinction has teeth. {@code ISpellContainer.get} resolves to
+     * {@code CodecHelper.get}, which ends in {@code DataResult.getOrThrow} — it throws a
+     * {@code RuntimeException} on a decode failure rather than returning null. So a carrier
+     * whose container key exists but does not decode throws on <em>every</em> subsequent read,
+     * including the tooltip Iron's builds when a player hovers the stack. A presence check
+     * would have called such a carrier valid and handed it out; this one refuses it, which is
+     * what {@link #initializeCarrierContainer}'s contract has always claimed to do.
+     */
+    public static boolean hasReadableContainer(ItemStack stack) {
+        if (!hasNativeContainer(stack)) {
+            return false;
+        }
+        try {
+            return ISpellContainer.get(stack) != null;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /**

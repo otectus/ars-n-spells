@@ -149,6 +149,36 @@ public class CastingAuthority {
     }
 
     /**
+     * The amount an Ars spell of {@code baseCost} actually costs under the current config.
+     *
+     * <p>Single source of truth for the Ars-side conversion, shared by pre-cast validation
+     * and by the expend-mana mixin. They used to compute it separately —
+     * {@code (float)(cost * rate)} here versus {@code (int) Math.round(cost * rate)} there —
+     * so the amount charged could differ from the amount checked by up to half a point, and
+     * at the config's 0.01 floor the rounding made every spell under 50 mana free.
+     */
+    public static float effectiveArsCost(int baseCost) {
+        if (baseCost <= 0) {
+            return 0.0f;
+        }
+        if (!BridgeManager.isUnificationEnabled()) {
+            return baseCost;
+        }
+        return (float) (baseCost * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+    }
+
+    /** The Iron's-side counterpart of {@link #effectiveArsCost}. */
+    public static float effectiveIronsCost(int baseCost) {
+        if (baseCost <= 0) {
+            return 0.0f;
+        }
+        if (!BridgeManager.isUnificationEnabled()) {
+            return baseCost;
+        }
+        return (float) (baseCost * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
+    }
+
+    /**
      * ANS-MED-043: consume the mana previously validated by
      * {@link #canCastIronsSpell}. Iron's scrolls never deduct mana natively, so
      * "full" scroll cost mode validated the cost and then charged nothing. The
@@ -162,11 +192,7 @@ public class CastingAuthority {
         if (player.isCreative() || manaCost <= 0) {
             return true;
         }
-        float effectiveCost = manaCost;
-        if (BridgeManager.isUnificationEnabled()) {
-            effectiveCost = (float) (manaCost * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
-        }
-        return BridgeManager.consumeManaForMode(player, effectiveCost, false);
+        return BridgeManager.consumeManaForMode(player, effectiveIronsCost(manaCost), false);
     }
 
     /**
@@ -191,12 +217,8 @@ public class CastingAuthority {
                     BridgeManager.getManaForMode(player, false) : 0;
             }
         } else {
-            // Apply conversion rate if needed
-            double conversionRate = fromArs ?
-                AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get() :
-                AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get();
-
-            effectiveCost = (float) (cost * conversionRate);
+            // Same helper the deduction uses, so validated cost == charged cost.
+            effectiveCost = fromArs ? effectiveArsCost(cost) : effectiveIronsCost(cost);
             availableMana = BridgeManager.getManaForMode(player, fromArs);
         }
 

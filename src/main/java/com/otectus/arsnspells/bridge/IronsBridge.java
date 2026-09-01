@@ -41,6 +41,21 @@ public class IronsBridge implements IManaBridge {
         }
     }
 
+    /**
+     * Deduct {@code amount} from Iron's pool, and verify that is all that was deducted.
+     *
+     * <p>Iron's {@code MagicData.setMana} clamps <em>every</em> write down to the player's
+     * {@code MAX_MANA} attribute, and {@code addMana} is just {@code setMana(mana + v)}. So
+     * if the ceiling ever sits below the current pool, this call does not subtract the cost —
+     * it collapses the pool to the ceiling, however large the surplus and however small the
+     * spell. That is the "one spell drained all my mana" report.
+     *
+     * <p>Two defences. Before writing, {@code ensureSharedPoolCeiling} re-applies the ceiling
+     * if it has drifted below Ars's real max, which is what makes the collapse impossible.
+     * After writing, the result is compared against the arithmetic one; a mismatch means some
+     * other ceiling source is still wrong, and it is logged once rather than being silently
+     * eaten — the previous code had no way to tell a correct deduction from a wipe.
+     */
     @Override
     public boolean consumeMana(Player player, float amount) {
         if (player == null || player.level().isClientSide()) return false;
@@ -49,15 +64,38 @@ public class IronsBridge implements IManaBridge {
             if (data == null) {
                 return false;
             }
-            // Remove unsafe synchronization - MagicData handles thread safety internally
-            if (data.getMana() >= amount) {
-                data.addMana(-amount);
-                return true;
+            float before = data.getMana();
+            if (before < amount) {
+                return false;
             }
+            com.otectus.arsnspells.equipment.EquipmentIntegration.ensureSharedPoolCeiling(player);
+            // Remove unsafe synchronization - MagicData handles thread safety internally
+            data.addMana(-amount);
+            float expected = before - amount;
+            float after = data.getMana();
+            if (after < expected - CLAMP_TOLERANCE) {
+                warnOnce(player, before, amount, expected, after);
+            }
+            return true;
         } catch (Throwable e) {
             logCriticalError("consumeMana", e);
         }
         return false;
+    }
+
+    /** Float slop below which a shortfall is rounding, not a clamp. */
+    private static final float CLAMP_TOLERANCE = 1.0e-3f;
+
+    private void warnOnce(Player player, float before, float amount, float expected, float after) {
+        if (!loggedOps.add("consumeMana:clamped")) {
+            return;
+        }
+        LOGGER.warn("Ars 'n' Spells: casting for {} cost {} mana but the pool fell from {} to {} "
+                + "(expected {}). Iron's clamps every mana write down to the max_mana attribute, "
+                + "currently {}, so the surplus above it was destroyed rather than spent. "
+                + "Please report this with your mana_unification_mode and gear.",
+            player.getName().getString(), amount, before, after, expected,
+            getMaxMana(player));
     }
 
     @Override

@@ -50,6 +50,10 @@ public class RitualRegistryHandler {
             ModItemsRegistry.spellTranscriptionTablet());
         spliceTablet(SpellbookBindingRitual.REGISTRY_PATH,
             ModItemsRegistry.spellbookBindingTablet());
+        spliceTablet(ManaInfusionRitual.REGISTRY_PATH,
+            ModItemsRegistry.manaInfusionTablet());
+        spliceTablet(ManaWellRitual.REGISTRY_PATH,
+            ModItemsRegistry.manaWellTablet());
 
         registered = true;
     }

@@ -39,7 +39,11 @@ public abstract class MixinArsPotionEffects {
     /**
      * Intercept mana regeneration tick to apply potion effects to unified pool.
      */
-    @Inject(method = "playerOnTick", at = @At("HEAD"))
+    // require = 0: this mixin lives in the non-required compat config because it
+    // depends on Iron's AttributeRegistry. A missing target must skip this one inject
+    // rather than drop the whole mixin - and note that the require-count failure throws
+    // InjectionError, which "required": false does NOT downgrade.
+    @Inject(method = "playerOnTick", at = @At("HEAD"), require = 0)
     private static void arsnspells$redirectPotionEffects(PlayerTickEvent event, CallbackInfo ci) {
         Player player = event.player;
 

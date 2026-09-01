@@ -4,8 +4,8 @@ import com.hollingsworth.arsnouveau.api.spell.SpellContext;
 import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.bridge.IManaBridge;
+import com.otectus.arsnspells.casting.CastingAuthority;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
-import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.spell.CrossCastContext;
 import com.otectus.arsnspells.spell.CrossSpellType;
@@ -67,10 +67,14 @@ public abstract class MixinSpellResolverMana {
             return;
         }
 
-        int cost = Math.max(0, getResolveCost());
-        double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
-        cost = (int) Math.round(cost * conversionRate);
-        if (cost == 0) {
+        // Same helper CastingAuthority validated with, so the amount charged is exactly the
+        // amount checked. This used to round to an int here and not there, which at low
+        // conversion rates rounded small spells down to free.
+        float cost = CastingAuthority.effectiveArsCost(Math.max(0, getResolveCost()));
+        if (cost <= 0.0f) {
+            // Cancel like every other exit does. Falling through ran Ars's native
+            // expendMana, which is the one path in this method that did not.
+            ci.cancel();
             return;
         }
 

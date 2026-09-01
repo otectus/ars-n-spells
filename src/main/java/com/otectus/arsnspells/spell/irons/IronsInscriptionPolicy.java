@@ -73,7 +73,10 @@ public final class IronsInscriptionPolicy {
             CarrierReconciler.reconcile(scroll);
             return Verdict.ANS_CARRIER;
         }
-        if (!IronsScrollFactory.hasNativeContainer(scroll)) {
+        // "Readable", not merely present: the guard exists because Iron's dereferences the
+        // decoded container unguarded, and a key that fails to decode throws just as surely
+        // as a key that is missing.
+        if (!IronsScrollFactory.hasReadableContainer(scroll)) {
             return Verdict.NO_NATIVE_CONTAINER;
         }
         return Verdict.ALLOW;

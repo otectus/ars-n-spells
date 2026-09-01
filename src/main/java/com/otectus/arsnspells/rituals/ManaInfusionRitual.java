@@ -20,6 +20,9 @@ import java.util.Comparator;
  * Going through the bridge also makes the ritual useful on Ars-only setups.
  */
 public class ManaInfusionRitual extends AbstractRitual {
+    /** Registry path shared by the ritual id, its tablet item, and its assets. */
+    public static final String REGISTRY_PATH = "mana_infusion";
+
     @Override
     protected void tick() {}
 
@@ -48,6 +51,6 @@ public class ManaInfusionRitual extends AbstractRitual {
 
     @Override
     public ResourceLocation getRegistryName() {
-        return new ResourceLocation("ars_n_spells", "mana_infusion");
+        return new ResourceLocation("ars_n_spells", REGISTRY_PATH);
     }
 }

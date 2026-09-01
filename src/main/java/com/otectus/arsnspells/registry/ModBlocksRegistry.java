@@ -3,13 +3,11 @@ package com.otectus.arsnspells.registry;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.block.SpellLoomBlock;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
-import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -39,12 +37,7 @@ public final class ModBlocksRegistry {
     public static void register(IEventBus modBus) {
         BLOCKS.register(modBus);
         BLOCK_ITEMS.register(modBus);
-        modBus.addListener(ModBlocksRegistry::addToCreativeTab);
-    }
-
-    private static void addToCreativeTab(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) {
-            event.accept(SPELL_LOOM_ITEM);
-        }
+        // The Spell Loom used to be pushed into vanilla FUNCTIONAL_BLOCKS. It now lives in the
+        // mod's own tab instead — see ModCreativeTabs.
     }
 }

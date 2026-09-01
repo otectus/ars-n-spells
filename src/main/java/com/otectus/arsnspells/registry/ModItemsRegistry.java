@@ -2,6 +2,8 @@ package com.otectus.arsnspells.registry;
 
 import com.hollingsworth.arsnouveau.common.items.RitualTablet;
 import com.otectus.arsnspells.ArsNSpells;
+import com.otectus.arsnspells.rituals.ManaInfusionRitual;
+import com.otectus.arsnspells.rituals.ManaWellRitual;
 import com.otectus.arsnspells.rituals.SpellbookBindingRitual;
 import com.otectus.arsnspells.rituals.SpellTranscriptionRitual;
 import com.otectus.arsnspells.rituals.SpellUninscriptionRitual;
@@ -36,6 +38,8 @@ public final class ModItemsRegistry {
     private static RegistryObject<RitualTablet> spellTranscriptionTablet;
     private static RegistryObject<RitualTablet> spellbookBindingTablet;
     private static RegistryObject<RitualTablet> spellUninscriptionTablet;
+    private static RegistryObject<RitualTablet> manaInfusionTablet;
+    private static RegistryObject<RitualTablet> manaWellTablet;
 
     private ModItemsRegistry() {}
 
@@ -55,6 +59,18 @@ public final class ModItemsRegistry {
         spellbookBindingTablet = ITEMS.register(
             SpellbookBindingRitual.REGISTRY_PATH,
             () -> new RitualTablet(new SpellbookBindingRitual())
+        );
+        // Mana Infusion and Mana Well were registered as rituals but never had a
+        // tablet, so there was no way to put either on a brazier — the features
+        // shipped unreachable. Both are Iron's-gated in RitualRegistryHandler, so
+        // their tablets belong here rather than with the common items.
+        manaInfusionTablet = ITEMS.register(
+            ManaInfusionRitual.REGISTRY_PATH,
+            () -> new RitualTablet(new ManaInfusionRitual())
+        );
+        manaWellTablet = ITEMS.register(
+            ManaWellRitual.REGISTRY_PATH,
+            () -> new RitualTablet(new ManaWellRitual())
         );
     }
 
@@ -87,5 +103,13 @@ public final class ModItemsRegistry {
 
     public static RegistryObject<RitualTablet> spellUninscriptionTablet() {
         return spellUninscriptionTablet;
+    }
+
+    public static RegistryObject<RitualTablet> manaInfusionTablet() {
+        return manaInfusionTablet;
+    }
+
+    public static RegistryObject<RitualTablet> manaWellTablet() {
+        return manaWellTablet;
     }
 }

@@ -79,6 +79,31 @@ public class EquipmentHandler {
     }
 
     /**
+     * Handle a dimension change.
+     *
+     * <p>The Ars-to-Iron's mana modifiers are <em>transient</em>, and travelling between
+     * dimensions rebuilds the {@code ServerPlayer} — attribute map included — so they are
+     * silently dropped. Nothing else re-applied them until the next equipment change,
+     * leaving the Iron's mana ceiling at its bare base value while the pool still held its
+     * pre-portal amount. Since Iron's clamps every mana write down to that ceiling, the
+     * surplus was destroyed by the next write, typically the first spell cast on the far
+     * side. Every other lifecycle handler in the mod already listens for this event.
+     */
+    @SubscribeEvent
+    public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (!BridgeManager.isUnificationEnabled()) {
+            return;
+        }
+
+        Player player = event.getEntity();
+        EquipmentIntegration.clearCache(player);
+        updatePlayerMaxMana(player);
+
+        logDebug("Player {} changed dimension, re-applying mana bonuses",
+            player.getName().getString());
+    }
+
+    /**
      * Handle player logout to clear cached equipment data
      */
     @SubscribeEvent
@@ -109,18 +134,38 @@ public class EquipmentHandler {
                 return;
             }
 
-            if (!AnsConfig.respectArmorBonuses.get()) {
+            // HYBRID is exempt from respect_armor_bonuses on purpose. That toggle governs
+            // whether Ars *gear* bonuses are carried across; in HYBRID the Iron's MAX_MANA
+            // attribute is not a bonus but the ceiling every mana write is clamped to, so
+            // leaving it below Ars's real max does not withhold a bonus — it deletes mana
+            // the player already has. See EquipmentIntegration.syncIronsMaxToArs.
+            if (!AnsConfig.respectArmorBonuses.get() && !mode.isHybrid()) {
                 EquipmentIntegration.clearArsBonusesFromIrons(player);
                 return;
             }
 
-            if (mode.isArsPrimary()) {
-                // Sync Iron's MAX_MANA to Ars's actual max to prevent Iron's tick from clamping
-                float arsMax = BridgeManager.getBridge().getMaxMana(player);
+            if (mode.isArsPrimary() || mode.isHybrid()) {
+                // One ceiling for the shared pool: drive Iron's MAX_MANA to cover Ars's real
+                // max (base + glyph bonus + book tier + perks), which is what the Ars side
+                // reports and what the player sees. HYBRID previously received only the
+                // gear-derived slice, so a spell book or glyph bonus raised the displayed
+                // pool without raising the ceiling that governs writes — and Iron's clamps
+                // every write down to that ceiling, so the surplus vanished on the next cast.
+                float arsMax = EquipmentIntegration.arsRealMaxMana(player);
                 EquipmentIntegration.syncIronsMaxToArs(player, arsMax);
-                logDebug("Synced Iron's max mana to Ars max for {}: arsMax={}",
-                    player.getName().getString(), arsMax);
-            } else if (mode.isIssPrimary() || mode.isHybrid()) {
+                if (mode.isHybrid()) {
+                    if (AnsConfig.respectArmorBonuses.get()) {
+                        // Ars's real max already includes its gear bonuses, so only the regen
+                        // half of applyArsBonusesToIrons is still wanted here.
+                        EquipmentIntegration.applyArsRegenBonusToIrons(
+                            player, AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+                    } else {
+                        EquipmentIntegration.clearArsRegenBonusFromIrons(player);
+                    }
+                }
+                logDebug("Synced Iron's max mana to Ars max for {} (mode {}): arsMax={}",
+                    player.getName().getString(), mode, arsMax);
+            } else if (mode.isIssPrimary()) {
                 double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
                 EquipmentIntegration.applyArsBonusesToIrons(player, conversionRate);
                 EquipmentIntegration.ManaBonus arsBonus = EquipmentIntegration.getArsManaBonuses(player);

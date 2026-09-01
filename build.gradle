@@ -134,8 +134,14 @@ processResources {
 }
 
 mixin {
+    // One refmap per source set; both configs declare the same refmap name so the
+    // annotation processor's single output serves them both.
     add sourceSets.main, "ars_n_spells.refmap.json"
     config "ars_n_spells.mixins.json"
+    // Iron's/Covenant-targeting mixins live in a separate, non-required config so a
+    // conflict with a third-party mixin degrades that one mixin instead of aborting
+    // mod loading for the whole pack.
+    config "ars_n_spells.compat.mixins.json"
 }
 
 jar {
@@ -147,7 +153,7 @@ jar {
                 "Implementation-Title": project.name,
                 "Implementation-Version": project.jar.archiveVersion,
                 "Implementation-Vendor": mod_authors,
-                "MixinConfigs": "ars_n_spells.mixins.json"
+                "MixinConfigs": "ars_n_spells.mixins.json,ars_n_spells.compat.mixins.json"
         ])
     }
 }

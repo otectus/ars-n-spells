@@ -12,6 +12,9 @@ import net.minecraft.world.phys.AABB;
  * {@link ManaInfusionRitual} for full rationale.
  */
 public class ManaWellRitual extends AbstractRitual {
+    /** Registry path shared by the ritual id, its tablet item, and its assets. */
+    public static final String REGISTRY_PATH = "mana_well";
+
     @Override
     protected void tick() {
         if (this.getWorld() == null || this.getWorld().isClientSide()) {
@@ -30,6 +33,6 @@ public class ManaWellRitual extends AbstractRitual {
 
     @Override
     public ResourceLocation getRegistryName() {
-        return new ResourceLocation("ars_n_spells", "mana_well");
+        return new ResourceLocation("ars_n_spells", REGISTRY_PATH);
     }
 }
