@@ -17,6 +17,13 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 import java.util.Optional;
+import io.redspace.ironsspellbooks.api.util.Utils;
+import net.minecraft.network.chat.Component;
+import com.otectus.arsnspells.util.AdvancementUtil;
+import com.otectus.arsnspells.util.CrossCastTrace;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A registered Iron's Spellbooks proxy spell that carries no effect of its own:
@@ -36,6 +43,8 @@ import java.util.Optional;
  * (constructed by {@link ArsCrossProxyRegistry}).
  */
 public class ArsCrossProxySpell extends AbstractSpell {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ArsCrossProxySpell.class);
+
     private final int poolId;
     private final ResourceLocation spellResource;
     private final DefaultConfig defaultConfig;
@@ -91,14 +100,66 @@ public class ArsCrossProxySpell extends AbstractSpell {
         if (level.isClientSide() || !(entity instanceof ServerPlayer player)) {
             return;
         }
-        ItemStack book = playerMagicData.getPlayerCastingItem();
-        if (book == null || book.isEmpty()) {
+        Carrier carrier = resolveCastingBook(player, playerMagicData);
+        if (carrier == null) {
+            // Previously a silent return: the wheel slot selected and nothing happened, with
+            // no way for a player or a log reader to tell why.
+            LOGGER.warn("Ars cross proxy pool {} cast by {} (source={}) but no carried spellbook "
+                    + "holds a sidecar entry for it - the native wheel slot is desynced from the "
+                    + "cross-cast component, or the book was unequipped mid-cast",
+                poolId, player.getGameProfile().getName(), castSource);
+            player.displayClientMessage(
+                Component.translatable("message.ars_n_spells.crosscast.proxy.book_missing", poolId), true);
             return;
         }
-        Optional<CrossModSpell> entry = CrossModSpellComponents.findEntryByProxyPoolId(book, poolId);
-        if (entry.isEmpty() || entry.get().arsSpellTag().isEmpty()) {
+        if (carrier.entry().arsSpellTag().isEmpty()) {
+            LOGGER.warn("Ars cross proxy pool {} cast by {} resolved a book but that entry carries "
+                    + "no Ars payload", poolId, player.getGameProfile().getName());
+            player.displayClientMessage(
+                Component.translatable("message.ars_n_spells.crosscast.proxy.entry_missing", poolId), true);
             return;
         }
-        CrossCastingHandler.castArsSpell(player, book, entry.get());
+        UUID attemptId = UUID.randomUUID();
+        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+            CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "runtime", "ARS_PROXY", "pool", poolId);
+        if (CrossCastingHandler.castArsSpell(player, carrier.book(), carrier.entry(), attemptId)) {
+            // Audit H4: the native-wheel path bypasses serverHandleCast, so the advancement is
+            // granted here too (grant() is idempotent).
+            AdvancementUtil.grant(player, "first_cross_cast");
+        }
     }
+
+    /**
+     * Find the stack that actually carries this proxy's sidecar entry.
+     *
+     * <p>{@code MagicData.getPlayerCastingItem()} is the authoritative answer only when Iron's
+     * set it for this cast; it comes back empty for a book held in the Curios spellbook slot,
+     * which made every such cast a silent no-op (3.0.3). The equipped spellbook and both hands
+     * are checked as fallbacks, and each candidate must actually hold an entry for this pool
+     * id - so a player carrying two bound books can never resolve to the wrong one.
+     */
+    private Carrier resolveCastingBook(ServerPlayer player, MagicData magicData) {
+        Carrier carrier = carrierOf(magicData.getPlayerCastingItem());
+        if (carrier != null) {
+            return carrier;
+        }
+        carrier = carrierOf(Utils.getPlayerSpellbookStack(player));
+        if (carrier != null) {
+            return carrier;
+        }
+        carrier = carrierOf(player.getMainHandItem());
+        return carrier != null ? carrier : carrierOf(player.getOffhandItem());
+    }
+
+    /** The carrier view of {@code stack}, or null when it holds no entry for this pool id. */
+    private Carrier carrierOf(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return null;
+        }
+        Optional<CrossModSpell> entry = CrossModSpellComponents.findEntryByProxyPoolId(stack, poolId);
+        return entry.map(e -> new Carrier(stack, e)).orElse(null);
+    }
+
+    /** A resolved book and the sidecar entry on it that belongs to this proxy. */
+    private record Carrier(ItemStack book, CrossModSpell entry) {}
 }

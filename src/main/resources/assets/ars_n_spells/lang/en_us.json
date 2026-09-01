@@ -136,5 +136,7 @@
   "commands.ans.bind.book_full": "That spell book already holds the maximum of %1$s Ars spells.",
   "commands.ans.bind.uncastable": "That scroll's Ars spell can't be read (exported on a different Ars Nouveau version, or a glyph's mod was removed?). Re-export the spell and bind the new scroll.",
   "message.ars_n_spells.inscription.ans_carrier": "This scroll carries an Ars Nouveau spell, which the Inscription Table can't read. Bind it to a spell book with the Spellbook Binding ritual or /ans bind_scroll_to_irons_book.",
-  "message.ars_n_spells.inscription.no_container": "This scroll is missing its spell data and can't be inscribed. It was created by an older version of Ars 'n' Spells - export the spell again at a Spell Loom."
+  "message.ars_n_spells.inscription.no_container": "This scroll is missing its spell data and can't be inscribed. It was created by an older version of Ars 'n' Spells - export the spell again at a Spell Loom.",
+  "message.ars_n_spells.crosscast.proxy.book_missing": "Cross-cast failed: the book carrying this spell (wheel slot %1$s) could not be found. Make sure it is equipped in your spellbook slot.",
+  "message.ars_n_spells.crosscast.proxy.entry_missing": "Cross-cast failed: this book no longer carries an Ars spell for wheel slot %1$s. Rebind the spell."
 }
