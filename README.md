@@ -1,27 +1,31 @@
-# Ars 'n' Spells (v3.0.2, NeoForge 1.21.1)
+# Ars 'n' Spells (v3.2.0, NeoForge 1.21.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.21.1 on **NeoForge**. It unifies mana, scaling, and progression while keeping each mod playable on its own.
 
-> **Status (v3.0.2, NeoForge 1.21.1).** Full parity with the Forge 1.20.1 v3.0.1 line: **Ars spells
-> in Iron's native spell wheel** (export onto real Iron's scrolls via the new **Spell Loom**
-> workstation or `/ans export_to_irons_scroll`, bind onto real Iron's spellbooks via the
-> Spellbook Binding ritual or `/ans bind_scroll_to_irons_book`; bound spells appear as their own
-> wheel entries with a player-chosen name, nature, and icon, casting through the ANS cost
-> pipeline exactly once), plus the 3.0.x audit fixes (SEPARATE-mode pre-pay/refund, Source-Jar
-> chunk-load guard + kill switch, apparatus-recipe tag fix, config screen legibility + multiplayer
-> read-only gating, dead-config removal). Compile targets: Ars Nouveau 5.11.1 / **Iron's Spells
-> 1.21.1-3.16.0**. The LP/aura features of 1.20.1 3.0.x remain out of scope (see below).
+> **Status (v3.2.0, NeoForge 1.21.1).** Feature parity with the Forge 1.20.1 **3.2.0** line,
+> with one documented exception (Covenant of the Seven — see *Known gaps* below).
 >
-> **Status (v2.6.1, NeoForge 1.21.1).** Mana unification, cross-cast inscription, rituals, affinity, progression, resonance, cooldowns, and equipment scaling are all live (the mana mixins were repaired against Ars 5.x / Iron's 3.x in 2.0.1). **2.6.1 restores core parity with the Forge 1.20.1 build:** the in-game config screen, Ars mana-potion mirroring into the unified pool, a mana-only pre-cast validator, and the debug overlay are all functional again (each was stubbed or unported in 2.5.0). **2.5.0** was a correctness release: affinity now tracks *every* Iron's addon school dynamically instead of a hardcoded sixteen, the Curios spell-discount applies on both the Ars and Iron's sides, and two datapack features that silently broke in the 1.20.1 → 1.21 directory flattening (the ritual apparatus recipes and the curio-discount tag) are restored to their correct singular paths. Compile targets are pinned to Ars Nouveau 5.11.1 / Iron's Spells 3.15.6; the mod runs against newer (5.11.7 / 3.16.0) at runtime. The previous **Covenant of the Seven / Sanctified Legacy** integration (Cursed Ring, Virtue Ring, Blasphemy curios, LP / aura systems) remains **removed** (no NeoForge 1.21.1 build of that addon exists); the `#ars_n_spells:curio_spell_discount` item tag is its replacement footprint.
+> This release closes the gap from the 3.0.2 port. Beyond the 3.0.x feature set it adds the
+> **3.0.3** fixes (the proxy book-resolution fallback chain, so a spellbook in the Curios slot
+> casts instead of silently doing nothing; proxy double-billing short-circuits), the **3.1.0**
+> fixes (the Inscription Table crash guard on both client and server; payload-integrity checks
+> before anything is consumed; the school-classification rebuild on Ars metadata plus datapack
+> overrides; `ISpellbook`-based spellbook detection; JEI/EMI proxy hiding), and the **3.2.0**
+> fixes (the mod's own creative tab; Mana Infusion and the Mana Well finally obtainable; the
+> shared-pool ceiling that stopped a single hybrid-mode cast draining the whole mana pool; the
+> tooltip crash guard).
+>
+> Compile targets: **Ars Nouveau 5.13.1.1400**, **Iron's Spells 1.21.1-3.16.3**,
+> **NeoForge 21.1.248**.
 
 ## Requirements
 
 | Mod | Version | Required |
 | --- | --- | --- |
-| Minecraft (NeoForge) | 1.21.1 / 21.1.84+ | Yes |
+| Minecraft (NeoForge) | 1.21.1 / 21.1.0+ (built against 21.1.248) | Yes |
 | Java | 21 | Yes |
-| Ars Nouveau | 5.11.1+ | Yes |
-| Iron's Spells 'n Spellbooks | 1.21.1-3.16.0+ | No |
+| Ars Nouveau | 5.13+ (built against 5.13.1.1400) | Yes |
+| Iron's Spells 'n Spellbooks | 1.21.1-3.15.0+ (built against 3.16.3) | No |
 
 If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior. The mod will not load on Forge or on Minecraft versions other than 1.21.1.
 
@@ -178,9 +182,25 @@ An **in-game config screen** is available from the mod list (**Mods → Ars 'n' 
 | `source_jar_scan_interval_ticks` | `20` | Ticks between proximity checks per player (1–200). |
 | `source_jar_scan_radius` | `4` | Horizontal scan radius in blocks (1–8; the scan never loads chunks). |
 
-### Removed in the NeoForge 1.21.1 port
+### Config keys carried but inert
 
-The config keys for subsystems without a 1.21.1 build (Blood Magic LP / Covenant of the Seven aura and rings) and the never-read keys flagged by the 1.20.1 audit (ANS-MED-044) were **deleted from the spec in 3.0.1** — they no longer appear in generated TOMLs: `enable_lp_system`, `lp_source_mode`, `death_on_insufficient_lp`, `show_lp_cost_messages`, `ars_lp_*`, `irons_lp_*`, `aura_*`, `blasphemy_*`, `hide_mana_bar_with_ring`, `scroll_cost_mode`, the glyph/school bonus sections, resonance caps, category cooldowns, and the performance keys. `virtue_ring_discount` and `max_total_curio_discount` are **kept** — they were repurposed as the generic `#ars_n_spells:curio_spell_discount` per-curio discount and its stacking cap.
+The Covenant of the Seven keys (`enable_lp_system`, `lp_source_mode`,
+`death_on_insufficient_lp`, `show_lp_cost_messages`, `hide_mana_bar_with_ring`, `ars_lp_*`,
+`irons_lp_*`, `enable_virtue_aura_system`, `ars_virtue_aura_multiplier`, `aura_failure_mode`,
+`blasphemy_*`) are **declared and generated, but nothing in this build reads them** — that
+subsystem has no 1.21.1 dependency to run against. They are kept so an existing server's TOML
+round-trips unchanged and re-enabling the subsystem is a code change rather than a config
+migration. Each carries an `INERT on 1.21.1` comment in the generated file.
+
+`scroll_cost_mode` **is** live again: `full` charges scroll casts through the unified pool
+(Iron's scrolls never deduct mana natively). Only its `lp_only` value is inert, and it behaves
+as `free`.
+
+The never-read keys the 1.20.1 audit flagged (ANS-MED-044) stay deleted: the glyph/school bonus
+sections, the resonance caps, category cooldowns, and the dead performance keys.
+`virtue_ring_discount` and `max_total_curio_discount` are **kept** and are live — they were
+repurposed as the generic `#ars_n_spells:curio_spell_discount` per-curio discount and its
+stacking cap.
 
 ---
 
@@ -230,7 +250,7 @@ Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMa
 
 Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`.
 
-Output jar: `build/libs/ars_n_spells-3.0.2.jar`
+Output jar: `build/libs/ars_n_spells-3.2.0.jar`
 
 ## Changelog
 

@@ -2,6 +2,110 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.2.0] — parity with the Forge 1.20.1 3.2.0 line (2026-08-25)
+
+Closes the gap from the 3.0.2 port. This release brings the NeoForge build up to the feature
+set of Forge 1.20.1 **3.2.0**, with one documented exception (Covenant of the Seven).
+
+### Platform
+
+- **NeoForge 21.1.84 → 21.1.248**, ModDevGradle 2.0.78 → 2.0.144, Gradle wrapper 8.10 → 8.12.
+- **Ars Nouveau 5.11.1 → 5.13.1.1400** and **Iron's Spells 3.16.0 → 1.21.1-3.16.3**, both moved
+  off CurseMaven onto their upstream mavens. Ars' POM declares its own runtime graph, so dev
+  runs now get a genuine Ars install (GeckoLib, Curios, Nuggets, Patchouli, JEI, TerraBlender)
+  instead of a bare jar. The bump caused no API drift.
+- Curios and JEI added as compile-only APIs.
+- `gradle-wrapper.jar` was never committed — `.gitignore`'s blanket `*.jar` swallowed it, so a
+  fresh clone had no working wrapper. Fixed, along with `run-server/` and `run-data/` not being
+  ignored.
+
+### Added
+
+- **The mod's own creative tab** (`ars_n_spells:general`, Spell Loom icon). Items no longer
+  squat in vanilla Functional Blocks or surface inside Ars Nouveau's tab. The removal from Ars'
+  tab is scoped to that namespace and asks for `PARENT_TAB_ONLY`, so the creative search index
+  is untouched.
+- **Mana Infusion and the Mana Well are obtainable.** Both were registered as rituals with no
+  tablet item and no splice into Ars' ritual-item map, so no brazier could resolve them. Both
+  now have a tablet, artwork, an Enchanting Apparatus recipe, and lang entries.
+- **The four-advancement Spell Loom chain** (Warp and Weft → Written in Starlight → A Foreign
+  Chapter → Two Schools, One Voice).
+- **Server-authoritative cross-casting.** A new `cross_cast_request` payload replaces
+  client-side resolution; the server re-reads the held stack and never trusts the client's
+  index. Network protocol `"2"` → `"3"`.
+- **The scroll cost system.** `scroll_cost_mode=full` charges scroll casts through the unified
+  pool — Iron's scrolls never deduct mana natively, so this was documented but free.
+- **The hard pre-cast gate** (`MixinSpellResolverPreCast`) and the cast-validation redirect
+  owner (`MixinIronsCastValidation`).
+- **Datapack glyph → school overrides** under `data/<pack>/ans_glyph_schools/`.
+- **JEI/EMI proxy hiding**, plus `allowCrafting=false` on the proxy spells so they stop
+  appearing in Iron's Scroll Forge.
+- **The GameTest suite** returns (Iron's-less profile), and the JUnit suite grows from 60 tests
+  to 140.
+
+### Fixed
+
+- **One Ars spell drained the whole mana pool in hybrid mode.** Only the gear-derived slice of
+  Ars' max was pushed into Iron's `max_mana`, and `MagicData.setMana` clamps every write down
+  to that attribute — so the surplus was not capped, it was deleted on the next write. The
+  ceiling is now `max(Ars max, Iron's own max)`, re-checked immediately before any deduction,
+  and `IronsBridge.consumeMana` audits its own arithmetic.
+- **Affinity decayed roughly 20× faster than documented.** `Math.max(1, floor(...))` stripped a
+  flat point per interval; a fractional residual is now carried between intervals and persisted.
+- **Hovering a Spell Loom scroll could crash the client.** The tooltip handler had no top-level
+  guard and its inner guard caught only `Exception`, so a linkage `Error` from an Ars/addon
+  version skew propagated out of `getTooltipLines` into the render loop.
+- **The Inscription Table crashed on ANS carrier scrolls** — on the client (the reported NPE)
+  and on dedicated servers, where it was a remote crash vector. Iron's dereferences
+  `ISpellContainer.get` unguarded in three places; carriers now get a valid empty native
+  container, and a shared guard refuses both legacy and well-formed ANS carriers on both sides.
+- **A bound spell could silently become a different spell.** Ars 5.x substitutes
+  `EffectBreak` for a glyph whose mod has been removed, so a stale payload still decoded, still
+  passed `isValid()`, and cast something the player never built — after charging for it.
+  Payloads are now checked against the glyph registry before anything is consumed, at the cast
+  gate, the binding ritual, and the bind command.
+- **A spellbook in the Curios slot cast nothing.** The proxy read only
+  `MagicData.getPlayerCastingItem()`, which is empty for that slot, and returned silently. The
+  fallback chain (casting item → equipped spellbook → main hand → offhand) is restored, with
+  translated failure messages instead of silence.
+- **Proxy casts were billed twice** and filed under the placeholder's Ender school. Affinity,
+  cooldown, progression and the Iron's cost handler now short-circuit on ANS proxy ids.
+- **The cross-cast multiplier did not apply when unification was off.** It applies in every
+  mode, including `disabled`; only the currency conversion and the SEPARATE split are gated.
+- **ARS_PRIMARY used a flat conversion rate**, so a 50-mana Iron's spell cost half the Ars pool.
+  The rate is now pool-aware.
+- **Filter glyphs decided a spell's school.** `AbstractFilter extends AbstractEffect` in Ars, so
+  `Projectile → Sensitive → Ignite` was classified by *Sensitive* — wrong school, wrong cooldown
+  category, wrong elemental scaling.
+- **Firework was classified as fire**, and an addon glyph's declared school was invisible: the
+  substring heuristic was the whole implementation. Resolution is now datapack override → Ars'
+  own `spellSchools` metadata → heuristic.
+- **Spellbook detection matched `"spell_book"` in the registry path** rather than testing what
+  an item is. It now uses Iron's published `ISpellbook` plus the
+  `ars_n_spells:irons_spell_books` tag, which shipped in the 1.20.1 F1 fix and had never been
+  read by any code.
+- **Source Jar detection** moved from a registry-path substring match to the
+  `ars_n_spells:source_jars` tag.
+- **Both mana rituals granted mana straight into Iron's `MagicData`**, so they did nothing on an
+  Ars-only install and ignored the active mana mode. They route through `BridgeManager` now.
+- `/ans bind_scroll_to_irons_book` reported "failed" for a full book; `BOOK_FULL` is now
+  distinct and actionable.
+- `AnsConfig.safeSave()` returned a boolean that was always `true` and described the queueing,
+  not the save. Void, per audit D5.
+- The sneak-cycle message was hardcoded English.
+
+### Known gaps
+
+- **Covenant of the Seven** (Cursed Ring LP, Virtue Ring aura, Blasphemy curios) has no 1.21.1
+  release, so its integration cannot be compiled or tested. The 1.20.1 sources are preserved
+  under `src/covenant-disabled/` with a README describing what re-enabling involves; nothing
+  there is compiled or shipped. Its ~24 config keys are still declared and generated, marked
+  `INERT`, so an existing server TOML round-trips unchanged.
+- **Too Many Glyphs** has no 1.21.1 build, so the `-PwithTooManyGlyphs` test profile has no
+  counterpart here. Ars Elemental's profile is ported.
+- Items and player data written by the Forge 1.20.1 build do **not** migrate: the cross-cast
+  payload is a data component here, and affinity/cooldown/progression are entity attachments.
+
 ## [3.0.2] — config screen blur hotfix (2026-07-12)
 
 ### Fixed
