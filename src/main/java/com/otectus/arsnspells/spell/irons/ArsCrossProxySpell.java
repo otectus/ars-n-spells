@@ -65,6 +65,12 @@ public class ArsCrossProxySpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.ENDER_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(0.0)
+            // A proxy is meaningless outside a book that carries the matching sidecar entry,
+            // so it must never be craftable as a standalone scroll. Iron's gates the Scroll
+            // Forge (and the Scroll Forge recipes it feeds to JEI) on this flag and nothing
+            // else - casting, the spell wheel and the inscription table are unaffected - so
+            // this removes a nonsense craft without disabling the spell itself.
+            .setAllowCrafting(false)
             .build();
     }
 

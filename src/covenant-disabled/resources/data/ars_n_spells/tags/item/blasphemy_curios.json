@@ -1,0 +1,18 @@
+{
+  "replace": false,
+  "values": [
+    { "id": "covenant_of_the_seven:fire_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:ice_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:lightning_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:holy_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:ender_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:blood_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:evocation_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:nature_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:eldritch_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:aqua_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:geo_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:wind_blasphemy", "required": false },
+    { "id": "covenant_of_the_seven:dormant_blasphemy", "required": false }
+  ]
+}

@@ -73,6 +73,36 @@ public class AnsConfig {
     public static final ModConfigSpec.BooleanValue READ_CURIO_ATTRIBUTE_MODIFIERS;
     public static final ModConfigSpec.ConfigValue<String> SCROLL_COST_MODE;
 
+    // ---- Covenant of the Seven (LP / aura). INERT on 1.21.1 ----
+    // Covenant has no 1.21.1 release, so nothing in the compiled jar reads these. They stay
+    // declared so a server's existing TOML carries over untouched and re-enabling the
+    // subsystem is a compile-scope change, not a config migration.
+    // See src/covenant-disabled/README.md.
+    public static final ModConfigSpec.BooleanValue ENABLE_LP_SYSTEM;
+    public static final ModConfigSpec.ConfigValue<String> LP_SOURCE_MODE;
+    public static final ModConfigSpec.BooleanValue DEATH_ON_INSUFFICIENT_LP;
+    public static final ModConfigSpec.BooleanValue SHOW_LP_COST_MESSAGES;
+    public static final ModConfigSpec.BooleanValue HIDE_MANA_BAR_WITH_RING;
+    public static final ModConfigSpec.DoubleValue ARS_LP_BASE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue ARS_LP_TIER1_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue ARS_LP_TIER2_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue ARS_LP_TIER3_MULTIPLIER;
+    public static final ModConfigSpec.IntValue ARS_LP_MINIMUM_COST;
+    public static final ModConfigSpec.DoubleValue IRONS_LP_BASE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue IRONS_LP_PER_LEVEL_MULTIPLIER;
+    public static final ModConfigSpec.IntValue IRONS_LP_MINIMUM_COST;
+    public static final ModConfigSpec.DoubleValue IRONS_LP_COMMON_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue IRONS_LP_UNCOMMON_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue IRONS_LP_RARE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue IRONS_LP_EPIC_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue IRONS_LP_LEGENDARY_MULTIPLIER;
+    public static final ModConfigSpec.BooleanValue ENABLE_VIRTUE_AURA_SYSTEM;
+    public static final ModConfigSpec.DoubleValue ARS_VIRTUE_AURA_MULTIPLIER;
+    public static final ModConfigSpec.ConfigValue<String> AURA_FAILURE_MODE;
+    public static final ModConfigSpec.DoubleValue BLASPHEMY_DISCOUNT;
+    public static final ModConfigSpec.DoubleValue BLASPHEMY_MATCHING_SCHOOL_BONUS;
+    public static final ModConfigSpec.DoubleValue BLASPHEMY_LP_DISCOUNT;
+
     // ========================================
     // SPELL SCALING
     // ========================================
@@ -417,6 +447,77 @@ public class AnsConfig {
             .define("scroll_cost_mode", "full");
 
         BUILDER.pop();
+
+        // ========================================
+        // COVENANT OF THE SEVEN (LP / AURA) - INERT on 1.21.1
+        // ========================================
+        // Nothing in the compiled jar reads this section: the Cursed Ring / Virtue Ring /
+        // Blasphemy subsystem lives in src/covenant-disabled and is blocked on Covenant of the
+        // Seven shipping for 1.21.1. Declared anyway so a server's existing TOML round-trips
+        // unchanged and re-enabling is a compile-scope change. See that directory's README.
+        BUILDER.push("Cursed Ring LP System");
+        BUILDER.comment(
+            "INERT on 1.21.1 - Covenant of the Seven has no 1.21.1 release.",
+            "These keys are read by nothing in this build; they are kept so an existing server",
+            "config carries over and re-enabling the subsystem needs no config migration."
+        );
+        ENABLE_LP_SYSTEM = BUILDER
+            .comment("Master toggle for the Cursed Ring LP cost path.")
+            .define("enable_lp_system", true);
+        LP_SOURCE_MODE = BUILDER
+            .comment("Where LP comes from: BLOOD_MAGIC_PRIORITY, BLOOD_MAGIC_ONLY, or HEALTH_ONLY.")
+            .define("lp_source_mode", "BLOOD_MAGIC_PRIORITY");
+        DEATH_ON_INSUFFICIENT_LP = BUILDER
+            .comment("false: cancel the cast and deal 1 heart. true: the spell casts and the player dies.")
+            .define("death_on_insufficient_lp", false);
+        SHOW_LP_COST_MESSAGES = BUILDER
+            .comment("Show LP consumption/denial messages on the action bar.")
+            .define("show_lp_cost_messages", true);
+        HIDE_MANA_BAR_WITH_RING = BUILDER
+            .comment("Hide both mana bars while a Cursed or Virtue Ring is equipped.")
+            .define("hide_mana_bar_with_ring", true);
+        BUILDER.pop();
+
+        BUILDER.push("LP Calculation - Ars Nouveau");
+        BUILDER.comment("INERT on 1.21.1 - see the Cursed Ring LP System section.");
+        ARS_LP_BASE_MULTIPLIER = BUILDER.defineInRange("ars_lp_base_multiplier", 1.0, 0.1, 100.0);
+        ARS_LP_TIER1_MULTIPLIER = BUILDER.defineInRange("ars_lp_tier1_multiplier", 1.5, 0.1, 10.0);
+        ARS_LP_TIER2_MULTIPLIER = BUILDER.defineInRange("ars_lp_tier2_multiplier", 2.0, 0.1, 10.0);
+        ARS_LP_TIER3_MULTIPLIER = BUILDER.defineInRange("ars_lp_tier3_multiplier", 2.5, 0.1, 10.0);
+        ARS_LP_MINIMUM_COST = BUILDER.defineInRange("ars_lp_minimum_cost", 10, 1, 10000);
+        BUILDER.pop();
+
+        BUILDER.push("LP Calculation - Irons Spellbooks");
+        BUILDER.comment("INERT on 1.21.1 - see the Cursed Ring LP System section.");
+        IRONS_LP_BASE_MULTIPLIER = BUILDER.defineInRange("irons_lp_base_multiplier", 0.5, 0.1, 100.0);
+        IRONS_LP_PER_LEVEL_MULTIPLIER = BUILDER.defineInRange("irons_lp_per_level_multiplier", 0.1, 0.0, 10.0);
+        IRONS_LP_MINIMUM_COST = BUILDER.defineInRange("irons_lp_minimum_cost", 10, 1, 10000);
+        IRONS_LP_COMMON_MULTIPLIER = BUILDER.defineInRange("irons_lp_common_multiplier", 1.0, 0.1, 100.0);
+        IRONS_LP_UNCOMMON_MULTIPLIER = BUILDER.defineInRange("irons_lp_uncommon_multiplier", 1.5, 0.1, 100.0);
+        IRONS_LP_RARE_MULTIPLIER = BUILDER.defineInRange("irons_lp_rare_multiplier", 2.0, 0.1, 100.0);
+        IRONS_LP_EPIC_MULTIPLIER = BUILDER.defineInRange("irons_lp_epic_multiplier", 3.0, 0.1, 100.0);
+        IRONS_LP_LEGENDARY_MULTIPLIER = BUILDER.defineInRange("irons_lp_legendary_multiplier", 5.0, 0.1, 100.0);
+        BUILDER.pop();
+
+        BUILDER.push("Virtue Ring");
+        BUILDER.comment("INERT on 1.21.1 - see the Cursed Ring LP System section.");
+        ENABLE_VIRTUE_AURA_SYSTEM = BUILDER
+            .comment("Master toggle for the Virtue Ring aura cost path.")
+            .define("enable_virtue_aura_system", true);
+        ARS_VIRTUE_AURA_MULTIPLIER = BUILDER.defineInRange("ars_virtue_aura_multiplier", 1.0, 0.1, 10.0);
+        AURA_FAILURE_MODE = BUILDER
+            .comment("Behaviour when the Covenant reflection bridge is degraded: open or closed.")
+            .define("aura_failure_mode", "open", o -> o instanceof String v
+                && ("open".equalsIgnoreCase(v) || "closed".equalsIgnoreCase(v)));
+        BUILDER.pop();
+
+        BUILDER.push("Blasphemy Curio Discounts");
+        BUILDER.comment("INERT on 1.21.1 - see the Cursed Ring LP System section.");
+        BLASPHEMY_DISCOUNT = BUILDER.defineInRange("blasphemy_discount", 0.15, 0.0, 1.0);
+        BLASPHEMY_MATCHING_SCHOOL_BONUS = BUILDER.defineInRange("blasphemy_matching_school_bonus", 0.10, 0.0, 1.0);
+        BLASPHEMY_LP_DISCOUNT = BUILDER.defineInRange("blasphemy_lp_discount", 0.85, 0.0, 1.0);
+        BUILDER.pop();
+
 
         // ========================================
         // SPELL SCALING

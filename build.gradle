@@ -160,6 +160,12 @@ test {
     useJUnitPlatform()
 }
 
+// `src/covenant-disabled/` is deliberately NOT a source set. It holds the 1.20.1 Covenant of
+// the Seven integration (LP / aura / blasphemy curios), kept as a reference because Covenant has
+// no 1.21.1 release to compile or test against. Nothing there is compiled or shipped; see
+// src/covenant-disabled/README.md for what re-enabling involves. This block exists so the
+// directory is discoverable from the build file rather than only by browsing the tree.
+
 // The GameTest harness resolves unprefixed templates (e.g. "platform") against
 // <run dir>/gameteststructures/*.snbt. Neither vanilla nor NeoForge ship any, so stage the
 // committed ones into the run dir before any game run.

@@ -11,6 +11,9 @@ build/
 out/
 logs/
 run/
+# ModDevGradle gives each run task its own game directory (build.gradle `runs` block).
+run-server/
+run-data/
 
 # Dependencies & local copies
 dependencies/
@@ -20,6 +23,7 @@ io/
 gradle-8.12/
 gradle-8.12-bin.zip
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 
 # Root META-INF (build artifact, not src/main/resources one)
 /META-INF/
