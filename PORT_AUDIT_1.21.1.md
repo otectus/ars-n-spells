@@ -149,6 +149,25 @@ Everything below is client-side and cannot be asserted headlessly. This is the s
 MCA: Quests port audit flagged, and both of that port's P1 bugs were client rendering
 regressions invisible to unit tests.
 
+> **Update 2026-08-25 — the first client run happened, and the prediction held.** It
+> immediately found a P1 rendering regression of exactly that shape: **both mana bars drew at
+> once** in `iss_primary`, because `ManaBarController` compared the GUI layer id against two
+> hardcoded ids neither mod uses (`*:mana_bar`, against the real `ars_nouveau:mana_hud` and
+> `irons_spellbooks:mana_overlay`). Fixed by restoring the 1.20.1 namespace + `contains("mana")`
+> matching and porting the regression test that had been left behind. Two contributing defects
+> were fixed alongside it: `OverlayDiagnostics` — the tool that dumps real layer ids — was
+> unreachable because it was gated on a SERVER config read at client setup, and
+> `BridgeManager` logged a "requires a game restart" note that contradicted the live mode
+> switching this branch implements.
+>
+> **Items 2–8 below are still unverified.** Item 1's cross-cast walkthrough was not completed
+> either. Two further questions were opened by the fix and remain open: whether the surviving
+> bar shows the *unified* value (`MixinManaCapability` bails out client-side, so this depends
+> on Ars's server→client mana sync still firing), and the deep client-surface audit of the
+> config screen, Spell Loom screen, wheel-icon mixin, tooltips and menu slot indices. Verified
+> clean so far: every `Component.translatable` key resolves against `en_us.json`, and neither
+> screen double-draws its background — which was one of the two MCA P1s.
+
 1. `./gradlew runClient` with Ars + Iron's. Walk: craft the Spell Loom → transcribe a spell →
    bind to a spellbook → cast from Iron's wheel with the custom name and icon → uninscribe.
 2. All six items appear in the `ars_n_spells:general` tab **with real textures** (the 3.2.0
