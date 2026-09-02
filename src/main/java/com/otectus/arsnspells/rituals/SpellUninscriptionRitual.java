@@ -1,6 +1,5 @@
 package com.otectus.arsnspells.rituals;
 
-import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import net.minecraft.core.BlockPos;
@@ -34,13 +33,10 @@ import java.util.List;
  *  </ul>
  * Every violation produces a lang-keyed message naming the offending items.
  */
-public class SpellUninscriptionRitual extends AbstractRitual {
+public class SpellUninscriptionRitual extends AnsRitual {
     public static final String REGISTRY_PATH = "spell_uninscription";
     private static final String LANG_PREFIX = "ritual.ars_n_spells.spell_uninscription.";
     private static final int SEARCH_RADIUS = 3;
-
-    @Override
-    protected void tick() {}
 
     @Override
     public void onEnd() {
@@ -55,7 +51,7 @@ public class SpellUninscriptionRitual extends AbstractRitual {
             e -> e.isAlive() && !e.getItem().isEmpty());
 
         if (entities.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.empty_range");
+            error(LANG_PREFIX + "error.empty_range");
             return;
         }
 
@@ -65,22 +61,22 @@ public class SpellUninscriptionRitual extends AbstractRitual {
         // refuse early so we never accidentally strip an item the player
         // intended to keep inscribed.
         if (!inputs.sources.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.unexpected_source",
+            error(LANG_PREFIX + "error.unexpected_source",
                 InscriptionInputs.joinNames(inputs.sources));
             return;
         }
         if (!inputs.blankTargets.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.unexpected_blank",
+            error(LANG_PREFIX + "error.unexpected_blank",
                 InscriptionInputs.joinNames(inputs.blankTargets));
             return;
         }
 
         if (inputs.inscribed.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_inscribed");
+            error(LANG_PREFIX + "error.no_inscribed");
             return;
         }
         if (inputs.inscribed.size() > 1) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_inscribed",
+            error(LANG_PREFIX + "error.multiple_inscribed",
                 inputs.inscribed.size(), InscriptionInputs.joinNames(inputs.inscribed));
             return;
         }
@@ -96,7 +92,7 @@ public class SpellUninscriptionRitual extends AbstractRitual {
         inscribedEntity.setItem(stack);
 
         playUninscribeEffects(level, pos);
-        RitualFeedback.success(level, pos, LANG_PREFIX + "success", displayName);
+        success(LANG_PREFIX + "success", displayName);
     }
 
     private void playUninscribeEffects(Level level, BlockPos pos) {

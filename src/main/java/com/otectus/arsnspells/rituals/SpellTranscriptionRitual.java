@@ -1,6 +1,5 @@
 package com.otectus.arsnspells.rituals;
 
-import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.CrossSpellType;
 import net.minecraft.core.BlockPos;
@@ -33,13 +32,10 @@ import java.util.List;
  * Validation runs fully before any item mutation: every failure produces a
  * lang-keyed, player-facing message naming the offending items and the rule.
  */
-public class SpellTranscriptionRitual extends AbstractRitual {
+public class SpellTranscriptionRitual extends AnsRitual {
     public static final String REGISTRY_PATH = "spell_transcription";
     private static final String LANG_PREFIX = "ritual.ars_n_spells.spell_transcription.";
     private static final int SEARCH_RADIUS = 3;
-
-    @Override
-    protected void tick() {}
 
     @Override
     public void onEnd() {
@@ -54,7 +50,7 @@ public class SpellTranscriptionRitual extends AbstractRitual {
             e -> e.isAlive() && !e.getItem().isEmpty());
 
         if (entities.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.empty_range");
+            error(LANG_PREFIX + "error.empty_range");
             return;
         }
 
@@ -63,27 +59,27 @@ public class SpellTranscriptionRitual extends AbstractRitual {
         // Already-inscribed items in range are a distinct error from
         // too-many-targets: the fix is "uninscribe first", not "remove".
         if (!inputs.inscribed.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.inscribed_items",
+            error(LANG_PREFIX + "error.inscribed_items",
                 InscriptionInputs.joinNames(inputs.inscribed));
             return;
         }
 
         if (inputs.sources.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_source");
+            error(LANG_PREFIX + "error.no_source");
             return;
         }
         if (inputs.sources.size() > 1) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_sources",
+            error(LANG_PREFIX + "error.multiple_sources",
                 inputs.sources.size(), InscriptionInputs.joinNames(inputs.sources));
             return;
         }
 
         if (inputs.blankTargets.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_target");
+            error(LANG_PREFIX + "error.no_target");
             return;
         }
         if (inputs.blankTargets.size() > 1) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_targets",
+            error(LANG_PREFIX + "error.multiple_targets",
                 inputs.blankTargets.size(), InscriptionInputs.joinNames(inputs.blankTargets));
             return;
         }
@@ -98,7 +94,7 @@ public class SpellTranscriptionRitual extends AbstractRitual {
         // root that the source parser didn't recognize as filled but would
         // still let Ars's own right-click handler shadow the cross-cast.
         if (InscriptionInputs.hasArsSpellAtRoot(targetStack)) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.target_ars_rooted",
+            error(LANG_PREFIX + "error.target_ars_rooted",
                 targetStack.getHoverName().getString());
             return;
         }
@@ -107,7 +103,7 @@ public class SpellTranscriptionRitual extends AbstractRitual {
         if (source == null) {
             // Classify said this was a source but a second read failed -- a
             // genuinely transient parse problem, not a validation error.
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.source_parse_failed",
+            error(LANG_PREFIX + "error.source_parse_failed",
                 sourceStack.getHoverName().getString());
             return;
         }
@@ -134,7 +130,7 @@ public class SpellTranscriptionRitual extends AbstractRitual {
         }
 
         playInscribeEffects(level, pos);
-        RitualFeedback.success(level, pos, LANG_PREFIX + "success", sourceLabel(source));
+        success(LANG_PREFIX + "success", sourceLabel(source));
     }
 
     private void playInscribeEffects(Level level, BlockPos pos) {

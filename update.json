@@ -1,6 +1,7 @@
 {
   "homepage": "https://github.com/otectus/ars-n-spells",
   "1.21.1": {
+    "3.2.4": "Parity with the Forge 1.20.1 3.2.3 and 3.2.4 lines. Fixes Ars 'n' Spells rituals doing nothing at all: placing a Spellbook Binding, Spell Transcription, Spell Uninscription or Mana Infusion tablet on a ritual brazier and lighting it consumed nothing and produced nothing, because the ritual never told Ars it had finished - they now burn for about three seconds, complete, and consume their items. Ritual messages and the binding advancement now go to the player who lit the brazier instead of whoever happened to be nearest when it finished, or being dropped entirely if they walked away. /ans bind_scroll_to_irons_book now honours allow_ars_spells_in_irons_spellbooks instead of bypassing the kill switch. On the performance side the Mana Well ritual no longer scans every entity section in range on every tick while lit, and the per-tick regen path no longer queries the mod list each player tick. No gameplay, config, packet or save-format changes.",
     "3.2.2": "Parity with the Forge 1.20.1 3.2.2 line. Fixes fake \"Ars 'n' Spells\" spell scrolls turning up in Iron's Spellbooks loot - exploration chests, Mystery Scroll Pouches, magic-mob drops and wandering traders. These were the mod's internal ars_cross_* proxy spells, which do nothing outside a spellbook that carries the matching Ars spell. Ars 'n' Spells does not modify any loot table; the proxies simply never opted out of Iron's random-spell pool, and now do. A stray scroll already in your world becomes a blank Iron's scroll the first time you right-click it, and the eight missing spell-description translations have been added.",
     "3.2.1": "Parity with the Forge 1.20.1 3.2.1 line. Fixes a mixin conflict that could stop an entire modpack from loading: adjusting the mana value Iron's reads inside canBeCastedBy used an injection aimed at one specific instruction, and a mod that replaces that whole method made it fatal. It now uses only HEAD and RETURN injection points, which Mixin permits into a replaced method by design. Mixins targeting Iron's Spellbooks - an optional dependency - moved into a non-required config, so a conflict there logs a warning and skips one mixin instead of aborting startup for every mod in the chain. Also fixes uninscription leaving unusable entries in the spell wheel, the Spell Transcription ritual destroying stacked source scrolls, ARS_PRIMARY deleting mana above Iron's own ceiling, and three ritual tablets rendering with Ars Nouveau's art. Requires NeoForge 21.1+, Ars Nouveau 5.13+; Iron's Spellbooks 3.16.3+ optional.",
     "3.2.0": "Parity with the Forge 1.20.1 3.2.0 line. Adds the mod's own creative tab, makes the Mana Infusion and Mana Well tablets obtainable, and fixes one Ars spell draining the entire mana pool in hybrid mode. Restores server-authoritative cross-casting, the Inscription Table crash guard (client AND server), payload-integrity checks that refuse a spell whose glyphs are gone, the Curios spellbook-slot cast fix, proxy double-billing short-circuits, the scroll cost system, and school classification from Ars Nouveau's own metadata. Requires NeoForge 21.1+, Ars Nouveau 5.13+.",
@@ -10,7 +11,7 @@
     "2.5.0": "Dynamic Iron's addon school tracking, two-sided Curios spell discount, datapack path fixes."
   },
   "promos": {
-    "1.21.1-latest": "3.2.2",
-    "1.21.1-recommended": "3.2.2"
+    "1.21.1-latest": "3.2.4",
+    "1.21.1-recommended": "3.2.4"
   }
 }

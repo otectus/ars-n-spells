@@ -98,7 +98,7 @@ Place the tablet on a Ritual Brazier, then drop two items within three blocks:
 
 Strict disambiguation: more than one of either category fails the ritual with a chat message naming what it saw. Items already carrying a cross-cast inscription are rejected too — uninscribe first.
 
-On completion the source is consumed and the target gains a `CrossModSpellList` data component. Enchantment-glyph particles and the enchantment-table sound mark the inscribe.
+Light the brazier by right-clicking it with an **empty main hand** (right-clicking while holding something tries to feed that item to the brazier instead). The ritual burns for about three seconds; on completion the source is consumed and the target gains a `CrossModSpellList` data component. Enchantment-glyph particles and the enchantment-table sound mark the inscribe.
 
 **3. Cast the inscribed spell.**
 Right-click the target. Sneak-right-click cycles between multiple inscriptions on the same item. Mana costs flow through `BridgeManager` and respect the active unification mode; in SEPARATE mode the dual-cost split (`dual_cost_ars_percentage` / `dual_cost_iss_percentage`) and conversion rates determine how much each pool pays per cast.
@@ -114,7 +114,9 @@ Beyond the generic right-click cross-cast, an Ars spell can be bound into a real
 
 **1. Make a carrier scroll.** Craft the **Spell Loom** (gold ingot over lapis-book-lapis over three obsidian). Insert an Ars spell source (filled parchment, focus, or spellbook) and a blank Iron's scroll, type a display name, cycle a nature and icon, and press *Inscribe*. The output is a real `irons_spellbooks:scroll` carrying the Ars spell as an ANS component sidecar. (`/ans export_to_irons_scroll` is the admin shortcut.)
 
-**2. Bind it onto a spellbook.** Craft the **Spellbook Binding** tablet on the Enchanting Apparatus (novice spellbook reagent; any Iron's spellbook, an Iron's scroll, a source gem block, and an archwood log on pedestals — 2500 source). Run the ritual with exactly one carrier scroll and one Iron's spellbook dropped near the brazier. One scroll is consumed; the book gains the Ars spell. (`/ans bind_scroll_to_irons_book` binds the two items you hold, one per hand.)
+**2. Bind it onto a spellbook.** Craft the **Spellbook Binding** tablet on the Enchanting Apparatus (novice spellbook reagent; any Iron's spellbook, an Iron's scroll, a source gem block, and an archwood log on pedestals — 2500 source). The ritual reads **dropped item entities, not inventories**: place the tablet on a Ritual Brazier, throw (`Q`) exactly one carrier scroll and one Iron's spellbook on the ground within **three blocks** of the brazier, then light it by right-clicking the brazier with an **empty main hand**. It burns for about three seconds. Anything else lying inside that radius aborts the run with `unexpected item(s) in range` rather than risk binding the wrong stack. One scroll is consumed; the book gains the Ars spell. (`/ans bind_scroll_to_irons_book` binds the two items you hold, one per hand, and refuses when `allow_ars_spells_in_irons_spellbooks` is off.)
+
+> **This is not Ars Nouveau's "Binding" ritual.** Ars ships `ars_nouveau:ritual_binding`, whose display name is exactly **Binding**; it converts nearby mobs into Bound Scripts for familiars and ignores dropped scrolls entirely. The tablet you want is **Spellbook Binding** (`ars_n_spells:spellbook_binding`, shown as *Ritual of Spellbook Binding* on the brazier). Lighting the wrong one looks identical to the feature being broken, because neither ritual says anything about the other.
 
 **3. Cast from the wheel.** The bound spell shows in Iron's spell wheel as its own entry (name/icon from the loom; defaults otherwise). Casting delegates to the ANS cross-cast pipeline, so the cost multiplier, unification mode, and SEPARATE dual-cost split all apply — exactly once (the wheel entry itself is a zero-cost proxy spell).
 

@@ -190,9 +190,10 @@ Pass: output slot holds one `irons_spellbooks:scroll` named *Ars Scroll: <name>*
 ### W18 — Spellbook Binding ritual
 
 1. Craft the Spellbook Binding tablet (apparatus: novice spellbook reagent; pedestals any Iron's spellbook, Iron's scroll, source gem block, archwood log — 2500 source).
-2. Place it on a brazier; drop exactly one W17 carrier scroll and one Iron's spellbook nearby; activate.
+2. Place it on a brazier; drop exactly one W17 carrier scroll and one Iron's spellbook on the ground
+   within 3 blocks with nothing else in range; light the brazier by right-clicking it with an empty hand.
 
-Pass: success message names the spell, ONE scroll is consumed (drop a stack of 2+ to verify the rest survives), and the book now lists the Ars entry in its `ars_n_spells:cross_spells` component with a `proxy_pool_id` ≥ 1. Extra items in range, multiple scrolls, or multiple books must each fail with the precise error message, mutating nothing.
+Pass: the brazier burns ~3s, then a success message names the spell, ONE scroll is consumed (drop a stack of 2+ to verify the rest survives), and the book now lists the Ars entry in its `ars_n_spells:cross_spells` component with a `proxy_pool_id` ≥ 1. Extra items in range, multiple scrolls, or multiple books must each fail with the precise error message, mutating nothing.
 
 ### W19 — Native wheel entry + cast (the headline check)
 
@@ -210,7 +211,7 @@ Pass: two distinct wheel entries show simultaneously (dedup-by-id check — each
 
 ### W21 — Admin commands round-trip
 
-`/ans export_to_irons_scroll` with a filled parchment in main hand → carrier lands in inventory. Hold carrier + book (one per hand) → `/ans bind_scroll_to_irons_book` → bound (metadata preserved), scroll consumed. Both commands fail cleanly with the localized message when Iron's is absent or the held items are wrong.
+`/ans export_to_irons_scroll` with a filled parchment in main hand → carrier lands in inventory. Hold carrier + book (one per hand) → `/ans bind_scroll_to_irons_book` → bound (metadata preserved), scroll consumed; with `allow_ars_spells_in_irons_spellbooks=false` the command refuses instead. Both commands fail cleanly with the localized message when Iron's is absent or the held items are wrong.
 
 ### W22 — SEPARATE-mode pre-pay/refund (ANS-CRIT-002 / ANS-HIGH-030)
 

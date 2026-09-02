@@ -173,6 +173,14 @@ dependencies {
         }
     }
 
+    // GeckoLib also compileOnly: it appears in Ars Nouveau's own class signatures
+    // (RitualBrazierTile implements GeoBlockEntity), so javac cannot resolve those types
+    // without it, which blocked the ritual GameTests from referencing a brazier at all.
+    // Runtime classpath is unchanged; the runtimeOnly line above already supplies it there.
+    compileOnly("software.bernie.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_runtime_version}") {
+        transitive = false
+    }
+
     // Curios API only (Ars pulls the full jar transitively at runtime).
     compileOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}"
 

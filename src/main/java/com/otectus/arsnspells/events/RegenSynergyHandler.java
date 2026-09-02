@@ -64,12 +64,12 @@ public final class RegenSynergyHandler {
 
     @SubscribeEvent
     public static void onPlayerTickPost(PlayerTickEvent.Post event) {
-        if (!IronsCompat.isLoaded()) {
+        // Entity check first: this fires for client-side players too, where the SERVER config may
+        // not be loaded, and the instanceof is the cheapest gate here.
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
-        // Entity check before the config reads: this fires for client-side players too, where
-        // the SERVER config may not be loaded, and the instanceof is the cheapest gate here.
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
+        if (!IronsCompat.isLoaded()) {
             return;
         }
         // F5: route the unification gate through BridgeManager (single source of

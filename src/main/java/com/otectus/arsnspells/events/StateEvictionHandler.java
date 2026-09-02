@@ -4,6 +4,7 @@ import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
 import com.otectus.arsnspells.compat.ScrollLPTracker;
 import com.otectus.arsnspells.spell.CrossCastContext;
+import com.otectus.arsnspells.util.LogThrottle;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -77,5 +78,6 @@ public final class StateEvictionHandler {
         ResonanceManager.clearAll();
         CrossCastContext.clearAll();
         ArsSpellScalingHandler.clearAll();
+        LogThrottle.clearAll();
     }
 }

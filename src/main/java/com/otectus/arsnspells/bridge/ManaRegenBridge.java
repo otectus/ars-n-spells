@@ -1,9 +1,9 @@
 package com.otectus.arsnspells.bridge;
 
+import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.fml.ModList;
 
 /**
  * Single point of truth for converting mana regen values between Ars Nouveau
@@ -126,7 +126,7 @@ public final class ManaRegenBridge {
      * Returns 0 if Iron's is not loaded or the read fails.
      */
     public static double getCurrentIronsMaxMana(Player player) {
-        if (player == null || !ModList.get().isLoaded("irons_spellbooks")) {
+        if (player == null || !IronsCompat.isLoaded()) {
             return 0.0;
         }
         try {
