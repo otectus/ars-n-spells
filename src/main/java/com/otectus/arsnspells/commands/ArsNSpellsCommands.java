@@ -287,6 +287,16 @@ public class ArsNSpellsCommands {
             return 0;
         }
 
+        // The ritual honours this at SpellbookBindingRitual.onEnd(); this command did not, so
+        // allow_ars_spells_in_irons_spellbooks=false stopped survival players while leaving the
+        // op path wide open -- the opposite of what the config comment promises. Checked before
+        // the hand contents for the same reason the ritual checks it first: the feature being
+        // switched off is not a "you are holding the wrong things" problem.
+        if (!AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.get()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.bind.disabled"));
+            return 0;
+        }
+
         ItemStack main = player.getMainHandItem();
         ItemStack off = player.getOffhandItem();
         ItemStack scroll;

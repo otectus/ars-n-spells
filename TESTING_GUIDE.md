@@ -156,9 +156,10 @@ server** for the authority checks.
    in the scroll slot. Type a name, cycle a nature and an icon, press **Inscribe**.
    Pass: an inscribed scroll appears in the output; source + one scroll consumed.
 4. Bind the scroll onto an Iron's spellbook that already holds a native Iron's
-   spell — drop both near a Spellbook Binding ritual brazier, or
-   `/ans bind_scroll_to_irons_book` holding scroll + book.
-   Pass: success message; the scroll is consumed.
+   spell — drop both on the ground within 3 blocks of a Spellbook Binding
+   brazier with nothing else in range, then right-click the brazier with an
+   empty hand; or `/ans bind_scroll_to_irons_book` holding scroll + book.
+   Pass: the brazier burns ~3s, then a success message; the scroll is consumed.
 5. Hold the spellbook, open Iron's **spell wheel**.
    Pass: the Ars spell shows as its own entry with your name + nature icon,
    **alongside** the book's native Iron's spell (which is unchanged).
@@ -643,7 +644,8 @@ re-inscribed cleanly.
 
 2. With the exported scroll in one hand and a real Iron's spellbook in the
    other, run `/ans bind_scroll_to_irons_book` (or run the **Spellbook Binding**
-   ritual with the scroll + spellbook in range of the brazier).
+   ritual: drop the scroll + spellbook within 3 blocks of the brazier with
+   nothing else in range, then right-click the brazier with an empty hand).
 
    Pass: the scroll is consumed and the Ars entry is appended to the spellbook.
    The spellbook tooltip now shows the embedded Ars spell, active index, and

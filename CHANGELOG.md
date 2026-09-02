@@ -2,6 +2,59 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.2.3] - 2026-09-01
+
+### Fixed: the ritual brazier never finished an Ars 'n' Spells ritual, so four rituals did nothing
+
+- Placing a **Spellbook Binding**, **Spell Transcription**, **Spell Uninscription** or
+  **Mana Infusion** tablet on a Ritual Brazier and lighting it did nothing at all: no items
+  consumed, no result, no error message, and the brazier stayed lit indefinitely. Every one of
+  these rituals had been inert since 3.0.0.
+- Ars Nouveau only runs a ritual's payload once the ritual marks itself finished - the brazier
+  calls `onEnd()` exclusively when `RitualContext.isDone` is set, and the only thing that sets it
+  is a ritual calling `setFinished()` from its own `tick()`. All four of these rituals shipped
+  with an empty `tick()`, so they burned forever and never reached their payload. They now run
+  for about three seconds and then complete. Ritual tablets are not returned, matching Ars's own
+  rituals.
+- This went unnoticed because both the documentation and the automated tests reached for
+  `/ans bind_scroll_to_irons_book` instead, which was never affected. New GameTests now drive a
+  real brazier through the full light-burn-complete lifecycle, and assert that every one-shot
+  ritual actually finishes.
+
+### Fixed: ritual failure messages were silently dropped if you walked away
+
+- A ritual's chat feedback went to the nearest player within 8 blocks *at the moment it
+  completed*. Since a ritual now visibly burns for a few seconds, a player who lit it and stepped
+  away got no message at all - success or failure. Rituals now remember who lit them (persisted
+  across chunk unloads and restarts) and report to that player wherever they are, falling back to
+  proximity only for redstone-triggered rituals.
+- The binding ritual's advancement used a 16-block radius while its messages used 8, so a player
+  twelve blocks out silently earned the advancement while being told nothing. Both now resolve the
+  same player.
+
+### Fixed: `/ans bind_scroll_to_irons_book` ignored the binding kill switch
+
+- Setting `allow_ars_spells_in_irons_spellbooks=false` blocked the ritual but not the command, so
+  the feature stayed available to operators on servers that had switched it off. The command now
+  refuses too.
+- The ritual also checked that setting only *after* validating the dropped items, so on a server
+  with binding disabled you were told "unexpected item(s) in range" or "drop a carrier scroll and
+  a spell book" - troubleshooting advice for a ritual that was never going to run. It now says the
+  feature is disabled straight away.
+
+### Changed: Spellbook Binding documentation
+
+- The in-game tablet description had not been updated since before 3.0.0. It pointed at Spell
+  Transcription for making carrier scrolls (the Spell Loom has been the survival path since 3.0.0)
+  and claimed bound spells cast with right-click and sneak-right-click (they cast from Iron's
+  native spell wheel). Rewritten, and it now states the "nothing else in range" rule the ritual
+  actually enforces.
+- The README, mod page and testing guide now say that the ritual reads *dropped items* rather than
+  your inventory, give the three-block radius, note that any other item in range aborts the run,
+  and explain that you light a brazier by right-clicking it with an empty hand. They also warn that
+  Ars Nouveau ships its own ritual named literally **Binding** - a different ritual that makes
+  Bound Scripts for familiars and ignores scrolls - which is easy to reach for by mistake.
+
 ## [3.2.2] - 2026-08-28
 
 ### Fixed: Iron's loot chests could contain fake "Ars 'n' Spells" spell scrolls

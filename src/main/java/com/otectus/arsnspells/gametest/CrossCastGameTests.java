@@ -60,7 +60,7 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public final class CrossCastGameTests {
 
-    private static final GameProfile FAKE_PROFILE =
+    static final GameProfile FAKE_PROFILE =
         new GameProfile(UUID.fromString("0a000000-0000-0000-0000-00000000a115"), "ans_gametest");
 
     private CrossCastGameTests() {
@@ -77,7 +77,7 @@ public final class CrossCastGameTests {
     }
 
     /** Find any registered Iron's spellbook item (tier-agnostic), or null if none. */
-    private static Item findIronsSpellBook() {
+    static Item findIronsSpellBook() {
         for (Item item : ForgeRegistries.ITEMS) {
             if (IronsBookBindingUtil.isIronsSpellBook(new ItemStack(item))) {
                 return item;
@@ -310,7 +310,7 @@ public final class CrossCastGameTests {
      * being tested. It stayed hidden until loading addon profiles changed the test order.
      * Tests that specifically want survival downgrade from here.
      */
-    private static ServerPlayer emptyHandedPlayer(GameTestHelper helper) {
+    static ServerPlayer emptyHandedPlayer(GameTestHelper helper) {
         ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), FAKE_PROFILE);
         player.moveTo(helper.absoluteVec(new Vec3(1.0, 2.0, 1.0)));
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);

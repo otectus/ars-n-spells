@@ -104,6 +104,11 @@ dependencies {
     // Ars Nouveau's own runtime graph (Curios full jar + GeckoLib) so
     // runClient/runGameTestServer can boot without hand-copied jars.
     runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}")
+    // GeckoLib also compileOnly: it appears in Ars Nouveau's own class signatures
+    // (RitualBrazierTile implements GeoBlockEntity), so javac cannot resolve those types
+    // without it -- which blocked the ritual GameTests from referencing a brazier at all.
+    // Runtime classpath is unchanged; the line below already supplies it there.
+    compileOnly fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
     runtimeOnly fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 

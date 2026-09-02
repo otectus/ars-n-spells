@@ -1,6 +1,5 @@
 package com.otectus.arsnspells.rituals;
 
-import com.hollingsworth.arsnouveau.api.ritual.AbstractRitual;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
@@ -26,25 +25,25 @@ import java.util.Optional;
  *
  * Usage:
  *  <ol>
- *    <li>Drop exactly one carrier scroll (an Iron's scroll exported via the
- *        transcription ritual or {@code /ans export_to_irons_scroll}) near the
- *        brazier.</li>
- *    <li>Drop exactly one Iron's spellbook in the same area.</li>
- *    <li>Activate the ritual. On success the scroll's Ars spell is appended to
- *        the book's cross-cast sidecar and the scroll is consumed.</li>
+ *    <li>Drop exactly one carrier scroll (a real Iron's scroll woven at the Spell
+ *        Loom, or exported with {@code /ans export_to_irons_scroll}) within three
+ *        blocks of the brazier.</li>
+ *    <li>Drop exactly one Iron's spellbook in the same area, with nothing else in
+ *        range -- any other item aborts the ritual rather than risk binding the
+ *        wrong stack.</li>
+ *    <li>Light the brazier by right-clicking it empty-handed. On success the
+ *        scroll's Ars spell is appended to the book's cross-cast sidecar and one
+ *        scroll is consumed.</li>
  *  </ol>
  *
  * Validation runs fully before any item mutation. The bound entry coexists with
- * the book's native {@code ISB_Spells} container and casts through the ANS
- * cross-cast pipeline (sneak-right-click cycles between entries).
+ * the book's native {@code ISB_Spells} container and appears as its own entry in
+ * Iron's native spell wheel, cast through the ANS cross-cast pipeline.
  */
-public class SpellbookBindingRitual extends AbstractRitual {
+public class SpellbookBindingRitual extends AnsRitual {
     public static final String REGISTRY_PATH = "spellbook_binding";
     private static final String LANG_PREFIX = "ritual.ars_n_spells.spellbook_binding.";
     private static final int SEARCH_RADIUS = 3;
-
-    @Override
-    protected void tick() {}
 
     @Override
     public void onEnd() {
@@ -54,39 +53,48 @@ public class SpellbookBindingRitual extends AbstractRitual {
             return;
         }
 
+        // Feature-state checks come before input validation, which reads backwards until you see
+        // why: with binding switched off the player used to be told "unexpected item(s) in range"
+        // or "drop a carrier scroll and a spell book" -- troubleshooting advice for a ritual that
+        // was never going to run -- and never learned the server had the feature disabled.
+        if (!AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.get()) {
+            error(LANG_PREFIX + "error.disabled");
+            return;
+        }
+
         AABB area = new AABB(pos).inflate(SEARCH_RADIUS);
         List<ItemEntity> entities = level.getEntitiesOfClass(ItemEntity.class, area,
             e -> e.isAlive() && !e.getItem().isEmpty());
 
         if (entities.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.empty_range");
+            error(LANG_PREFIX + "error.empty_range");
             return;
         }
 
         SpellbookBindingInputs inputs = SpellbookBindingInputs.classify(entities);
 
         if (inputs.carrierScrolls.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_scroll");
+            error(LANG_PREFIX + "error.no_scroll");
             return;
         }
         if (inputs.carrierScrolls.size() > 1) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_scrolls",
+            error(LANG_PREFIX + "error.multiple_scrolls",
                 inputs.carrierScrolls.size(), InscriptionInputs.joinNames(inputs.carrierScrolls));
             return;
         }
         if (inputs.spellbooks.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.no_book");
+            error(LANG_PREFIX + "error.no_book");
             return;
         }
         if (inputs.spellbooks.size() > 1) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.multiple_books",
+            error(LANG_PREFIX + "error.multiple_books",
                 inputs.spellbooks.size(), InscriptionInputs.joinNames(inputs.spellbooks));
             return;
         }
         // Strict: refuse rather than risk binding the wrong stack when extra
         // items share the brazier, mirroring the uninscribe ritual's philosophy.
         if (!inputs.other.isEmpty()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.unexpected_items",
+            error(LANG_PREFIX + "error.unexpected_items",
                 InscriptionInputs.joinNames(inputs.other));
             return;
         }
@@ -100,23 +108,18 @@ public class SpellbookBindingRitual extends AbstractRitual {
         if (entryOpt.isEmpty()) {
             // Classification said this was a valid carrier but a second read
             // failed -- a transient parse problem, not a validation error.
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.scroll_parse_failed",
+            error(LANG_PREFIX + "error.scroll_parse_failed",
                 scrollStack.getHoverName().getString());
             return;
         }
         CompoundTag entry = entryOpt.get();
         CompoundTag arsTag = entry.getCompound(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ARS_SPELL);
 
-        if (!AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.get()) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.disabled");
-            return;
-        }
-
         // Reject an unreadable payload before anything is consumed. Binding it would
         // produce a wheel entry that selects and does nothing, and the scroll would
         // already be gone.
         if (!IronsBookBindingUtil.isCastableArsPayload(arsTag)) {
-            RitualFeedback.error(level, pos, LANG_PREFIX + "error.uncastable",
+            error(LANG_PREFIX + "error.uncastable",
                 scrollStack.getHoverName().getString());
             return;
         }
@@ -135,11 +138,11 @@ public class SpellbookBindingRitual extends AbstractRitual {
             case ADDED:
                 break;
             case DUPLICATE:
-                RitualFeedback.error(level, pos, LANG_PREFIX + "error.duplicate",
+                error(LANG_PREFIX + "error.duplicate",
                     bookStack.getHoverName().getString());
                 return;
             case BOOK_FULL:
-                RitualFeedback.error(level, pos, LANG_PREFIX + "error.book_full",
+                error(LANG_PREFIX + "error.book_full",
                     bookStack.getHoverName().getString(),
                     IronsBookBindingUtil.effectiveProxyCeiling(maxCap));
                 return;
@@ -149,7 +152,7 @@ public class SpellbookBindingRitual extends AbstractRitual {
                 // binding util has already rolled the sidecar back. Report it against
                 // the BOOK — the scroll parsed fine, so "scroll parse failed" sent
                 // players to re-export a scroll that was never the problem.
-                RitualFeedback.error(level, pos, LANG_PREFIX + "error.bind_failed",
+                error(LANG_PREFIX + "error.bind_failed",
                     bookStack.getHoverName().getString());
                 return;
         }
@@ -164,13 +167,15 @@ public class SpellbookBindingRitual extends AbstractRitual {
         }
 
         playBindEffects(level, pos);
-        RitualFeedback.success(level, pos, LANG_PREFIX + "success", spellLabel(arsTag));
+        success(LANG_PREFIX + "success", spellLabel(arsTag));
 
-        // Audit H4: the ritual has no owning player, so credit the nearest one —
-        // rituals are player-initiated and the initiator is standing at the brazier.
-        if (level.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 16.0, false)
-                instanceof net.minecraft.server.level.ServerPlayer nearest) {
-            com.otectus.arsnspells.util.AdvancementUtil.grant(nearest, "bind_spell");
+        // Audit H4: the ritual has no owning player of its own, so credit whoever the success
+        // message just went to -- the player who lit the brazier, or the nearest one if they have
+        // since logged off. Resolving it the same way keeps the message and the advancement from
+        // ever disagreeing about who ran the ritual, which they did back when this kept its own
+        // 16-block radius while feedback searched only 8.
+        if (recipient() instanceof net.minecraft.server.level.ServerPlayer credited) {
+            com.otectus.arsnspells.util.AdvancementUtil.grant(credited, "bind_spell");
         }
     }
 
