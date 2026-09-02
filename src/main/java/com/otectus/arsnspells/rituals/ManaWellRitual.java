@@ -24,8 +24,11 @@ public class ManaWellRitual extends AbstractRitual {
         AABB area = new AABB(this.getPos()).inflate(range);
         float regenRate = AnsConfig.MANA_WELL_REGEN_RATE.get().floatValue();
 
-        this.getWorld().getEntitiesOfClass(Player.class, area).forEach(p ->
-            BridgeManager.getBridge().addMana(p, regenRate));
+        for (Player p : this.getWorld().players()) {
+            if (area.intersects(p.getBoundingBox())) {
+                BridgeManager.getBridge().addMana(p, regenRate);
+            }
+        }
     }
 
     @Override

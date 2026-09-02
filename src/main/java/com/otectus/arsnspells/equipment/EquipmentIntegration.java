@@ -6,6 +6,7 @@ import com.hollingsworth.arsnouveau.api.perk.PerkAttributes;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.bridge.SharedPoolCeiling;
 import com.otectus.arsnspells.bridge.ManaRegenBridge;
+import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
@@ -87,7 +88,7 @@ public class EquipmentIntegration {
         if (player == null || player.level().isClientSide()) {
             return;
         }
-        if (!ModList.get().isLoaded("irons_spellbooks")) {
+        if (!IronsCompat.isLoaded()) {
             return;
         }
 
@@ -113,7 +114,7 @@ public class EquipmentIntegration {
         if (player == null || player.level().isClientSide()) {
             return;
         }
-        if (!ModList.get().isLoaded("irons_spellbooks")) {
+        if (!IronsCompat.isLoaded()) {
             return;
         }
         ManaBonus arsBonus = getArsManaBonuses(player);
@@ -142,17 +143,32 @@ public class EquipmentIntegration {
         if (player == null || player.level().isClientSide()) {
             return;
         }
-        if (!ModList.get().isLoaded("irons_spellbooks")) {
+        if (!IronsCompat.isLoaded()) {
             return;
         }
         AttributeInstance instance = player.getAttribute(AttributeRegistry.MAX_MANA.get());
         if (instance == null) {
             return;
         }
+        AttributeModifier existing = instance.getModifier(ARS_TO_IRON_MAX_MANA_ID);
+        // Skip the remove/add churn when the ceiling is unchanged; MAX_MANA is syncable and each dirty broadcasts an attribute packet.
+        if (existing != null) {
+            double ownMax = instance.getBaseValue();
+            boolean additiveOnly = true;
+            for (AttributeModifier m : instance.getModifiers()) {
+                if (m.getOperation() != AttributeModifier.Operation.ADDITION) { additiveOnly = false; break; }
+                if (!m.getId().equals(ARS_TO_IRON_MAX_MANA_ID)) ownMax += m.getAmount();
+            }
+            if (additiveOnly
+                    && SharedPoolCeiling.modifierAmount(instance.getAttribute().sanitizeValue(ownMax), arsMax)
+                       == existing.getAmount()) {
+                return; // ceiling already correct; do not dirty the attribute
+            }
+        }
         // Drop our own modifier first so getValue() reports Iron's own max, whatever
         // operations other mods' modifiers use. Nothing writes mana in between, so the
         // momentarily lower ceiling cannot clamp anything.
-        if (instance.getModifier(ARS_TO_IRON_MAX_MANA_ID) != null) {
+        if (existing != null) {
             instance.removeModifier(ARS_TO_IRON_MAX_MANA_ID);
         }
         double ironsOwnMax = instance.getValue();
@@ -198,7 +214,7 @@ public class EquipmentIntegration {
         if (player == null || player.level().isClientSide()) {
             return;
         }
-        if (!ModList.get().isLoaded("irons_spellbooks")) {
+        if (!IronsCompat.isLoaded()) {
             return;
         }
         ManaUnificationMode mode = BridgeManager.getCurrentMode();
@@ -226,7 +242,7 @@ public class EquipmentIntegration {
         if (player == null) {
             return;
         }
-        if (!ModList.get().isLoaded("irons_spellbooks")) {
+        if (!IronsCompat.isLoaded()) {
             return;
         }
         removeAttributeModifier(player, AttributeRegistry.MAX_MANA.get(), ARS_TO_IRON_MAX_MANA_ID);
@@ -239,7 +255,7 @@ public class EquipmentIntegration {
      * bonus the player opted out of, but the ceiling is a correctness invariant.
      */
     public static void clearArsRegenBonusFromIrons(Player player) {
-        if (player == null || !ModList.get().isLoaded("irons_spellbooks")) {
+        if (player == null || !IronsCompat.isLoaded()) {
             return;
         }
         removeAttributeModifier(player, AttributeRegistry.MANA_REGEN.get(), ARS_TO_IRON_REGEN_ID);
@@ -261,7 +277,7 @@ public class EquipmentIntegration {
         double ironMaxBonus = 0.0;
         double ironRegenBonus = 0.0;
 
-        boolean ironsLoaded = ModList.get().isLoaded("irons_spellbooks");
+        boolean ironsLoaded = IronsCompat.isLoaded();
 
         for (EquipmentSlot slot : EQUIPPED_SLOTS) {
             ItemStack item = player.getItemBySlot(slot);

@@ -1,6 +1,7 @@
 package com.otectus.arsnspells.events;
 
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.util.ChunkScanUtil;
 import net.minecraft.core.BlockPos;
@@ -10,7 +11,6 @@ import net.minecraft.world.level.Level;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +43,10 @@ public class RegenSynergyHandler {
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (!ModList.get().isLoaded("irons_spellbooks")) {
+        if (event.phase != TickEvent.Phase.END || event.player.level().isClientSide()) {
+            return;
+        }
+        if (!IronsCompat.isLoaded()) {
             return;
         }
         if (!BridgeManager.isUnificationEnabled()) {
@@ -55,7 +58,7 @@ public class RegenSynergyHandler {
         }
 
         int scanInterval = Math.max(1, AnsConfig.SOURCE_JAR_SCAN_INTERVAL_TICKS.get());
-        if (event.phase == TickEvent.Phase.END && !event.player.level().isClientSide() && event.player.tickCount % scanInterval == 0) {
+        if (event.player.tickCount % scanInterval == 0) {
             Player player = event.player;
             Level level = player.level();
             BlockPos pos = player.blockPosition();

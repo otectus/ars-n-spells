@@ -1,6 +1,7 @@
 package com.otectus.arsnspells.events;
 
 import com.otectus.arsnspells.augmentation.ResonanceManager;
+import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.network.ResonanceSyncPacket;
@@ -9,7 +10,6 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
 
 public class ResonanceEvents {
     // ANS-MED-028: cleanup tracking moved to a server-wide ServerTickEvent handler
@@ -20,15 +20,19 @@ public class ResonanceEvents {
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !ModList.get().isLoaded("irons_spellbooks")) {
+        if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !IronsCompat.isLoaded()) {
             return;
         }
         if (event.phase == TickEvent.Phase.END
             && !event.player.level().isClientSide()
             && event.player.tickCount % 40 == 0
             && event.player instanceof ServerPlayer player) {
+            double before = ResonanceManager.getResonance(player);
             ResonanceManager.computeResonance(player);
-            PacketHandler.sendToClient(new ResonanceSyncPacket((float) ResonanceManager.getResonance(player)), player);
+            double after = ResonanceManager.getResonance(player);
+            if (after != before) {
+                PacketHandler.sendToClient(new ResonanceSyncPacket((float) after), player);
+            }
         }
     }
 
@@ -41,7 +45,7 @@ public class ResonanceEvents {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        if (!ModList.get().isLoaded("irons_spellbooks")) {
+        if (!IronsCompat.isLoaded()) {
             return;
         }
         serverCleanupTickCounter++;
@@ -53,7 +57,7 @@ public class ResonanceEvents {
 
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !ModList.get().isLoaded("irons_spellbooks")) {
+        if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !IronsCompat.isLoaded()) {
             return;
         }
         if (event.getEntity() instanceof ServerPlayer player) {

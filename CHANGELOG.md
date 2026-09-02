@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.2.4] - 2026-09-02
+
+### Performance: server-side hot paths trimmed
+
+- The **Mana Well** ritual scanned every entity section within its range (configurable up to
+  64 blocks) on every world tick for as long as the brazier stayed lit. It now walks the level's
+  player list and tests each player against the same box, so an idle well costs almost nothing.
+- Several per-tick handlers (Source Jar regen synergy, resonance sync, equipment integration,
+  potion regen bridge) asked Forge's `ModList` whether Iron's Spellbooks was loaded on every
+  player tick, before their own throttle gates. That lookup streams the whole mod list. They now
+  use the mod's cached answer, and the regen handler checks phase and side before anything else.
+- The shared-pool mana ceiling removed and re-added Iron's `MAX_MANA` modifier on every Ars
+  mana recalculation, which happens every regen interval per player. Because that attribute is
+  client-synced, every recalculation broadcast an attribute packet to the player and everyone
+  tracking them even when nothing changed. The sync now returns early when the ceiling is
+  already correct.
+- Resonance was pushed to the client every 40 ticks per player regardless of whether it had
+  changed. It is now sent only when the value moves; login and respawn resyncs are unchanged.
+
+No gameplay behaviour changes. No config, packet, or save-format changes.
+
 ## [3.2.3] - 2026-09-01
 
 ### Fixed: the ritual brazier never finished an Ars 'n' Spells ritual, so four rituals did nothing
