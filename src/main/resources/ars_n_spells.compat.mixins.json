@@ -7,7 +7,7 @@
   "mixins": [
     "irons.MagicDataAccessor",
     "irons.MixinIronsCastValidation",
-    "irons.MixinIronsSpellDamage",
+    "irons.MixinIronsSpellPowerResonance",
     "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem",
     "irons.MixinInscriptionTableMenu"

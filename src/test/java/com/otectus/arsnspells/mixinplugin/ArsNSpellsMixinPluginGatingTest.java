@@ -89,7 +89,7 @@ class ArsNSpellsMixinPluginGatingTest {
     void existingIronsGatedMixins_stillGate() throws Exception {
         ArsNSpellsMixinPlugin plugin = newPluginWithIronsPresent(false);
         String[] gatedSuffixes = {
-            "MixinIronsSpellDamage",
+            "MixinIronsSpellPowerResonance",
             "MixinIronsMagicDataMana",
             "MixinScrollItem",
             "MixinIronsCastValidation",

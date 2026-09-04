@@ -66,9 +66,15 @@ When Iron's is the primary pool (`iss_primary`), Ars mana potions feed the unifi
 
 ### Spell scaling
 
-Ars spell potency scales with Iron's spell power attributes. The base `SPELL_POWER` attribute applies to every Ars cast; if the first glyph indicates an element (fire, ice, lightning, holy, ender, blood, evocation, nature, eldritch), the matching Iron's elemental spell-power attribute layers on additively. Affinity (per-school) and resonance (mana fullness) further shape the multiplier. The final scalar is clamped to `spell_power_cap` (default 3.0).
+Cross-mod spell damage scales bidirectionally when Iron's Spellbooks is installed:
 
-Implementation: scaling activates on each Ars `SpellCastEvent` and is applied within a 60-tick window to spell-flavored damage from the casting player. Iron's must be installed for the scaling path to fire — without Iron's, Ars spells use their native damage values.
+**Iron's → Ars:** Ars spell damage multiplies by `globalSpellPower + (schoolSpellPower - 1.0)`, where `globalSpellPower` is Iron's generic `SPELL_POWER` and `schoolSpellPower` is the matching elemental attribute for the spell's resolved school(s). When a spell resolves to multiple schools (dual-element addon glyphs, compound-school recipes), the configured `multi_school_power_policy` (`primary`, `max` [default], or `average`) decides how those schools combine. The result is then multiplied by affinity (per-school) and resonance (mana fullness) bonuses. The final scalar is clamped to `spell_power_cap` (default 3.0).
+
+**Ars → Iron's:** Iron's spell damage adds the caster's Ars `SPELL_DAMAGE_BONUS` perk value as a flat addition. This value is picked up automatically from any source — Ars armor threads, curios with Spell Damage modifiers, potions, or other mods. Plain Ars armor with no offensive perk grants no Iron's damage bonus. The perk addition is **not** subject to the `spell_power_cap`.
+
+**Multi-school policy split:** damage scaling uses all schools the policy resolves; affinity and progression credit the primary (first-resolved) school only. This means a dual-element spell scales with the caster's better element and trains exactly one affinity track.
+
+Implementation: both directions subscribe directly to spell-damage events (`SpellDamageEvent.Pre` from Ars Nouveau and `SpellDamageEvent` from Iron's) with no time window or damage-string guessing. Iron's must be installed for cross-mod scaling to fire — without Iron's, Ars spells use their native damage values, and Iron's applies no Ars perk bonus. Cross-mod combat scaling is independent of the mana-unification mode and remains active even when mana unification is `DISABLED`.
 
 ### Resonance
 
@@ -167,7 +173,11 @@ An **in-game config screen** is available from the mod list (**Mods → Ars 'n' 
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `spell_power_cap` | `3.0` | Maximum total spell power multiplier from Iron's attributes. |
+| `enable_cross_mod_combat_stats` | `true` | Master switch for Iron's → Ars and Ars → Iron's spell damage scaling. Active even when mana unification is `disabled`. |
+| `enable_irons_power_for_ars_damage` | `true` | Iron's spell power multiplies Ars spell damage. |
+| `enable_ars_damage_for_irons_damage` | `true` | Ars Spell Damage Bonus adds to Iron's spell damage. |
+| `spell_power_cap` | `3.0` | Maximum total spell power multiplier from Iron's attributes. Caps multipliers only; does not apply to the Ars flat bonus. |
+| `multi_school_power_policy` | `max` | How multiple matching schools combine: `primary` (first-resolved only), `max` (strongest single value), `average` (mean of all). |
 | `source_jar_synergy_multiplier` | `5.0` | Multiplier for Source Jar proximity regen bonus. |
 | `ritual_mana_infusion_amount` | `500.0` | Mana added by Ritual of Mana Infusion. |
 
@@ -229,8 +239,7 @@ With `debug_mode` enabled, `OverlayDiagnostics` logs every rendered GUI layer id
 The 1.21.1 port is functionally complete; the items below are intentionally deferred, not broken. The mana-unification mixins disabled during the early port were repaired and re-enabled in 2.0.1; the cross-cast / rituals / scaling re-attach work tracked as "Phase 3" is done; and 2.6.1 restored the last stubbed pieces (in-game config screen, Ars mana-potion mirroring, mana-only pre-cast validation, debug overlay). The remaining deferral is the **LP/Cursed-Ring and Aura/Virtue-Ring** systems, which depend on Sanctified Legacy / Covenant of the Seven — no NeoForge 1.21.1 build of those exists yet.
 
 - **Event-first mana bridge.** The bridge routes through two repaired mixins (`MixinManaCapability`, `MixinIronsMagicDataMana`) plus the Ars `SpellResolver` context/cost mixins. Every inject now uses `require = 0` and the mixin plugin probes its target classes (`ManaCap`/`ManaData`/`SpellResolver`), so a dependency point-release fails soft on **method** drift — but a **field** rename would still abort load. Migrating the bridge to Ars/Iron's public events (`MaxManaCalcEvent`, `SpellCostCalcEvent`, `ChangeManaEvent`, …) removes that fragility and is the main deferred item.
-- **Compile-target bump.** Pinned to Ars 5.11.1 / Iron's 3.15.6 (build-verified); the target pack runs 5.11.7 / 3.16.0. Moving the compile classpath up is deferred until an in-game validation pass exists.
-- **Larger optional-mod integrations** from the compatibility plan (Apotheosis affixes, Ars Elemental focus mapping, familiar/summon synergy, Iron's Restrictions gating, ISS upgrade orbs, DailyBoss) are scoped for a later release. 2.5.0 ships only the data-only scaffolding (`#ars_n_spells:magical_companions` entity tag, the curio-discount tag default) and the light `compat.ModPresence` / `compat.CompatIds` foundation.
+- **Larger optional-mod integrations** (Apotheosis affixes, Ars Elemental focus mapping, familiar/summon synergy, Iron's Restrictions gating, ISS upgrade orbs, DailyBoss) from the compatibility plan are scoped for a later release. Ars Elemental, Ars Zero, and Ars Elemancy are now verified optional addons with working profiles and GameTests; deeper per-item feature integrations remain deferred.
 - **In-game runtime validation** — the build environment has no Minecraft, so the scenarios in [TESTING_GUIDE.md](TESTING_GUIDE.md) remain to be run manually.
 
 ## Building from source

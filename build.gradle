@@ -142,15 +142,12 @@ dependencies {
     // the Iron's-loaded GameTests self-skip on IronsCompat.isLoaded()==false. Pass
     // -PwithIronsRuntimeGameTests to also put Iron's on the run classpath.
     //
-    // KNOWN GAP in that profile: Iron's declares three mods.toml dependencies that its POM does
-    // not, so adding only irons_spellbooks left mod loading refusing to start. Two of the three
-    // are wired below and resolve. The third, `playeranimator`, publishes NO NeoForge artifact
-    // to any Maven repository - kosmx's maven carries only the common/Fabric/Forge library
-    // variants, and the jar named there has no mods.toml at all. Finishing the profile means
-    // adding the CurseForge coordinate by hand, e.g.
-    //     runtimeOnly "curse.maven:player-animator-<projectId>:<fileId>"
-    // once a 1.21.1 NeoForge file id is known. Until then this profile still fails at load with
-    // one clear "requires playeranimator" error rather than three.
+    // Iron's declares three mods.toml dependencies that its POM does not, so adding only
+    // irons_spellbooks leaves mod loading refusing to start. All three are wired below.
+    // `playeranimator` is the awkward one: kosmx's maven publishes only the common/Fabric/Forge
+    // library variants and the jar named there carries no mods.toml at all, so it never supplies
+    // the `playeranimator` modid Iron's asks for. The NeoForge build exists only on CurseForge,
+    // so it is pulled by coordinate like the Ars addon profiles below.
     compileOnly "io.redspace:irons_spellbooks:${irons_spellbooks_version}"
     if (project.hasProperty('withIronsRuntimeGameTests')) {
         runtimeOnly "io.redspace:irons_spellbooks:${irons_spellbooks_version}"
@@ -162,9 +159,11 @@ dependencies {
         // POMs name Fabric artifacts (player-animation-lib pulls fabric-loader), which do not
         // resolve here and are not wanted on a NeoForge run classpath anyway.
         runtimeOnly("io.redspace:irons_lib:${irons_lib_version}") { transitive = false }
-        runtimeOnly("dev.kosmx.player-anim:player-animation-lib:${player_animation_version}") {
-            transitive = false
-        }
+        // CurseForge, not kosmx's maven: only the CurseForge NeoForge build carries the
+        // neoforge.mods.toml that registers the `playeranimator` modid. The file id below is
+        // player-animation-lib-forge-${player_animation_version}.jar ("forge" is NeoForge on
+        // this MC line); the version it resolves to must stay >= what Iron's requires.
+        runtimeOnly "curse.maven:player-animator-${player_animator_project}:${player_animator_file}"
         // Ars Nouveau pins GeckoLib 4.6.6; Iron's requires 4.7.5.1 or above. 4.7.5.1 is the
         // lowest version that satisfies Iron's, so it is the smallest possible step away from
         // what Ars was tested against.
@@ -190,11 +189,15 @@ dependencies {
     // Optional Ars Nouveau addon profiles. Runtime-only and opt-in: ANS compiles against them in
     // no way, and the addon GameTests self-skip when the mod is absent. Ars Zero 2.0.2 declares
     // Ars Elemental as a required dependency, so the Zero profile implies the Elemental one.
-    if (project.hasProperty('withArsElemental') || project.hasProperty('withArsZero')) {
+    if (project.hasProperty('withArsElemental') || project.hasProperty('withArsZero')
+            || project.hasProperty('withArsElemancy')) {
         runtimeOnly "curse.maven:ars-elemental-${ars_elemental_project}:${ars_elemental_file}"
     }
     if (project.hasProperty('withArsZero')) {
         runtimeOnly "curse.maven:ars-zero-${ars_zero_project}:${ars_zero_file}"
+    }
+    if (project.hasProperty('withArsElemancy')) {
+        runtimeOnly "curse.maven:ars-elemancy-${ars_elemancy_project}:${ars_elemancy_file}"
     }
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
@@ -234,6 +237,7 @@ processResources {
         irons_spellbooks_version_range: irons_spellbooks_version_range,
         ars_elemental_version_range   : ars_elemental_version_range,
         ars_zero_version_range        : ars_zero_version_range,
+        ars_elemancy_version_range    : ars_elemancy_version_range,
         mod_id                        : mod_id,
         mod_name                      : mod_name,
         mod_license                   : mod_license,

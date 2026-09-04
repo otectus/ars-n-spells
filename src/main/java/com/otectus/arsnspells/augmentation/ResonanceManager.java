@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * Per-player resonance: a spell-damage multiplier derived from how full the mana pool is.
  *
  * <p>The value produced here is multiplied into <em>both</em> damage paths — Iron's via
- * {@code MixinIronsSpellDamage} and Ars via {@code SpellScalingUtil} — so every input and the
+ * {@code MixinIronsSpellPowerResonance} and Ars via {@code SpellScalingUtil} — so every input and the
  * output must be bounded. All four clamps below exist because of specific audit findings
  * (`ANS-HIGH-006`, `ANS-HIGH-007`) and were missing from the 1.21.1 port:
  *

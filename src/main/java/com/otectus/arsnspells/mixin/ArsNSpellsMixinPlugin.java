@@ -41,7 +41,7 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // MagicDataAccessor were once missing from this list, and an Iron's-less
         // dedicated server crashed in the mixin loader with NoClassDefFoundError before
         // any of the runtime gates could help.
-        if (mixinClassName.endsWith("MixinIronsSpellDamage")
+        if (mixinClassName.endsWith("MixinIronsSpellPowerResonance")
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
             || mixinClassName.endsWith("MixinIronsCastValidation")
             || mixinClassName.endsWith("MagicDataAccessor")

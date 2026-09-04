@@ -91,6 +91,10 @@ public class AnsConfig {
     // SPELL SCALING
     // ========================================
     public static final ModConfigSpec.DoubleValue SPELL_POWER_CAP;
+    public static final ModConfigSpec.BooleanValue ENABLE_CROSS_MOD_COMBAT_STATS;
+    public static final ModConfigSpec.BooleanValue ENABLE_IRONS_POWER_FOR_ARS_DAMAGE;
+    public static final ModConfigSpec.BooleanValue ENABLE_ARS_DAMAGE_FOR_IRONS_DAMAGE;
+    public static final ModConfigSpec.ConfigValue<String> MULTI_SCHOOL_POWER_POLICY;
 
     // ========================================
     // SOURCE JAR SYNERGY
@@ -457,6 +461,46 @@ public class AnsConfig {
                      "Prevents stacking from exceeding this value. Set higher to allow more scaling.")
             .defineInRange("spell_power_cap", 3.0, 1.0, 10.0);
 
+        ENABLE_CROSS_MOD_COMBAT_STATS = BUILDER
+            .comment("Master switch for both directions of cross-mod spell damage scaling:",
+                     "Iron's spell power scaling Ars spell damage, and Ars' Spell Damage Bonus",
+                     "perk adding to Iron's spell damage.",
+                     "This is independent of the mana-unification mode: both directions stay",
+                     "active even when mana unification is DISABLED, because a player who earned",
+                     "the stats on either side should keep them regardless of how mana is pooled.")
+            .define("enable_cross_mod_combat_stats", true);
+
+        ENABLE_IRONS_POWER_FOR_ARS_DAMAGE = BUILDER
+            .comment("Iron's -> Ars direction: scale Ars Nouveau spell damage by the caster's",
+                     "Iron's spell power attributes (generic + the matching school), affinity and",
+                     "resonance, capped by spell_power_cap.",
+                     "Independent of the mana-unification mode; active even when mana",
+                     "unification is DISABLED.")
+            .define("enable_irons_power_for_ars_damage", true);
+
+        ENABLE_ARS_DAMAGE_FOR_IRONS_DAMAGE = BUILDER
+            .comment("Ars -> Iron's direction: add the caster's Ars Nouveau Spell Damage Bonus",
+                     "perk value to Iron's spell damage as a flat addition, matching how Ars",
+                     "itself applies that attribute. Not affected by spell_power_cap, which is a",
+                     "multiplier cap and must not clamp a flat bonus.",
+                     "Independent of the mana-unification mode; active even when mana",
+                     "unification is DISABLED.")
+            .define("enable_ars_damage_for_irons_damage", true);
+
+        MULTI_SCHOOL_POWER_POLICY = BUILDER
+            .comment("How a spell that resolves to more than one school picks the Iron's elemental",
+                     "spell power attribute it scales with (dual-element and compound-element",
+                     "addon glyphs, and recipes that chain effects from different schools):",
+                     "  primary - only the first-resolved school scales the spell, the same one",
+                     "            affinity and progression credit",
+                     "  max - the single strongest matching elemental attribute (DEFAULT)",
+                     "  average - the mean of all matching elemental attributes",
+                     "There is deliberately no 'sum' option: adding every matching bonus would",
+                     "make a spell stronger purely for carrying more school labels, so an",
+                     "all-element glyph would collect fire, ice, lightning and nature power at",
+                     "once. Unknown values fall back to 'max'.")
+            .define("multi_school_power_policy", "max");
+
         BUILDER.pop();
 
         // ========================================
@@ -581,7 +625,19 @@ public class AnsConfig {
         }
         return ManaUnificationMode.fromString(MANA_UNIFICATION_MODE.get());
     }
-    
+
+    /**
+     * Get the aggregation policy for spells that resolve to several schools.
+     *
+     * <p>The same read {@code SpellScalingUtil} performs, named here so command and UI callers
+     * do not each repeat the parse. Unknown or removed values degrade to
+     * {@link MultiSchoolPowerPolicy#MAX} rather than throwing, so an edited config never takes
+     * damage scaling down.
+     */
+    public static MultiSchoolPowerPolicy getMultiSchoolPowerPolicy() {
+        return MultiSchoolPowerPolicy.fromString(MULTI_SCHOOL_POWER_POLICY.get());
+    }
+
     /**
      * Check if a specific system is enabled
      */

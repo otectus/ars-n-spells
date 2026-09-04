@@ -10,8 +10,10 @@ import com.otectus.arsnspells.cooldown.CooldownCategory;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Central spell analysis utility. Correctly identifies the first effect glyph
@@ -37,17 +39,20 @@ public final class SpellAnalysis {
         private final @Nullable AbstractSpellPart castMethod;
         private final List<AbstractSpellPart> allEffects;
         private final String dominantSchool;
+        private final Set<String> schools;
         private final CooldownCategory category;
 
         Result(@Nullable AbstractSpellPart firstEffect,
                @Nullable AbstractSpellPart castMethod,
                List<AbstractSpellPart> allEffects,
                String dominantSchool,
+               Set<String> schools,
                CooldownCategory category) {
             this.firstEffect = firstEffect;
             this.castMethod = castMethod;
             this.allEffects = Collections.unmodifiableList(allEffects);
             this.dominantSchool = dominantSchool;
+            this.schools = Collections.unmodifiableSet(schools);
             this.category = category;
         }
 
@@ -62,15 +67,35 @@ public final class SpellAnalysis {
         /** All AbstractEffect parts found in the recipe. */
         public List<AbstractSpellPart> allEffects() { return allEffects; }
 
-        /** The derived school: "fire", "ice", "holy", etc., or "generic" if unknown. */
+        /**
+         * The derived primary school: "fire", "ice", "holy", etc., or "generic" if unknown.
+         *
+         * <p>One school, deterministically chosen, and the value affinity and progression
+         * credit. It is unaffected by {@link #schools()}: a multi-school spell still has exactly
+         * one primary school and always has had.
+         */
         public String dominantSchool() { return dominantSchool; }
+
+        /**
+         * Every canonical school resolved across the recipe's effect glyphs, in the order they
+         * were resolved, with "generic" excluded — so an empty set is the normal answer for a
+         * spell with no school at all.
+         *
+         * <p>Exists because a single dominant school silently discarded the rest: addon glyphs
+         * declare dual and compound elements, and a recipe can chain effects from different
+         * schools. Damage scaling aggregates over this set under the configured
+         * {@code multi_school_power_policy}; everything else still uses
+         * {@link #dominantSchool()}.
+         */
+        public Set<String> schools() { return schools; }
 
         /** The cooldown category for this spell. */
         public CooldownCategory category() { return category; }
     }
 
     private static final Result EMPTY = new Result(
-            null, null, Collections.emptyList(), "generic", CooldownCategory.UTILITY);
+            null, null, Collections.emptyList(), "generic", Collections.emptySet(),
+            CooldownCategory.UTILITY);
 
     /**
      * Analyze an Ars Nouveau spell and return structured information about its
@@ -132,9 +157,32 @@ public final class SpellAnalysis {
         AbstractSpellPart classifier = firstEffect != null ? firstEffect : firstFilter;
 
         String school = deriveSchool(classifier);
+        Set<String> schools = deriveSchools(allEffects);
         CooldownCategory category = deriveCategory(classifier);
 
-        return new Result(firstEffect, castMethod, allEffects, school, category);
+        return new Result(firstEffect, castMethod, allEffects, school, schools, category);
+    }
+
+    /**
+     * Derive every canonical school the recipe's effect glyphs resolve to, in recipe order,
+     * with "generic" excluded.
+     *
+     * <p>Union rather than "the classifier's schools" because both halves of the problem are
+     * real: one glyph can declare several schools (dual and compound elements), and a recipe can
+     * chain effects that belong to different ones. The primary school from
+     * {@link #deriveSchool} is unchanged and still comes from the classifier alone.
+     */
+    public static Set<String> deriveSchools(@Nullable List<AbstractSpellPart> effects) {
+        if (effects == null || effects.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<String> schools = new LinkedHashSet<>();
+        for (AbstractSpellPart effect : effects) {
+            for (SpellSchoolId school : SchoolResolver.resolveAll(effect)) {
+                schools.add(school.id());
+            }
+        }
+        return schools;
     }
 
     /**

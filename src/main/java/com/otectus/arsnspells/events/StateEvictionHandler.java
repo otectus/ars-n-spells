@@ -2,6 +2,7 @@ package com.otectus.arsnspells.events;
 
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
+import com.otectus.arsnspells.combat.CombatDebugState;
 import com.otectus.arsnspells.compat.ScrollLPTracker;
 import com.otectus.arsnspells.spell.CrossCastContext;
 import com.otectus.arsnspells.util.LogThrottle;
@@ -16,18 +17,21 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 /**
  * One place that evicts every piece of per-player state this mod keeps outside the world save.
  *
- * <p>Four static maps hold entries keyed by player UUID:
+ * <p>Four static stores hold entries keyed by player UUID (the last of them a pair of maps):
  * {@link ScrollLPTracker} (staged scroll costs), {@link ResonanceManager} (the damage
  * multiplier cache), {@link CrossCastContext} (in-flight cross-cast attempts) and
- * {@link ArsSpellScalingHandler} (the post-cast damage window). Each has an opportunistic TTL
- * that expires the <em>value</em> on the next touch by that same player, but nothing removed
- * the <em>key</em> — so on a long-lived server every player who ever logged in stayed in all
- * four maps until restart, and a player who logged out mid-cast left a live entry behind.
+ * {@link CombatDebugState} (the last spell-damage snapshot each combat bridge took, read back
+ * by {@code /ans debug combat}). The first three have an
+ * opportunistic TTL that expires the <em>value</em> on the next touch by that same player, but
+ * nothing removed the <em>key</em> — so on a long-lived server every player who ever logged in
+ * stayed in all of them until restart, and a player who logged out mid-cast left a live
+ * entry behind. The debug snapshots have no TTL at all: they are overwritten per hit and
+ * outlive the session entirely unless they are evicted here.
  * {@code ResonanceManager.cleanupOfflinePlayers} and {@code ScrollLPTracker.clear} both
  * existed and both had zero callers.
  *
- * <p>Registered unconditionally: three of the four maps are written on paths that do not
- * require Iron's Spellbooks, and eviction of an empty map costs nothing.
+ * <p>Registered unconditionally: these maps are written on paths that do not require Iron's
+ * Spellbooks, and eviction of an empty map costs nothing.
  *
  * <p>The periodic sweep restores {@code ANS-MED-028}: it fires once per 1200 server ticks
  * regardless of player count, rather than once per player per tick. It exists in addition to
@@ -53,7 +57,7 @@ public final class StateEvictionHandler {
         ScrollLPTracker.clear(player.getUUID());
         ResonanceManager.clear(player);
         CrossCastContext.clear(player);
-        ArsSpellScalingHandler.clear(player.getUUID());
+        CombatDebugState.clear(player.getUUID());
     }
 
     @SubscribeEvent
@@ -77,7 +81,7 @@ public final class StateEvictionHandler {
         com.otectus.arsnspells.spell.CastValidationScope.clearAll();
         ResonanceManager.clearAll();
         CrossCastContext.clearAll();
-        ArsSpellScalingHandler.clearAll();
+        CombatDebugState.clearAll();
         LogThrottle.clearAll();
     }
 }

@@ -18,10 +18,15 @@ public final class CompatIds {
      * Ars Nouveau addons ANS is verified against. Never compiled against: their glyphs reach
      * ANS through Ars' own {@code GlyphRegistry}, and the only ANS-side knowledge of them is
      * datapack data plus the opt-in GameTest profiles ({@code -PwithArsElemental},
-     * {@code -PwithArsZero}).
+     * {@code -PwithArsZero}, {@code -PwithArsElemancy}).
      */
     public static final String ARS_ELEMENTAL = "ars_elemental";
     public static final String ARS_ZERO = "ars_zero";
+    /**
+     * Ars Elemancy is equipment-only - armor, bangles and foci - and registers no glyphs of its
+     * own, so ANS knows it purely as an id to probe for.
+     */
+    public static final String ARS_ELEMANCY = "ars_elemancy";
 
     private CompatIds() {}
 }

@@ -4,7 +4,10 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.hollingsworth.arsnouveau.api.perk.PerkAttributes;
 import com.otectus.arsnspells.affinity.AffinityType;
+import com.otectus.arsnspells.combat.CombatDebugState;
+import com.otectus.arsnspells.combat.IronsAttributeReport;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.compat.CompatIds;
@@ -64,6 +67,9 @@ public class ArsNSpellsCommands {
                 .then(Commands.literal("debug")
                     .requires(source -> source.hasPermission(2))
                     .executes(ArsNSpellsCommands::toggleDebug)
+                    .then(Commands.literal("combat")
+                        .executes(ArsNSpellsCommands::debugCombat)
+                    )
                 )
                 .then(Commands.literal("info")
                     .requires(source -> source.hasPermission(2))
@@ -129,6 +135,141 @@ public class ArsNSpellsCommands {
             true
         );
         return 1;
+    }
+
+    /**
+     * Print everything that decides a cross-mod damage number for the executing player: the
+     * config that governs the two bridges, both mods' spell-power attributes, and the last hit
+     * each bridge actually touched.
+     *
+     * <p>This is the answer to "armour does nothing" and its whole family of look-alikes. The
+     * fault can be the attribute (zero on the player), the school (the glyph resolved to one
+     * the caster has no power in), the config (a toggle off, or a policy that discards the
+     * school that mattered) or the formula (the cap swallowed the product), and all four look
+     * identical from inside the game. Every one of them is a line below.
+     *
+     * <p>Chat feedback, never the log: an op running this wants the numbers in front of them,
+     * and the damage path itself is forbidden from logging per event.
+     *
+     * <p>No Iron's type is named here. The Iron's attribute block goes through
+     * {@link IronsAttributeReport}, called only inside the presence gate, because this class
+     * loads on Iron's-less servers too.
+     */
+    private static int debugCombat(CommandContext<CommandSourceStack> context) {
+        ServerPlayer player;
+        try {
+            player = context.getSource().getPlayerOrException();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.not_player"));
+            return 0;
+        }
+        CommandSourceStack source = context.getSource();
+
+        source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.header")
+            .withStyle(ChatFormatting.GOLD), false);
+
+        // Said first and said plainly: with debug off nothing is recorded, so the two snapshot
+        // sections below read "none recorded" even while the bridges are working perfectly.
+        // Without this line that empty report looks exactly like the bug being hunted.
+        if (!AnsConfig.debugEnabled()) {
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.debug_off")
+                .withStyle(ChatFormatting.RED), false);
+        }
+
+        final String manaMode = AnsConfig.getManaMode().getConfigName();
+        final String policy = AnsConfig.getMultiSchoolPowerPolicy().name();
+        final String cap = String.format("%.2f", AnsConfig.SPELL_POWER_CAP.get());
+        source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.config",
+            manaMode, policy, cap).withStyle(ChatFormatting.GRAY), false);
+
+        final boolean crossStats = AnsConfig.flag(AnsConfig.ENABLE_CROSS_MOD_COMBAT_STATS, true);
+        final boolean ironsForArs = AnsConfig.flag(AnsConfig.ENABLE_IRONS_POWER_FOR_ARS_DAMAGE, true);
+        final boolean arsForIrons = AnsConfig.flag(AnsConfig.ENABLE_ARS_DAMAGE_FOR_IRONS_DAMAGE, true);
+        source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.toggles",
+            crossStats, ironsForArs, arsForIrons).withStyle(ChatFormatting.GRAY), false);
+
+        final String damageBonus =
+            String.format("%.2f", arsAttribute(player, PerkAttributes.SPELL_DAMAGE_BONUS));
+        final String maxMana = String.format("%.2f", arsAttribute(player, PerkAttributes.MAX_MANA));
+        final String manaRegen =
+            String.format("%.2f", arsAttribute(player, PerkAttributes.MANA_REGEN_BONUS));
+        source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.ars_attributes",
+            damageBonus, maxMana, manaRegen).withStyle(ChatFormatting.AQUA), false);
+
+        // Gated exactly like the Iron's school roster in /ans info: the helper imports Iron's,
+        // so it must not classload on a server without it.
+        if (ModPresence.isLoaded(CompatIds.IRONS_SPELLBOOKS)) {
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.irons_attributes")
+                .withStyle(ChatFormatting.AQUA), false);
+            for (java.util.Map.Entry<String, Double> entry : IronsAttributeReport.read(player).entrySet()) {
+                final String name = entry.getKey();
+                final double raw = entry.getValue();
+                // NaN is IronsAttributeReport's "could not read" sentinel; rendering it as a
+                // number would misreport an unreadable attribute as a real zero.
+                final String value = Double.isNaN(raw)
+                    ? Component.translatable("commands.ans.debug.combat.attribute_unavailable").getString()
+                    : String.format("%.2f", raw);
+                source.sendSuccess(() -> Component.translatable(
+                    "commands.ans.debug.combat.attribute_line", name, value), false);
+            }
+        } else {
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.irons_absent")
+                .withStyle(ChatFormatting.GRAY), false);
+        }
+
+        CombatDebugState.ArsSnapshot ars = CombatDebugState.lastArs(player.getUUID());
+        if (ars == null) {
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.ars_none")
+                .withStyle(ChatFormatting.GRAY), false);
+        } else {
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.ars_header")
+                .withStyle(ChatFormatting.YELLOW), false);
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.ars_spell",
+                ars.spellId(), ars.spellName(), ars.crossCast()), false);
+            // The whole school set, not only the winner: "matched" being the wrong school is the
+            // symptom, and the set is what says whether the resolution or the policy chose it.
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.ars_schools",
+                String.join(", ", ars.schools()),
+                ars.breakdown().matchedSchool() == null ? "-" : ars.breakdown().matchedSchool()), false);
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.ars_factors",
+                String.format("%.2f", ars.breakdown().globalPower()),
+                String.format("%.2f", ars.breakdown().schoolPower()),
+                String.format("%.2f", ars.breakdown().affinity()),
+                String.format("%.2f", ars.breakdown().resonance())), false);
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.ars_result",
+                String.format("%.2f", ars.rawDamage()),
+                String.format("%.2f", ars.finalDamage()),
+                String.format("%.3f", ars.breakdown().multiplier()),
+                String.format("%.3f", ars.breakdown().uncapped())), false);
+        }
+
+        CombatDebugState.IronsSnapshot irons = CombatDebugState.lastIrons(player.getUUID());
+        if (irons == null) {
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.irons_none")
+                .withStyle(ChatFormatting.GRAY), false);
+        } else {
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.irons_header")
+                .withStyle(ChatFormatting.YELLOW), false);
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.irons_spell",
+                irons.spellId() == null ? "-" : irons.spellId(),
+                irons.school() == null ? "-" : irons.school()), false);
+            source.sendSuccess(() -> Component.translatable("commands.ans.debug.combat.irons_result",
+                String.format("%.2f", irons.nativeAmount()),
+                String.format("%.2f", irons.finalAmount()),
+                String.format("%.2f", irons.arsBonus())), false);
+        }
+
+        return 1;
+    }
+
+    /** Ars perk attribute read that reports 0 rather than throwing in front of a diagnostic. */
+    private static double arsAttribute(ServerPlayer player, net.minecraft.core.Holder<
+            net.minecraft.world.entity.ai.attributes.Attribute> attribute) {
+        try {
+            return player.getAttributeValue(attribute);
+        } catch (Throwable t) {
+            return 0.0;
+        }
     }
 
     private static int showPlayerInfo(CommandContext<CommandSourceStack> context) throws com.mojang.brigadier.exceptions.CommandSyntaxException {

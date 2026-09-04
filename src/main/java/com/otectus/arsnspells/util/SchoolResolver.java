@@ -7,9 +7,11 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The single authority for "what school is this glyph?".
@@ -39,6 +41,14 @@ import java.util.Map;
  * in {@link SpellSchoolId}'s declaration order — a total, stable ordering — rather than whichever
  * the underlying collection happened to yield first. The old scaling code iterated a
  * {@code HashMap}, so a path matching two elements resolved by hash order.
+ *
+ * <h2>One school or all of them</h2>
+ * {@link #resolve} answers "which single school is this glyph?", which is what affinity,
+ * progression, cooldowns and the UI need — one glyph, one credited track. {@link #resolveAll}
+ * answers "which schools does this glyph belong to at all?", which is what damage scaling needs:
+ * a dual-element or compound-element addon glyph really does carry several, and collapsing it to
+ * one silently discarded the rest. The two share a single resolution chain, so they can never
+ * disagree: {@code resolve} is the deterministic winner among {@code resolveAll}'s answers.
  */
 public final class SchoolResolver {
 
@@ -69,7 +79,12 @@ public final class SchoolResolver {
         m.put("abjuration", SpellSchoolId.HOLY);
         m.put("conjuration", SpellSchoolId.EVOCATION);
         m.put("manipulation", SpellSchoolId.ENDER);
-        // "elemental" intentionally absent — see the javadoc above.
+        // "elemental" intentionally absent — see the javadoc above. It is NOT expanded to its
+        // four child elements even now that resolveAll can return several schools: under the
+        // MAX aggregation policy that would let any generic-elemental glyph claim whichever of
+        // the caster's fire/ice/lightning/nature powers is highest, which is a balance change
+        // rather than a compatibility fix. A pack that wants that can opt in per glyph or per
+        // school through SchoolMappings.
         ARS_SCHOOL_TO_CANONICAL = Collections.unmodifiableMap(m);
     }
 
@@ -82,11 +97,96 @@ public final class SchoolResolver {
      * lets the whole resolution chain be unit-tested without an Ars runtime.
      */
     public static SpellSchoolId resolve(@Nullable AbstractSpellPart part) {
+        return resolve(registryIdOf(part), declaredArsSchoolsOf(part));
+    }
+
+    /**
+     * The resolution chain itself, expressed over plain data.
+     *
+     * <p>Defined as the deterministic winner among {@link #resolveAll(String, List)}: the school
+     * earliest in {@link SpellSchoolId} declaration order, or {@link SpellSchoolId#GENERIC} when
+     * that set is empty. Declaration order of the glyph's own schools is deliberately *not* the
+     * tie-break here — two addons declaring the same pair in opposite orders must still credit
+     * the same affinity track.
+     *
+     * @param registryId   full glyph registry id, e.g. {@code ars_nouveau:glyph_ignite}
+     * @param arsSchoolIds the Ars school ids the glyph declares, possibly empty
+     */
+    public static SpellSchoolId resolve(@Nullable String registryId,
+                                        @Nullable List<String> arsSchoolIds) {
+        SpellSchoolId best = SpellSchoolId.GENERIC;
+        for (SpellSchoolId candidate : resolveAll(registryId, arsSchoolIds)) {
+            if (candidate.ordinal() < best.ordinal()) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Resolve <em>every</em> canonical school a glyph belongs to.
+     *
+     * <p>Same three sources in the same order as {@link #resolve}, and the same source wins
+     * outright — the difference is only that every school that source names is translated,
+     * rather than just the winning one. Ars addons declare dual elements (Ars Elemental) and
+     * compound elements, and damage scaling has to see the whole set to apply the configured
+     * multi-school policy to it.
+     *
+     * <p>The returned set is ordered by declaration and never contains
+     * {@link SpellSchoolId#GENERIC}: "generic" is the absence of a school, so it is expressed as
+     * an empty set. Empty is therefore a normal, meaningful result.
+     */
+    public static Set<SpellSchoolId> resolveAll(@Nullable AbstractSpellPart part) {
+        return resolveAll(registryIdOf(part), declaredArsSchoolsOf(part));
+    }
+
+    /**
+     * The multi-school resolution chain over plain data, so it is unit-testable without an Ars
+     * runtime. See {@link #resolveAll(AbstractSpellPart)} for the contract.
+     */
+    public static Set<SpellSchoolId> resolveAll(@Nullable String registryId,
+                                                @Nullable List<String> arsSchoolIds) {
+        if (registryId == null || registryId.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        // An explicit mapping is the pack author's deliberate correction and is authoritative:
+        // it stops resolution even when it names nothing but "generic", which is how a pack says
+        // "this glyph has no school" (glyph_firework).
+        List<SpellSchoolId> mapped = SchoolMappings.get().glyphSchoolsAll(registryId);
+        if (mapped != null) {
+            return toSchoolSet(mapped);
+        }
+
+        Set<SpellSchoolId> fromMetadata = fromArsSchools(arsSchoolIds);
+        if (!fromMetadata.isEmpty()) {
+            return fromMetadata;
+        }
+
+        int colon = registryId.indexOf(':');
+        String path = colon >= 0 ? registryId.substring(colon + 1) : registryId;
+        return toSchoolSet(List.of(heuristic(path)));
+    }
+
+    /** Full registry id of a glyph, or null when it has none. */
+    @Nullable
+    private static String registryIdOf(@Nullable AbstractSpellPart part) {
         if (part == null || part.getRegistryName() == null) {
-            return SpellSchoolId.GENERIC;
+            return null;
+        }
+        return part.getRegistryName().toString();
+    }
+
+    /**
+     * The Ars school ids a glyph declares, in declaration order. Extracted here so the whole
+     * resolution chain can be exercised through the plain-data overloads.
+     */
+    private static List<String> declaredArsSchoolsOf(@Nullable AbstractSpellPart part) {
+        List<String> arsSchoolIds = new ArrayList<>();
+        if (part == null) {
+            return arsSchoolIds;
         }
         List<SpellSchool> declared = part.spellSchools;
-        List<String> arsSchoolIds = new ArrayList<>();
         if (declared != null) {
             for (SpellSchool school : declared) {
                 if (school != null && school.getId() != null) {
@@ -94,59 +194,46 @@ public final class SchoolResolver {
                 }
             }
         }
-        return resolve(part.getRegistryName().toString(), arsSchoolIds);
+        return arsSchoolIds;
     }
 
     /**
-     * The resolution chain itself, expressed over plain data.
-     *
-     * @param registryId   full glyph registry id, e.g. {@code ars_nouveau:glyph_ignite}
-     * @param arsSchoolIds the Ars school ids the glyph declares, possibly empty
+     * Translate every declared Ars school, keeping declaration order and dropping anything that
+     * does not name a canonical school (an unrecognised id, or the parent {@code elemental}).
      */
-    public static SpellSchoolId resolve(@Nullable String registryId,
-                                        @Nullable List<String> arsSchoolIds) {
-        if (registryId == null || registryId.isEmpty()) {
-            return SpellSchoolId.GENERIC;
-        }
-
-        SpellSchoolId mapped = SchoolMappings.get().glyphSchool(registryId);
-        if (mapped != null) {
-            return mapped;
-        }
-
-        SpellSchoolId fromMetadata = fromArsSchools(arsSchoolIds);
-        if (!fromMetadata.isGeneric()) {
-            return fromMetadata;
-        }
-
-        int colon = registryId.indexOf(':');
-        String path = colon >= 0 ? registryId.substring(colon + 1) : registryId;
-        return heuristic(path);
-    }
-
-    /**
-     * Translate declared Ars schools, picking the canonical value earliest in
-     * {@link SpellSchoolId} declaration order so multi-school glyphs resolve deterministically.
-     */
-    private static SpellSchoolId fromArsSchools(@Nullable List<String> arsSchoolIds) {
+    private static Set<SpellSchoolId> fromArsSchools(@Nullable List<String> arsSchoolIds) {
         if (arsSchoolIds == null || arsSchoolIds.isEmpty()) {
-            return SpellSchoolId.GENERIC;
+            return Collections.emptySet();
         }
-        SpellSchoolId best = SpellSchoolId.GENERIC;
+        Set<SpellSchoolId> resolved = new LinkedHashSet<>();
         for (String rawId : arsSchoolIds) {
             if (rawId == null) {
                 continue;
             }
             String arsId = rawId.toLowerCase(Locale.ROOT);
-            SpellSchoolId candidate = SchoolMappings.get().arsSchool(arsId);
-            if (candidate == null) {
-                candidate = ARS_SCHOOL_TO_CANONICAL.get(arsId);
+            List<SpellSchoolId> candidates = SchoolMappings.get().arsSchoolsAll(arsId);
+            if (candidates == null) {
+                SpellSchoolId builtin = ARS_SCHOOL_TO_CANONICAL.get(arsId);
+                candidates = builtin == null ? List.of() : List.of(builtin);
             }
-            if (candidate != null && !candidate.isGeneric() && candidate.ordinal() < best.ordinal()) {
-                best = candidate;
+            for (SpellSchoolId candidate : candidates) {
+                if (candidate != null && !candidate.isGeneric()) {
+                    resolved.add(candidate);
+                }
             }
         }
-        return best;
+        return resolved;
+    }
+
+    /** Ordered, GENERIC-free view of a resolved school list. */
+    private static Set<SpellSchoolId> toSchoolSet(List<SpellSchoolId> schools) {
+        Set<SpellSchoolId> out = new LinkedHashSet<>();
+        for (SpellSchoolId school : schools) {
+            if (school != null && !school.isGeneric()) {
+                out.add(school);
+            }
+        }
+        return out;
     }
 
     /**

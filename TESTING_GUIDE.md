@@ -43,6 +43,20 @@ Run these gradle tasks against the worktree before any manual scenario. Each gat
 
 Gates G4 / G5 exercise the live mixin set; a failure means a target drifted in the pinned Ars/Iron's build (all injects use `require = 0`, so drift skips rather than crashes).
 
+## Optional addon profiles
+
+The `-PwithArsElemental`, `-PwithArsZero`, and `-PwithArsElemancy` profiles enable GameTest suites that exercise ANS against real addon glyphs and items. Use them with `runGameTestServer`:
+
+```bash
+./gradlew runGameTestServer -PwithArsElemental    # Ars Elemental 0.7.10+
+./gradlew runGameTestServer -PwithArsZero         # Ars Zero 2.0.2+; also pulls Ars Elemental
+./gradlew runGameTestServer -PwithArsElemancy     # Ars Elemancy 1.18.3+; also pulls Ars Elemental
+```
+
+Each profile is runtime-only and opt-in — ANS never compiles against the addons, and the GameTests self-skip when the mod is absent. Ars Zero and Ars Elemancy both require Ars Elemental, so their profiles pull it transitively.
+
+**Ars Elemancy note:** Elemancy is equipment-only (armor, bangles, spell foci) and registers no glyphs. The two glyph-population suites (`glyphsRoundTrip`, `schoolsResolveFromDeclaredMetadata`) deliberately exclude it — both fail by design on an empty glyph list. The Elemancy tests verify the profile integrity, profile completeness (Elemental loaded), and item-registry presence.
+
 ## V1 — V10 manual scenarios
 
 These scenarios exercise gameplay equivalence to the Forge 1.20.1 build. Each is documented with a Phase-gate so you know whether to expect it to pass against the current commit.
@@ -342,13 +356,7 @@ now rejected at load rather than silently resolving.
 
 ## V15 – V17 — 3.2.2 lootability checks (Iron's required)
 
-**Known gap: these cannot yet be run headlessly on this tree.** The equivalent
-GameTests exist in `CrossCastGameTests` — including one that asks Iron's own
-`SpellFilter.getApplicableSpells()` directly — but the opt-in
-`-PwithIronsRuntimeGameTests` profile cannot boot, because `playeranimator`
-(a hard dependency of Iron's) publishes no NeoForge artifact to any Maven this
-build uses. The same logic is proven on the Forge 1.20.1 tree, where that profile
-does run. Until the profile is fixed, V15–V17 are the only evidence on NeoForge.
+The opt-in `-PwithIronsRuntimeGameTests` profile now boots successfully. Iron's requires `playeranimator` as a dependency; the profile pulls it from CurseForge. The profile runs all tests in `CrossCastGameTests` (including ones that call Iron's `SpellFilter.getApplicableSpells()` directly) and `RitualLifecycleGameTests`. Four pre-existing GameTest failures in these suites are unrelated to the combat fix work and were never previously executed because the profile could not boot.
 
 ### V15 — No proxy scrolls in generated loot
 

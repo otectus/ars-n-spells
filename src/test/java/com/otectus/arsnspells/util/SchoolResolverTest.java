@@ -3,12 +3,15 @@ package com.otectus.arsnspells.util;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Behavioural tests for the school resolution chain.
@@ -29,6 +32,11 @@ class SchoolResolverTest {
 
     private static SpellSchoolId resolve(String id, String... schools) {
         return SchoolResolver.resolve(id, List.of(schools));
+    }
+
+    private static List<SpellSchoolId> resolveAll(String id, String... schools) {
+        // A List, not a Set, so the assertions can pin the *order* resolveAll promises.
+        return new ArrayList<>(SchoolResolver.resolveAll(id, List.of(schools)));
     }
 
     // --- source 1: explicit glyph mapping -------------------------------------------------
@@ -163,6 +171,88 @@ class SchoolResolverTest {
         SchoolMappings.applyOverlay(Map.of(), Map.of("water", SpellSchoolId.NATURE));
         assertEquals(SpellSchoolId.NATURE, resolve("ars_nouveau:glyph_freeze", "water"),
             "packs must be able to re-aim an entire Ars school without touching Java");
+    }
+
+    // --- multi-school resolution -------------------------------------------------------------
+
+    @Test
+    void resolveAll_returnsEverySchoolTheGlyphDeclares() {
+        assertEquals(List.of(SpellSchoolId.FIRE, SpellSchoolId.LIGHTNING),
+            resolveAll("some_addon:glyph_storm_flame", "fire", "air"),
+            "a dual-element glyph declares two schools and must resolve to both - keeping only "
+                + "the dominant one silently discarded half of what the addon said");
+    }
+
+    @Test
+    void resolveAll_preservesDeclarationOrder() {
+        assertEquals(List.of(SpellSchoolId.LIGHTNING, SpellSchoolId.FIRE),
+            resolveAll("some_addon:glyph_storm_flame", "air", "fire"),
+            "resolveAll is ordered by declaration, so the caller can see which school the addon "
+                + "listed first");
+    }
+
+    @Test
+    void resolveAll_singleSchoolGlyphYieldsExactlyOne() {
+        assertEquals(List.of(SpellSchoolId.FIRE), resolveAll("ars_nouveau:glyph_ignite", "fire"));
+    }
+
+    @Test
+    void resolveAll_excludesGenericAndMayBeEmpty() {
+        assertTrue(resolveAll("ars_nouveau:glyph_firework").isEmpty(),
+            "generic is the absence of a school, so it is expressed as an empty set rather than "
+                + "as a GENERIC member");
+        assertTrue(resolveAll("some_addon:glyph_thing", "elemental").isEmpty(),
+            "the parent 'elemental' school stays unmapped: expanding it to its four children "
+                + "would let any generic-elemental glyph claim the caster's best element");
+        assertTrue(resolveAll("some_addon:glyph_nondescript").isEmpty());
+    }
+
+    @Test
+    void resolveAll_dropsUnrecognisedSchoolsButKeepsTheRest() {
+        assertEquals(List.of(SpellSchoolId.FIRE),
+            resolveAll("some_addon:glyph_x", "chronomancy", "fire"),
+            "an Ars school ANS cannot translate is dropped; the ones it can are kept");
+    }
+
+    @Test
+    void resolve_isStillTheDeterministicWinnerAmongResolveAll() {
+        // resolve() is now defined in terms of resolveAll(), so pin that it did not inherit
+        // declaration order: the winner is still earliest in SpellSchoolId order, whichever way
+        // round the addon declared the pair.
+        assertEquals(SpellSchoolId.FIRE, resolve("some_addon:glyph_x", "air", "fire"));
+        assertEquals(SpellSchoolId.FIRE, resolve("some_addon:glyph_x", "fire", "air"));
+        assertEquals(SpellSchoolId.GENERIC, resolve("some_addon:glyph_nondescript"),
+            "an empty resolveAll still means GENERIC to every existing caller");
+    }
+
+    @Test
+    void overlay_acceptsSeveralSchoolsForOneGlyph() {
+        // The datapack array form: {"glyphs": {"addon:glyph_x": ["ice", "nature"]}}
+        SchoolMappings.applyMultiOverlay(
+            Map.of("addon:glyph_x", List.of(SpellSchoolId.ICE, SpellSchoolId.NATURE)), Map.of());
+        assertEquals(List.of(SpellSchoolId.ICE, SpellSchoolId.NATURE),
+            resolveAll("addon:glyph_x", "fire"),
+            "an override lists every school the glyph counts as, and stays authoritative over "
+                + "the glyph's own declared metadata");
+        assertEquals(SpellSchoolId.ICE, resolve("addon:glyph_x", "fire"));
+    }
+
+    @Test
+    void overlay_singleSchoolFormIsUnchangedByTheArrayForm() {
+        SchoolMappings.applyOverlay(Map.of("addon:glyph_y", SpellSchoolId.BLOOD), Map.of());
+        assertEquals(SpellSchoolId.BLOOD, resolve("addon:glyph_y", "fire"));
+        assertEquals(List.of(SpellSchoolId.BLOOD), resolveAll("addon:glyph_y", "fire"),
+            "a one-school override is just a one-element list; existing pack files must keep "
+                + "behaving identically");
+    }
+
+    @Test
+    void overlay_canRemapAnArsSchoolToSeveralCanonicalSchools() {
+        SchoolMappings.applyMultiOverlay(Map.of(),
+            Map.of("elemental", List.of(SpellSchoolId.FIRE, SpellSchoolId.ICE)));
+        assertEquals(Set.of(SpellSchoolId.FIRE, SpellSchoolId.ICE),
+            SchoolResolver.resolveAll("some_addon:glyph_thing", List.of("elemental")),
+            "ANS will not expand 'elemental' itself, but a pack may opt in to doing so");
     }
 
     @Test

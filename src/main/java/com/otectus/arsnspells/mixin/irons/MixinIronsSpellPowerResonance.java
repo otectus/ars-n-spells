@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * - This affects all spell damage, healing, and other power-based calculations
  */
 @Mixin(value = AbstractSpell.class, remap = false)
-public abstract class MixinIronsSpellDamage {
+public abstract class MixinIronsSpellPowerResonance {
     /**
      * Apply resonance multiplier to spell power calculations.
      * 

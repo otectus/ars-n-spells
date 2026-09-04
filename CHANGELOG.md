@@ -2,14 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.2.5] - 2026-09-04
+
+### Fixed: cross-mod combat stat scaling never worked and has been completely rewritten
+
+**The bug:** Ars 'n' Spells computed the correct Iron's spell-power multiplier when a spell was cast, but waited for the resulting damage event and rejected it unless the damage-source message id contained `"magic"` or `"ars_nouveau"`. Ars Nouveau 5.x uses message ids like `"player"`, `"fire"`, and `"freeze"`, so every Ars spell damage event was rejected and scaling never applied. Players saw this as "Iron's armor bonuses do nothing for Ars spells".
+
+**The fix:** Two new event handlers replace the old time-window guessing:
+- **`ArsDamageBridge`** subscribes directly to Ars Nouveau's `SpellDamageEvent.Pre` and multiplies damage by the Iron's-derived multiplier (global + school power, affinity, resonance, capped). No staging map, no time window, no message-string guessing.
+- **`IronsDamageBridge`** subscribes to Iron's `SpellDamageEvent` and adds the player's Ars `SPELL_DAMAGE_BONUS` perk as a flat value, exactly once per hit. The perk is read from the player's runtime attributes, so any source of the perk (armor, curios, potions, other mods) is picked up automatically. The `spell_power_cap` is deliberately not applied — it caps a multiplier, not a flat addition.
+
+**Scaling formula (unchanged from the old intent):** `(globalSpellPower + (schoolSpellPower - 1.0)) × affinity × resonance`, capped by `spell_power_cap`. A four-piece Iron's school set grants `SPELL_POWER` 1.20 and matching school power 1.40, so the multiplier is `(1.20 + (1.40 - 1.0)) × affinity × resonance = 1.60 × …`.
+
+**Multi-school support:** Spells resolving to multiple schools (dual-element addon glyphs, compound-school recipes) now respect the configured `multi_school_power_policy`:
+- `primary` — only the first-resolved school scales the spell (same one affinity and progression track).
+- `max` — the strongest matching elemental attribute (default; prevents all-element spells from stacking bonuses).
+- `average` — the mean of all matching attributes (rewards broad investment; penalizes schools the caster has no gear for).
+There is deliberately no `sum` option — adding every matching bonus would make spells stronger purely for carrying more labels.
+
+**Documented policy split:** damage scaling uses every school the policy resolves; affinity and progression always credit only the primary school.
+
+**Combat independence from mana mode:** Cross-mod combat scaling (both directions) remains active even when `mana_unification_mode = DISABLED` — a player who earned armor and spell stats on either side should keep them regardless of how mana is pooled.
+
+**Diagnostics:** `/ans debug combat` (permission level 2) reports mana mode, the multi-school policy, all combat toggles, the `spell_power_cap`, the player's Ars and Iron's spell-damage attributes, and a snapshot of the last Ars and Iron's spell hit (schools resolved, all factors in the multiplier calculation). Snapshots are only recorded while `debug_mode` is enabled; attributes that cannot be read are reported as unavailable rather than zero.
+
+**Build profile fix:** `-PwithIronsRuntimeGameTests` now boots for the first time. Iron's requires `playeranimator` as a dependency; the profile now pulls it from CurseForge (see `gradle.properties`). Previously the profile failed at mod-load, and because the GameTest server exits 0 on mod-loading failure it silently reported success. Four pre-existing GameTest failures in `CrossCastGameTests` and `RitualLifecycleGameTests` are now revealed by the profile.
 
 ### Added
 
 - **Ars Zero (2.0.2) is now a verified optional addon.** The `-PwithArsZero` GameTest profile pulls both Ars Zero and Ars Elemental (a Zero dependency); the addon suite now runs nine tests: the three generic checks (glyph serialization, school resolution, exception-free resolution) for each addon, plus three Ars Zero-specific checks (profile completeness, Spell Staff resolver mixin inheritance, cross-cast blacklist enforcement). The optional dependency declarations are in `neoforge.mods.toml` with version ranges from `gradle.properties` (`ars_zero_version_range`, `ars_elemental_version_range`).
+- **Ars Elemancy (1.18.3+) is now a verified optional addon.** The `-PwithArsElemancy` GameTest profile pulls both Ars Elemancy and Ars Elemental (an Elemancy dependency); three GameTests validate the profile and its integration. Elemancy is equipment-only — armor, bangles, and spell foci — and registers no glyphs, so the glyph-based addon suites deliberately exclude it (they fail by design on an empty glyph list). Armor and bangles grant only mana-pool perks and apply no offensive stat, so they correctly grant no Iron's spell-damage bonus. Elemancy's major spell foci apply Ars Nouveau's Spell Damage effect conditionally (e.g., while the wearer is on fire), and because that effect raises the Ars `SPELL_DAMAGE_BONUS` attribute, **the Spell Damage from foci does carry into damaging Iron's spells** through the cross-mod bridge added in this same release. The optional dependency is declared in `neoforge.mods.toml`.
 - **Cross-cast glyph blacklist** (`#ars_n_spells:cross_cast_blacklist` item tag): glyphs that only work within their native caster's context and must not be exported to Iron's scrolls or cast through the cross-cast pipeline. Ars Zero's five multi-phase control glyphs (temporal context form, anchor, sustain, select, discard effects) are shipped by default; pack authors extend or replace the tag. Enforced at the Spell Loom (screen tooltip), the `/ans export` command, the Spell Transcription ritual, and all cross-cast entry points. New lang keys document the rejection reason.
 - **Datapack school overrides** (`data/ars_n_spells/ans_glyph_schools/` folder): the GlyphSchoolReloadListener was added in 3.2.0, allowing addon glyphs to have their ANS school reassigned without code changes. This release ships the first built-in data file (Ars Zero overrides: Conjure Blight → eldritch, and four control-flow glyphs → generic, which steer phases rather than resolve effects). Packs add new files or replace existing ones.
-- **CompatIds constants** for `ARS_ELEMENTAL` and `ARS_ZERO` (1.21.1 only; Ars Zero integration not yet available on Forge 1.20.1).
+- **CompatIds constants** for `ARS_ELEMENTAL`, `ARS_ZERO`, and `ARS_ELEMANCY` (Ars Elemancy is 1.21.1 only).
 
 ### Changed
 

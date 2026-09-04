@@ -35,6 +35,7 @@ import java.util.List;
  * <pre>
  *   ./gradlew runGameTestServer -PwithArsElemental
  *   ./gradlew runGameTestServer -PwithArsZero       # Ars Zero requires Ars Elemental; both load
+ *   ./gradlew runGameTestServer -PwithArsElemancy   # Ars Elemancy likewise requires Elemental
  * </pre>
  *
  * <p>The point is to falsify the "total addon compatibility" claim or earn it. A glyph from an
@@ -286,6 +287,62 @@ public final class AddonCompatGameTests {
                     + "Spell Staff casts, so shared-pool mana is never deducted");
                 return;
             }
+        }
+        helper.succeed();
+    }
+
+    // ---- Ars Elemancy ----
+
+    /**
+     * Ars Elemancy is equipment-only: armor, bangles and elemental foci. It registers no glyphs
+     * at all - its {@code ArsNouveauRegistry.registerGlyphs()} body is empty, and the compound
+     * schools it declares (tempest, cinder, silt, mire, vapor, lava) are used for item matching
+     * only and are never attached to a spell part. So the two glyph-population suites
+     * ({@code glyphsRoundTrip}, {@code schoolsResolveFromDeclaredMetadata}) deliberately are NOT
+     * wired for it: both fail by design on an empty glyph list, and running them here would
+     * manufacture a false failure. Do not "fix" that by copying the other two addons.
+     *
+     * <p>What remains: the resolver check, which passes trivially today and starts guarding the
+     * moment Elemancy ever does add a glyph; the dependency check, because Elemancy hard-requires
+     * Ars Elemental; and an item-registry check, which is what actually proves the profile loaded
+     * the right artifact.
+     */
+    @GameTest(template = "platform")
+    public static void arsElemancy_everyGlyphResolvesWithoutThrowing(GameTestHelper helper) {
+        everyGlyphResolvesWithoutThrowing(helper, CompatIds.ARS_ELEMANCY);
+    }
+
+    /** Ars Elemancy 1.18.3 requires Ars Elemental; an Elemancy-only classpath is a broken profile. */
+    @GameTest(template = "platform")
+    public static void arsElemancy_profileIsComplete(GameTestHelper helper) {
+        if (!loaded(CompatIds.ARS_ELEMANCY)) {
+            helper.succeed();
+            return;
+        }
+        if (!loaded(CompatIds.ARS_ELEMENTAL)) {
+            helper.fail("ars_elemancy is loaded without ars_elemental, which it declares as a "
+                + "required dependency. The -PwithArsElemancy profile must also pull Ars Elemental.");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Elemancy contributes items, not glyphs, so its items are the only evidence the profile
+     * resolved a real artifact rather than an empty or wrong one.
+     */
+    @GameTest(template = "platform")
+    public static void arsElemancy_registersItems(GameTestHelper helper) {
+        if (!loaded(CompatIds.ARS_ELEMANCY)) {
+            helper.succeed();
+            return;
+        }
+        boolean any = BuiltInRegistries.ITEM.keySet().stream()
+            .anyMatch(id -> CompatIds.ARS_ELEMANCY.equals(id.getNamespace()));
+        if (!any) {
+            helper.fail("ars_elemancy is loaded but registers no items; the profile resolved the "
+                + "wrong artifact and this suite is proving nothing");
+            return;
         }
         helper.succeed();
     }

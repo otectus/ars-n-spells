@@ -16,7 +16,7 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * {@code MagicData}; this handler is registered only when Iron's is loaded.
  *
  * <p>The server value is authoritative for spell scaling
- * ({@code MixinIronsSpellDamage} reads it directly server-side); the
+ * ({@code MixinIronsSpellPowerResonance} reads it directly server-side); the
  * {@link ResonanceSyncPayload} sent here only keeps the <em>client</em> copy in
  * sync — on login and on every recompute. Respawn / dimension sync is owned by
  * {@link CapabilityResyncHandler}.
