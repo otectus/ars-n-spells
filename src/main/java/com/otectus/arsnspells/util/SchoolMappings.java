@@ -109,6 +109,31 @@ public final class SchoolMappings {
         m.put("ars_nouveau:glyph_summon_undead", SpellSchoolId.EVOCATION);
         m.put("ars_nouveau:glyph_heal", SpellSchoolId.HOLY);
         m.put("ars_nouveau:glyph_light", SpellSchoolId.HOLY);
+
+        // Ars Elemental 0.6.8.0. Everything else it ships resolves correctly from its own
+        // declared schools, including glyph_conjure_terrain, which declares conjuration and
+        // earth and lands on NATURE through the declaration-order tie-break.
+        // Life Link declares conjuration (it summons the link) but its payload is a drain.
+        m.put("ars_elemental:glyph_life_link", SpellSchoolId.BLOOD);
+        // The propagators chain a spell onward; they carry no payload of their own.
+        m.put("ars_elemental:glyph_propagator_arc", SpellSchoolId.GENERIC);
+        m.put("ars_elemental:glyph_propagator_homing", SpellSchoolId.GENERIC);
+
+        // Ars Zero 2.0.2. Its ids carry no glyph_ prefix. effect_geometrize (earth),
+        // push_effect (air), conjure_voxel_effect / zero_gravity_effect / effect_beam
+        // (manipulation) and effect_conjure_blight (necromancy) all resolve from metadata.
+        // effect_windshear is a lang-only id in 2.0.2: Ars Zero registers no such glyph, and
+        // the class it references is Ars Nouveau's own EffectWindshear (ELEMENTAL_AIR).
+        // A ward, like Ars's abjuration line, but it declares manipulation and would read ENDER.
+        m.put("ars_zero:conjure_arcane_shield_effect", SpellSchoolId.HOLY);
+        // Multi-phase control flow. These all declare manipulation, which would earn ender
+        // affinity for glyphs that only decide when and where the rest of the spell runs.
+        m.put("ars_zero:anchor_effect", SpellSchoolId.GENERIC);
+        m.put("ars_zero:select_effect", SpellSchoolId.GENERIC);
+        m.put("ars_zero:sustain_effect", SpellSchoolId.GENERIC);
+        m.put("ars_zero:discard_effect", SpellSchoolId.GENERIC);
+        m.put("ars_zero:effect_convergence", SpellSchoolId.GENERIC);
+        m.put("ars_zero:enlarge_effect", SpellSchoolId.GENERIC);
         return m;
     }
 }

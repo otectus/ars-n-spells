@@ -67,6 +67,12 @@ repositories {
         name = 'BlameJared'
         url = 'https://maven.blamejared.com/'
     }
+    // Ars Zero is not on CurseMaven, so -PwithArsZero reads the jar straight out of
+    // libs/. That directory is git-ignored, which makes the profile local-only: the
+    // repository is declared only under the property so a clean checkout never sees it.
+    if (project.hasProperty('withArsZero')) {
+        flatDir { dirs 'libs' }
+    }
 }
 
 dependencies {
@@ -94,6 +100,18 @@ dependencies {
     if (project.hasProperty('withTooManyGlyphs')) {
         runtimeOnly fg.deobf("curse.maven:${toomanyglyphs_project}:${toomanyglyphs_file}")
     }
+    // Ars Zero: local-only profile, resolved from the flatDir repository above against
+    // libs/ars_zero-1.20.1-2.0.2HOTFIX.jar. It hard-depends on TerraBlender, which the
+    // flatDir coordinate carries no metadata for, so that comes from the Forge maven.
+    // Curios 5.14.1 (Ars Zero's floor) is already the runtime version, see step above.
+    // Combines with -PwithArsElemental — Ars Zero ships its own ArsElementalCompat.
+    if (project.hasProperty('withArsZero')) {
+        runtimeOnly fg.deobf("blank:ars_zero-1.20.1:2.0.2HOTFIX")
+        runtimeOnly fg.deobf("com.github.glitchfiend:TerraBlender-forge:${terrablender_version}")
+    }
+    // Covenant of the Seven has no runtime profile: its own hard deps (Blood Magic,
+    // Enigmatic Legacy, Nature's Aura, Iron's, Curios 5.14) are not resolvable here.
+    // Its surface is verified against the jar by CovenantJarSurfaceTest instead.
     // Curios API only (matches the version Ars Nouveau bundles at runtime).
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}:api")
     // JEI API, compile-only. ANS never requires JEI: the plugin class is annotated
@@ -114,6 +132,10 @@ dependencies {
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+    // ASM, so CovenantJarSurfaceTest can read the Covenant jar's bytecode without
+    // classloading it (its dependencies are not on any classpath here).
+    testImplementation 'org.ow2.asm:asm:9.5'
+    testImplementation 'org.ow2.asm:asm-tree:9.5'
 }
 
 test {

@@ -1,4 +1,4 @@
-# Ars 'n' Spells (v3.2.2)
+# Ars 'n' Spells (v3.3.0)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It rests on three pillars: **mana unification** (five configurable modes for how the two pools interact), **cross-mod scaling and progression** (Iron's spell-power attributes scale Ars spells; both mods feed shared school progression and affinity), and **cross-casting** (inscribe spells from either mod onto arbitrary items, or export Ars spells onto real Iron's scrolls and spellbooks and cast them from Iron's native spell wheel). Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
 
@@ -9,7 +9,9 @@ Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for M
 | Minecraft (Forge) | 1.20.1 / 47.4.0+ | Yes |
 | Ars Nouveau | 4.12.7 – 4.12.x (`[4.12.7,4.13)`) | Yes |
 | Iron's Spells 'n Spellbooks | 3.15.0 – 3.x (`[3.15.0,4.0.0)`) | No³ |
-| Covenant of the Seven (Sanctified Legacy) | 2.2.6 recommended¹ | No |
+| Ars Elemental | 0.6.8.0+ (`[0.6.8.0,)`) | No |
+| Ars Zero | 2.0.2+ (`[2.0.2,)`) requires Forge 47.4.10+ | No |
+| Covenant of the Seven (Sanctified Legacy) | 2.2.6+ (`[2.2.6,)`)¹ | No |
 | Blood Magic | Any | No |
 | Apotheosis / Apothic Curios | Any | No² |
 | Curios API | Any | Included via Ars |
@@ -361,7 +363,9 @@ Ars 'n' Spells classifies every glyph into one canonical school — `fire`, `ice
 2. **Ars Nouveau's declared schools** (`AbstractSpellPart.spellSchools`). Vanilla Ars populates these for every glyph and Ars Elemental populates them explicitly, so most addon content classifies correctly with no configuration at all.
 3. **A small registry-name keyword fallback**, for a glyph that declares nothing.
 
-Ars's own school vocabulary is a different axis from Iron's, so ANS translates: Ars models Freeze as `water` and Iron's has no water school, so `water` → `ice`; `abjuration` → `holy`, `conjuration` → `evocation`, `manipulation` → `ender`, `air` → `lightning`, `earth` → `nature`. The parent `elemental` school is deliberately unmapped, since it does not say *which* element a glyph is. Glyphs declaring several schools resolve deterministically, never by collection order.
+Ars's own school vocabulary is a different axis from Iron's, so ANS translates: Ars models Freeze as `water` and Iron's has no water school, so `water` → `ice`; `abjuration` → `holy`, `conjuration` → `evocation`, `manipulation` → `ender`, `air` → `lightning`, `earth` → `nature`, `necromancy` → `eldritch`. The parent `elemental` school is deliberately unmapped, since it does not say *which* element a glyph is. Glyphs declaring several schools resolve deterministically, never by collection order.
+
+**Augments, cast methods (forms), and filters** — `AbstractAugment`, `AbstractCastMethod` and `AbstractFilter` instances always resolve as `generic`, regardless of metadata or registry name, since they do not carry payloads and do not decide a spell's school. This rule applies to glyphs from all sources (vanilla Ars, Ars Elemental, Ars Zero, etc.).
 
 Override any of it from a datapack — no Java, no mod update — with `data/<your_pack>/ans_glyph_schools/anything.json`:
 
@@ -440,19 +444,22 @@ Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 
 Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven; no manual jar placement required.
 
-Output jar: `build/libs/ars_n_spells-3.2.2.jar` (version tracks `mod_version` in `gradle.properties`).
+Output jar: `build/libs/ars_n_spells-3.3.0.jar` (version tracks `mod_version` in `gradle.properties`).
 
 ### Test profiles
 
-`./gradlew test` runs the JUnit suite (213 tests). GameTests run on a real server via `runGameTestServer`, with opt-in profiles that put real dependencies on the runtime classpath:
+`./gradlew test` runs the JUnit suite (272 tests). GameTests run on a real server via `runGameTestServer`, with opt-in profiles that put real dependencies on the runtime classpath:
 
 | Command | Covers |
 | --- | --- |
 | `./gradlew runGameTestServer` | Iron's-absent fallback and boot safety |
 | `./gradlew runGameTestServer -PwithIronsRuntimeGameTests` | The cross-cast pipeline against real Iron's: bind, cast from the Curios spellbook slot, unbind, inscription guard, legacy repair |
 | `./gradlew runGameTestServer -PwithArsElemental` | Ars Elemental 0.6.8.0 glyph round-trip and school resolution |
+| `./gradlew runGameTestServer -PwithArsZero` | Ars Zero 2.0.2 glyph round-trip and school resolution *(local-only: requires jar in `libs/`, which is git-ignored; needs Forge 47.4.10)* |
 | `./gradlew runGameTestServer -PwithTooManyGlyphs` | Too Many Glyphs equivalent |
 | Any combination of the above | Mixed-addon recipes |
+
+*(Covenant of the Seven has no dedicated runtime profile; its surface is verified by `CovenantJarSurfaceTest` instead, which reads the jar bytecode and skips when the jar is absent.)*
 
 Gradle reports `BUILD SUCCESSFUL` even when a GameTest world fails to load, so assert on the log line instead: `All N required tests passed`. The profiles share the `run/` directory, and an Iron's-loaded run leaves an `irons_spellbooks:pocket_dimension` reference in `run/world` that a later Iron's-absent run cannot load — delete `run/world` between profile switches.
 

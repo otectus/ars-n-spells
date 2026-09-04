@@ -50,3 +50,29 @@ mandatory=false
 versionRange="[1.20.1-3.15.0,1.20.1-4.0.0)"
 ordering="AFTER"
 side="BOTH"
+
+# Optional Ars Nouveau addons. ANS compiles against none of them; the declarations
+# exist so FML loads them first and the school-resolution overrides in
+# SchoolMappings see the addon glyphs already registered.
+[[dependencies.ars_n_spells]]
+modId="ars_elemental"
+mandatory=false
+versionRange="[0.6.8.0,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.ars_n_spells]]
+modId="ars_zero"
+mandatory=false
+versionRange="[2.0.2,)"
+ordering="AFTER"
+side="BOTH"
+
+# [2.2.6,) admits the shipped 2.2.6-hotfix: a qualifier sorts above the bare
+# release in Maven version ordering. Pinned by VersionRangeTest.
+[[dependencies.ars_n_spells]]
+modId="covenant_of_the_seven"
+mandatory=false
+versionRange="[2.2.6,)"
+ordering="AFTER"
+side="BOTH"

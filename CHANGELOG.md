@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.3.0] - 2026-09-04
+
+### New: optional Ars Elemental, Ars Zero, and Covenant compatibility
+
+- **Ars Elemental 0.6.8.0+** — Ars Elemental glyphs now resolve their schools from their declared Ars metadata. Necromancy glyphs like `glyph_phantom_grasp` and `glyph_charm` resolve as `eldritch`; `glyph_life_link` declares Necromancy too but is explicitly mapped to `blood`. Filters like `glyph_aquatic_filter` resolve as `generic` and do not decide the spell's school. Most Ars Elemental content classifies correctly with no configuration at all; override any glyph from a datapack if needed.
+- **Ars Zero 2.0.2+** — Ars Zero's named effects (like `effect_conjure_blight`, `conjure_arcane_shield_effect`) resolve their schools from their declared Ars metadata or from the glyph's Ars school. Control-flow glyphs (`select_effect`, `anchor_effect`, etc.) resolve as `generic` and do not decide the spell's school. The mod requires Forge `[47.4.10,)` and Curios `5.14.1+1.20.1`.
+- **Covenant of the Seven 2.2.6+** — Covenant aura is sampled server-side through Nature's Aura's chunk aura to block casts when the aura threshold is too low, avoiding method probes for routines Covenant 2.2.6 removed. Dedicated servers behave correctly. The integration has no dedicated runtime test profile; surface compatibility is verified by bytecode inspection instead.
+- **Ars Nouveau's own glyph metadata** now drives all school resolution — `AbstractSpellPart.spellSchools` for vanilla and addon glyphs, with per-glyph overrides from datapacks. `AbstractAugment`, `AbstractCastMethod` and `AbstractFilter` instances always resolve as `generic` — they are not payload glyphs and do not carry a school (prior versions leaked the school decision to the glyph's registry name heuristic).
+
+### Changed: test suite structure
+
+- New JUnit tests (`SchoolResolverAddonTest`, `CovenantJarSurfaceTest` which reads the Covenant jar bytecode and skips when absent, `VersionRangeTest`).
+- New gametests in `AddonCompatGameTests`: `arsZero_glyphsRoundTrip`, `arsZero_everyGlyphResolvesWithoutThrowing`, `arsZero_schoolsResolveFromDeclaredMetadata`, `arsZero_controlFlowGlyphsAreGeneric`, `arsZero_augmentsAndFormsDoNotDecideTheSchool`, `arsZero_namedEffectsAreUsable`, `arsElemental_necromancyGlyphsResolve`, `arsElemental_filtersResolveGeneric`, `mixedArsElementalArsZero_recipe_survivesSerialization`. With `-PwithArsElemental -PwithArsZero`: all pass (JUnit: 272 tests).
+- The `-PwithArsZero` profile is local-only (jar in `libs/`, git-ignored) and requires Forge `47.4.10`. Ars Elemental and Covenant profiles continue as before.
+
+### Changed: `cursed_rings.json` item tag
+
+- The non-existent `covenant_of_the_seven:cursed_ring` entry was removed; `enigmaticlegacy:cursed_ring` remains.
+
+No config, packet, or save-format changes.
+
 ## [3.2.4] - 2026-09-02
 
 ### Performance: server-side hot paths trimmed

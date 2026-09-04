@@ -1,5 +1,8 @@
 package com.otectus.arsnspells.util;
 
+import com.hollingsworth.arsnouveau.api.spell.AbstractAugment;
+import com.hollingsworth.arsnouveau.api.spell.AbstractCastMethod;
+import com.hollingsworth.arsnouveau.api.spell.AbstractFilter;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.SpellSchool;
 
@@ -56,6 +59,12 @@ public final class SchoolResolver {
      * available power. {@code elemental} is the parent of the four sub-schools and is
      * deliberately unmapped — a glyph carrying only the parent has not said which element it is.
      *
+     * <p>{@code necromancy} is not an Ars Nouveau school; it is a custom {@code SpellSchool}
+     * that Ars Elemental and Ars Zero each construct with the same id, so one entry serves both
+     * (lookup is by {@code getId()}). It maps to {@code eldritch}, which is where the heuristic
+     * already sends wither/dark/hex/void: {@code blood} would feed undead charms into the Blood
+     * track, and {@code evocation} is summoning rather than death magic.
+     *
      * <p>All of these are overridable per-glyph through {@link SchoolMappings}.
      */
     private static final Map<String, SpellSchoolId> ARS_SCHOOL_TO_CANONICAL;
@@ -69,6 +78,7 @@ public final class SchoolResolver {
         m.put("abjuration", SpellSchoolId.HOLY);
         m.put("conjuration", SpellSchoolId.EVOCATION);
         m.put("manipulation", SpellSchoolId.ENDER);
+        m.put("necromancy", SpellSchoolId.ELDRITCH);
         // "elemental" intentionally absent — see the javadoc above.
         ARS_SCHOOL_TO_CANONICAL = Collections.unmodifiableMap(m);
     }
@@ -83,6 +93,9 @@ public final class SchoolResolver {
      */
     public static SpellSchoolId resolve(@Nullable AbstractSpellPart part) {
         if (part == null || part.getRegistryName() == null) {
+            return SpellSchoolId.GENERIC;
+        }
+        if (isNonPayloadPart(part)) {
             return SpellSchoolId.GENERIC;
         }
         List<SpellSchool> declared = part.spellSchools;
@@ -112,6 +125,11 @@ public final class SchoolResolver {
         SpellSchoolId mapped = SchoolMappings.get().glyphSchool(registryId);
         if (mapped != null) {
             return mapped;
+        }
+
+        int nameStart = registryId.indexOf(':');
+        if (isNonPayloadPath(nameStart >= 0 ? registryId.substring(nameStart + 1) : registryId)) {
+            return SpellSchoolId.GENERIC;
         }
 
         SpellSchoolId fromMetadata = fromArsSchools(arsSchoolIds);
@@ -147,6 +165,35 @@ public final class SchoolResolver {
             }
         }
         return best;
+    }
+
+    /**
+     * Whether the part only shapes a cast rather than delivering one.
+     *
+     * <p>Augments, cast methods and filters carry declared schools of their own — Ars
+     * Elemental's {@code glyph_aquatic_filter} declares water, {@code glyph_fiery_filter} fire —
+     * and those are statements about what the glyph <em>targets</em>, not about the damage the
+     * spell deals. Letting them through made a fire spell filtered to aquatic mobs resolve ICE.
+     * Ars Zero's forms and its eight augments fall out the same way. A spell's school comes from
+     * its effects; everything else is {@link SpellSchoolId#GENERIC} and earns no affinity.
+     */
+    private static boolean isNonPayloadPart(AbstractSpellPart part) {
+        return part instanceof AbstractAugment
+            || part instanceof AbstractCastMethod
+            || part instanceof AbstractFilter;
+    }
+
+    /**
+     * The name-shaped equivalent of {@link #isNonPayloadPart}, so the pure overload and the
+     * typed one give the same answer for the same glyph. Covers both id conventions in play:
+     * Ars Nouveau and Ars Elemental prefix with {@code glyph_}, Ars Zero does not.
+     */
+    private static boolean isNonPayloadPath(String rawPath) {
+        String path = rawPath.toLowerCase(Locale.ROOT);
+        if (path.startsWith("glyph_")) {
+            path = path.substring("glyph_".length());
+        }
+        return path.endsWith("_filter") || path.startsWith("augment_") || path.endsWith("_form");
     }
 
     /**
