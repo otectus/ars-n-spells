@@ -59,3 +59,21 @@ description = '''${mod_description}'''
     versionRange = "${irons_spellbooks_version_range}"
     ordering = "AFTER"
     side = "BOTH"
+
+# Ars Nouveau addons ANS is verified against. Both OPTIONAL and never compiled against: their
+# glyphs arrive through Ars' GlyphRegistry, which ANS reads lazily, so the AFTER ordering is
+# documentary. The ranges are floored at the files the opt-in GameTest profiles actually load.
+# Ars Zero 2.0.2 itself requires Ars Elemental.
+[[dependencies.${mod_id}]]
+    modId = "ars_elemental"
+    type = "optional"
+    versionRange = "${ars_elemental_version_range}"
+    ordering = "AFTER"
+    side = "BOTH"
+
+[[dependencies.${mod_id}]]
+    modId = "ars_zero"
+    type = "optional"
+    versionRange = "${ars_zero_version_range}"
+    ordering = "AFTER"
+    side = "BOTH"

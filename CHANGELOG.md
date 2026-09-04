@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Ars Zero (2.0.2) is now a verified optional addon.** The `-PwithArsZero` GameTest profile pulls both Ars Zero and Ars Elemental (a Zero dependency); the addon suite now runs nine tests: the three generic checks (glyph serialization, school resolution, exception-free resolution) for each addon, plus three Ars Zero-specific checks (profile completeness, Spell Staff resolver mixin inheritance, cross-cast blacklist enforcement). The optional dependency declarations are in `neoforge.mods.toml` with version ranges from `gradle.properties` (`ars_zero_version_range`, `ars_elemental_version_range`).
+- **Cross-cast glyph blacklist** (`#ars_n_spells:cross_cast_blacklist` item tag): glyphs that only work within their native caster's context and must not be exported to Iron's scrolls or cast through the cross-cast pipeline. Ars Zero's five multi-phase control glyphs (temporal context form, anchor, sustain, select, discard effects) are shipped by default; pack authors extend or replace the tag. Enforced at the Spell Loom (screen tooltip), the `/ans export` command, the Spell Transcription ritual, and all cross-cast entry points. New lang keys document the rejection reason.
+- **Datapack school overrides** (`data/ars_n_spells/ans_glyph_schools/` folder): the GlyphSchoolReloadListener was added in 3.2.0, allowing addon glyphs to have their ANS school reassigned without code changes. This release ships the first built-in data file (Ars Zero overrides: Conjure Blight → eldritch, and four control-flow glyphs → generic, which steer phases rather than resolve effects). Packs add new files or replace existing ones.
+- **CompatIds constants** for `ARS_ELEMENTAL` and `ARS_ZERO` (1.21.1 only; Ars Zero integration not yet available on Forge 1.20.1).
+
+### Changed
+
+- **Documentation cleanup: Covenant of the Seven.** The mod has no 1.21.1 or NeoForge release and therefore no integration on this port. Stale build.gradle comments, ModTags javadoc, and MixinSpellResolverPreCast comments that referenced the deleted `src/covenant-disabled/` directory (removed in 3.2.1) were corrected. README.md and PORT_AUDIT_1.21.1.md brought into 3.2.1 parity.
+
 ## [3.2.4] - 2026-09-02
 
 Parity with the Forge 1.20.1 **3.2.3** and **3.2.4** lines. The ritual bugs below were present

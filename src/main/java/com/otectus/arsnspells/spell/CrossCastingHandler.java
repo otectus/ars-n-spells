@@ -406,6 +406,21 @@ public class CrossCastingHandler {
             }
             return false;
         }
+        // Same pre-decode discipline for glyphs that exist but must not leave their own caster
+        // (see ModTags.CROSS_CAST_BLACKLIST). CrossCastValidator already refuses these on the
+        // request path; this guards the proxy-spell path, which reaches castArsSpell directly.
+        List<String> blacklistedGlyphs = ArsSpellIntegrity.blacklistedGlyphIds(tag.get());
+        if (!blacklistedGlyphs.isEmpty()) {
+            LOGGER.warn("Cross-mod Ars spell uses {} glyph(s) tagged cross_cast_blacklist: {}",
+                blacklistedGlyphs.size(), blacklistedGlyphs);
+            if (player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.displayClientMessage(
+                    Component.translatable("message.ars_n_spells.crosscast.invalid.blacklisted_glyphs.detail",
+                        ArsSpellIntegrity.describeMissing(blacklistedGlyphs))
+                        .withStyle(ChatFormatting.RED), true);
+            }
+            return false;
+        }
 
         Spell spell = decodeArsSpell(tag.get());
         if (spell == null || spell.size() == 0) {

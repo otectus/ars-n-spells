@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    { "id": "ars_zero:temporal_context_form", "required": false },
+    { "id": "ars_zero:anchor_effect", "required": false },
+    { "id": "ars_zero:select_effect", "required": false },
+    { "id": "ars_zero:sustain_effect", "required": false },
+    { "id": "ars_zero:discard_effect", "required": false }
+  ]
+}

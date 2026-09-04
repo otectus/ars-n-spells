@@ -107,6 +107,17 @@ public class SpellTranscriptionRitual extends AnsRitual {
                 sourceStack.getHoverName().getString());
             return;
         }
+        if (source.type == CrossSpellType.ARS_NOUVEAU) {
+            // Caster-bound addon glyphs (ModTags.CROSS_CAST_BLACKLIST) would inscribe fine and
+            // then do nothing - or not what the player built - when cast without their caster.
+            java.util.List<String> blacklisted =
+                com.otectus.arsnspells.util.ArsSpellIntegrity.blacklistedGlyphIds(source.arsSpell);
+            if (!blacklisted.isEmpty()) {
+                error(LANG_PREFIX + "error.blacklisted_glyphs",
+                    com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(blacklisted));
+                return;
+            }
+        }
 
         // Validation complete -- mutation begins here.
         switch (source.type) {

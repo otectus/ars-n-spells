@@ -187,10 +187,14 @@ dependencies {
     // JEI API, compile-only. The full jar arrives transitively via Ars at runtime.
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
 
-    // Optional Ars Nouveau addon profile. Runtime-only and opt-in: ANS compiles against it in
-    // no way, and the addon GameTests self-skip when the mod is absent.
-    if (project.hasProperty('withArsElemental')) {
+    // Optional Ars Nouveau addon profiles. Runtime-only and opt-in: ANS compiles against them in
+    // no way, and the addon GameTests self-skip when the mod is absent. Ars Zero 2.0.2 declares
+    // Ars Elemental as a required dependency, so the Zero profile implies the Elemental one.
+    if (project.hasProperty('withArsElemental') || project.hasProperty('withArsZero')) {
         runtimeOnly "curse.maven:ars-elemental-${ars_elemental_project}:${ars_elemental_file}"
+    }
+    if (project.hasProperty('withArsZero')) {
+        runtimeOnly "curse.maven:ars-zero-${ars_zero_project}:${ars_zero_file}"
     }
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
@@ -207,12 +211,6 @@ test {
     // rather than overriding workingDir, which the harness owns.
     systemProperty 'ans.projectDir', projectDir.absolutePath
 }
-
-
-// the Seven integration (LP / aura / blasphemy curios), kept as a reference because Covenant has
-// no 1.21.1 release to compile or test against. Nothing there is compiled or shipped; see
-// src/covenant-disabled/README.md for what re-enabling involves. This block exists so the
-// directory is discoverable from the build file rather than only by browsing the tree.
 
 // The GameTest harness resolves unprefixed templates (e.g. "platform") against
 // <run dir>/gameteststructures/*.snbt. Neither vanilla nor NeoForge ship any, so stage the
@@ -234,6 +232,8 @@ processResources {
         loader_version_range          : loader_version_range,
         ars_nouveau_version_range     : ars_nouveau_version_range,
         irons_spellbooks_version_range: irons_spellbooks_version_range,
+        ars_elemental_version_range   : ars_elemental_version_range,
+        ars_zero_version_range        : ars_zero_version_range,
         mod_id                        : mod_id,
         mod_name                      : mod_name,
         mod_license                   : mod_license,

@@ -199,8 +199,18 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
             return Component.translatable("ars_n_spells.spell_loom.error.output_full");
         }
         ItemStack source = this.menu.getSlot(0).getItem();
-        if (ArsSpellExportUtil.extractArsSpell(source).isEmpty()) {
+        java.util.Optional<com.hollingsworth.arsnouveau.api.spell.Spell> arsSpell =
+            ArsSpellExportUtil.extractArsSpell(source);
+        if (arsSpell.isEmpty()) {
             return Component.translatable("ars_n_spells.spell_loom.error.no_source");
+        }
+        // Item tags are synced to the client, so this mirrors the server-side refusal in
+        // SpellLoomExportPayload and greys the button out with the reason instead of failing late.
+        java.util.List<String> blacklisted =
+            com.otectus.arsnspells.util.ArsSpellIntegrity.blacklistedGlyphIds(arsSpell.get());
+        if (!blacklisted.isEmpty()) {
+            return Component.translatable("ars_n_spells.spell_loom.error.blacklisted_glyphs",
+                com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(blacklisted));
         }
         ItemStack scroll = this.menu.getSlot(1).getItem();
         if (!IronsBookBindingUtil.isIronsScroll(scroll) || InscriptionInputs.isInscribed(scroll)) {

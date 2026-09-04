@@ -96,6 +96,16 @@ public record SpellLoomExportPayload(String name, String nature, String iconSymb
                 Component.translatable("ars_n_spells.spell_loom.error.no_source"), true);
             return;
         }
+        // Caster-bound addon glyphs (ModTags.CROSS_CAST_BLACKLIST) are refused at export, where
+        // the player can still fix the spell, rather than at cast time on a finished scroll.
+        java.util.List<String> blacklisted =
+            com.otectus.arsnspells.util.ArsSpellIntegrity.blacklistedGlyphIds(spell.get());
+        if (!blacklisted.isEmpty()) {
+            sender.displayClientMessage(
+                Component.translatable("ars_n_spells.spell_loom.error.blacklisted_glyphs",
+                    com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(blacklisted)), true);
+            return;
+        }
 
         String cleanName = payload.name() == null ? "" : payload.name().trim();
         if (cleanName.length() > MAX_NAME) {

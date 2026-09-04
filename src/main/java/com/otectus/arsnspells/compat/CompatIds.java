@@ -14,6 +14,14 @@ public final class CompatIds {
     public static final String ARS_NOUVEAU = "ars_nouveau";
     public static final String IRONS_SPELLBOOKS = "irons_spellbooks";
     public static final String CURIOS = "curios";
+    /**
+     * Ars Nouveau addons ANS is verified against. Never compiled against: their glyphs reach
+     * ANS through Ars' own {@code GlyphRegistry}, and the only ANS-side knowledge of them is
+     * datapack data plus the opt-in GameTest profiles ({@code -PwithArsElemental},
+     * {@code -PwithArsZero}).
+     */
+    public static final String ARS_ELEMENTAL = "ars_elemental";
+    public static final String ARS_ZERO = "ars_zero";
 
     private CompatIds() {}
 }

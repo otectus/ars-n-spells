@@ -187,25 +187,15 @@ An **in-game config screen** is available from the mod list (**Mods → Ars 'n' 
 | `source_jar_scan_interval_ticks` | `20` | Ticks between proximity checks per player (1–200). |
 | `source_jar_scan_radius` | `4` | Horizontal scan radius in blocks (1–8; the scan never loads chunks). |
 
-### Config keys carried but inert
+### Covenant of the Seven integration (removed in 3.2.1)
 
-The Covenant of the Seven keys (`enable_lp_system`, `lp_source_mode`,
-`death_on_insufficient_lp`, `show_lp_cost_messages`, `hide_mana_bar_with_ring`, `ars_lp_*`,
-`irons_lp_*`, `enable_virtue_aura_system`, `ars_virtue_aura_multiplier`, `aura_failure_mode`,
-`blasphemy_*`) are **declared and generated, but nothing in this build reads them** — that
-subsystem has no 1.21.1 dependency to run against. They are kept so an existing server's TOML
-round-trips unchanged and re-enabling the subsystem is a code change rather than a config
-migration. Each carries an `INERT on 1.21.1` comment in the generated file.
+Covenant of the Seven has no 1.21.1 or NeoForge release, so the Cursed Ring LP subsystem, Virtue Ring aura, Blasphemy curios, and all associated config keys were removed in the 3.2.1 parity pass. If Covenant returns to NeoForge, those keys and their hooks will be re-added alongside the integration.
 
-`scroll_cost_mode` **is** live again: `full` charges scroll casts through the unified pool
-(Iron's scrolls never deduct mana natively). Only its `lp_only` value is inert, and it behaves
-as `free`.
+`virtue_ring_discount` and `max_total_curio_discount` are kept and live — they were repurposed as the generic `#ars_n_spells:curio_spell_discount` per-curio discount and its stacking cap, extensible through datapack tags.
 
-The never-read keys the 1.20.1 audit flagged (ANS-MED-044) stay deleted: the glyph/school bonus
-sections, the resonance caps, category cooldowns, and the dead performance keys.
-`virtue_ring_discount` and `max_total_curio_discount` are **kept** and are live — they were
-repurposed as the generic `#ars_n_spells:curio_spell_discount` per-curio discount and its
-stacking cap.
+`scroll_cost_mode` is live: `full` charges scroll casts through the unified pool (Iron's scrolls never deduct mana natively), and `free` removes the cost entirely. The `lp_only` value is inert and behaves as `free`.
+
+The never-read keys the 1.20.1 audit flagged (ANS-MED-044) also stay deleted: the glyph/school bonus sections, the resonance caps, category cooldowns, and the dead performance keys.
 
 ---
 

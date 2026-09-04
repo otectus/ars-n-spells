@@ -2,6 +2,7 @@ package com.otectus.arsnspells.spell;
 
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.compat.IronsCompat;
+import com.otectus.arsnspells.util.ArsSpellIntegrity;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.ResourceLocation;
@@ -70,6 +71,11 @@ public final class CrossCastValidator {
                 Spell spell = decodeArsSpell(tag.get());
                 if (spell == null || spell.isEmpty()) {
                     return ValidationResult.failure("message.ars_n_spells.crosscast.invalid.ars_empty");
+                }
+                // Checked on the serialized ids, not the decoded spell: the tag is the source
+                // of truth for what the payload claims to contain.
+                if (!ArsSpellIntegrity.blacklistedGlyphIds(tag.get()).isEmpty()) {
+                    return ValidationResult.failure("message.ars_n_spells.crosscast.invalid.blacklisted_glyphs");
                 }
                 return ValidationResult.success(CrossSpellType.ARS_NOUVEAU);
 

@@ -4,7 +4,19 @@
 
 Works with **Minecraft 1.21.1** on **NeoForge**.
 
-> **Version note (3.2.2, NeoForge 1.21.1).** This build is at feature parity with the Forge 1.20.1 **3.2.2** line. Mana unification, cross-cast invocation, Ars spells in Iron's native spell wheel, the Spell Loom, rituals, cooldowns, progression, resonance and equipment scaling are all live. The **Covenant of the Seven** (Sanctified Legacy) integration — Ring of Seven Curses, Ring of Seven Virtues, Blasphemy curios, LP and aura systems — remains **removed**, because Covenant of the Seven has no NeoForge 1.21.1 build. Compile targets: Ars Nouveau 5.13.1.1400, Iron's Spells 1.21.1-3.16.3, NeoForge 21.1.248.
+> **Version note (3.2.4, NeoForge 1.21.1).** This build is at feature parity with the Forge 1.20.1 **3.2.3** and **3.2.4** lines. Mana unification, cross-cast invocation, Ars spells in Iron's native spell wheel, the Spell Loom, rituals, cooldowns, progression, resonance and equipment scaling are all live. The **Covenant of the Seven** (Sanctified Legacy) integration — Ring of Seven Curses, Ring of Seven Virtues, Blasphemy curios, LP and aura systems — remains **removed**, because Covenant of the Seven has no NeoForge 1.21.1 build. Compile targets: Ars Nouveau 5.13.1.1400, Iron's Spells 1.21.1-3.16.3, NeoForge 21.1.248.
+
+---
+
+## What's new in 3.2.4
+
+**If you were using the rituals and nothing was happening, they work now.** The Spellbook Binding, Spell Transcription, Spell Uninscription, and Mana Infusion rituals were completely broken since version 3.0.0 — you could light the brazier, but it would stay lit forever and never consume the items or produce a result. The rituals now complete properly after burning for about three seconds. Ritual tablets are consumed but not returned, matching how Ars Nouveau's own rituals work.
+
+**Ritual feedback now follows you.** When a ritual completes, the success or failure message used to go to whichever player was closest to the brazier at that moment. If you stepped away while it was burning, you'd get no message at all. Rituals now remember who lit them and send the report to that player, no matter how far away they've wandered — or to the nearest player if the original lighter has logged off.
+
+A third fix closes a loophole: the `/ans bind_scroll_to_irons_book` command now respects the `allow_ars_spells_in_irons_spellbooks=false` config option and says the feature is disabled immediately rather than asking you to provide items it will never accept.
+
+On the server side, the Mana Well ritual no longer scans every entity section within its range on every tick; instead it walks the player list and checks each player's position. The potion regeneration bridge also switched from querying NeoForge's mod list on every call to using a cached answer, so both paths are significantly faster. No gameplay changes outside the ritual fixes above, and no config, packet, or save-format changes.
 
 ---
 
@@ -113,6 +125,19 @@ If you change your mind, the **Spell Uninscription** ritual returns an inscribed
 3. The cross-cast component is removed cleanly, with an ash + smoke dissolution theme.
 
 The uninscribe ritual works without Iron's Spellbooks loaded, so legacy inscribed items can still be cleaned up after Iron's is removed.
+
+### Spellbook Binding — bind an exported Ars spell into an Iron's spellbook
+
+A two-step ceremony to turn an Ars Nouveau spell into an Iron's native spell: first, export it onto a blank scroll via the Spell Loom or the `/ans export_to_irons_scroll` command. Then use this ritual to bind it into a real Iron's spellbook, where it joins the native spell wheel and casts like any other.
+
+1. **Craft the Spellbook Binding tablet.** Reagent: a novice Ars Nouveau spellbook. Pedestals: an Iron's spellbook, an Iron's scroll, a source gem block, and an archwood log. Costs 2500 source.
+2. **Set up the brazier.** Place the tablet on a Ritual Brazier and drop exactly two items within a three-block radius:
+   - exactly one **carrier scroll** — an Iron's scroll exported via the Spell Loom or `/ans export_to_irons_scroll`
+   - exactly one **target spellbook** — a blank or existing Iron's spellbook
+3. **Activate.** Light the brazier by right-clicking it with an empty hand. Any other item in range aborts the ritual with a chat message.
+4. **Cast.** The bound spell is now part of the book's collection and casts from Iron's native spell wheel like any other entry.
+
+**Caution:** Ars Nouveau ships its own ritual also named **Binding** — a different ritual that makes Bound Scripts for familiars and ignores scrolls. It is easy to reach for by mistake if you are not looking closely. This ritual uses a three-block radius around the brazier and reads only dropped items.
 
 ---
 

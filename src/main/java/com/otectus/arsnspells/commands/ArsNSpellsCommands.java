@@ -241,6 +241,13 @@ public class ArsNSpellsCommands {
             context.getSource().sendFailure(Component.translatable("commands.ans.export.no_ars_spell"));
             return 0;
         }
+        java.util.List<String> blacklisted =
+            com.otectus.arsnspells.util.ArsSpellIntegrity.blacklistedGlyphIds(spell.get());
+        if (!blacklisted.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.export.blacklisted_glyphs",
+                com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(blacklisted)));
+            return 0;
+        }
 
         net.minecraft.world.item.ItemStack carrier =
             com.otectus.arsnspells.spell.ArsSpellExportUtil.createIronsScrollCarrier(spell.get());

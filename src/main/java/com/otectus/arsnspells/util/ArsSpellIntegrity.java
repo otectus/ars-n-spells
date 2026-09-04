@@ -1,6 +1,11 @@
 package com.otectus.arsnspells.util;
 
 import com.hollingsworth.arsnouveau.api.registry.GlyphRegistry;
+import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
+import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.hollingsworth.arsnouveau.common.items.Glyph;
+import com.otectus.arsnspells.registry.ModTags;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -72,6 +77,63 @@ public final class ArsSpellIntegrity {
     /** True when every serialized glyph still resolves. */
     public static boolean isIntact(@Nullable CompoundTag arsTag) {
         return missingGlyphIds(arsTag).isEmpty();
+    }
+
+    /**
+     * Glyph ids in {@code arsTag}'s serialized recipe whose glyph item is tagged
+     * {@link ModTags#CROSS_CAST_BLACKLIST}, in recipe order. Empty when none are.
+     *
+     * <p>The complement of {@link #missingGlyphIds}: that one catches glyphs that are gone, this
+     * one catches glyphs that are present but must not leave their own caster. Ars Zero's
+     * multi-phase glyphs are the shipped case - they read a phase context that only a Spell Staff
+     * provides, so cast from an Iron's scroll they do nothing, or not what the player built.
+     * Unregistered ids are skipped here; they are {@code missingGlyphIds}' job.
+     */
+    public static List<String> blacklistedGlyphIds(@Nullable CompoundTag arsTag) {
+        List<String> blacklisted = new ArrayList<>();
+        if (arsTag == null || arsTag.isEmpty() || !arsTag.contains("recipe", Tag.TAG_LIST)) {
+            return blacklisted;
+        }
+        ListTag recipe = arsTag.getList("recipe", Tag.TAG_STRING);
+        for (int i = 0; i < recipe.size(); i++) {
+            String raw = recipe.getString(i);
+            ResourceLocation id = raw == null || raw.isEmpty() ? null : ResourceLocation.tryParse(raw);
+            AbstractSpellPart part = id == null ? null : GlyphRegistry.getSpellpartMap().get(id);
+            if (part != null && isBlacklisted(part)) {
+                blacklisted.add(raw);
+            }
+        }
+        return blacklisted;
+    }
+
+    /**
+     * Registry ids of the glyphs in a live {@code spell} whose glyph item is tagged
+     * {@link ModTags#CROSS_CAST_BLACKLIST}. The export-time twin of
+     * {@link #blacklistedGlyphIds(CompoundTag)}, for the Spell Loom and the transcription
+     * ritual, which hold a decoded {@link Spell} rather than its serialized form.
+     */
+    public static List<String> blacklistedGlyphIds(@Nullable Spell spell) {
+        List<String> blacklisted = new ArrayList<>();
+        if (spell == null) {
+            return blacklisted;
+        }
+        for (AbstractSpellPart part : spell.unsafeList()) {
+            if (part != null && isBlacklisted(part)) {
+                ResourceLocation id = part.getRegistryName();
+                blacklisted.add(id == null ? part.getClass().getSimpleName() : id.toString());
+            }
+        }
+        return blacklisted;
+    }
+
+    /**
+     * Whether {@code part}'s glyph item carries {@link ModTags#CROSS_CAST_BLACKLIST}. Keyed on
+     * the item rather than the spell-part id so the tag is an ordinary item tag a pack can edit,
+     * and so the check needs no naming convention between the two registries.
+     */
+    public static boolean isBlacklisted(AbstractSpellPart part) {
+        Glyph glyph = part.getGlyph();
+        return glyph != null && BuiltInRegistries.ITEM.wrapAsHolder(glyph).is(ModTags.CROSS_CAST_BLACKLIST);
     }
 
     /**

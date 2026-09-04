@@ -16,12 +16,10 @@ import net.minecraft.world.level.block.Block;
  * mods are absent; pack makers extend or {@code replace} them to add custom
  * rings/blasphemies/jars without a code change.
  *
- * <p><b>Covenant of the Seven on 1.21.1:</b> the ring and blasphemy tags are
- * declared here and shipped, but nothing in the compiled jar reads them yet —
- * Covenant has no 1.21.1 release, so the LP/aura subsystem that consumes them
- * is excluded from this build (see {@code src/covenant-disabled/README.md}).
- * They are kept so a pack's overrides survive and re-enabling the subsystem is
- * a compile-scope change rather than a data migration.
+ * <p><b>Covenant of the Seven on 1.21.1:</b> the 1.20.1 line also declared ring
+ * and blasphemy tags for its LP/aura subsystem. Covenant has no 1.21.1 release,
+ * so that subsystem and its tags were removed in the 3.2.1 parity pass rather
+ * than carried as dead declarations.
  */
 public final class ModTags {
 
@@ -35,6 +33,19 @@ public final class ModTags {
      */
     public static final TagKey<Item> IRONS_SPELL_BOOKS =
         ItemTags.create(ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "irons_spell_books"));
+
+    /**
+     * Glyph items whose spell part must not be exported onto an Iron's scroll or cast through
+     * the cross-cast pipeline.
+     *
+     * <p>Exists for addon glyphs that only work inside their own caster's context. The shipped
+     * file lists Ars Zero's multi-phase glyphs (temporal context, sustain, anchor, select,
+     * discard): outside a Spell Staff they have no phase context to act on, so a scroll carrying
+     * them would cast a spell the player never built. Entries are {@code required: false}, so
+     * the tag loads cleanly when the addon is absent; packs extend or {@code replace} it.
+     */
+    public static final TagKey<Item> CROSS_CAST_BLACKLIST =
+        ItemTags.create(ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "cross_cast_blacklist"));
 
     /** Blocks that count as Source Jars for the regen synergy scan. */
     public static final TagKey<Block> SOURCE_JARS =

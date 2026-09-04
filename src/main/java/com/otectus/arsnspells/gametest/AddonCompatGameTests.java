@@ -3,15 +3,23 @@ package com.otectus.arsnspells.gametest;
 import com.hollingsworth.arsnouveau.api.registry.GlyphRegistry;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
+import com.hollingsworth.arsnouveau.common.items.Glyph;
+import com.otectus.arsnspells.compat.CompatIds;
+import com.otectus.arsnspells.compat.ModPresence;
+import com.otectus.arsnspells.registry.ModTags;
 import com.otectus.arsnspells.util.ArsSpellIntegrity;
 import com.otectus.arsnspells.util.SchoolResolver;
 import com.otectus.arsnspells.util.SpellSchoolId;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.neoforged.fml.ModList;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -22,16 +30,30 @@ import java.util.List;
  * Addon compatibility, exercised against real addon glyphs rather than synthetic ones.
  *
  * <p>Every test here self-skips when its addon is absent, so the default GameTest run is
- * unaffected. Enable with the opt-in profile:
+ * unaffected. Enable with the opt-in profiles:
  *
  * <pre>
  *   ./gradlew runGameTestServer -PwithArsElemental
+ *   ./gradlew runGameTestServer -PwithArsZero       # Ars Zero requires Ars Elemental; both load
  * </pre>
  *
  * <p>The point is to falsify the "total addon compatibility" claim or earn it. A glyph from an
  * addon has to survive the full data path - serialize, integrity-check, deserialize - and its
  * school has to come from the addon's declared metadata rather than from a lucky substring
- * match on its registry path.
+ * match on its registry path. The three generic checks run once per addon.
+ *
+ * <p>Ars Zero adds checks of its own, because it is the first addon with a caster of its own.
+ * ANS's shared-pool mana accounting lives in two mixins on {@link SpellResolver}
+ * ({@code canCast} and {@code expendMana}); Ars Zero's Spell Staff resolves through its own
+ * {@code SpellResolver} subclasses, which inherit those injections only for as long as they do
+ * not override the two methods. That is a fact about the addon's bytecode, so it is asserted
+ * reflectively here rather than assumed. Its beam and voxel entities drain mana through
+ * {@code IManaCap.removeMana}, which {@code MixinManaCapability} intercepts - no test needed.
+ * Its multi-phase control glyphs only work inside the staff's phase context, so they are tagged
+ * {@code #ars_n_spells:cross_cast_blacklist} and the tag is asserted to bite.
+ *
+ * <p>Addon classes are only ever named as strings: an import of an {@code ars_zero} type would
+ * make this whole class fail verification on the addon-less default run.
  *
  * <p>The 1.20.1 line also carried a Too Many Glyphs profile. That mod has no 1.21.1 release, so
  * per the standing rule on mods without a 1.21.1 build there is no counterpart here.
@@ -40,12 +62,16 @@ import java.util.List;
 @PrefixGameTestTemplate(false)
 public final class AddonCompatGameTests {
 
-    private static final String ARS_ELEMENTAL = "ars_elemental";
+    /** Ars Zero's {@code SpellResolver} subclasses, as of 2.0.2. Class names, never imports. */
+    private static final String[] ARS_ZERO_RESOLVERS = {
+        "com.github.ars_zero.common.spell.WrappedSpellResolver",
+        "com.github.ars_zero.api.spell.MobSpellResolver",
+    };
 
     private AddonCompatGameTests() {}
 
     private static boolean loaded(String modid) {
-        return ModList.get().isLoaded(modid);
+        return ModPresence.isLoaded(modid);
     }
 
     /** Every registered glyph belonging to {@code modid}. */
@@ -66,15 +92,16 @@ public final class AddonCompatGameTests {
         return encoded instanceof CompoundTag tag ? tag : new CompoundTag();
     }
 
-    @GameTest(template = "platform")
-    public static void arsElemental_glyphsRoundTrip(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
+    // ---- Generic per-addon checks ----
+
+    private static void glyphsRoundTrip(GameTestHelper helper, String modid) {
+        if (!loaded(modid)) {
             helper.succeed();
             return;
         }
-        List<AbstractSpellPart> glyphs = glyphsOf(ARS_ELEMENTAL);
+        List<AbstractSpellPart> glyphs = glyphsOf(modid);
         if (glyphs.isEmpty()) {
-            helper.fail(ARS_ELEMENTAL + " is loaded but registers no glyphs; the profile is "
+            helper.fail(modid + " is loaded but registers no glyphs; the profile is "
                 + "misconfigured and this suite is proving nothing");
             return;
         }
@@ -109,13 +136,12 @@ public final class AddonCompatGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "platform")
-    public static void arsElemental_schoolsResolveFromDeclaredMetadata(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
+    private static void schoolsResolveFromDeclaredMetadata(GameTestHelper helper, String modid) {
+        if (!loaded(modid)) {
             helper.succeed();
             return;
         }
-        List<AbstractSpellPart> glyphs = glyphsOf(ARS_ELEMENTAL);
+        List<AbstractSpellPart> glyphs = glyphsOf(modid);
         int declared = 0;
         int resolved = 0;
 
@@ -134,19 +160,19 @@ public final class AddonCompatGameTests {
                 }
             });
             SpellSchoolId viaMetadata =
-                SchoolResolver.resolve(ARS_ELEMENTAL + ":zzz_unmatchable_path", schoolIds);
+                SchoolResolver.resolve(modid + ":zzz_unmatchable_path", schoolIds);
             if (!viaMetadata.isGeneric()) {
                 resolved++;
             }
         }
 
         if (declared == 0) {
-            helper.fail(ARS_ELEMENTAL + " declares no spell schools on any glyph - either the "
+            helper.fail(modid + " declares no spell schools on any glyph - either the "
                 + "addon changed, or the profile loaded the wrong artifact");
             return;
         }
         if (resolved == 0) {
-            helper.fail(ARS_ELEMENTAL + " declares schools on " + declared + " glyph(s) but none "
+            helper.fail(modid + " declares schools on " + declared + " glyph(s) but none "
                 + "translate to an ANS school. The Ars-school translation table has drifted from "
                 + "the addon's vocabulary.");
             return;
@@ -154,13 +180,12 @@ public final class AddonCompatGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "platform")
-    public static void arsElemental_everyGlyphResolvesWithoutThrowing(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
+    private static void everyGlyphResolvesWithoutThrowing(GameTestHelper helper, String modid) {
+        if (!loaded(modid)) {
             helper.succeed();
             return;
         }
-        for (AbstractSpellPart glyph : glyphsOf(ARS_ELEMENTAL)) {
+        for (AbstractSpellPart glyph : glyphsOf(modid)) {
             try {
                 SpellSchoolId school = SchoolResolver.resolve(glyph);
                 if (school == null) {
@@ -172,6 +197,159 @@ public final class AddonCompatGameTests {
                 helper.fail("resolving a school for " + glyph.getRegistryName() + " threw: " + t);
                 return;
             }
+        }
+        helper.succeed();
+    }
+
+    // ---- Ars Elemental ----
+
+    @GameTest(template = "platform")
+    public static void arsElemental_glyphsRoundTrip(GameTestHelper helper) {
+        glyphsRoundTrip(helper, CompatIds.ARS_ELEMENTAL);
+    }
+
+    @GameTest(template = "platform")
+    public static void arsElemental_schoolsResolveFromDeclaredMetadata(GameTestHelper helper) {
+        schoolsResolveFromDeclaredMetadata(helper, CompatIds.ARS_ELEMENTAL);
+    }
+
+    @GameTest(template = "platform")
+    public static void arsElemental_everyGlyphResolvesWithoutThrowing(GameTestHelper helper) {
+        everyGlyphResolvesWithoutThrowing(helper, CompatIds.ARS_ELEMENTAL);
+    }
+
+    // ---- Ars Zero ----
+
+    @GameTest(template = "platform")
+    public static void arsZero_glyphsRoundTrip(GameTestHelper helper) {
+        glyphsRoundTrip(helper, CompatIds.ARS_ZERO);
+    }
+
+    @GameTest(template = "platform")
+    public static void arsZero_schoolsResolveFromDeclaredMetadata(GameTestHelper helper) {
+        schoolsResolveFromDeclaredMetadata(helper, CompatIds.ARS_ZERO);
+    }
+
+    @GameTest(template = "platform")
+    public static void arsZero_everyGlyphResolvesWithoutThrowing(GameTestHelper helper) {
+        everyGlyphResolvesWithoutThrowing(helper, CompatIds.ARS_ZERO);
+    }
+
+    /** Ars Zero 2.0.2 requires Ars Elemental; a Zero-only classpath is a broken profile. */
+    @GameTest(template = "platform")
+    public static void arsZero_profileIsComplete(GameTestHelper helper) {
+        if (!loaded(CompatIds.ARS_ZERO)) {
+            helper.succeed();
+            return;
+        }
+        if (!loaded(CompatIds.ARS_ELEMENTAL)) {
+            helper.fail("ars_zero is loaded without ars_elemental, which it declares as a "
+                + "required dependency. The -PwithArsZero profile must also pull Ars Elemental.");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The two mana mixins inject into {@code SpellResolver.canCast} and
+     * {@code SpellResolver.expendMana}. A subclass that overrides either one silently takes
+     * every staff cast out of the shared pool, so an override here is a failure, not a warning.
+     */
+    @GameTest(template = "platform")
+    public static void arsZero_resolversInheritManaHooks(GameTestHelper helper) {
+        if (!loaded(CompatIds.ARS_ZERO)) {
+            helper.succeed();
+            return;
+        }
+        for (String name : ARS_ZERO_RESOLVERS) {
+            Class<?> resolver;
+            try {
+                resolver = Class.forName(name);
+            } catch (ClassNotFoundException e) {
+                helper.fail("Ars Zero no longer ships " + name + "; the addon changed shape and "
+                    + "its mana path has to be re-verified against MixinSpellResolverPreCast and "
+                    + "MixinSpellResolverMana");
+                return;
+            }
+            if (!SpellResolver.class.isAssignableFrom(resolver)) {
+                helper.fail(name + " no longer extends SpellResolver, so ANS's mana mixins do not "
+                    + "apply to Spell Staff casts at all");
+                return;
+            }
+            if (declares(resolver, "canCast", LivingEntity.class)) {
+                helper.fail(name + " overrides canCast(LivingEntity): MixinSpellResolverPreCast is "
+                    + "bypassed for Spell Staff casts, so shared-pool mana is never validated");
+                return;
+            }
+            if (declares(resolver, "expendMana")) {
+                helper.fail(name + " overrides expendMana(): MixinSpellResolverMana is bypassed for "
+                    + "Spell Staff casts, so shared-pool mana is never deducted");
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
+    private static boolean declares(Class<?> type, String method, Class<?>... params) {
+        try {
+            type.getDeclaredMethod(method, params);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Every glyph item in {@code #ars_n_spells:cross_cast_blacklist} must be reported by both
+     * integrity overloads. Also proves the shipped tag still names real Ars Zero glyphs: an
+     * empty tag while Zero is loaded means the ids drifted and the blacklist is silently dead.
+     */
+    @GameTest(template = "platform")
+    public static void arsZero_blacklistedGlyphsAreRejected(GameTestHelper helper) {
+        if (!loaded(CompatIds.ARS_ZERO)) {
+            helper.succeed();
+            return;
+        }
+        List<AbstractSpellPart> tagged = new ArrayList<>();
+        BuiltInRegistries.ITEM.getTag(ModTags.CROSS_CAST_BLACKLIST).ifPresent(named -> {
+            for (Holder<Item> holder : named) {
+                if (holder.value() instanceof Glyph glyph && glyph.spellPart != null
+                    && CompatIds.ARS_ZERO.equals(glyph.spellPart.getRegistryName().getNamespace())) {
+                    tagged.add(glyph.spellPart);
+                }
+            }
+        });
+        if (tagged.isEmpty()) {
+            helper.fail("#ars_n_spells:cross_cast_blacklist resolves to no Ars Zero glyph item "
+                + "while ars_zero is loaded - the shipped ids no longer match the addon");
+            return;
+        }
+        for (AbstractSpellPart part : tagged) {
+            if (!ArsSpellIntegrity.isBlacklisted(part)) {
+                helper.fail(part.getRegistryName() + " is in the tag but isBlacklisted() says no");
+                return;
+            }
+            if (ArsSpellIntegrity.blacklistedGlyphIds(serialize(part)).isEmpty()) {
+                helper.fail(part.getRegistryName() + " is tagged but its serialized payload passes "
+                    + "blacklistedGlyphIds(CompoundTag) - a scroll carrying it would cast");
+                return;
+            }
+            Spell live = new Spell().setRecipe(List.of(part));
+            if (ArsSpellIntegrity.blacklistedGlyphIds(live).isEmpty()) {
+                helper.fail(part.getRegistryName() + " is tagged but passes "
+                    + "blacklistedGlyphIds(Spell) - the Spell Loom would export it");
+                return;
+            }
+        }
+        // And the control case: a stock Ars glyph must not be caught.
+        AbstractSpellPart stock = GlyphRegistry.getSpellpartMap().values().stream()
+            .filter(p -> p != null && p.getRegistryName() != null
+                && CompatIds.ARS_NOUVEAU.equals(p.getRegistryName().getNamespace())
+                && !ArsSpellIntegrity.isBlacklisted(p))
+            .findFirst().orElse(null);
+        if (stock == null) {
+            helper.fail("every Ars Nouveau glyph is blacklisted - the tag file is wrong");
+            return;
         }
         helper.succeed();
     }

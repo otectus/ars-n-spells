@@ -91,6 +91,28 @@ class ArsSpellIntegrityTest {
     }
 
     @Test
+    void blacklistedGlyphIds_isEmptyWithNothingToCheck() {
+        assertTrue(ArsSpellIntegrity.blacklistedGlyphIds((CompoundTag) null).isEmpty());
+        assertTrue(ArsSpellIntegrity.blacklistedGlyphIds(new CompoundTag()).isEmpty());
+        assertTrue(ArsSpellIntegrity.blacklistedGlyphIds((com.hollingsworth.arsnouveau.api.spell.Spell) null)
+            .isEmpty());
+    }
+
+    @Test
+    void blacklistedGlyphIds_skipsUnknownAndMalformedIdsRatherThanThrowing() {
+        // Missing ids are missingGlyphIds' job; this check must neither report nor throw on them.
+        assertTrue(ArsSpellIntegrity.blacklistedGlyphIds(
+            payloadWithRecipe("NOT A VALID ID", "ars_n_spells:definitely_not_a_glyph")).isEmpty());
+    }
+
+    @Test
+    void blacklistedGlyphIds_leavesUntaggedStockGlyphsAlone() {
+        // No datapack is loaded under the unit-test harness, so no item carries the tag: a stock
+        // Ars glyph must come back clean rather than tripping on an unbound tag lookup.
+        assertTrue(ArsSpellIntegrity.blacklistedGlyphIds(payloadWithRecipe("ars_nouveau:glyph_break")).isEmpty());
+    }
+
+    @Test
     void missingGlyphIds_isEmptyForAPayloadWithNoRecipe() {
         assertTrue(ArsSpellIntegrity.missingGlyphIds(new CompoundTag()).isEmpty(),
             "a payload with no recipe field has nothing to report");

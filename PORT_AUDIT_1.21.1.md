@@ -122,26 +122,21 @@ first effect — `Projectile → Sensitive → Ignite` was classified by *Sensit
 - **`gradle-wrapper.jar` was never committed** — `.gitignore`'s blanket `*.jar` swallowed it,
   so a fresh clone had no working wrapper. `run-server/`/`run-data/` were also unignored.
 
-## 4. The one parity gap: Covenant of the Seven
+## 4. Covenant of the Seven — removed in 3.2.1
 
 Covenant has **no 1.21.1 release** — CurseForge lists 1.20.1/Forge only, newest file March
 2026, no public source repository. The subsystem it powers (Cursed Ring LP, Virtue Ring aura,
 13 Blasphemy curios, the aura HUD rewiring, Blood Magic and Nature's Aura reflection bridges)
 therefore cannot be compiled or tested.
 
-The previous porting attempt deleted it (`72ee2a0`). This port instead preserves the 1.20.1
-sources under `src/covenant-disabled/` — not a source set, so nothing is compiled or shipped —
-with a README describing what porting each file would take. The ~24 config keys stay declared
-and generated, marked `INERT`, so an existing server TOML round-trips unchanged, and the three
-places the subsystem hooks in are marked in place with what belongs there and why the ordering
-matters.
+The 3.2.1 parity pass completely removed this subsystem: the `src/covenant-disabled/` directory
+was deleted, all ~24 config keys were removed (not just marked inert), and all hooks were removed.
+This matches the trajectory of mods with no 1.21.1 release and keeps the config surface honest.
+**Update (2026-09-04):** this obsoleted the preservation design documented here.
 
-**Consequences while blocked:** `scroll_cost_mode=lp_only` behaves as `free`; ring and
-blasphemy keys have no effect; `/ans aura` reports nothing useful;
-`hide_mana_bar_with_ring` never triggers.
-
-**Also blocked:** Too Many Glyphs has no 1.21.1 build, so the `-PwithTooManyGlyphs` GameTest
-profile has no counterpart. Ars Elemental's profile is ported (`-PwithArsElemental`).
+**Also removed:** Too Many Glyphs has no 1.21.1 build, so the `-PwithTooManyGlyphs` GameTest
+profile has no counterpart. Ars Elemental and Ars Zero profiles are ported (`-PwithArsElemental`,
+`-PwithArsZero`).
 
 ## 5. Residual risk — what a human still needs to check
 
