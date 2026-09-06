@@ -8,6 +8,8 @@ import com.otectus.arsnspells.bridge.SharedPoolCeiling;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
+import com.otectus.arsnspells.modifier.AnsModifierIdMapper;
+import com.otectus.arsnspells.modifier.NativeAttributeSnapshot;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
@@ -100,33 +102,33 @@ public final class EquipmentIntegration {
      * the 1.20.1 line read a per-item gear scan here instead.
      */
     public static double ironsGearMaxManaBonus(Player player) {
-        return foreignModifierTotal(player, AttributeRegistry.MAX_MANA, ARS_TO_IRON_MAX_MANA_ID);
+        return foreignModifierTotal(player, AttributeRegistry.MAX_MANA);
     }
 
     /** The gear-derived Iron's MANA_REGEN bonus. See {@link #ironsGearMaxManaBonus}. */
     public static double ironsGearRegenBonus(Player player) {
-        return foreignModifierTotal(player, AttributeRegistry.MANA_REGEN, ARS_TO_IRON_REGEN_ID);
+        return foreignModifierTotal(player, AttributeRegistry.MANA_REGEN);
     }
 
     /**
-     * {@code getValue() - getBaseValue()}, less the amount contributed by {@code ownId}.
+     * Everything other than ANS contributes above the base value, measured through an isolated
+     * native snapshot (audit V13).
      *
-     * <p>Exact under the ADD_VALUE model every modifier in this class uses; a third-party
-     * multiply modifier would skew it, which is the same approximation
-     * {@link #syncIronsMaxToArs} already reasons in. Never negative.
+     * <p>This used to be {@code getValue() - getBaseValue() - ownModifier.amount()}: a raw
+     * {@code ADD_VALUE} amount subtracted out of a total that every {@code ADD_MULTIPLIED_*}
+     * modifier had already scaled. A third-party multiplier on Iron's {@code max_mana}
+     * therefore left part of ANS's own contribution in the result, ARS_PRIMARY folded that
+     * residue back into Ars's max, {@link #syncIronsMaxToArs} wrote the larger ceiling back
+     * onto the same attribute, and the pool grew on every recompute.
+     * {@link NativeAttributeSnapshot} takes the ANS modifiers off and lets the attribute
+     * recompute instead, so no amount is ever subtracted from a multiplied result.
      */
-    private static double foreignModifierTotal(Player player, Holder<Attribute> attribute,
-                                               ResourceLocation ownId) {
+    private static double foreignModifierTotal(Player player, Holder<Attribute> attribute) {
         if (player == null || !IronsCompat.isLoaded()) {
             return 0.0;
         }
-        AttributeInstance instance = player.getAttribute(attribute);
-        if (instance == null) {
-            return 0.0;
-        }
-        AttributeModifier own = instance.getModifier(ownId);
-        double ownAmount = own == null ? 0.0 : own.amount();
-        return Math.max(0.0, instance.getValue() - instance.getBaseValue() - ownAmount);
+        return NativeAttributeSnapshot.foreignAdditiveDelta(
+            player.getAttribute(attribute), AnsModifierIdMapper.INSTANCE.allIds());
     }
 
     /** Remove any Ars-derived modifiers from Iron's attributes. */
@@ -217,13 +219,14 @@ public final class EquipmentIntegration {
             return;
         }
 
-        // Drop our own modifier first so getValue() reports Iron's own max, whatever
-        // operations other mods' modifiers use. Nothing writes mana in between, so the
+        // Read Iron's own max through the isolated native snapshot: every ANS modifier off,
+        // recompute, read, put back (audit V13). Nothing writes mana in between, so the
         // momentarily lower ceiling cannot clamp anything.
+        double ironsOwnMax = NativeAttributeSnapshot.nativeValue(
+            instance, AnsModifierIdMapper.INSTANCE.allIds());
         if (existing != null) {
             instance.removeModifier(ARS_TO_IRON_MAX_MANA_ID);
         }
-        double ironsOwnMax = instance.getValue();
         double needed = SharedPoolCeiling.modifierAmount(ironsOwnMax, arsMax);
         if (needed != 0.0) {
             instance.addTransientModifier(new AttributeModifier(

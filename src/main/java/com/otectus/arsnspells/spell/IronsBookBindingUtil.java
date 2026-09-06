@@ -229,32 +229,40 @@ public final class IronsBookBindingUtil {
     }
 
     /**
-     * Remove every ANS-owned artifact from {@code stack}: native wheel proxy slots first, then
-     * the sidecar entries, then ANS's own export marker.
+     * The public, user-facing full removal: every ANS-owned artifact leaves {@code stack} -
+     * native wheel proxy slots first, then the sidecar entries and the selection index they
+     * carry, then ANS's export marker and schema stamp (audit V20).
      *
-     * <p><b>Order matters.</b> The pool ids live in the sidecar, so clearing the sidecar first
-     * loses the only record of which native slots belong to ANS - leaving selectable wheel
-     * entries that cast nothing. That is exactly the bug this exists to prevent, and it is what
-     * a bare {@code CrossModSpellComponents.clear(stack)} does.
+     * <p><b>This is the one to call.</b> Its counterpart
+     * {@link CrossModSpellComponents#clearPayloadOnly} drops the sidecar component and nothing
+     * else, which is correct for an internal rewrite and wrong for anything a player triggers:
+     * the pool ids live in the sidecar, so clearing it first loses the only record of which
+     * native slots belong to ANS, leaving selectable wheel entries that cast nothing.
+     *
+     * <p><b>Atomic.</b> The native slots are reconciled in one
+     * {@code IronsProxySlotWriter.removeProxySlots} write before any ANS component is touched,
+     * so a failure there leaves the item entirely unchanged rather than half stripped. What is
+     * not ours is left alone: the player's own native spells keep their indices and levels, and
+     * unrelated components are not read at all.
+     *
+     * <p>Runs on an item with no sidecar too - a stack can carry the export marker or the
+     * schema stamp on its own, and "remove all ANS state" has to mean all of it.
      *
      * @return how many native proxy slots were removed
      */
     public static int removeAllArsEntries(ItemStack stack) {
-        if (stack == null || stack.isEmpty() || !CrossModSpellComponents.has(stack)) {
+        if (stack == null || stack.isEmpty()) {
             return 0;
         }
         int removed = 0;
-        if (IronsCompat.isLoaded()) {
-            // Read the pool ids BEFORE clearing - see the ordering note above.
-            for (int poolId : CrossModSpellComponents.usedProxyPoolIds(
-                    CrossModSpellComponents.get(stack))) {
-                if (com.otectus.arsnspells.spell.irons.IronsProxySlotWriter
-                        .removeProxySlot(stack, poolId)) {
-                    removed++;
-                }
-            }
+        if (IronsCompat.isLoaded() && CrossModSpellComponents.has(stack)) {
+            // Read the pool ids BEFORE clearing - see the ordering note above. Gated + FQN so
+            // the Iron's-importing writer only classloads with Iron's present.
+            removed = com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.removeProxySlots(
+                stack, CrossModSpellComponents.usedProxyPoolIds(
+                    CrossModSpellComponents.get(stack)));
         }
-        CrossModSpellComponents.clear(stack);
+        CrossModSpellComponents.clearPayloadOnly(stack);
         // The cosmetic export marker is ANS-owned too; leaving it behind means the result is
         // not byte-identical to a never-inscribed item and it survives a re-transcribe.
         stack.remove(ModDataComponents.EXPORT_MODE.get());

@@ -89,6 +89,31 @@ public final class IronsScrollFactory {
     }
 
     /**
+     * True when Iron's own container on {@code stack} reports itself empty.
+     *
+     * <p>This is the native-emptiness answer {@code contract.InscriptionView} demands, taken
+     * from {@code ISpellContainer.isEmpty()} - descriptor
+     * {@code io/redspace/ironsspellbooks/api/spells/ISpellContainer.isEmpty()Z} in the pinned
+     * {@code irons_spellbooks-1.21.1-3.16.3.jar} (sha256
+     * {@code 70cc7e37c48d45260eb101a4c536cd391b8e258ca95199bde4f06707b2d5623b}). "ANS wrote
+     * nothing here" is not the same question and is not an acceptable substitute for it.
+     *
+     * <p>An unreadable container counts as <em>not</em> empty: it holds something ANS cannot
+     * account for, and overwriting it is the failure mode this whole path exists to avoid.
+     */
+    public static boolean isNativeContainerEmpty(ItemStack stack) {
+        if (!hasNativeContainer(stack)) {
+            return true;
+        }
+        try {
+            ISpellContainer container = ISpellContainer.get(stack);
+            return container == null || container.isEmpty();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
      * True when {@code stack} is an Iron's spell book, by Iron's own published interface.
      *
      * <p>Replaces a registry-path substring test ({@code path.contains("spell_book")}), which

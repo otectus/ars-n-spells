@@ -3,6 +3,9 @@ package com.otectus.arsnspells.casting;
 import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.contract.CarrierPolicy;
+import com.otectus.arsnspells.contract.CostRules;
+import com.otectus.arsnspells.contract.ResourceUnit;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import org.slf4j.Logger;
@@ -90,36 +93,45 @@ public class CastingAuthority {
     /**
      * The amount an Ars spell of {@code baseCost} actually costs under the current config.
      *
-     * <p>Single source of truth for the Ars-side conversion, shared by pre-cast validation and
-     * by the expend-mana mixin. They used to compute it separately - {@code (float)(cost*rate)}
-     * in validation versus {@code (int) Math.round(cost*rate)} when charging - so the amount
-     * charged could differ from the amount checked by up to half a point, and at the config's
-     * 0.01 rate floor the rounding made every spell under 50 mana free.
+     * <p>Single source of truth for the Ars-side price, shared by pre-cast validation and by the
+     * expend-mana mixin. They used to compute it separately - {@code (float)(cost*rate)} in
+     * validation versus {@code (int) Math.round(cost*rate)} when charging - so the amount charged
+     * could differ from the amount checked by up to half a point, and at the config's 0.01 rate
+     * floor the rounding made every spell under 50 mana free. Both now read one
+     * {@link com.otectus.arsnspells.contract.CostQuote} from one {@link CostRules} snapshot.
      */
     public static float effectiveArsCost(int baseCost) {
+        return effectiveArsCost(baseCost, AnsQuotes.rules());
+    }
+
+    /** As {@link #effectiveArsCost(int)}, against a snapshot the caller took once for the attempt. */
+    public static float effectiveArsCost(int baseCost, CostRules rules) {
         if (baseCost <= 0) {
             return 0.0f;
         }
-        if (!BridgeManager.isUnificationEnabled()) {
-            return baseCost;
-        }
-        return (float) (baseCost * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+        return AnsQuotes.legAsFloat(
+            AnsQuotes.quote(baseCost, ResourceUnit.ARS_MANA, CarrierPolicy.NATIVE_ONLY, rules),
+            ResourceUnit.ARS_MANA);
     }
 
     /**
-     * The mode-adjusted cost of an Iron's spell, in the units of whichever pool the
-     * active mode spends from. Mirrors the conversion inside
-     * {@link #validateManaResource} exactly, so the amount consumed always equals the
-     * amount validated.
+     * The mode-adjusted cost of an Iron's spell, in the units of whichever pool the active mode
+     * spends from. Same quote the charging path reads, so the amount consumed always equals the
+     * amount validated - the V05 defect was that in SEPARATE the check converted and the charge
+     * did not, so at a rate of 10 a spell was validated at ten times its billed price.
      */
     public static float effectiveIronsCost(int baseCost) {
+        return effectiveIronsCost(baseCost, AnsQuotes.rules());
+    }
+
+    /** As {@link #effectiveIronsCost(int)}, against a snapshot the caller took once. */
+    public static float effectiveIronsCost(int baseCost, CostRules rules) {
         if (baseCost <= 0) {
             return 0.0f;
         }
-        if (!BridgeManager.isUnificationEnabled()) {
-            return baseCost;
-        }
-        return (float) (baseCost * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
+        return AnsQuotes.legAsFloat(
+            AnsQuotes.quote(baseCost, ResourceUnit.IRONS_MANA, CarrierPolicy.NATIVE_ONLY, rules),
+            ResourceUnit.IRONS_MANA);
     }
 
     /**
@@ -135,7 +147,10 @@ public class CastingAuthority {
         if (player.isCreative() || manaCost <= 0) {
             return true;
         }
-        return BridgeManager.consumeManaForMode(player, effectiveIronsCost(manaCost), false);
+        // One snapshot for this charge, taken with the player so the Iron's-to-Ars rate is the
+        // same pool-aware value canCastIronsSpell validated against.
+        return BridgeManager.consumeManaForMode(
+            player, effectiveIronsCost(manaCost, AnsQuotes.rules(player)), ResourceUnit.IRONS_MANA);
     }
 
     /**
@@ -147,31 +162,20 @@ public class CastingAuthority {
      * @return true if the player can afford the (possibly converted) cost
      */
     private static boolean validateManaResource(Player player, int cost, boolean fromArs) {
-        float availableMana;
-        float effectiveCost = cost;
-
-        if (!BridgeManager.isUnificationEnabled()) {
-            // No unification: each system uses its own native pool.
-            if (fromArs) {
-                availableMana = BridgeManager.getBridge().getMana(player);
-            } else {
-                availableMana = BridgeManager.isIronsSpellbooksLoaded()
-                    ? BridgeManager.getManaForMode(player, false) : 0;
-            }
-        } else {
-            // Unified: convert through the same helper the charging path uses, so validate and
-            // charge can never drift apart again. Computing the rate inline here (and rounding
-            // differently over in the mixin) is exactly what made sub-50-mana spells free at
-            // the 0.01 rate floor.
-            effectiveCost = fromArs ? effectiveArsCost(cost) : effectiveIronsCost(cost);
-            availableMana = BridgeManager.getManaForMode(player, fromArs);
-        }
+        ResourceUnit origin = fromArs ? ResourceUnit.ARS_MANA : ResourceUnit.IRONS_MANA;
+        // One snapshot for this attempt: the check below and the charge that follows must be
+        // priced by the same config values, not by two reads a tick apart.
+        CostRules rules = AnsQuotes.rules(player);
+        float effectiveCost = fromArs
+            ? effectiveArsCost(cost, rules)
+            : effectiveIronsCost(cost, rules);
+        float availableMana = BridgeManager.getManaForMode(player, origin);
 
         boolean canAfford = availableMana >= effectiveCost;
 
         if (!canAfford) {
-            logDebug("Mana validation failed for {}: cost={}, available={}, fromArs={}",
-                player.getName().getString(), effectiveCost, availableMana, fromArs);
+            logDebug("Mana validation failed for {}: cost={}, available={}, origin={}",
+                player.getName().getString(), effectiveCost, availableMana, origin);
             sendDenialMessage(player,
                 "§cNot Enough Mana: Need " + (int) effectiveCost + ", have " + (int) availableMana);
         }

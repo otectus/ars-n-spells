@@ -2,6 +2,57 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.3.0] - 2026-09-05
+
+Parity with the Forge 1.20.1 **3.3.0** line, with NeoForge-specific enhancements.
+
+### Casting and payment correctness
+
+- **Cost quotes are now repeatable.** A first cost query used to return one price and a second query a different one; cross-cast could debit mana during cost calculation itself. A cast now takes one immutable quote and pays it once at the native payment boundary. Ten cost reads change no balances.
+- **Cross-cast failures now report failure.** The Ars cross-cast path reported success even when the underlying cast had failed; it now uses the real cast result.
+- **On NeoForge, Iron's cross-casting no longer defaults to scroll semantics.** Scroll semantics consume no mana and bypass cooldowns, so cross-cast was effectively free and cooldown-exempt. The charging policy is now derived from the carrier itself — a reusable book bills like a book, a consumable scroll like a scroll.
+- **Checks and charges now agree on units and rounding.** A single conversion policy prices both. Existing worlds keep their current pricing by default (`conversion_policy = flat_legacy`); equal-percentage conversion is a separate opt-in.
+- **Disabling mana unification now restores native pool routing properly.** The Iron's adapter is no longer dropped when unification is disabled.
+- **Mana granted by other mods is no longer silently swallowed.** Regeneration suppression is now scoped to the regeneration tick itself instead of blanketing every mana mutation.
+
+### Progression, gear and combat
+
+- **NeoForge progression attribute modifier fix:** NeoForge used two different modifier identities for one bonus; there is now one canonical modifier, and both historical identities are cleaned up. Cast counts are preserved.
+- **Disabling a feature now removes its bonuses.** Cleanup is unconditional and no longer gated on the feature being enabled, so a mode or config change removes old modifiers first, then recomputes, then clamps mana under a documented rule, then syncs.
+- **Fixed a ratchet where a third-party attribute multiplier could make the shared mana ceiling climb on every recompute.** Values are now measured against an isolated native snapshot rather than by subtracting a raw amount from an already-multiplied total.
+
+### Spell Loom and inscription
+
+- **Item loss fixed:** the Loom consumed reusable spell sources. Books and foci are now read and returned, never eaten.
+- **A scroll that already holds a spell is no longer treated as blank.** It is identified as filled, with a stated reason, and converting it is a separate deliberate action with a preview.
+- **Previewing an inscription no longer changes your inventory.**
+- **Transcription now produces one output and returns the remainder,** instead of transforming a whole stack for a single source.
+- **NeoForge:** clearing an inscription now removes all ANS state atomically while preserving your genuine native spells and unrelated item components.
+
+### Tests and infrastructure
+
+- **The NeoForge branch now has CI on every push and pull request**, with GameTest profiles for a dependency-absent world and a loaded-dependency world running as separate jobs in separate world directories.
+- **GameTest success is now three independent checks:** process exit code, expected executed-scenario count, and negative log assertions for failure signatures — because a run can print BUILD SUCCESSFUL while the world failed to decode.
+- **Tests that skip because an optional mod is absent are now counted and reported separately** from tests that actually exercised the integration.
+
+### Optional compatibility
+
+- **Ars Elemental 0.7.10.1** — Ars Elemental glyphs now resolve their schools from their declared Ars metadata, with datapack overrides.
+- **Ars Zero 2.0.2** — Cross-cast glyph blacklist enforcement and control-flow glyph classification as `generic`.
+- **Ars Elemancy 1.18.3** — Armor, bangles, and conditional Spell Damage foci are now integrated with cross-mod combat scaling; foci that apply Ars Spell Damage conditionally now feed into Iron's spell damage through the cross-mod bridge.
+
+### Known limitations (deliberately deferred)
+
+The following are known and scheduled for future work:
+- Curios equipment lifecycle and the full attribute contribution ledger.
+- Configuration keys that currently have no effect.
+- Source Jar cache invalidation and source-synergy rate decoupling.
+- School-analysis corpus, custom school identity and datapack overlay sync.
+- The icon registry and legacy icon-key fallback.
+- Loom automation policy.
+
+No config, packet, or save-format changes.
+
 ## [3.2.5] - 2026-09-04
 
 ### Fixed: cross-mod combat stat scaling never worked and has been completely rewritten

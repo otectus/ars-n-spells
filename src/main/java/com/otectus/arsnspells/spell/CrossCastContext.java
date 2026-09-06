@@ -150,28 +150,32 @@ public final class CrossCastContext {
          * logger substitutes the nil UUID.
          */
         public volatile java.util.UUID attemptId;
-        // ANS-HIGH-004: volatile so writes from the cost-calc event are visible to the TAIL
-        // mixin (which may run on a different thread under exotic mod chains) and to
-        // concurrent peek() readers. A torn read here charges the wrong pool.
+        // ANS-HIGH-004: volatile so writes from the cost-calc event are visible to the payment
+        // boundary (which may run on a different thread under exotic mod chains) and to
+        // concurrent peek() readers. A torn read here charges the wrong pool. These now carry a
+        // quoted price rather than a running total, so a repeated cost query rewrites them with
+        // the same values instead of compounding them.
         public volatile float arsCost;
         public volatile float issCost;
         public volatile boolean costsReady;
         public volatile boolean blocked;
         public volatile String spellId;
         /**
-         * ANS-HIGH-004: one-shot guard. The Ars cost-calc event can fire more than once
-         * during a resolve (preview vs. actual deduction). A plain read-then-write is racy
-         * under overlapping cross-casts, and losing that race applies the cross-cast premium
-         * twice; {@link #tryMarkMultiplierApplied()} uses compareAndSet so exactly one caller
-         * wins the first-application slot.
+         * Opaque identity of the item this cast came from, as
+         * {@link com.otectus.arsnspells.casting.CarrierIdentity} derives it. This is the key the
+         * {@link com.otectus.arsnspells.contract.AttemptLedger} files the attempt under, so the
+         * cost-calc handler can find the quote that belongs to <em>this</em> cast rather than
+         * re-deriving one.
          */
-        private final java.util.concurrent.atomic.AtomicBoolean multiplierApplied =
-            new java.util.concurrent.atomic.AtomicBoolean(false);
+        public volatile String carrierIdentity;
         /**
-         * ANS-CRIT-002 / ANS-HIGH-030: Iron's share pre-paid atomically during
-         * Ars cost-calc in SEPARATE mode. Non-zero means the TAIL consume must
-         * no-op ({@code issCost} is zeroed alongside) and a failed Ars leg must
-         * refund this amount via the secondary bridge.
+         * ANS-CRIT-002 / ANS-HIGH-030: Iron's share pre-paid during Ars cost-calc in SEPARATE
+         * mode.
+         *
+         * <p>Audit V01 retired the prepayment itself - a cost <em>query</em> must not move mana -
+         * so this is written only by the payment boundary, and only with what the ledger actually
+         * reserved. It is kept because the Iron's-side handler and the refund path both need to
+         * know whether this leg has been paid, and because zero is a meaningful answer there.
          */
         public volatile float issPaid;
 
@@ -182,11 +186,6 @@ public final class CrossCastContext {
 
         public boolean isExpired(long gameTime) {
             return gameTime >= expiresAt;
-        }
-
-        /** Atomic check-and-mark. Returns true iff this is the first caller. */
-        public boolean tryMarkMultiplierApplied() {
-            return multiplierApplied.compareAndSet(false, true);
         }
     }
 

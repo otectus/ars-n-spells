@@ -7,7 +7,15 @@ import com.hollingsworth.arsnouveau.api.spell.SpellContext;
 import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.casting.AnsQuotes;
+import com.otectus.arsnspells.casting.AttemptLedgerService;
+import com.otectus.arsnspells.casting.CarrierIdentity;
 import com.otectus.arsnspells.compat.IronsCompat;
+import com.otectus.arsnspells.contract.CarrierPolicy;
+import com.otectus.arsnspells.contract.CastAttempt;
+import com.otectus.arsnspells.contract.CostQuote;
+import com.otectus.arsnspells.contract.CostRules;
+import com.otectus.arsnspells.contract.ResourceUnit;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.network.CrossCastRequestPayload;
@@ -53,9 +61,9 @@ import java.util.UUID;
  * <p>For Ars casts: deserialises the embedded {@link Spell} via
  * {@link Spell#CODEC} against {@link NbtOps} (the cross-cast NBT shape was
  * preserved through the data-component port). For Iron's casts: looks the
- * spell up by id in {@link SpellRegistry#REGISTRY} and dispatches with
- * {@link CastSource#SCROLL} semantics (instant cast, no charge animation,
- * respects mana checks).
+ * spell up by id in {@link SpellRegistry#REGISTRY} and dispatches with the
+ * {@link CastSource} that matches the carrier's own item kind - never the one
+ * serialized onto the item (audit V02).
  *
  * <p>The {@link SpellCostCalcEvent} hook applies the cross-cast cost
  * multiplier ({@link AnsConfig#CROSS_CAST_COST_MULTIPLIER}) on Ars-side casts
@@ -107,9 +115,21 @@ public class CrossCastingHandler {
         CrossModSpellComponents.addCrossModSpell(stack, spellId, spellLevel, type, arsSpellTag);
     }
 
-    /** Strip every inscription artifact from a stack. */
+    /**
+     * Strip every inscription artifact from a stack (audit V20).
+     *
+     * <p>This is the public, user-facing entry point, so it routes to the full removal -
+     * {@link IronsBookBindingUtil#removeAllArsEntries} - not to
+     * {@link CrossModSpellComponents#clearPayloadOnly}. It used to be the latter, which is
+     * how the name came to promise more than the body delivered: native wheel proxy slots,
+     * the export marker and the schema stamp all survived it.
+     *
+     * <p>{@code IronsBookBindingUtil} declares no Iron's types, so naming it here is safe on
+     * this class - which is an {@code @EventBusSubscriber} and therefore has every declared
+     * method's signature resolved at registration.
+     */
     public static void clearCrossModSpells(ItemStack stack) {
-        CrossModSpellComponents.clear(stack);
+        IronsBookBindingUtil.removeAllArsEntries(stack);
     }
 
     // -------------------------------------------------------------------------
@@ -237,6 +257,20 @@ public class CrossCastingHandler {
      * base cost, before any other listener rewrites {@code event.currentCost}. At default
      * priority a listener that zeroes the cost first turns the documented 1.25x premium into
      * 0x1.25 - which is how the 1.20.1 line lost the premium entirely for ring wearers.
+     *
+     * <p><b>Audit V01: this handler never debits.</b> Ars 5.13.1 builds a <em>fresh</em> cost
+     * event on every query - {@code getResolveCost()} posts {@code SpellCostCalcEvent.Pre} and
+     * {@code getExpendedCost()} posts {@code SpellCostCalcEvent.Post}, and this listener sees
+     * both - so a cost query is asked and answered many times per cast. The old code guarded
+     * with {@code entry.tryMarkMultiplierApplied()}, a once-per-<em>attempt</em> latch, which
+     * suppressed every later event instead of pricing it: the second query returned the
+     * unmultiplied base cost. Worse, the first query also pre-paid the Iron's leg, so merely
+     * <em>asking</em> what a spell cost moved mana.
+     *
+     * <p>The fix is idempotence per <em>event</em>, not per attempt. The attempt's quote is the
+     * answer, and applying an immutable quote to a freshly-constructed event object is
+     * naturally repeatable: ten queries return the same price and move nothing. Payment happens
+     * once, at the verified native boundary in {@code MixinSpellResolverMana}.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onArsSpellCost(SpellCostCalcEvent event) {
@@ -250,83 +284,36 @@ public class CrossCastingHandler {
         if (entry == null || entry.type != CrossSpellType.ARS_NOUVEAU) {
             return;
         }
-        // ANS-HIGH-004: atomic check-and-mark, not read-then-write. This event can fire more
-        // than once per resolve (preview vs. actual deduction), and the non-atomic version
-        // let two overlapping cross-casts both pass the check and both apply the premium.
-        if (!entry.tryMarkMultiplierApplied()) {
-            return;
-        }
 
-        ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        boolean unified = BridgeManager.isUnificationEnabled();
-        float multiplier = (float) Math.max(0.0, AnsConfig.CROSS_CAST_COST_MULTIPLIER.get());
         int baseEventCost = Math.max(0, event.currentCost);
-        // Apply the cross-cast multiplier to the Ars-computed base cost first;
-        // the SEPARATE-mode dual-cost split (below) then operates on the
-        // already-multiplied total, matching the Iron's-side accounting where
-        // the multiplier is applied before the split.
-        int totalCost = Math.max(0, Math.round(baseEventCost * multiplier));
 
-        if (unified && mode == ManaUnificationMode.SEPARATE) {
-            // Same normalised split BridgeManager spends through, so the amount stamped on
-            // the context entry is the amount the tail consume charges.
-            double[] split = AnsConfig.dualCostSplit();
-            float arsCost = (float) (totalCost * split[0]);
-            float issCost = (float) (totalCost * split[1]
-                * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
-
-            entry.arsCost = arsCost;
-            entry.issCost = issCost;
-            entry.costsReady = true;
-
-            if (!player.isCreative() && issCost > 0.0f) {
-                var issBridge = BridgeManager.getSecondaryBridge();
-                float issMana = issBridge != null ? issBridge.getMana(player) : 0.0f;
-                if (issMana < issCost) {
-                    entry.blocked = true;
-                    event.currentCost = Integer.MAX_VALUE;
-                    CrossCastContext.clear(player);
-                    logDebug("Insufficient Iron mana for cross-cast: need {}, have {}", issCost, issMana);
-                    return;
-                }
-                // ANS-CRIT-002: pre-consume Iron's atomically with the Ars cost-calc.
-                // The previous design deferred the Iron's-side consume to the @TAIL of
-                // MixinSpellResolverMana, but the TAIL silently swallowed consume failures,
-                // letting Ars mana drain one-way. Consuming here makes the dual-cost
-                // atomic with the sufficiency check above, and the TAIL is now a no-op
-                // for entries that have already paid (issCost = 0).
-                if (issBridge != null && !issBridge.consumeMana(player, issCost)) {
-                    entry.blocked = true;
-                    event.currentCost = Integer.MAX_VALUE;
-                    CrossCastContext.clear(player);
-                    logDebug("Iron mana consume failed for cross-cast: need {}, have {}", issCost, issMana);
-                    return;
-                }
-                // ANS-HIGH-030: remember what was pre-paid so castArsSpell can
-                // refund it if the Ars leg fails (insufficient Ars mana or a
-                // downstream cancel). issCost must still go to 0 for the TAIL
-                // mixin's already-paid contract (ANS-CRIT-002).
-                entry.issPaid = issCost;
-                entry.issCost = 0.0f;
-            }
-
-            event.currentCost = Math.max(0, Math.round(arsCost));
-            CrossCastTrace.log(entry.attemptId, player, CrossCastTrace.Side.S,
-                CrossCastTrace.Stage.ARS_COST_APPLIED,
-                "mode", "SEPARATE", "unified", true, "base", baseEventCost,
-                "final", event.currentCost, "issSecondary", issCost);
-            logDebug("Ars cross-cast (SEPARATE): base={} multiplier={} total={} ars={} iss={}",
-                baseEventCost, multiplier, totalCost, arsCost, issCost);
-            return;
+        // The open attempt for this carrier already holds a quote. Reuse it, so every query
+        // during one cast answers identically even if the config changed mid-cast.
+        CostQuote quote = AttemptLedgerService.findOpen(player, entry.carrierIdentity)
+            .map(CastAttempt::quote)
+            .orElse(null);
+        CostRules rules = AnsQuotes.rules(player);
+        if (quote == null) {
+            // No open attempt: a native-wheel proxy cast, or a query outside the cross-cast
+            // request path. Quote fresh; still charge nothing.
+            quote = AnsQuotes.quote(baseEventCost, ResourceUnit.ARS_MANA,
+                CarrierPolicy.REUSABLE_BOOK_SEMANTICS, rules);
         }
 
-        // Non-SEPARATE (or unified=false): Ars deducts the full multiplied
-        // cost from its own pool. The multiplier is the only adjustment we make.
-        event.currentCost = totalCost;
+        // Stamp the priced legs onto the staging entry so the Iron's-side handler and the
+        // payment boundary read the same numbers. These are values, not payments.
+        entry.arsCost = AnsQuotes.legAsFloat(quote, ResourceUnit.ARS_MANA);
+        entry.issCost = AnsQuotes.legAsFloat(quote, ResourceUnit.IRONS_MANA);
+        entry.costsReady = true;
+
+        event.currentCost = AnsQuotes.legAsInt(quote, ResourceUnit.ARS_MANA, rules);
+
         CrossCastTrace.log(entry.attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.ARS_COST_APPLIED,
-            "mode", mode, "unified", unified, "base", baseEventCost, "final", totalCost);
-        logDebug("[CrossCasting] Ars cross-cast cost multiplier applied: x{} -> {}", multiplier, event.currentCost);
+            "mode", rules.modeName(), "base", baseEventCost, "final", event.currentCost,
+            "issLeg", entry.issCost, "event", event.getClass().getSimpleName());
+        logDebug("Ars cross-cast quote applied: base={} ars={} iss={} (query only, nothing charged)",
+            baseEventCost, entry.arsCost, entry.issCost);
     }
 
     private static void logDebug(String message, Object... args) {
@@ -335,17 +322,30 @@ public class CrossCastingHandler {
         }
     }
 
-    @SubscribeEvent
+    /**
+     * Defence in depth, not the success signal (audit V03).
+     *
+     * <p>{@code castArsSpell} now reads {@code SpellResolver.onCast}'s own boolean, which is
+     * already false when {@code postEvent()} came back cancelled. This observer exists so a
+     * cancellation that arrives by some other route still settles the attempt promptly rather
+     * than waiting for the TTL sweep. {@code receiveCanceled = true} is required: without it a
+     * listener that cancels never reaches us at all, which is why this used to miss the very
+     * cancellations it was written for.
+     */
+    @SubscribeEvent(receiveCanceled = true)
     public static void onArsSpellCastFailed(SpellCastEvent event) {
-        // Defensive cleanup: if Ars cancels the cast entirely (e.g., validation
-        // failure), drop the staged context — refunding any pre-paid Iron's
-        // share (ANS-HIGH-030) — so we don't leak it into the next cast.
-        if (event.isCanceled() && event.getEntity() instanceof Player player) {
-            CrossCastContext.Entry entry = CrossCastContext.peek(player);
-            if (entry != null && entry.type == CrossSpellType.ARS_NOUVEAU) {
-                refundPrepaidIronsShare(player);
-            }
+        if (!event.isCanceled() || !(event.getEntity() instanceof Player player)) {
+            return;
         }
+        CrossCastContext.Entry entry = CrossCastContext.peek(player);
+        if (entry == null || entry.type != CrossSpellType.ARS_NOUVEAU) {
+            return;
+        }
+        // Release is one-shot in the ledger, so settling here and again in castArsSpell's
+        // finally credits the player exactly once.
+        AttemptLedgerService.findOpen(player, entry.carrierIdentity)
+            .ifPresent(attempt -> AttemptLedgerService.cancel(attempt, player));
+        refundPrepaidIronsShare(player);
     }
 
     @SubscribeEvent
@@ -360,6 +360,9 @@ public class CrossCastingHandler {
             return;
         }
         CrossCastContext.cleanupExpired(player, player.level().getGameTime());
+        // Audit V01 leak guard: a recast or long cast whose finish boundary never fired would
+        // otherwise hold its reservation against the player forever.
+        AttemptLedgerService.sweep(player.getServer(), player.level().getGameTime());
     }
 
     // -------------------------------------------------------------------------
@@ -430,60 +433,111 @@ public class CrossCastingHandler {
             // Mark on server side only — the right-click event fires on both sides.
             return true;
         }
+        // Audit V03: the attempt is opened, quoted and reserved BEFORE the upstream cast, and
+        // settled in a finally. The old code opened a staging context, called onCast, threw the
+        // return value away and reported true unconditionally - so a cast Ars refused, or a
+        // downstream listener cancelled, still counted as a success and still left the pre-paid
+        // Iron's share drained.
+        CastAttempt attempt = null;
+        boolean success = false;
         try {
             CrossCastContext.begin(player, CrossSpellType.ARS_NOUVEAU, player.level().getGameTime());
             CrossCastContext.Entry ctxEntry = CrossCastContext.peek(player);
+            String carrierIdentity = CarrierIdentity.identityOf(stack);
             if (ctxEntry != null) {
                 ctxEntry.spellId = entry.spellId().toString();
                 ctxEntry.attemptId = attemptId;
+                ctxEntry.carrierIdentity = carrierIdentity;
             }
+
             SpellContext context = SpellContext.fromEntity(spell, player, stack);
             SpellResolver resolver = new SpellResolver(context);
+
+            // Quote once, from one config snapshot, before anything is asked or charged. Every
+            // later cost query during this cast answers from this quote (audit V01).
+            CostRules rules = AnsQuotes.rules(player);
+            CostQuote quote = AnsQuotes.quote(resolver.getResolveCost(), ResourceUnit.ARS_MANA,
+                CarrierIdentity.policyOf(stack), rules);
+            attempt = AttemptLedgerService.open(player, carrierIdentity,
+                CarrierIdentity.payloadRevision(stack), quote, player.level().getGameTime());
+
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
                 CrossCastTrace.Stage.RESOURCE_CHECK, "spell", entry.spellId());
-            if (resolver.canCast(player)) {
-                CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                    CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "spell", entry.spellId());
-                resolver.onCast(stack, player.level());
-                CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                    CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "spell", entry.spellId());
-                return true;
+            if (!resolver.canCast(player)) {
+                return false;
             }
-            refundPrepaidIronsShare(player);
-            return false;
+
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "spell", entry.spellId());
+            // Ars 5.13.1.1400: SpellResolver.onCast(ItemStack, Level) returns boolean -
+            // descriptor (Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/level/Level;)Z.
+            // It returns CastResolveType.wasSuccess, and false outright when its own canCast()
+            // fails or when postEvent() comes back cancelled. That is the authoritative success
+            // signal; the SpellCastEvent observer below is defence in depth, not the primary.
+            success = resolver.onCast(stack, player.level());
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "spell", entry.spellId(),
+                "success", success);
+            return success;
         } catch (Throwable t) {
             LOGGER.warn("Ars cross-cast failed for {}: {}", entry.spellId(), t.toString());
-            refundPrepaidIronsShare(player);
+            success = false;
             return false;
+        } finally {
+            // One settlement point for every exit path - normal, denied, thrown. Release is
+            // idempotent, so a cancel observer that already settled this attempt makes the call
+            // below a no-op rather than a second refund.
+            if (success) {
+                AttemptLedgerService.complete(attempt);
+            } else {
+                AttemptLedgerService.fail(attempt, player);
+                refundPrepaidIronsShare(player);
+            }
         }
     }
 
     /**
-     * ANS-HIGH-030: SEPARATE mode pre-pays the Iron's share during cost-calc
-     * ({@code onArsSpellCost}). If the Ars leg then fails, compensate — matching
-     * the BridgeManager rollback contract (ANS-CRIT-003). {@code take()} drains
-     * the entry atomically; blocked paths that already cleared it consumed
-     * nothing, so a missing entry means nothing to refund.
+     * ANS-HIGH-030: drain the staging context and compensate any Iron's leg the payment boundary
+     * actually paid, matching the BridgeManager rollback contract (ANS-CRIT-003).
+     *
+     * <p>Audit V01 retired the cost-calc prepayment, so in the normal case the ledger has already
+     * released the reservation and {@code issPaid} is zero. This remains as the compensating path
+     * for a leg paid outside the ledger - and, like the ledger's own release, it is one-shot,
+     * because {@code take()} drains the entry.
      */
     private static void refundPrepaidIronsShare(Player player) {
         CrossCastContext.Entry entry = CrossCastContext.take(player);
         if (entry != null && entry.issPaid > 0.0f) {
-            var issBridge = BridgeManager.getSecondaryBridge();
+            var issBridge = BridgeManager.getNativeIronsBridge();
             if (issBridge != null) {
                 issBridge.addMana(player, entry.issPaid);
                 logDebug("Refunded pre-paid Iron's share after failed Ars cross-cast: {}", entry.issPaid);
             } else {
                 LOGGER.warn("Cross-cast failed after Iron's mana was consumed but no "
-                    + "secondary bridge is available to refund {} mana", entry.issPaid);
+                    + "Iron's adapter is available to refund {} mana", entry.issPaid);
             }
         }
     }
 
     /**
      * Cast the Iron's entry. Looks up the {@link AbstractSpell} from
-     * {@link SpellRegistry#REGISTRY}, then dispatches
-     * {@link AbstractSpell#attemptInitiateCast} with the embedded
-     * {@link CastSource} (defaults to SCROLL semantics: instant, mana-checked).
+     * {@link SpellRegistry#REGISTRY}, then dispatches {@link AbstractSpell#attemptInitiateCast}.
+     *
+     * <p><b>Audit V02.</b> The {@link CastSource} used to come from the item's own serialized
+     * cross-cast data, defaulting to {@link CastSource#SCROLL}. In the pinned Iron's 3.16.3 that
+     * default is not neutral: {@code CastSource.consumesMana()} and
+     * {@code CastSource.respectsCooldown()} both return {@code false} for {@code SCROLL},
+     * {@code AbstractSpell.castSpell} only subtracts the event cost when the source consumes
+     * mana, and {@code canBeCastedBy} skips the book/sword cooldown check for it and rejects
+     * recast spells outright. A serialized value therefore decided, for free, whether the cast
+     * cost anything at all.
+     *
+     * <p>The source is now derived from the carrier's item kind through {@link CarrierIdentity}
+     * and mapped to a native {@code CastSource} by
+     * {@link com.otectus.arsnspells.spell.irons.IronsCastSourceAdapter}, and the serialized value
+     * is ignored for billing. Costs and attempt identity are established <em>before</em>
+     * {@code attemptInitiateCast}, so the ledger already holds this cast's price by the time
+     * Iron's asks for it.
      */
     private static boolean castIronsSpell(Player player, ItemStack stack, CrossModSpell entry,
                                           java.util.UUID attemptId) {
@@ -506,34 +560,61 @@ public class CrossCastingHandler {
         if (player.level().isClientSide()) {
             return true;
         }
-        int level = Math.max(1, entry.level());
-        CastSource source = parseCastSource(entry.castSource()).orElse(CastSource.SCROLL);
 
+        // Iron's 1.21.1-3.16.3: AbstractSpell.getLevelFor(int, LivingEntity) is the pinned
+        // accessor for a spell's effective level - it folds in the Curios level bonus and posts
+        // ModifySpellLevelEvent. max(1, stored) skipped both, so a cross-cast was priced and
+        // resolved at a different level than the same spell cast natively.
+        int level;
         try {
+            level = Math.max(spell.getMinLevel(), spell.getLevelFor(entry.level(), player));
+        } catch (Throwable notAvailable) {
+            level = Math.max(1, entry.level());
+        }
+
+        CarrierPolicy carrier = CarrierIdentity.policyOf(stack);
+        CastSource source = com.otectus.arsnspells.spell.irons.IronsCastSourceAdapter.forCarrier(carrier);
+
+        CastAttempt attempt = null;
+        boolean success = false;
+        try {
+            // Costs and identity BEFORE attemptInitiateCast: Iron's charges inside that call,
+            // and an attempt opened afterwards has nothing to say about a payment already made.
+            CostRules rules = AnsQuotes.rules(player);
+            CostQuote quote = AnsQuotes.quote(spell.getManaCost(level), ResourceUnit.IRONS_MANA,
+                carrier, rules);
+            String carrierIdentity = CarrierIdentity.identityOf(stack);
+
             CrossCastContext.begin(player, CrossSpellType.IRONS_SPELLBOOKS, player.level().getGameTime());
             CrossCastContext.Entry ctxEntry = CrossCastContext.peek(player);
             if (ctxEntry != null) {
                 ctxEntry.spellId = entry.spellId().toString();
+                ctxEntry.attemptId = attemptId;
+                ctxEntry.carrierIdentity = carrierIdentity;
+                ctxEntry.arsCost = AnsQuotes.legAsFloat(quote, ResourceUnit.ARS_MANA);
+                ctxEntry.issCost = AnsQuotes.legAsFloat(quote, ResourceUnit.IRONS_MANA);
+                ctxEntry.costsReady = true;
             }
+            attempt = AttemptLedgerService.open(player, carrierIdentity,
+                CarrierIdentity.payloadRevision(stack), quote, player.level().getGameTime());
+
             // attemptInitiateCast(ItemStack, int level, Level, Player, CastSource, boolean consumeMana, String slotTag)
-            boolean ok = spell.attemptInitiateCast(stack, level, player.level(), player, source, true, "");
-            if (!ok) {
-                CrossCastContext.clear(player);
-            }
-            return ok;
+            success = spell.attemptInitiateCast(stack, level, player.level(), player, source, true, "");
+            return success;
         } catch (Throwable t) {
             LOGGER.warn("Iron's cross-cast failed for {}: {}", entry.spellId(), t.toString());
-            CrossCastContext.clear(player);
+            success = false;
             return false;
-        }
-    }
-
-    private static Optional<CastSource> parseCastSource(Optional<String> s) {
-        if (s == null || s.isEmpty()) return Optional.empty();
-        try {
-            return Optional.of(CastSource.valueOf(s.get()));
-        } catch (IllegalArgumentException e) {
-            return Optional.empty();
+        } finally {
+            if (success) {
+                // A long or recast Iron's cast stays open past this return; the ledger keeps it
+                // keyed by attempt id until the native finish boundary or the TTL sweep.
+                AttemptLedgerService.commit(attempt);
+                AttemptLedgerService.complete(attempt);
+            } else {
+                AttemptLedgerService.fail(attempt, player);
+                CrossCastContext.clear(player);
+            }
         }
     }
 

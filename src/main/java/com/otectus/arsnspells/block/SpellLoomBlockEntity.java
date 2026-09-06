@@ -1,5 +1,6 @@
 package com.otectus.arsnspells.block;
 
+import com.otectus.arsnspells.contract.InscriptionPlan;
 import com.otectus.arsnspells.menu.SpellLoomMenu;
 import com.otectus.arsnspells.registry.ModBlockEntities;
 import net.minecraft.core.BlockPos;
@@ -12,6 +13,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.ItemStackHandler;
@@ -70,6 +72,44 @@ public class SpellLoomBlockEntity extends BlockEntity implements MenuProvider {
     @Override
     public AbstractContainerMenu createMenu(int id, Inventory inv, Player player) {
         return new SpellLoomMenu(id, inv, this);
+    }
+
+    /**
+     * Carry out an {@link InscriptionPlan} against the working slots: the whole mutation, in
+     * one place, after every decision has already been made (audit V18/V19).
+     *
+     * <p>Static and taking the handler so the arithmetic is exercisable without a placed block.
+     * Nothing here decides anything - a refused plan is refused, and the slots are not touched.
+     *
+     * <p>The source is charged {@link InscriptionPlan#consumedUnits()}, which is {@code 0} for a
+     * reusable book or focus: reading a spellbook is not allowed to destroy it. The target is
+     * charged {@link InscriptionPlan#outputCount()} units and the remainder stays in the slot -
+     * a full stack of blanks yields one inscribed item and 63 blanks back, not 64 stamped ones.
+     *
+     * @param output the finished carrier; its count is set to the plan's output count
+     * @return whether the inscription ran
+     */
+    public static boolean applyInscription(ItemStackHandler items, InscriptionPlan plan,
+                                           ItemStack output) {
+        if (items == null || plan == null || !plan.isPermitted()
+            || output == null || output.isEmpty()) {
+            return false;
+        }
+        if (!items.getStackInSlot(SLOT_OUTPUT).isEmpty()) {
+            return false;
+        }
+        ItemStack source = items.getStackInSlot(SLOT_SOURCE);
+        ItemStack target = items.getStackInSlot(SLOT_SCROLL);
+        if (source.getCount() < plan.consumedUnits() || target.getCount() < plan.outputCount()) {
+            return false;
+        }
+        if (plan.consumedUnits() > 0) {
+            items.extractItem(SLOT_SOURCE, plan.consumedUnits(), false);
+        }
+        items.extractItem(SLOT_SCROLL, plan.outputCount(), false);
+        output.setCount(plan.outputCount());
+        items.setStackInSlot(SLOT_OUTPUT, output);
+        return true;
     }
 
     /** Drops the three working slots into the world (called on block removal). */

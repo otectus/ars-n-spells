@@ -1,0 +1,1004 @@
+{
+  "cases": [
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_BOOK->REUSABLE_BOOK/empty=true/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_BOOK->REUSABLE_BOOK/empty=true/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_BOOK->REUSABLE_BOOK/empty=false/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_BOOK->REUSABLE_BOOK/empty=false/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_BOOK->REUSABLE_FOCUS/empty=true/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_BOOK->REUSABLE_FOCUS/empty=true/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_BOOK->REUSABLE_FOCUS/empty=false/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_BOOK->REUSABLE_FOCUS/empty=false/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_BOOK->CONSUMABLE_SCROLL/empty=true/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_BOOK->CONSUMABLE_SCROLL/empty=true/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_BOOK->CONSUMABLE_SCROLL/empty=false/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_BOOK->CONSUMABLE_SCROLL/empty=false/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_BOOK->BLANK_PARCHMENT/empty=true/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_BOOK->BLANK_PARCHMENT/empty=true/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_BOOK->BLANK_PARCHMENT/empty=false/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_BOOK->BLANK_PARCHMENT/empty=false/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "REUSABLE_BOOK->FILLED_SCROLL/empty=true/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "REUSABLE_BOOK->FILLED_SCROLL/empty=true/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "REUSABLE_BOOK->FILLED_SCROLL/empty=false/count=1",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "REUSABLE_BOOK->FILLED_SCROLL/empty=false/count=0",
+      "sourceKind": "REUSABLE_BOOK",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_FOCUS->REUSABLE_BOOK/empty=true/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_FOCUS->REUSABLE_BOOK/empty=true/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_FOCUS->REUSABLE_BOOK/empty=false/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_FOCUS->REUSABLE_BOOK/empty=false/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_FOCUS->REUSABLE_FOCUS/empty=true/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_FOCUS->REUSABLE_FOCUS/empty=true/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_FOCUS->REUSABLE_FOCUS/empty=false/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_FOCUS->REUSABLE_FOCUS/empty=false/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_FOCUS->CONSUMABLE_SCROLL/empty=true/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_FOCUS->CONSUMABLE_SCROLL/empty=true/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_FOCUS->CONSUMABLE_SCROLL/empty=false/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_FOCUS->CONSUMABLE_SCROLL/empty=false/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_FOCUS->BLANK_PARCHMENT/empty=true/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "REUSABLE_FOCUS->BLANK_PARCHMENT/empty=true/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_FOCUS->BLANK_PARCHMENT/empty=false/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "REUSABLE_FOCUS->BLANK_PARCHMENT/empty=false/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "REUSABLE_FOCUS->FILLED_SCROLL/empty=true/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "REUSABLE_FOCUS->FILLED_SCROLL/empty=true/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "REUSABLE_FOCUS->FILLED_SCROLL/empty=false/count=1",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "REUSABLE_FOCUS->FILLED_SCROLL/empty=false/count=0",
+      "sourceKind": "REUSABLE_FOCUS",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "CONSUMABLE_SCROLL->REUSABLE_BOOK/empty=true/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
+      "name": "CONSUMABLE_SCROLL->REUSABLE_BOOK/empty=true/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "CONSUMABLE_SCROLL->REUSABLE_BOOK/empty=false/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "CONSUMABLE_SCROLL->REUSABLE_BOOK/empty=false/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "CONSUMABLE_SCROLL->REUSABLE_FOCUS/empty=true/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
+      "name": "CONSUMABLE_SCROLL->REUSABLE_FOCUS/empty=true/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "CONSUMABLE_SCROLL->REUSABLE_FOCUS/empty=false/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "CONSUMABLE_SCROLL->REUSABLE_FOCUS/empty=false/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "CONSUMABLE_SCROLL->CONSUMABLE_SCROLL/empty=true/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
+      "name": "CONSUMABLE_SCROLL->CONSUMABLE_SCROLL/empty=true/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "CONSUMABLE_SCROLL->CONSUMABLE_SCROLL/empty=false/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "CONSUMABLE_SCROLL->CONSUMABLE_SCROLL/empty=false/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "CONSUMABLE_SCROLL->BLANK_PARCHMENT/empty=true/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
+      "name": "CONSUMABLE_SCROLL->BLANK_PARCHMENT/empty=true/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "CONSUMABLE_SCROLL->BLANK_PARCHMENT/empty=false/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "CONSUMABLE_SCROLL->BLANK_PARCHMENT/empty=false/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "CONSUMABLE_SCROLL->FILLED_SCROLL/empty=true/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "CONSUMABLE_SCROLL->FILLED_SCROLL/empty=true/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "CONSUMABLE_SCROLL->FILLED_SCROLL/empty=false/count=1",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "CONSUMABLE_SCROLL->FILLED_SCROLL/empty=false/count=0",
+      "sourceKind": "CONSUMABLE_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "BLANK_PARCHMENT->REUSABLE_BOOK/empty=true/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
+      "name": "BLANK_PARCHMENT->REUSABLE_BOOK/empty=true/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "BLANK_PARCHMENT->REUSABLE_BOOK/empty=false/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "BLANK_PARCHMENT->REUSABLE_BOOK/empty=false/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "BLANK_PARCHMENT->REUSABLE_FOCUS/empty=true/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
+      "name": "BLANK_PARCHMENT->REUSABLE_FOCUS/empty=true/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "BLANK_PARCHMENT->REUSABLE_FOCUS/empty=false/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "BLANK_PARCHMENT->REUSABLE_FOCUS/empty=false/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "BLANK_PARCHMENT->CONSUMABLE_SCROLL/empty=true/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
+      "name": "BLANK_PARCHMENT->CONSUMABLE_SCROLL/empty=true/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "BLANK_PARCHMENT->CONSUMABLE_SCROLL/empty=false/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "BLANK_PARCHMENT->CONSUMABLE_SCROLL/empty=false/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
+      "name": "BLANK_PARCHMENT->BLANK_PARCHMENT/empty=true/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
+      "name": "BLANK_PARCHMENT->BLANK_PARCHMENT/empty=true/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "BLANK_PARCHMENT->BLANK_PARCHMENT/empty=false/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "target not empty",
+      "name": "BLANK_PARCHMENT->BLANK_PARCHMENT/empty=false/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "BLANK_PARCHMENT->FILLED_SCROLL/empty=true/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "BLANK_PARCHMENT->FILLED_SCROLL/empty=true/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "BLANK_PARCHMENT->FILLED_SCROLL/empty=false/count=1",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "BLANK_PARCHMENT->FILLED_SCROLL/empty=false/count=0",
+      "sourceKind": "BLANK_PARCHMENT",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->REUSABLE_BOOK/empty=true/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->REUSABLE_BOOK/empty=true/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->REUSABLE_BOOK/empty=false/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->REUSABLE_BOOK/empty=false/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_BOOK"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->REUSABLE_FOCUS/empty=true/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->REUSABLE_FOCUS/empty=true/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->REUSABLE_FOCUS/empty=false/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->REUSABLE_FOCUS/empty=false/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "REUSABLE_FOCUS"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->CONSUMABLE_SCROLL/empty=true/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->CONSUMABLE_SCROLL/empty=true/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->CONSUMABLE_SCROLL/empty=false/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->CONSUMABLE_SCROLL/empty=false/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "CONSUMABLE_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->BLANK_PARCHMENT/empty=true/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->BLANK_PARCHMENT/empty=true/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->BLANK_PARCHMENT/empty=false/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->BLANK_PARCHMENT/empty=false/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "BLANK_PARCHMENT"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->FILLED_SCROLL/empty=true/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->FILLED_SCROLL/empty=true/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": true,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->FILLED_SCROLL/empty=false/count=1",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 1,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    },
+    {
+      "expectedConsumedUnits": 0,
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "not blank",
+      "name": "FILLED_SCROLL->FILLED_SCROLL/empty=false/count=0",
+      "sourceKind": "FILLED_SCROLL",
+      "sourceStackCount": 0,
+      "targetIsNativelyEmpty": false,
+      "targetKind": "FILLED_SCROLL"
+    }
+  ]
+}

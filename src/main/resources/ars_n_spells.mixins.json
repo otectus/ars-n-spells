@@ -5,6 +5,7 @@
   "plugin": "com.otectus.arsnspells.mixin.ArsNSpellsMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "ars.MixinManaCapEventsRegen",
     "ars.MixinManaCapability",
     "ars.MixinSpellResolverMana",
     "ars.MixinSpellResolverPreCast"

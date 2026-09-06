@@ -17,6 +17,7 @@ import com.otectus.arsnspells.events.CooldownHandler;
 import com.otectus.arsnspells.events.IronsAffinityHandler;
 import com.otectus.arsnspells.events.IronsCooldownHandler;
 import com.otectus.arsnspells.events.IronsProgressionHandler;
+import com.otectus.arsnspells.events.ModeChangeMigration;
 import com.otectus.arsnspells.events.ProgressionHandler;
 import com.otectus.arsnspells.events.ResonanceEvents;
 import com.otectus.arsnspells.network.PacketHandler;
@@ -113,6 +114,8 @@ public class ArsNSpells {
         NeoForge.EVENT_BUS.register(new AffinityDecayHandler());
         NeoForge.EVENT_BUS.register(new AffinitySyncOnLoginHandler());
         NeoForge.EVENT_BUS.register(ArsNSpellsCommands.class);
+        // Self-gates on the GameTest namespace property, so this is a no-op on a real install.
+        com.otectus.arsnspells.gametest.ScenarioReport.register();
 
         if (ModList.get().isLoaded("irons_spellbooks")) {
             NeoForge.EVENT_BUS.register(new IronsCooldownHandler());
@@ -182,6 +185,18 @@ public class ArsNSpells {
         if (!event.getConfig().getModId().equals(MODID)) {
             return;
         }
+        // 3.3.0 (T1.2): resolve the schema-migrated keys and log the migration report once,
+        // before anything downstream reads a policy that migration may have decided.
+        // ModConfig.getFullPath() throws for a non-file config, so the path is optional here;
+        // an unknown path resolves as "not freshly generated", preserving existing behaviour.
+        java.nio.file.Path configFile = null;
+        try {
+            configFile = event.getConfig().getFullPath();
+        } catch (IllegalStateException notAFileConfig) {
+            // no path to probe
+        }
+        com.otectus.arsnspells.config.AnsConfig.onConfigLoaded(configFile);
+
         // The SERVER config is now readable — (re)build the mana bridges for the active
         // mode. This is the real bridge-init point on a server (common setup runs before
         // the SERVER config loads). Idempotent with BridgeManager.init().
@@ -200,6 +215,11 @@ public class ArsNSpells {
         // Pick up runtime config edits (e.g. mana_unification_mode changed on disk or via
         // the config screen) without a restart.
         BridgeManager.refreshMode();
+        // Then bring every online player onto the new snapshot: cleanup, recompute, clamp,
+        // sync (audit V14). Called from inside this listener rather than registered as a
+        // second ModConfigEvent.Reloading listener so the ordering against refreshMode() is
+        // fixed rather than left to listener registration order.
+        ModeChangeMigration.onRoutingChanged();
         syncClientDiagnostics();
     }
 

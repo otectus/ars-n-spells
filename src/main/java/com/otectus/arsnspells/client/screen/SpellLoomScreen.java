@@ -3,8 +3,9 @@ package com.otectus.arsnspells.client.screen;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.menu.SpellLoomMenu;
 import com.otectus.arsnspells.network.PacketHandler;
+import com.otectus.arsnspells.contract.InscriptionPlan;
 import com.otectus.arsnspells.network.SpellLoomExportPayload;
-import com.otectus.arsnspells.rituals.InscriptionInputs;
+import com.otectus.arsnspells.rituals.LoomInscriptionView;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import net.minecraft.client.Minecraft;
@@ -146,8 +147,8 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
 
     private void sendExport() {
         String name = nameField.getValue() == null ? "" : nameField.getValue().trim();
-        PacketHandler.sendToServer(new SpellLoomExportPayload(
-            name, NATURES[natureIndex], ICONS[iconIndex]));
+        PacketHandler.sendToServer(SpellLoomExportPayload.request(
+            name, NATURES[natureIndex], ICONS[iconIndex], previewReasonCode()));
     }
 
     // ---- Inscribe enablement (client-side mirror of the payload's validation) ----
@@ -213,10 +214,27 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
                 com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(blacklisted));
         }
         ItemStack scroll = this.menu.getSlot(1).getItem();
-        if (!IronsBookBindingUtil.isIronsScroll(scroll) || InscriptionInputs.isInscribed(scroll)) {
+        if (!IronsBookBindingUtil.isIronsScroll(scroll)) {
             return Component.translatable("ars_n_spells.spell_loom.error.no_scroll");
         }
+        // Audit V18: whether the scroll is blank is the planner's answer, not a local
+        // "does it carry ANS data" test. Same call the server makes, so the greyed-out
+        // button names the rule the server would have refused on.
+        String reason = previewReasonCode();
+        if (!InscriptionPlan.REASON_OK.equals(reason)) {
+            return Component.translatable("ars_n_spells.spell_loom.error.rejected", reason);
+        }
         return null;
+    }
+
+    /** The reason code of this screen's own preview. Reads the slots; mutates nothing. */
+    private String previewReasonCode() {
+        if (this.menu.slots.size() < 3) {
+            return InscriptionPlan.REASON_INSUFFICIENT_STACK;
+        }
+        return LoomInscriptionView
+            .plan(this.menu.getSlot(0).getItem(), this.menu.getSlot(1).getItem())
+            .reasonCode();
     }
 
     // ---- Rendering ----

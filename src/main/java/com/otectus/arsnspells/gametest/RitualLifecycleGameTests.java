@@ -6,6 +6,7 @@ import com.hollingsworth.arsnouveau.common.spell.effect.EffectHeal;
 import com.hollingsworth.arsnouveau.common.spell.method.MethodSelf;
 import com.mojang.authlib.GameProfile;
 import com.otectus.arsnspells.ArsNSpells;
+import com.otectus.arsnspells.compat.CompatIds;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.rituals.AnsRitual;
@@ -34,6 +35,7 @@ import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -73,8 +75,6 @@ public final class RitualLifecycleGameTests {
 
     private static final BlockPos BRAZIER = new BlockPos(2, 1, 2);
 
-    private static final GameProfile FAKE_PROFILE =
-        new GameProfile(UUID.fromString("0a000000-0000-0000-0000-00000000a11c"), "ans_ritual_gametest");
 
     private RitualLifecycleGameTests() {
     }
@@ -103,11 +103,19 @@ public final class RitualLifecycleGameTests {
     }
 
     /**
-     * The player who lights every brazier here. Creative and empty-handed so a ritual can only be
+     * The player who lights a brazier here. Creative and empty-handed so a ritual can only be
      * refused for the reason under test.
+     *
+     * <p>One player per {@code scenario}, never a shared one: {@code FakePlayerFactory} caches
+     * by {@link GameProfile}, so a single profile hands every concurrently-running ritual test
+     * the same entity - and the rituals set state on their initiator. The UUID is derived from
+     * the scenario name so it is stable across runs and unique across scenarios.
      */
-    private static ServerPlayer emptyHandedPlayer(GameTestHelper helper) {
-        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), FAKE_PROFILE);
+    private static ServerPlayer emptyHandedPlayer(GameTestHelper helper, String scenario) {
+        GameProfile profile = new GameProfile(
+            UUID.nameUUIDFromBytes(("ans_ritual_gametest/" + scenario).getBytes(StandardCharsets.UTF_8)),
+            "ans_gt_" + scenario);
+        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), profile);
         player.moveTo(helper.absoluteVec(new Vec3(1.0, 2.0, 1.0)));
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
         player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
@@ -191,7 +199,7 @@ public final class RitualLifecycleGameTests {
         List<RitualBrazierTile> tiles = new ArrayList<>();
         for (int i = 0; i < paths.size(); i++) {
             RitualBrazierTile tile = lightAnsBrazier(helper, spots[i], paths.get(i));
-            tile.startRitual(emptyHandedPlayer(helper));
+            tile.startRitual(emptyHandedPlayer(helper, "one_shot_" + paths.get(i)));
             tiles.add(tile);
         }
         helper.startSequence()
@@ -210,8 +218,7 @@ public final class RitualLifecycleGameTests {
     /** The happy path: dropped carrier scroll + dropped Iron's book, bound by the ritual itself. */
     @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals")
     public static void bindingRitual_bindsDroppedScrollOntoDroppedBook(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         // Count 2 proves the ritual consumes ONE scroll rather than the whole stack: Iron's scrolls
@@ -220,7 +227,7 @@ public final class RitualLifecycleGameTests {
         ItemEntity book = dropNear(helper, new Vec3(2.5, 1.3, 3.5), ironsBookStack(helper));
         RitualBrazierTile tile = lightAnsBrazier(helper, BRAZIER, SpellbookBindingRitual.REGISTRY_PATH);
 
-        tile.startRitual(emptyHandedPlayer(helper));
+        tile.startRitual(emptyHandedPlayer(helper, "binding_happy_path"));
 
         helper.startSequence()
             .thenExecuteAfter(RITUAL_SETTLE_TICKS, () -> {
@@ -247,8 +254,7 @@ public final class RitualLifecycleGameTests {
      */
     @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals")
     public static void bindingRitual_strayItemInRangeAbortsWithoutMutating(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         ItemEntity scroll = dropNear(helper, new Vec3(2.5, 1.3, 1.5), carrierScrollStack(helper, 2));
@@ -256,7 +262,7 @@ public final class RitualLifecycleGameTests {
         dropNear(helper, new Vec3(1.5, 1.3, 2.5), new ItemStack(Items.TORCH));
         RitualBrazierTile tile = lightAnsBrazier(helper, BRAZIER, SpellbookBindingRitual.REGISTRY_PATH);
 
-        tile.startRitual(emptyHandedPlayer(helper));
+        tile.startRitual(emptyHandedPlayer(helper, "binding_stray_item"));
 
         helper.startSequence()
             .thenExecuteAfter(RITUAL_SETTLE_TICKS, () -> {
@@ -276,33 +282,45 @@ public final class RitualLifecycleGameTests {
     /**
      * With {@code allow_ars_spells_in_irons_spellbooks=false} the ritual must refuse and leave both
      * items untouched.
+     *
+     * <p><b>Its own batch.</b> The config spec is process-global while GameTest batches run
+     * concurrently, so holding the flag false here for the length of a ritual is holding it false
+     * for every test running alongside - including {@link #bindingRitual_bindsDroppedScrollOntoDroppedBook},
+     * the happy path that asserts the exact opposite. A batch of one is the only isolation
+     * GameTest offers. The prior value, not {@code true}, is what gets restored, and it is
+     * restored from a {@code finally} so an assertion that bails out cannot leave it set.
      */
-    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals")
+    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_ritual_config")
     public static void bindingRitual_honoursTheConfigKillSwitch(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         ItemEntity scroll = dropNear(helper, new Vec3(2.5, 1.3, 1.5), carrierScrollStack(helper, 2));
         ItemEntity book = dropNear(helper, new Vec3(2.5, 1.3, 3.5), ironsBookStack(helper));
         RitualBrazierTile tile = lightAnsBrazier(helper, BRAZIER, SpellbookBindingRitual.REGISTRY_PATH);
 
+        boolean previous = AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.get();
         AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.set(false);
-        tile.startRitual(emptyHandedPlayer(helper));
+        try {
+            tile.startRitual(emptyHandedPlayer(helper, "binding_config_kill_switch"));
+        } catch (Throwable t) {
+            AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.set(previous);
+            throw t;
+        }
 
         helper.startSequence()
             .thenExecuteAfter(RITUAL_SETTLE_TICKS, () -> {
-                // Restored FIRST, before any assertion can bail out: the config spec is shared
-                // across every test in the run, so leaving this false would silently break
-                // unrelated tests later in the batch.
-                AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.set(true);
-                assertRitualFinished(helper, tile, "Spellbook Binding");
-                if (arsEntryCount(book) != 0) {
-                    helper.fail("binding is disabled in config, but the book gained "
-                        + arsEntryCount(book) + " Ars entries");
-                }
-                if (!scroll.isAlive() || scroll.getItem().getCount() != 2) {
-                    helper.fail("a config-refused bind must not consume the carrier scroll");
+                try {
+                    assertRitualFinished(helper, tile, "Spellbook Binding");
+                    if (arsEntryCount(book) != 0) {
+                        helper.fail("binding is disabled in config, but the book gained "
+                            + arsEntryCount(book) + " Ars entries");
+                    }
+                    if (!scroll.isAlive() || scroll.getItem().getCount() != 2) {
+                        helper.fail("a config-refused bind must not consume the carrier scroll");
+                    }
+                } finally {
+                    AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.set(previous);
                 }
             })
             .thenSucceed();

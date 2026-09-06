@@ -29,8 +29,11 @@ public final class PacketHandler {
      *       the full resyncs sent on login / respawn / dimension change.
      * "3" = 3.2.0 parity pass — cross_cast_request added, restoring the
      * server-authoritative cast path from the 1.20.1 build.
+     * "5" = spell_loom_export gained its reasonCode field (audit V18). A client that
+     *       still sends the three-string form would decode the next field off the end of
+     *       the buffer, so the mismatch has to be refused at negotiation.
      */
-    public static final String PROTOCOL_VERSION = "4";
+    public static final String PROTOCOL_VERSION = "5";
 
     private PacketHandler() {}
 

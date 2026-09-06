@@ -1,5 +1,6 @@
 package com.otectus.arsnspells.rituals;
 
+import com.otectus.arsnspells.contract.InscriptionPlan;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.CrossSpellType;
 import net.minecraft.core.BlockPos;
@@ -99,6 +100,18 @@ public class SpellTranscriptionRitual extends AnsRitual {
             return;
         }
 
+        // Audit V18/V19. One planner decides both questions the ritual used to answer for
+        // itself: is the target actually blank (asked of its own mod's container, not of
+        // "does it carry ANS data"), and does reading this source cost the player anything.
+        // It also fixes the sizing: the ritual used to stamp whatever stack it was handed,
+        // so a dropped stack of 64 blanks became 64 inscribed items for one source.
+        InscriptionPlan plan = LoomInscriptionView.plan(sourceStack, targetStack);
+        if (!plan.isPermitted()) {
+            error(LANG_PREFIX + "error.rejected", plan.reasonCode(),
+                targetStack.getHoverName().getString());
+            return;
+        }
+
         InscriptionSource source = InscriptionInputs.readSource(sourceStack);
         if (source == null) {
             // Classify said this was a source but a second read failed -- a
@@ -120,28 +133,50 @@ public class SpellTranscriptionRitual extends AnsRitual {
         }
 
         // Validation complete -- mutation begins here.
+        // V19: split off exactly the units the plan authorises and inscribe those. The
+        // remainder goes back to the item entity untouched, so a stack of 64 blanks yields
+        // one inscribed item and 63 blanks rather than 64 stamped ones.
+        ItemStack inscribed = targetStack.split(plan.outputCount());
         switch (source.type) {
             case ARS_NOUVEAU:
-                CrossCastingHandler.addCrossModSpell(targetStack, source.arsSpell);
+                CrossCastingHandler.addCrossModSpell(inscribed, source.arsSpell);
                 break;
             case IRONS_SPELLBOOKS:
-                CrossCastingHandler.addCrossModSpell(targetStack, source.spellId,
+                CrossCastingHandler.addCrossModSpell(inscribed, source.spellId,
                     source.spellLevel, CrossSpellType.IRONS_SPELLBOOKS);
                 break;
         }
-        targetEntity.setItem(targetStack);
+        if (targetStack.isEmpty()) {
+            targetEntity.setItem(inscribed);
+        } else {
+            targetEntity.setItem(targetStack);
+            spawnRemainder(level, targetEntity, inscribed);
+        }
         // Consume ONE source item, not the whole entity - Iron's scrolls stack to 16, and
         // discarding a stacked source destroyed the extras. Same fix, same reason, as
         // SpellbookBindingRitual's scroll consumption.
-        sourceStack.shrink(1);
-        if (sourceStack.isEmpty()) {
-            sourceEntity.discard();
-        } else {
-            sourceEntity.setItem(sourceStack);
+        // V18: only a disposable source is charged. A spellbook or focus used as a source is
+        // read and handed back - the plan's consumedUnits is 0 for those, and InscriptionPlan
+        // refuses to be built saying otherwise.
+        if (plan.consumedUnits() > 0) {
+            sourceStack.shrink(plan.consumedUnits());
+            if (sourceStack.isEmpty()) {
+                sourceEntity.discard();
+            } else {
+                sourceEntity.setItem(sourceStack);
+            }
         }
 
         playInscribeEffects(level, pos);
         success(LANG_PREFIX + "success", sourceLabel(source));
+    }
+
+    /** Drop the inscribed unit beside the stack it came from, so neither is lost. */
+    private void spawnRemainder(Level level, ItemEntity origin, ItemStack inscribed) {
+        ItemEntity spawned = new ItemEntity(level, origin.getX(), origin.getY(), origin.getZ(),
+            inscribed);
+        spawned.setDefaultPickUpDelay();
+        level.addFreshEntity(spawned);
     }
 
     private void playInscribeEffects(Level level, BlockPos pos) {

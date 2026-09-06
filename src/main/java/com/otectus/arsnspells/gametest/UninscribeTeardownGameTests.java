@@ -1,5 +1,6 @@
 package com.otectus.arsnspells.gametest;
 
+import com.otectus.arsnspells.compat.CompatIds;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
@@ -24,9 +25,10 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * {@link IronsBookBindingUtil#removeAllArsEntries} is the ordered teardown that replaced it.
  *
  * <p>This runs as a GameTest rather than a unit test because {@code ModDataComponents} are
- * {@code DeferredHolder}s: they only resolve once the mod is loaded. The proxy-slot half of
- * the teardown needs Iron's, which is {@code compileOnly} and therefore absent here; the
- * sidecar and export-marker halves are asserted unconditionally.
+ * {@code DeferredHolder}s: they only resolve once the mod is loaded. The sidecar and
+ * export-marker halves are asserted unconditionally on a vanilla stand-in; the proxy-slot half
+ * needs a real Iron's spellbook and so runs behind {@link OptionalModGate}, in
+ * {@link #teardown_onRealIronsSpellbook_leavesNoAnsState}.
  */
 @GameTestHolder("ars_n_spells")
 @PrefixGameTestTemplate(false)
@@ -90,6 +92,27 @@ public final class UninscribeTeardownGameTests {
         }
         if (!ItemStack.isSameItemSameComponents(clean, new ItemStack(Items.BOOK))) {
             helper.fail("teardown mutated a clean item: " + clean.getComponents());
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Audit V20 on the only item that can actually show the defect: a real Iron's spellbook.
+     *
+     * <p>The three tests above run on a vanilla stand-in, so they can only see the sidecar and
+     * the markers. The native half - a proxy slot left selectable in Iron's wheel after the
+     * payload behind it is gone - needs Iron's loaded, and the probe is where the Iron's types
+     * are confined.
+     */
+    @GameTest(template = "platform")
+    public static void teardown_onRealIronsSpellbook_leavesNoAnsState(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+            return;
+        }
+        String failure = IronsTeardownProbe.fullRemovalLeavesNoAnsState();
+        if (failure != null) {
+            helper.fail(failure);
+            return;
         }
         helper.succeed();
     }

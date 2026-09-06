@@ -113,8 +113,16 @@ public final class CrossModSpellComponents {
         return list != null ? list : CrossModSpellList.EMPTY;
     }
 
-    /** Drop every inscription artifact from the stack. */
-    public static void clear(ItemStack stack) {
+    /**
+     * Drop the cross-spell payload component - and only that (audit V20).
+     *
+     * <p>Named for what it does. It leaves the export marker, the schema stamp and any native
+     * wheel proxy slots in place, so it is correct only for an internal rewrite that is about
+     * to put something back. Anything a player triggers must go through
+     * {@link IronsBookBindingUtil#removeAllArsEntries}, which reconciles all of that; calling
+     * this instead is how a book ends up with wheel entries that cast nothing.
+     */
+    public static void clearPayloadOnly(ItemStack stack) {
         stack.remove(ModDataComponents.CROSS_SPELLS.get());
     }
 
@@ -301,7 +309,7 @@ public final class CrossModSpellComponents {
             return false;
         }
         if (next.isEmpty()) {
-            clear(stack);
+            clearPayloadOnly(stack);
         } else {
             stack.set(ModDataComponents.CROSS_SPELLS.get(), next);
         }

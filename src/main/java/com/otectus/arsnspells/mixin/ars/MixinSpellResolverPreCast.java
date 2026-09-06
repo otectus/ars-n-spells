@@ -7,7 +7,15 @@ import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
 import com.hollingsworth.arsnouveau.api.spell.SpellValidationError;
 import com.hollingsworth.arsnouveau.common.util.PortUtil;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.casting.AnsQuotes;
+import com.otectus.arsnspells.casting.AttemptLedgerService;
+import com.otectus.arsnspells.casting.CarrierIdentity;
 import com.otectus.arsnspells.casting.CastingAuthority;
+import com.otectus.arsnspells.contract.AttemptState;
+import com.otectus.arsnspells.contract.CastAttempt;
+import com.otectus.arsnspells.contract.CostQuote;
+import com.otectus.arsnspells.contract.CostRules;
+import com.otectus.arsnspells.contract.ResourceUnit;
 import com.otectus.arsnspells.spell.CrossCastContext;
 import com.otectus.arsnspells.util.CrossCastTrace;
 import net.minecraft.world.entity.LivingEntity;
@@ -16,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -119,6 +128,17 @@ public abstract class MixinSpellResolverPreCast {
 
         CrossCastContext.Entry entry = CrossCastContext.peek(player);
         UUID attemptId = entry != null ? entry.attemptId : null;
+
+        // Audit V01: open -> validate -> quote -> RESERVE, in that order, and deny with a reason
+        // on failure. Reserving here is what makes the price a fact rather than a prediction: the
+        // pool can move between the check above and the payment boundary - regen, another mod, a
+        // second concurrent cast - and a check that is not backed by a held reservation is only
+        // ever a guess. Nothing below re-derives a price; the payment boundary commits this
+        // reservation and nothing else.
+        if (canCast && entry != null && entry.carrierIdentity != null) {
+            canCast = arsnspells$reserve(player, entry, cost);
+        }
+
         CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.RESOURCE_CHECK,
             "cost", cost, "approved", canCast);
@@ -126,6 +146,62 @@ public abstract class MixinSpellResolverPreCast {
         // Always set the return value — both pass and fail — to prevent Ars's native
         // enoughMana() from running against possibly-stale ManaCap data.
         arsnspells$finish(cir, canCast);
+    }
+
+    /**
+     * Reserve the open attempt's quoted legs, or deny the cast with a reason.
+     *
+     * <p>The attempt was opened and quoted by {@code CrossCastingHandler.castArsSpell}; this is
+     * the one place its legs are debited. A partial drain reserves less than it asked for, and
+     * {@link com.otectus.arsnspells.contract.AttemptLedger} refunds exactly that smaller amount -
+     * which is why the reservation, not the request, is what gets released.
+     */
+    @Unique
+    private static boolean arsnspells$reserve(Player player, CrossCastContext.Entry entry, int cost) {
+        CastAttempt attempt =
+            AttemptLedgerService.findOpen(player, entry.carrierIdentity).orElse(null);
+        if (attempt == null || attempt.state() != AttemptState.QUOTED) {
+            // No open attempt, or one already past reservation (a long cast re-entering
+            // canCast). Nothing to reserve, and re-reserving would double-charge.
+            return true;
+        }
+        try {
+            java.util.List<com.otectus.arsnspells.contract.ResourceAmount> reserved =
+                AttemptLedgerService.reserve(attempt, player);
+            for (com.otectus.arsnspells.contract.ResourceAmount leg : attempt.quote().legs()) {
+                double taken = 0.0d;
+                for (com.otectus.arsnspells.contract.ResourceAmount got : reserved) {
+                    if (got.unit() == leg.unit()) {
+                        taken += got.amount();
+                    }
+                }
+                if (taken + 1.0e-3d < leg.amount()) {
+                    AttemptLedgerService.fail(attempt, player);
+                    CastingAuthority.sendDenialMessage(player,
+                        "§cNot Enough Mana: Need " + (int) Math.ceil(leg.amount()) + " "
+                            + arsnspells$unitName(leg.unit()) + ", have " + (int) taken);
+                    return false;
+                }
+            }
+            // Record what the Iron's leg actually cost so a later failure compensates the real
+            // amount rather than the quoted one.
+            entry.issPaid = (float) attempt.reservedLegs().stream()
+                .filter(a -> a.unit() == ResourceUnit.IRONS_MANA)
+                .mapToDouble(com.otectus.arsnspells.contract.ResourceAmount::amount)
+                .sum();
+            return true;
+        } catch (IllegalStateException illegalTransition) {
+            // An illegal edge means some other path already settled this attempt. Denying is
+            // the safe answer: the alternative is casting against a reservation nobody holds.
+            LOGGER.warn("Refusing an Ars cast whose attempt is no longer reservable: {}",
+                illegalTransition.toString());
+            return false;
+        }
+    }
+
+    @Unique
+    private static String arsnspells$unitName(ResourceUnit unit) {
+        return unit == ResourceUnit.IRONS_MANA ? "Iron's mana" : "mana";
     }
 
     /** Set the result and cancel. */

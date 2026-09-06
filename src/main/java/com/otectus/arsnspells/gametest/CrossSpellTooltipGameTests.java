@@ -1,6 +1,6 @@
 package com.otectus.arsnspells.gametest;
 
-import com.otectus.arsnspells.compat.IronsCompat;
+import com.otectus.arsnspells.compat.CompatIds;
 import com.otectus.arsnspells.events.CrossSpellTooltipHandler;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
@@ -132,8 +132,7 @@ public final class CrossSpellTooltipGameTests {
 
     @GameTest(template = "platform")
     public static void ironsLoaded_tooltip_onRealLoomCarrier_survives(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         ItemStack carrier = new ItemStack(Items.BOOK);

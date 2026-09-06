@@ -61,11 +61,22 @@ public final class CapabilityResyncHandler {
     }
 
     private static void resync(ServerPlayer player) {
+        syncClientState(player);
+        ProgressionHandler.reapplyAll(player);
+        EquipmentIntegration.recomputeFor(player);
+    }
+
+    /**
+     * Push the client-side mirror of affinity, cooldowns and resonance, without recomputing
+     * anything server-side.
+     *
+     * <p>Split out for {@link ModeChangeMigration}, which has to run the recompute and the mana
+     * clamp between the cleanup and the sync, and so cannot use {@link #resync} whole.
+     */
+    public static void syncClientState(ServerPlayer player) {
         syncAffinity(player);
         syncCooldowns(player);
         syncResonance(player);
-        ProgressionHandler.reapplyAll(player);
-        EquipmentIntegration.recomputeFor(player);
     }
 
     private static void syncAffinity(ServerPlayer player) {

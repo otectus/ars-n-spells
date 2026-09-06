@@ -535,6 +535,10 @@ public class ArsNSpellsCommands {
         // needs Iron's and it is absent (e.g. ISS_PRIMARY -> ARS_PRIMARY), so we echo both
         // the requested and the now-active mode.
         BridgeManager.refreshMode();
+        // The mode-set path is the second entry point of the mode-change migration: remove
+        // every ANS modifier, recompute what the new mode enables, clamp the pool, re-sync
+        // (audit V14). Without it a live mode switch left the old mode's bonuses applied.
+        com.otectus.arsnspells.events.ModeChangeMigration.onRoutingChanged();
 
         final String requestedName = parsed.getConfigName();
         final String effectiveName = BridgeManager.getCurrentMode().getConfigName();

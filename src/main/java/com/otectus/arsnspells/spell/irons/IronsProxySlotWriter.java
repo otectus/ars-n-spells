@@ -74,4 +74,55 @@ public final class IronsProxySlotWriter {
         }
         return removed;
     }
+
+    /**
+     * Remove every proxy slot in {@code poolIds} from {@code book} in a single native write
+     * (audit V20).
+     *
+     * <p>Where {@link #removeProxySlot} publishes a container per pool id, this builds one
+     * mutable copy, removes all of them, and calls {@code ISpellContainer.set} once. A failure
+     * part-way through therefore leaves the book exactly as it was, rather than half
+     * reconciled - which matters because the ANS sidecar holding the pool ids is cleared
+     * immediately afterwards, so a partial pass is unrecoverable.
+     *
+     * <p>Max spell count is not shrunk, for the same deliberate reason as
+     * {@link #removeProxySlot}: shrinking re-indexes the player's own spells.
+     *
+     * @return how many proxy slots were removed; {@code 0} means the book was not written to
+     */
+    public static int removeProxySlots(ItemStack book, Iterable<Integer> poolIds) {
+        if (book == null || book.isEmpty() || poolIds == null
+            || !ISpellContainer.isSpellContainer(book)) {
+            return 0;
+        }
+        try {
+            ISpellContainer container = ISpellContainer.get(book);
+            if (container == null) {
+                return 0;
+            }
+            ISpellContainerMutable mutable = container.mutableCopy();
+            int removed = 0;
+            for (Integer poolId : poolIds) {
+                if (poolId == null) {
+                    continue;
+                }
+                AbstractSpell proxy = ArsCrossProxyRegistry.get(poolId);
+                if (proxy == null) {
+                    continue;
+                }
+                int index = mutable.getIndexForSpell(proxy);
+                if (index >= 0 && mutable.removeSpellAtIndex(index)) {
+                    removed++;
+                }
+            }
+            if (removed > 0) {
+                ISpellContainer.set(book, mutable.toImmutable());
+            }
+            return removed;
+        } catch (Exception e) {
+            // Narrow to Exception so LinkageError still propagates. Nothing was published:
+            // every mutation above happened on the local mutable copy.
+            return 0;
+        }
+    }
 }

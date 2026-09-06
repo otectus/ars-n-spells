@@ -4,8 +4,9 @@ import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.block.SpellLoomBlockEntity;
 import com.otectus.arsnspells.compat.IronsCompat;
+import com.otectus.arsnspells.contract.InscriptionPlan;
 import com.otectus.arsnspells.menu.SpellLoomMenu;
-import com.otectus.arsnspells.rituals.InscriptionInputs;
+import com.otectus.arsnspells.rituals.LoomInscriptionView;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
@@ -32,8 +33,15 @@ import java.util.Optional;
  * re-reads the block entity's slots (never trusting client item state), validates,
  * and performs the mutation. Play payload handlers run on the main thread, so no
  * explicit enqueue is needed.
+ *
+ * <p>{@code reasonCode} is the {@link InscriptionPlan} reason the sending screen's own preview
+ * produced (audit V18). It is never trusted - the server re-plans from its own slots - but a
+ * request that disagrees with the server's plan is refused rather than run, so a client working
+ * from a stale preview cannot act on a rule the server no longer applies. Adding it changed the
+ * wire shape, hence the {@code PacketHandler.PROTOCOL_VERSION} bump that came with it.
  */
-public record SpellLoomExportPayload(String name, String nature, String iconSymbol)
+public record SpellLoomExportPayload(String name, String nature, String iconSymbol,
+                                     String reasonCode)
     implements CustomPacketPayload {
 
     public static final int MAX_NAME = 40;
@@ -54,8 +62,19 @@ public record SpellLoomExportPayload(String name, String nature, String iconSymb
             ByteBufCodecs.stringUtf8(MAX_WIRE_STRING), SpellLoomExportPayload::name,
             ByteBufCodecs.stringUtf8(MAX_WIRE_STRING), SpellLoomExportPayload::nature,
             ByteBufCodecs.stringUtf8(MAX_WIRE_STRING), SpellLoomExportPayload::iconSymbol,
+            ByteBufCodecs.stringUtf8(MAX_WIRE_STRING), SpellLoomExportPayload::reasonCode,
             SpellLoomExportPayload::new
         );
+
+    /**
+     * The request the screen sends: the cosmetic choices plus the reason code its own preview
+     * arrived at, which is {@link InscriptionPlan#REASON_OK} whenever the button was clickable.
+     */
+    public static SpellLoomExportPayload request(String name, String nature, String iconSymbol,
+                                                 String reasonCode) {
+        return new SpellLoomExportPayload(name, nature, iconSymbol,
+            reasonCode == null ? "" : reasonCode);
+    }
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
@@ -84,10 +103,32 @@ public record SpellLoomExportPayload(String name, String nature, String iconSymb
                 Component.translatable("ars_n_spells.spell_loom.error.irons_missing"), true);
             return;
         }
-        // A blank Iron's scroll: the real scroll item, not already a carrier.
-        if (!IronsBookBindingUtil.isIronsScroll(scroll) || InscriptionInputs.isInscribed(scroll)) {
+        // The real Iron's scroll item. Whether it is *blank* is not asked here - that is the
+        // planner's call below, and asking it twice is how the two answers drifted apart.
+        if (!IronsBookBindingUtil.isIronsScroll(scroll)) {
             sender.displayClientMessage(
                 Component.translatable("ars_n_spells.spell_loom.error.no_scroll"), true);
+            return;
+        }
+        // Audit V18: the loom used to read "blank" as "carries no ANS data" and consume a unit
+        // of the source unconditionally, so it overwrote filled scrolls and ate spellbooks. One
+        // plan now answers both questions, before anything moves.
+        InscriptionPlan plan = LoomInscriptionView.plan(source, scroll);
+        if (!plan.isPermitted()) {
+            // The reason code travels to the player as the rejection text, so the screen can
+            // state which rule fired instead of "could not inscribe".
+            sender.displayClientMessage(
+                Component.translatable("ars_n_spells.spell_loom.error.rejected",
+                    plan.reasonCode()), true);
+            return;
+        }
+        // The client previews with the same planner. A request whose stated reason disagrees
+        // with the server's is a client acting on a stale or edited preview; it is refused
+        // rather than run, because the two sides no longer agree on what is about to happen.
+        if (!InscriptionPlan.REASON_OK.equals(payload.reasonCode())) {
+            sender.displayClientMessage(
+                Component.translatable("ars_n_spells.spell_loom.error.rejected",
+                    payload.reasonCode()), true);
             return;
         }
         Optional<Spell> spell = ArsSpellExportUtil.extractArsSpell(source);
@@ -126,9 +167,12 @@ public record SpellLoomExportPayload(String name, String nature, String iconSymb
             return;
         }
 
-        items.extractItem(SpellLoomBlockEntity.SLOT_SOURCE, 1, false);
-        items.extractItem(SpellLoomBlockEntity.SLOT_SCROLL, 1, false);
-        items.setStackInSlot(SpellLoomBlockEntity.SLOT_OUTPUT, carrier);
+        // One atomic output: the plan says what the slots owe, the block entity moves them.
+        if (!SpellLoomBlockEntity.applyInscription(items, plan, carrier)) {
+            sender.displayClientMessage(
+                Component.translatable("ars_n_spells.spell_loom.error.failed"), true);
+            return;
+        }
         be.setChanged();
         // Audit H4: transcribing has no vanilla trigger, so the advancement is code-awarded.
         // Without this the loom chain's second step was unobtainable.

@@ -1,6 +1,6 @@
 package com.otectus.arsnspells.gametest;
 
-import com.otectus.arsnspells.compat.IronsCompat;
+import com.otectus.arsnspells.compat.CompatIds;
 import com.otectus.arsnspells.rituals.SpellbookBindingInputs;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossCastValidator;
@@ -144,12 +144,12 @@ public final class ArsIronsExportGameTests {
     }
 
     @GameTest(template = "platform")
-    public static void clearCrossSpells_onRealItemStack_preservesSiblings(GameTestHelper helper) {
+    public static void clearPayloadOnly_onRealItemStack_preservesSiblings(GameTestHelper helper) {
         ItemStack book = new ItemStack(Items.BOOK);
         book.set(ModDataComponents.EXPORT_MODE.get(), "sibling_value");
         IronsBookBindingUtil.appendArsSpellToBook(book, arsPayload("glyph_heal"));
 
-        CrossModSpellComponents.clear(book);
+        CrossModSpellComponents.clearPayloadOnly(book);
 
         if (book.isEmpty()) {
             helper.fail("clearing inscriptions must not turn the stack into EMPTY");
@@ -263,9 +263,7 @@ public final class ArsIronsExportGameTests {
 
     @GameTest(template = "platform")
     public static void ironAbsent_predicatesAreSafe(GameTestHelper helper) {
-        if (IronsCompat.isLoaded()) {
-            // This one is specifically about the Iron's-absent path.
-            helper.succeed();
+        if (OptionalModGate.skipIfPresent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         try {

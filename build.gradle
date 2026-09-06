@@ -74,6 +74,10 @@ repositories {
     }
 }
 
+// Game directory for runGameTestServer. Overridable per profile so the absent and loaded runs
+// never reuse each other's saved world; see the gameTestServer run block below.
+def gametestRunDir = project.findProperty('gametestRunDir') ?: 'run'
+
 neoForge {
     version = neoforge_version
 
@@ -99,9 +103,15 @@ neoForge {
             programArgument '--nogui'
         }
         // Headless gameplay tests. Namespace-gated so other mods' GameTests do not run.
+        //
+        // -PgametestRunDir picks the game directory (default 'run', the historical behaviour).
+        // The absent and loaded profiles MUST NOT share one: the loaded profile writes a world
+        // whose chunks reference irons_spellbooks registry entries, and re-opening it without
+        // Iron's fails to decode while Gradle still prints BUILD SUCCESSFUL - a green run over
+        // a server that never started. CI passes a distinct directory per profile.
         gameTestServer {
             type = 'gameTestServer'
-            gameDirectory = project.file('run')
+            gameDirectory = project.file(gametestRunDir)
             systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
         }
         data {
@@ -220,10 +230,16 @@ test {
 // committed ones into the run dir before any game run.
 tasks.register('stageGameTestStructures', Copy) {
     from 'src/test/resources/gameteststructures'
+    into "${gametestRunDir}/gameteststructures"
+}
+// runClient uses 'run' unconditionally, so stage into both when a profile moved the gametest
+// directory elsewhere. Cheap: it is four small .snbt files.
+tasks.register('stageGameTestStructuresDefault', Copy) {
+    from 'src/test/resources/gameteststructures'
     into 'run/gameteststructures'
 }
 tasks.matching { it.name in ['runGameTestServer', 'runClient', 'runServer'] }.configureEach {
-    dependsOn 'stageGameTestStructures'
+    dependsOn 'stageGameTestStructures', 'stageGameTestStructuresDefault'
 }
 
 processResources {

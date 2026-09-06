@@ -1,0 +1,254 @@
+{
+  "cases": [
+    {
+      "authoritativeUnit": "IRONS_MANA",
+      "expectedAuthoritativeUnit": "IRONS_MANA",
+      "expectedCrossCast": {
+        "direction": "ARS_TO_IRONS",
+        "nativeAlsoDebits": false,
+        "payingUnit": "IRONS_MANA"
+      },
+      "expectedEffectiveMode": "iss_primary",
+      "expectedNativeArsSpend": {
+        "direction": "ARS_TO_IRONS",
+        "nativeAlsoDebits": false,
+        "payingUnit": "IRONS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": true,
+      "expectedNativeIronsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "IRONS_MANA"
+      },
+      "generation": 7,
+      "ironsPresent": true,
+      "name": "iss_primary/irons=true",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "iss_primary"
+    },
+    {
+      "authoritativeUnit": "IRONS_MANA",
+      "expectedAuthoritativeUnit": "ARS_MANA",
+      "expectedCrossCast": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedEffectiveMode": "disabled",
+      "expectedNativeArsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": false,
+      "expectedNativeIronsSpend": null,
+      "generation": 7,
+      "ironsPresent": false,
+      "name": "iss_primary/irons=false",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "iss_primary"
+    },
+    {
+      "authoritativeUnit": "ARS_MANA",
+      "expectedAuthoritativeUnit": "ARS_MANA",
+      "expectedCrossCast": {
+        "direction": "IRONS_TO_ARS",
+        "nativeAlsoDebits": false,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedEffectiveMode": "ars_primary",
+      "expectedNativeArsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": true,
+      "expectedNativeIronsSpend": {
+        "direction": "IRONS_TO_ARS",
+        "nativeAlsoDebits": false,
+        "payingUnit": "ARS_MANA"
+      },
+      "generation": 7,
+      "ironsPresent": true,
+      "name": "ars_primary/irons=true",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "ars_primary"
+    },
+    {
+      "authoritativeUnit": "ARS_MANA",
+      "expectedAuthoritativeUnit": "ARS_MANA",
+      "expectedCrossCast": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedEffectiveMode": "disabled",
+      "expectedNativeArsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": false,
+      "expectedNativeIronsSpend": null,
+      "generation": 7,
+      "ironsPresent": false,
+      "name": "ars_primary/irons=false",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "ars_primary"
+    },
+    {
+      "authoritativeUnit": "IRONS_MANA",
+      "expectedAuthoritativeUnit": "IRONS_MANA",
+      "expectedCrossCast": {
+        "direction": "ARS_TO_IRONS",
+        "nativeAlsoDebits": false,
+        "payingUnit": "IRONS_MANA"
+      },
+      "expectedEffectiveMode": "hybrid",
+      "expectedNativeArsSpend": {
+        "direction": "ARS_TO_IRONS",
+        "nativeAlsoDebits": false,
+        "payingUnit": "IRONS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": true,
+      "expectedNativeIronsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "IRONS_MANA"
+      },
+      "generation": 7,
+      "ironsPresent": true,
+      "name": "hybrid/irons=true",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "hybrid"
+    },
+    {
+      "authoritativeUnit": "IRONS_MANA",
+      "expectedAuthoritativeUnit": "ARS_MANA",
+      "expectedCrossCast": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedEffectiveMode": "disabled",
+      "expectedNativeArsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": false,
+      "expectedNativeIronsSpend": null,
+      "generation": 7,
+      "ironsPresent": false,
+      "name": "hybrid/irons=false",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "hybrid"
+    },
+    {
+      "authoritativeUnit": "ARS_MANA",
+      "expectedAuthoritativeUnit": "ARS_MANA",
+      "expectedCrossCast": {
+        "direction": "NONE",
+        "nativeAlsoDebits": false,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedEffectiveMode": "separate",
+      "expectedNativeArsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": true,
+      "expectedNativeIronsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "IRONS_MANA"
+      },
+      "generation": 7,
+      "ironsPresent": true,
+      "name": "separate/irons=true",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "separate"
+    },
+    {
+      "authoritativeUnit": "ARS_MANA",
+      "expectedAuthoritativeUnit": "ARS_MANA",
+      "expectedCrossCast": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedEffectiveMode": "disabled",
+      "expectedNativeArsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": false,
+      "expectedNativeIronsSpend": null,
+      "generation": 7,
+      "ironsPresent": false,
+      "name": "separate/irons=false",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "separate"
+    },
+    {
+      "authoritativeUnit": "ARS_MANA",
+      "expectedAuthoritativeUnit": "ARS_MANA",
+      "expectedCrossCast": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedEffectiveMode": "disabled",
+      "expectedNativeArsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": true,
+      "expectedNativeIronsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "IRONS_MANA"
+      },
+      "generation": 7,
+      "ironsPresent": true,
+      "name": "disabled/irons=true",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "disabled"
+    },
+    {
+      "authoritativeUnit": "ARS_MANA",
+      "expectedAuthoritativeUnit": "ARS_MANA",
+      "expectedCrossCast": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedEffectiveMode": "disabled",
+      "expectedNativeArsSpend": {
+        "direction": "NONE",
+        "nativeAlsoDebits": true,
+        "payingUnit": "ARS_MANA"
+      },
+      "expectedNativeIronsAdapterPresent": false,
+      "expectedNativeIronsSpend": null,
+      "generation": 7,
+      "ironsPresent": false,
+      "name": "disabled/irons=false",
+      "nativeArsAdapterId": "ans:ars_native",
+      "nativeIronsAdapterId": "ans:irons_native",
+      "requestedMode": "disabled"
+    }
+  ]
+}

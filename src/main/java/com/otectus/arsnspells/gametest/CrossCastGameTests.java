@@ -1,5 +1,6 @@
 package com.otectus.arsnspells.gametest;
 
+import com.otectus.arsnspells.compat.CompatIds;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.spell.CrossModSpell;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
@@ -89,9 +90,37 @@ public final class CrossCastGameTests {
         helper.succeed();
     }
 
+    /**
+     * Bind then unbind must leave no ANS-owned artifact on the carrier.
+     *
+     * <p><b>Two carriers, two contracts.</b> Without Iron's the bind touches nothing native,
+     * so a plain item must come back byte-identical to a fresh one - that is the whole of the
+     * generic teardown contract and {@link UninscribeTeardownGameTests} asserts it in detail.
+     * With Iron's the carrier is a real spellbook whose native container is <em>not</em>
+     * ANS-owned: {@code IronsProxySlotWriter.removeProxySlot} deliberately does not shrink the
+     * grown max spell count, because doing so would re-index the player's own spells. So what
+     * is asserted there is what ANS actually promises - its own components gone, no
+     * {@code ars_cross_*} slot left selectable in the wheel, and the player's genuine spell
+     * untouched.
+     *
+     * <p>The fixture used to be a vanilla {@code Items.BOOK} in both cases, which made the
+     * byte-identity check fail under Iron's for a reason that exists nowhere in production:
+     * ANS's own bind had created the only native container the book ever had, and teardown
+     * leaves that container behind by design.
+     */
     @GameTest(template = "platform")
     public static void bindThenUnbind_leavesNoTrace(GameTestHelper helper) {
-        ItemStack book = new ItemStack(Items.BOOK);
+        boolean irons = IronsCompat.isLoaded();
+        ItemStack book = irons
+            ? IronsCarrierSupport.spellBookWithNativeSpell()
+            : new ItemStack(Items.BOOK);
+        if (book.isEmpty()) {
+            helper.fail("no Iron's spellbook holding a genuine spell could be built, so there "
+                + "is no real carrier to tear down");
+            return;
+        }
+        String nativeSpellId = irons ? IronsCarrierSupport.nativeSpellId() : null;
+
         IronsBookBindingUtil.appendArsSpellToBook(book, arsPayload("glyph_heal"));
         if (!CrossModSpellComponents.has(book)) {
             helper.fail("fixture did not bind");
@@ -108,9 +137,23 @@ public final class CrossCastGameTests {
             helper.fail("the schema stamp is ANS-owned and must go with the rest");
             return;
         }
-        if (!ItemStack.isSameItemSameComponents(book, new ItemStack(Items.BOOK))) {
-            helper.fail("an uninscribed item must be indistinguishable from a fresh one: "
-                + book.getComponents());
+        if (!irons) {
+            if (!ItemStack.isSameItemSameComponents(book, new ItemStack(Items.BOOK))) {
+                helper.fail("an uninscribed item must be indistinguishable from a fresh one: "
+                    + book.getComponents());
+                return;
+            }
+            helper.succeed();
+            return;
+        }
+        if (IronsCarrierSupport.hasAnyProxySlot(book)) {
+            helper.fail("an ars_cross_* slot survived uninscribe: it is still selectable in "
+                + "Iron's wheel and casts nothing");
+            return;
+        }
+        if (nativeSpellId != null && !IronsCarrierSupport.holdsNativeSpell(book, nativeSpellId)) {
+            helper.fail("uninscribe removed the player's own Iron's spell " + nativeSpellId
+                + " along with ANS's proxy slot");
             return;
         }
         helper.succeed();
@@ -153,8 +196,7 @@ public final class CrossCastGameTests {
         // ArsCrossProxyHiding is Iron's-isolated by contract - it resolves ISpellContainer at
         // the top of every method, and both real callers gate on IronsCompat.isLoaded(). So
         // this must gate too; calling it Iron's-less is a contract violation, not a bug found.
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         if (ArsCrossProxyHiding.isProxyOnlyStack(new ItemStack(Items.BOOK))) {
@@ -170,13 +212,20 @@ public final class CrossCastGameTests {
 
     @GameTest(template = "platform")
     public static void ironsLoaded_aBoundBook_isNotAProxyOnlyStack(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         // The hiding rule must catch ANS's generated proxy scrolls without also hiding a real
-        // player-owned book that happens to carry a bound entry.
-        ItemStack book = new ItemStack(Items.BOOK);
+        // player-owned book that happens to carry a bound entry. So the fixture is that book:
+        // a genuine Iron's spellbook already holding a genuine Iron's spell. A vanilla
+        // Items.BOOK is not one - the only native container it ever had was the one ANS's own
+        // bind created, which is precisely the generated shape this rule is meant to catch.
+        ItemStack book = IronsCarrierSupport.spellBookWithNativeSpell();
+        if (book.isEmpty()) {
+            helper.fail("no Iron's spellbook holding a genuine spell could be built; the "
+                + "negative control cannot run");
+            return;
+        }
         IronsBookBindingUtil.appendArsSpellToBook(book, arsPayload("glyph_heal"));
         if (ArsCrossProxyHiding.isProxyOnlyStack(book)) {
             helper.fail("a real book with a bound entry must stay visible - hiding it would "
@@ -196,8 +245,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_proxies_areNotLootable(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         for (int poolId = 1; poolId <= ArsCrossProxyRegistry.POOL_SIZE; poolId++) {
@@ -224,8 +272,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_ironsLootFilter_neverOffersAProxy(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         var applicable = new io.redspace.ironsspellbooks.loot.SpellFilter().getApplicableSpells();
@@ -246,8 +293,7 @@ public final class CrossCastGameTests {
 
     @GameTest(template = "platform")
     public static void ironsLoaded_strayProxyScroll_isBlankedOnContact(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         ItemStack stray = lootedProxyScroll(1);
@@ -277,8 +323,7 @@ public final class CrossCastGameTests {
 
     @GameTest(template = "platform")
     public static void ironsLoaded_neutralizer_leavesRealItemsAlone(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         // A genuine Iron's spell scroll - blanking one would delete real player content.
@@ -379,8 +424,7 @@ public final class CrossCastGameTests {
         // The reconciler returns UNCHANGED immediately without Iron's: both repairs it can
         // make are about native proxy slots, so there is nothing to look over and nothing to
         // record having looked at.
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         ItemStack book = new ItemStack(Items.BOOK);
@@ -401,8 +445,7 @@ public final class CrossCastGameTests {
     @GameTest(template = "platform")
     public static void ironsLoaded_reconciler_removesOrphanProxiesButKeepsLiveOnes(
             GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
         ItemStack book = new ItemStack(Items.BOOK);
@@ -431,12 +474,18 @@ public final class CrossCastGameTests {
 
     @GameTest(template = "platform")
     public static void ironsLoaded_validCarrier_isRejectedFromNativeTable(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
             return;
         }
-        ItemStack carrier = new ItemStack(Items.BOOK);
-        IronsBookBindingUtil.appendArsSpellToBook(carrier, arsPayload("glyph_heal"));
+        // A real carrier: the irons_spellbooks:scroll item with the valid empty native
+        // container plus the ANS sidecar. IronsInscriptionPolicy only ever looks at scrolls -
+        // a vanilla book was never its concern, so asserting a rejection on one proved nothing
+        // about the guard.
+        ItemStack carrier = IronsCarrierSupport.scrollCarrier(arsPayload("glyph_heal"));
+        if (carrier.isEmpty()) {
+            helper.fail("could not build a real ANS scroll carrier to put in the table");
+            return;
+        }
 
         IronsInscriptionPolicy.Verdict verdict = IronsInscriptionPolicy.evaluate(carrier);
         if (!verdict.isRejection()) {

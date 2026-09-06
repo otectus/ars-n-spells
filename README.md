@@ -1,25 +1,10 @@
-# Ars 'n' Spells (v3.2.2, NeoForge 1.21.1)
+# Ars 'n' Spells (v3.3.0, NeoForge 1.21.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.21.1 on **NeoForge**. It unifies mana, scaling, and progression while keeping each mod playable on its own.
 
-> **Status (v3.2.2, NeoForge 1.21.1).** Feature parity with the Forge 1.20.1 **3.2.2** line,
-> with one documented exception (Covenant of the Seven — see *Known gaps* below).
+> **Status (v3.3.0, NeoForge 1.21.1).** Feature parity with the Forge 1.20.1 **3.3.0** line.
 >
-> This release closes the gap from the 3.0.2 port. Beyond the 3.0.x feature set it adds the
-> **3.0.3** fixes (the proxy book-resolution fallback chain, so a spellbook in the Curios slot
-> casts instead of silently doing nothing; proxy double-billing short-circuits), the **3.1.0**
-> fixes (the Inscription Table crash guard on both client and server; payload-integrity checks
-> before anything is consumed; the school-classification rebuild on Ars metadata plus datapack
-> overrides; `ISpellbook`-based spellbook detection; JEI/EMI proxy hiding), and the **3.2.0**
-> fixes (the mod's own creative tab; Mana Infusion and the Mana Well finally obtainable; the
-> shared-pool ceiling that stopped a single hybrid-mode cast draining the whole mana pool; the
-> tooltip crash guard), the **3.2.1** parity pass (the `canBeCastedBy` injection reworked so a
-> mod that replaces that method can no longer make mod loading fatal; Iron's mixins moved to a
-> non-required config), and the **3.2.2** fix (the `ars_cross_*` proxy spells no longer appear
-> in Iron's random-spell loot).
->
-> Compile targets: **Ars Nouveau 5.13.1.1400**, **Iron's Spells 1.21.1-3.16.3**,
-> **NeoForge 21.1.248**.
+> Compile targets: **Ars Nouveau 5.13.1.1400**, **Iron's Spells 1.21.1-3.16.3**, **Ars Elemental 0.7.10.1**, **Ars Elemancy 1.18.3**, **Ars Zero 2.0.2**, **NeoForge 21.1.248**.
 
 ## Requirements
 
@@ -30,7 +15,17 @@ Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for M
 | Ars Nouveau | 5.13+ (built against 5.13.1.1400) | Yes |
 | Iron's Spells 'n Spellbooks | 1.21.1-3.15.0+ (built against 3.16.3) | No |
 
-If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior. The mod will not load on Forge or on Minecraft versions other than 1.21.1.
+If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior.
+
+**Scenarios with or without Iron's Spellbooks:**
+- **Fresh configuration** — starting a new world with Iron's never installed works correctly, as the mod runs as a pure Ars Nouveau addon.
+- **Dormant ANS payloads** — ANS cross-cast data already written to items in a saved world remains inert and does not break the world.
+- **Missing registry items** — items belonging to Iron's that the save references only affect those individual items, not the world itself.
+- **Whole-world dimension compatibility** — if the world references `irons_spellbooks:pocket_dimension_type`, an **upstream Iron's Spellbooks resource** that Iron's writes into level data, the world may fail to decode entirely. This is not an ANS defect, and ANS cannot repair it.
+
+**Always keep backups** when removing Iron's from an established world. ANS does not automatically delete dimensions or cross-cast payloads that refer to the mod.
+
+The mod will not load on Forge or on Minecraft versions other than 1.21.1.
 
 ## Features
 
@@ -74,7 +69,7 @@ Cross-mod spell damage scales bidirectionally when Iron's Spellbooks is installe
 
 **Multi-school policy split:** damage scaling uses all schools the policy resolves; affinity and progression credit the primary (first-resolved) school only. This means a dual-element spell scales with the caster's better element and trains exactly one affinity track.
 
-Implementation: both directions subscribe directly to spell-damage events (`SpellDamageEvent.Pre` from Ars Nouveau and `SpellDamageEvent` from Iron's) with no time window or damage-string guessing. Iron's must be installed for cross-mod scaling to fire — without Iron's, Ars spells use their native damage values, and Iron's applies no Ars perk bonus. Cross-mod combat scaling is independent of the mana-unification mode and remains active even when mana unification is `DISABLED`.
+Implementation: both directions subscribe directly to spell-damage events (`SpellDamageEvent.Pre` from Ars Nouveau and `SpellDamageEvent` from Iron's) with the actual spell context, not a 60-tick staging map or damage-source message guessing. A delayed projectile is scaled by the spell that fired it, not by whatever the player cast most recently. Iron's must be installed for cross-mod scaling to fire — without Iron's, Ars spells use their native damage values, and Iron's applies no Ars perk bonus. Cross-mod combat scaling is independent of the mana-unification mode and remains active even when mana unification is `DISABLED`.
 
 ### Resonance
 
@@ -254,7 +249,22 @@ Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMa
 
 Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`.
 
-Output jar: `build/libs/ars_n_spells-3.2.2.jar` (version tracks `mod_version` in `gradle.properties`)
+Output jar: `build/libs/ars_n_spells-3.3.0.jar` (version tracks `mod_version` in `gradle.properties`)
+
+## Testing
+
+**Tested versions (this release):** Ars Nouveau 5.13.1.1400, Iron's Spellbooks 1.21.1-3.16.3, Ars Elemental 0.7.10.1, Ars Elemancy 1.18.3, Ars Zero 2.0.2.
+
+`./gradlew test` runs the JUnit suite. GameTests run on a real server via `runGameTestServer`, with opt-in profiles:
+
+| Command | Covers |
+| --- | --- |
+| `./gradlew runGameTestServer` | Iron's-absent fallback and boot safety |
+| `./gradlew runGameTestServer -PwithIronsRuntimeGameTests -PwithArsElemental -PwithArsElemancy -PwithArsZero` | The cross-cast pipeline against real Iron's, plus Ars addon integrations |
+
+**What is not tested this cycle:** No graphical client session, no real multiplayer session, no full Covenant dependency stack, no JEI/EMI client matrix, no performance load test, no cross-Minecraft-version world conversion.
+
+GameTest success requires three independent checks: process exit code, expected executed-scenario count, and a clean log (no failure signatures). See [.github/workflows/ci.yml](.github/workflows/ci.yml) for the full matrix.
 
 ## Changelog
 

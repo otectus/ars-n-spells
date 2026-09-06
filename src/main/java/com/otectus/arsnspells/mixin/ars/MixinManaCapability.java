@@ -3,12 +3,11 @@ package com.otectus.arsnspells.mixin.ars;
 import com.hollingsworth.arsnouveau.common.capability.ManaCap;
 import com.hollingsworth.arsnouveau.common.capability.ManaData;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.bridge.ManaMutationRouter;
+import com.otectus.arsnspells.casting.BridgeResourceAccess;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -44,38 +43,34 @@ public abstract class MixinManaCapability {
     private int arsnspells$arsNativeMaxMana = -1;
 
     /**
-     * Recursion guard: prevents infinite recursion when bridge == ArsNativeBridge
-     * (ARS_PRIMARY mode), since ArsNativeBridge.getMana() calls cap.getCurrentMana()
-     * which would trigger this mixin again.
+     * Recursion guard: prevents infinite recursion when the authoritative bridge is
+     * {@code ArsNativeBridge} (ARS_PRIMARY), since {@code ArsNativeBridge.getMana()} calls
+     * {@code cap.getCurrentMana()} and would re-enter this mixin.
      *
-     * <p>ANS-HIGH-010: keyed by player, not a single boolean. A thread-global flag meant that
-     * while ANY player's bridge call was in flight, ManaCap interception was suppressed for
-     * EVERY player on that thread - so an AoE or party-share spell that reads another player's
-     * mana mid-call fell through to native Ars data and bypassed the bridge entirely. The
-     * recursion this guards against is always same-player, so the key makes it exact.
+     * <p>ANS-HIGH-010 keyed it by player: a thread-global flag meant that while ANY player's
+     * bridge call was in flight, ManaCap interception was suppressed for EVERY player on that
+     * thread, so an AoE or party-share spell that reads another player's mana fell through to
+     * native Ars data and bypassed the bridge entirely.
+     *
+     * <p>Audit V06 adds the second dimension: a <b>direction</b>. Routing a write ends up
+     * reading the pool back to report the new balance, and with one flag per player that read
+     * looked like recursion and was dropped through to stale native state. A read nested inside
+     * a write is normal; only a write inside a write is recursion. The guard now lives in
+     * {@link ManaMutationRouter} so the mixin and the routing share one notion of "in flight".
      */
     @Unique
-    private static final ThreadLocal<Set<UUID>> arsnspells$inBridgeCall =
-        ThreadLocal.withInitial(HashSet::new);
-
-    @Unique
     private static boolean arsnspells$isGuarded(Player player) {
-        return arsnspells$inBridgeCall.get().contains(player.getUUID());
+        return ManaMutationRouter.isGuarded(player.getUUID(), ManaMutationRouter.Direction.READ);
     }
 
     @Unique
     private static void arsnspells$enterGuard(Player player) {
-        arsnspells$inBridgeCall.get().add(player.getUUID());
+        ManaMutationRouter.enter(player.getUUID(), ManaMutationRouter.Direction.READ);
     }
 
     @Unique
     private static void arsnspells$exitGuard(Player player) {
-        Set<UUID> active = arsnspells$inBridgeCall.get();
-        active.remove(player.getUUID());
-        if (active.isEmpty()) {
-            // Avoid a ThreadLocal leak on long-lived server threads.
-            arsnspells$inBridgeCall.remove();
-        }
+        ManaMutationRouter.exit(player.getUUID(), ManaMutationRouter.Direction.READ);
     }
 
     @Inject(method = "getCurrentMana", at = @At("HEAD"), cancellable = true, require = 0)
@@ -148,16 +143,21 @@ public abstract class MixinManaCapability {
     }
 
     /**
-     * FIX: Do NOT forward ManaCap writes to Iron's MagicData.
+     * {@code setMana} stays a read-only sync, deliberately, and is the one mutation not routed.
      *
-     * Spell consumption is handled separately by MixinSpellResolverMana → BridgeManager
-     * → IronsBridge.consumeMana(), which bypasses ManaCap entirely. Any other calls to
-     * setMana() are Ars-internal (capability init, clone, NBT deserialization, max-mana
-     * clamp) and must NOT overwrite Iron's mana with stale values.
+     * <p>Audit V06 asks that legitimate mutations reach the authoritative pool, and {@code
+     * addMana} / {@code removeMana} now do. {@code setMana} is different in kind: it is an
+     * <em>absolute assignment</em>, and every caller of it inside Ars is state restoration -
+     * capability construction, {@code clone}, NBT deserialization on login and dimension
+     * change, and the max-mana clamp. Those callers pass whatever Ars last had, typically
+     * {@code 0} on a fresh capability, and nothing in the signature distinguishes them from a
+     * third party setting a balance on purpose. Forwarding would therefore zero the shared pool
+     * every time a player crossed a portal.
      *
-     * Instead, we sync the ManaData sub-object's value from Iron's current value
-     * (read-only) so any direct field reads in Ars see a consistent value, then cancel
-     * the original method to prevent Ars from clamping against its own stale state.
+     * <p>So the sub-object is synced from the real pool (so Ars's own field reads stay
+     * consistent) and the native method is cancelled to stop Ars clamping against its own stale
+     * state. A third party wanting to change the balance has {@code addMana} / {@code
+     * removeMana}, which are routed.
      */
     @Inject(method = "setMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$setMana(double amount, CallbackInfoReturnable<Double> cir) {
@@ -183,6 +183,18 @@ public abstract class MixinManaCapability {
         }
     }
 
+    /**
+     * Route an additive mutation to the authoritative pool (audit V06).
+     *
+     * <p>This used to be a blanket no-op, which is how Ars's regeneration was suppressed - and
+     * how every other grant of Ars mana was suppressed along with it. Regeneration is now
+     * suppressed at its own call site by {@code MixinManaCapEventsRegen}, so a {@code +50} that
+     * arrives here is a real, legitimate grant from somewhere else and lands in the pool that
+     * actually holds this player's mana.
+     *
+     * <p>Returns the balance after the add, which is {@code ManaCap.addMana}'s own contract in
+     * the pinned Ars 5.13.1.1400 ({@code addMana(D)D}).
+     */
     @Inject(method = "addMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$addMana(double amount, CallbackInfoReturnable<Double> cir) {
         if (!(this.entity instanceof Player player)) {
@@ -194,21 +206,30 @@ public abstract class MixinManaCapability {
         if (player.level().isClientSide()) {
             return;
         }
-        // Read-only sync: do NOT add to Iron's mana here.
-        // In ISS_PRIMARY/HYBRID, this intercept suppresses Ars regen by making addMana
-        // a no-op. playerOnTick still runs for cap state maintenance and sync, but the
-        // actual mana addition is discarded. Any addMana calls from Ars internal code
-        // (e.g. potion effects restoring Ars mana) should not affect Iron's pool.
-        try {
-            arsnspells$enterGuard(player);
-            double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
-            this.manaData.setMana(ironsCurrentMana);
-            cir.setReturnValue(ironsCurrentMana);
-        } finally {
-            arsnspells$exitGuard(player);
+        if (ManaMutationRouter.isGuarded(
+                player.getUUID(), ManaMutationRouter.Direction.REGEN_TICK)) {
+            // Inside Ars's own regeneration tick, which MixinManaCapEventsRegen brackets. This
+            // is THE call that regenerates, and in a shared-pool mode Iron's already regenerates
+            // that pool - adding here too would mint mana. Report the unchanged balance, which
+            // is what ManaCap.addMana contracts to return, and let the tick's client sync run.
+            double current = BridgeManager.getBridge().getMana(player);
+            this.manaData.setMana(current);
+            cir.setReturnValue(current);
+            return;
         }
+        double now = ManaMutationRouter.routeAdd(player.getUUID(),
+            ManaMutationRouter.authoritativeUnit(), BridgeResourceAccess.of(player), amount);
+        this.manaData.setMana(now);  // Keep the sub-object consistent for Ars's own field reads.
+        cir.setReturnValue(now);
     }
 
+    /**
+     * Route a subtractive mutation to the authoritative pool.
+     *
+     * <p>Spell consumption does not arrive here - it goes through the resolver mixin and the
+     * attempt ledger - so anything that does is a third-party drain, and dropping it made those
+     * effects free in exactly the modes where mana matters most.
+     */
     @Inject(method = "removeMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$removeMana(double amount, CallbackInfoReturnable<Double> cir) {
         if (!(this.entity instanceof Player player)) {
@@ -220,18 +241,10 @@ public abstract class MixinManaCapability {
         if (player.level().isClientSide()) {
             return;
         }
-        // Read-only sync: do NOT remove from Iron's mana here.
-        // Spell consumption goes through MixinSpellResolverMana → BridgeManager →
-        // IronsBridge.consumeMana() directly, bypassing ManaCap. Any other removeMana
-        // calls from Ars are internal bookkeeping and should not affect Iron's pool.
-        try {
-            arsnspells$enterGuard(player);
-            double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
-            this.manaData.setMana(ironsCurrentMana);
-            cir.setReturnValue(ironsCurrentMana);
-        } finally {
-            arsnspells$exitGuard(player);
-        }
+        double now = ManaMutationRouter.routeRemove(player.getUUID(),
+            ManaMutationRouter.authoritativeUnit(), BridgeResourceAccess.of(player), amount);
+        this.manaData.setMana(now);
+        cir.setReturnValue(now);
     }
 
     @Inject(method = "setMaxMana", at = @At("HEAD"), cancellable = true, require = 0)

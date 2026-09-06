@@ -96,8 +96,7 @@ public final class AddonCompatGameTests {
     // ---- Generic per-addon checks ----
 
     private static void glyphsRoundTrip(GameTestHelper helper, String modid) {
-        if (!loaded(modid)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, modid)) {
             return;
         }
         List<AbstractSpellPart> glyphs = glyphsOf(modid);
@@ -138,8 +137,7 @@ public final class AddonCompatGameTests {
     }
 
     private static void schoolsResolveFromDeclaredMetadata(GameTestHelper helper, String modid) {
-        if (!loaded(modid)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, modid)) {
             return;
         }
         List<AbstractSpellPart> glyphs = glyphsOf(modid);
@@ -182,8 +180,7 @@ public final class AddonCompatGameTests {
     }
 
     private static void everyGlyphResolvesWithoutThrowing(GameTestHelper helper, String modid) {
-        if (!loaded(modid)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, modid)) {
             return;
         }
         for (AbstractSpellPart glyph : glyphsOf(modid)) {
@@ -239,8 +236,7 @@ public final class AddonCompatGameTests {
     /** Ars Zero 2.0.2 requires Ars Elemental; a Zero-only classpath is a broken profile. */
     @GameTest(template = "platform")
     public static void arsZero_profileIsComplete(GameTestHelper helper) {
-        if (!loaded(CompatIds.ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ZERO)) {
             return;
         }
         if (!loaded(CompatIds.ARS_ELEMENTAL)) {
@@ -258,8 +254,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsZero_resolversInheritManaHooks(GameTestHelper helper) {
-        if (!loaded(CompatIds.ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ZERO)) {
             return;
         }
         for (String name : ARS_ZERO_RESOLVERS) {
@@ -315,8 +310,7 @@ public final class AddonCompatGameTests {
     /** Ars Elemancy 1.18.3 requires Ars Elemental; an Elemancy-only classpath is a broken profile. */
     @GameTest(template = "platform")
     public static void arsElemancy_profileIsComplete(GameTestHelper helper) {
-        if (!loaded(CompatIds.ARS_ELEMANCY)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ELEMANCY)) {
             return;
         }
         if (!loaded(CompatIds.ARS_ELEMENTAL)) {
@@ -333,8 +327,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsElemancy_registersItems(GameTestHelper helper) {
-        if (!loaded(CompatIds.ARS_ELEMANCY)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ELEMANCY)) {
             return;
         }
         boolean any = BuiltInRegistries.ITEM.keySet().stream()
@@ -363,8 +356,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsZero_blacklistedGlyphsAreRejected(GameTestHelper helper) {
-        if (!loaded(CompatIds.ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ZERO)) {
             return;
         }
         List<AbstractSpellPart> tagged = new ArrayList<>();
