@@ -32,6 +32,7 @@ import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -152,11 +153,10 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_exportBindCoexist_roundTrip(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            // Iron's not on the runtime classpath — nothing to integrate against. Skip
-            // rather than assert the Iron-loaded contract (the Iron-absent contract is
-            // covered by ArsIronsExportGameTests#ironAbsent_predicatesAreSafe).
-            helper.succeed();
+        // Iron's not on the runtime classpath — nothing to integrate against. Skip
+        // rather than assert the Iron-loaded contract (the Iron-absent contract is
+        // covered by ArsIronsExportGameTests#ironAbsent_predicatesAreSafe).
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
 
@@ -230,8 +230,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_bindAllocatesProxyPoolId(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Item bookItem = findIronsSpellBook();
@@ -311,7 +310,22 @@ public final class CrossCastGameTests {
      * Tests that specifically want survival downgrade from here.
      */
     static ServerPlayer emptyHandedPlayer(GameTestHelper helper) {
-        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), FAKE_PROFILE);
+        return emptyHandedPlayer(helper, FAKE_PROFILE);
+    }
+
+    /**
+     * The same player, but private to {@code scenario}: a distinct {@link GameProfile} means
+     * {@code FakePlayerFactory} hands back a distinct instance, so two tests running concurrently
+     * in one batch cannot see each other's inventory, health or cast state.
+     */
+    static ServerPlayer scenarioPlayer(GameTestHelper helper, String scenario) {
+        String name = scenario.length() > 16 ? scenario.substring(0, 16) : scenario;
+        return emptyHandedPlayer(helper,
+            new GameProfile(UUID.nameUUIDFromBytes(("ans_gametest/" + scenario).getBytes(StandardCharsets.UTF_8)), name));
+    }
+
+    private static ServerPlayer emptyHandedPlayer(GameTestHelper helper, GameProfile profile) {
+        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), profile);
         player.moveTo(helper.absoluteVec(new Vec3(1.0, 2.0, 1.0)));
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
         player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
@@ -319,9 +333,15 @@ public final class CrossCastGameTests {
         player.setHealth(10.0f);
         // Permissive defaults so a cast can only be refused for the reason under test.
         player.setGameMode(GameType.CREATIVE);
-        IronsProxyCastDriver.setIronsMana(player, 10000.0f);
-        IronsProxyCastDriver.equipSpellbook(player, ItemStack.EMPTY);
-        IronsProxyCastDriver.resetCastingState(player);
+        // Iron's-only state, and IronsProxyCastDriver's every line resolves Iron's classes: the
+        // guard belongs HERE, at the call site, because a guard inside the driver would not stop
+        // the JVM resolving the class on entry. Without it every caller of this helper failed on
+        // the Iron's-absent run (audit V26/T0.2) -- including the Iron-agnostic ritual tests.
+        if (IronsCompat.isLoaded()) {
+            IronsProxyCastDriver.setIronsMana(player, 10000.0f);
+            IronsProxyCastDriver.equipSpellbook(player, ItemStack.EMPTY);
+            IronsProxyCastDriver.resetCastingState(player);
+        }
         return player;
     }
 
@@ -339,8 +359,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_boundArsSpell_creativeCastResolvesThroughProxy(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack book = bindHealSpellOntoRealBook(helper);
@@ -358,8 +377,7 @@ public final class CrossCastGameTests {
     /** Same path in survival with mana to spare: the resource authority must not deny a funded cast. */
     @GameTest(template = "platform")
     public static void ironsLoaded_boundArsSpell_survivalCastWithManaResolves(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack book = bindHealSpellOntoRealBook(helper);
@@ -377,8 +395,7 @@ public final class CrossCastGameTests {
     /** A book held in the main hand must still resolve, via the hand fallback. */
     @GameTest(template = "platform")
     public static void ironsLoaded_boundArsSpell_heldBookResolvesViaHandFallback(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack book = bindHealSpellOntoRealBook(helper);
@@ -394,8 +411,7 @@ public final class CrossCastGameTests {
     /** A wheel slot with no backing sidecar entry must do nothing — and must not throw. */
     @GameTest(template = "platform")
     public static void ironsLoaded_proxyCastWithoutSidecarEntry_isNoopWithoutCrash(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Item bookItem = findIronsSpellBook();
@@ -419,8 +435,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_bindCommand_rejectsUncastablePayload(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Item scrollItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", "scroll"));
@@ -477,8 +492,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_exportedCarrier_survivesInscriptionDereference(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
@@ -510,8 +524,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_legacyContainerlessCarrier_isRejectedNotCrashed(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Item scrollItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", "scroll"));
@@ -544,8 +557,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_validCarrier_isRejectedFromNativeTable(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
@@ -564,8 +576,7 @@ public final class CrossCastGameTests {
     /** A genuine Iron's scroll must pass through the guard untouched. */
     @GameTest(template = "platform")
     public static void ironsLoaded_nativeScroll_isAllowedThroughGuard(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Item scrollItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", "scroll"));
@@ -594,8 +605,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_unbind_removesNativeProxySlotAndSidecar(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack book = bindHealSpellOntoRealBook(helper);
@@ -624,8 +634,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_unbindCarrier_leavesValidBlankScroll(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
@@ -664,8 +673,7 @@ public final class CrossCastGameTests {
     /** A generated proxy scroll — exactly what the creative tab and JEI produce — is hideable. */
     @GameTest(template = "platform")
     public static void ironsLoaded_generatedProxyScroll_isRecognizedAsGhost(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack ghost = IronsProxyCastDriver.makeProxyScroll(1);
@@ -679,8 +687,7 @@ public final class CrossCastGameTests {
     /** A genuine Iron's scroll must never be hidden. */
     @GameTest(template = "platform")
     public static void ironsLoaded_nativeScroll_isNotAGhost(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack real = IronsProxyCastDriver.makeNativeScroll();
@@ -701,8 +708,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_realBookWithBoundEntry_isNotAGhost(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack book = bindHealSpellOntoRealBook(helper);
@@ -735,8 +741,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_proxies_declareNonCraftableButStayRegistered(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         var proxy = com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry.get(1);
@@ -769,8 +774,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_proxies_declareUnlootable(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         for (int poolId = 1;
@@ -798,8 +802,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_ironsLootFilter_neverOffersAProxy(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         var applicable = new io.redspace.ironsspellbooks.loot.SpellFilter().getApplicableSpells();
@@ -826,8 +829,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_strayProxyScroll_isBlankedOnContact(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack stray = IronsProxyCastDriver.makeProxyScroll(1);
@@ -849,8 +851,7 @@ public final class CrossCastGameTests {
     /** The negative control: real items must survive the neutralizer untouched. */
     @GameTest(template = "platform")
     public static void ironsLoaded_neutralizer_leavesRealItemsAlone(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         // A genuine Iron's spell scroll — blanking one would delete real player content.
@@ -897,8 +898,7 @@ public final class CrossCastGameTests {
     /** A legacy container-less carrier is repaired in place, not merely rejected. */
     @GameTest(template = "platform")
     public static void ironsLoaded_reconciler_repairsLegacyCarrierContainer(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Item scrollItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", "scroll"));
@@ -932,8 +932,7 @@ public final class CrossCastGameTests {
     /** An orphan wheel slot with no sidecar entry is removed; a live one is kept. */
     @GameTest(template = "platform")
     public static void ironsLoaded_reconciler_removesOrphanProxiesButKeepsLiveOnes(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack book = bindHealSpellOntoRealBook(helper); // occupies pool 1, sidecar + slot
@@ -961,8 +960,7 @@ public final class CrossCastGameTests {
     /** Spellbook detection uses Iron's type, not a path substring. */
     @GameTest(template = "platform")
     public static void ironsLoaded_spellbookDetection_usesTypeNotNaming(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Item bookItem = findIronsSpellBook();
@@ -991,8 +989,7 @@ public final class CrossCastGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_spellbookCast_leavesCastingItemEmpty(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemStack book = bindHealSpellOntoRealBook(helper);

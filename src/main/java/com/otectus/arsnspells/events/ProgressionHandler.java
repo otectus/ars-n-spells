@@ -67,7 +67,15 @@ public class ProgressionHandler {
         }
     }
 
-    private void reapplyAllBonuses(ServerPlayer player) {
+    /**
+     * Re-apply the persisted per-school bonuses as transient modifiers.
+     *
+     * <p>V14: static and public so {@code ModeChangeCleanup} can run it as step 2 of its
+     * reconcile sequence. It reads the persisted cast counts and writes only the transient
+     * modifier, which is what makes "progression data is preserved when the feature is
+     * disabled" true: turning the feature off removes the modifier, not the counts.
+     */
+    public static void reapplyAllBonuses(ServerPlayer player) {
         if (!AnsConfig.ENABLE_PROGRESSION_SYSTEM.get() || !AnsConfig.ENABLE_CROSS_MOD_PROGRESSION.get()) {
             return;
         }

@@ -4,14 +4,45 @@ All notable changes to this project will be documented in this file.
 
 ## [3.3.0] - 2026-09-04
 
-### New: optional Ars Elemental, Ars Zero, and Covenant compatibility
+### Casting and payment correctness
+
+- **Cost quotes are now repeatable.** A first cost query used to return one price and a second query a different one; cross-cast could debit mana during cost calculation itself. A cast now takes one immutable quote and pays it once at the native payment boundary. Ten cost reads change no balances.
+- **Spell damage scaling now identifies the spell from Ars Nouveau's own damage event.** Previous versions computed the multiplier at cast time, staged it for 60 ticks, and tried to recognise the resulting hit by substring-matching the damage-source message id for `"magic"` or `"ars_nouveau"`. A delayed projectile fired by player A that landed after player B opened their own window was scaled by whichever entry the map held, and any incidental magic damage the caster dealt was scaled as if it were their spell. The fix reads the immutable `SpellDamageEvent.Pre` directly, carrying the caster, target, spell context, and damage — the spell that is being scaled is the spell that is being resolved. No staging map, no tick window, and no message-string test. See [Spell scaling](#spell-scaling).
+- **Checks and charges now agree on units and rounding.** A single conversion policy prices both. Existing worlds keep their current pricing by default (`conversion_policy = flat_legacy`); equal-percentage conversion is a separate opt-in.
+- **Disabling mana unification now restores native pool routing properly.** The Iron's adapter is no longer dropped when unification is disabled.
+- **Mana granted by other mods is no longer silently swallowed.** Regeneration suppression is now scoped to the regeneration tick itself instead of blanketing every mana mutation.
+
+### Progression, gear and combat
+
+- **NeoForge progression attribute modifier fix:** The 1.21.1 port used two different modifier identities for one bonus; there is now one canonical modifier, and both historical identities are cleaned up. Cast counts are preserved.
+- **Disabling a feature now removes its bonuses.** Cleanup is unconditional and no longer gated on the feature being enabled, so a mode or config change removes old modifiers first, then recomputes, then clamps mana under a documented rule, then syncs.
+- **Fixed a ratchet where a third-party attribute multiplier could make the shared mana ceiling climb on every recompute.** Values are now measured against an isolated native snapshot rather than by subtracting a raw amount from an already-multiplied total.
+
+### Forge Covenant integration
+
+- **Fixed a crash:** the late Life Point cancellation path called `setCanceled` on an Iron's event that is not cancelable, raising an exception inside Iron's cast pipeline every time a late LP debit failed. See `src/main/java/com/otectus/arsnspells/events/IronsLPHandler.java` lines 250–256.
+- **LP and aura are now payment legs of the same cast transaction**, reserved before the cast commits rather than charged from an uncorrelated queue. Partial or unresolvable aura drain follows an explicit policy (`payment_open_failure_policy`) instead of reporting a success that did not happen. Existing worlds keep the previous permissive behavior; new installs get the safe one.
+
+### Spell Loom and inscription
+
+- **Item loss fixed:** the Loom consumed reusable spell sources. Books and foci are now read and returned, never eaten.
+- **A scroll that already holds a spell is no longer treated as blank.** It is identified as filled, with a stated reason, and converting it is a separate deliberate action with a preview.
+- **Previewing an inscription no longer changes your inventory.**
+- **Transcription now produces one output and returns the remainder,** instead of transforming a whole stack for a single source.
+
+### Tests and infrastructure
+
+- **Both loaders now run a loaded-dependency GameTest profile in CI** alongside the existing dependency-absent one, in separate world directories. GameTest success is now three independent checks — process exit code, expected executed-scenario count, and negative log assertions for failure signatures — because a run can print BUILD SUCCESSFUL while the world failed to decode.
+- **Tests that skip because an optional mod is absent are now counted and reported separately** from tests that actually exercised the integration.
+
+### Optional compatibility
 
 - **Ars Elemental 0.6.8.0+** — Ars Elemental glyphs now resolve their schools from their declared Ars metadata. Necromancy glyphs like `glyph_phantom_grasp` and `glyph_charm` resolve as `eldritch`; `glyph_life_link` declares Necromancy too but is explicitly mapped to `blood`. Filters like `glyph_aquatic_filter` resolve as `generic` and do not decide the spell's school. Most Ars Elemental content classifies correctly with no configuration at all; override any glyph from a datapack if needed.
 - **Ars Zero 2.0.2+** — Ars Zero's named effects (like `effect_conjure_blight`, `conjure_arcane_shield_effect`) resolve their schools from their declared Ars metadata or from the glyph's Ars school. Control-flow glyphs (`select_effect`, `anchor_effect`, etc.) resolve as `generic` and do not decide the spell's school. The mod requires Forge `[47.4.10,)` and Curios `5.14.1+1.20.1`.
 - **Covenant of the Seven 2.2.6+** — Covenant aura is sampled server-side through Nature's Aura's chunk aura to block casts when the aura threshold is too low, avoiding method probes for routines Covenant 2.2.6 removed. Dedicated servers behave correctly. The integration has no dedicated runtime test profile; surface compatibility is verified by bytecode inspection instead.
 - **Ars Nouveau's own glyph metadata** now drives all school resolution — `AbstractSpellPart.spellSchools` for vanilla and addon glyphs, with per-glyph overrides from datapacks. `AbstractAugment`, `AbstractCastMethod` and `AbstractFilter` instances always resolve as `generic` — they are not payload glyphs and do not carry a school (prior versions leaked the school decision to the glyph's registry name heuristic).
 
-### Changed: test suite structure
+### Test suite and build
 
 - New JUnit tests (`SchoolResolverAddonTest`, `CovenantJarSurfaceTest` which reads the Covenant jar bytecode and skips when absent, `VersionRangeTest`).
 - New gametests in `AddonCompatGameTests`: `arsZero_glyphsRoundTrip`, `arsZero_everyGlyphResolvesWithoutThrowing`, `arsZero_schoolsResolveFromDeclaredMetadata`, `arsZero_controlFlowGlyphsAreGeneric`, `arsZero_augmentsAndFormsDoNotDecideTheSchool`, `arsZero_namedEffectsAreUsable`, `arsElemental_necromancyGlyphsResolve`, `arsElemental_filtersResolveGeneric`, `mixedArsElementalArsZero_recipe_survivesSerialization`. With `-PwithArsElemental -PwithArsZero`: all pass (JUnit: 272 tests).
@@ -20,6 +51,16 @@ All notable changes to this project will be documented in this file.
 ### Changed: `cursed_rings.json` item tag
 
 - The non-existent `covenant_of_the_seven:cursed_ring` entry was removed; `enigmaticlegacy:cursed_ring` remains.
+
+### Known limitations (deliberately deferred)
+
+The following are known and scheduled for future work:
+- Curios equipment lifecycle and the full attribute contribution ledger.
+- Configuration keys that currently have no effect.
+- Source Jar cache invalidation and source-synergy rate decoupling.
+- School-analysis corpus, custom school identity and datapack overlay sync.
+- The icon registry and legacy icon-key fallback.
+- Loom automation policy.
 
 No config, packet, or save-format changes.
 

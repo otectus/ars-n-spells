@@ -1,5 +1,7 @@
 package com.otectus.arsnspells.progression;
 
+import com.otectus.arsnspells.bridge.AnsModifierIdentities;
+import com.otectus.arsnspells.contract.AnsModifierIds;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.Attribute;
@@ -23,7 +25,11 @@ import java.util.UUID;
  * be gated on {@link com.otectus.arsnspells.compat.IronsCompat#isLoaded()}.
  */
 public final class ProgressionAttributes {
-    public static final UUID ELEMENT_XP_ID = UUID.fromString("b0ba11ad-dead-beef-cafe-f00d20245678");
+    // V07/V14: one identity for this bonus, and it is the shared registry's. Both the Ars-side
+    // and the Iron's-side handler reach the attribute through this helper, so there is exactly
+    // one UUID to clean up.
+    public static final UUID ELEMENT_XP_ID =
+        AnsModifierIdentities.uuid(AnsModifierIds.CROSS_MOD_SCHOOL_PROGRESSION);
     private static final String IRONS_NAMESPACE = "irons_spellbooks";
     private static final String MODIFIER_NAME = "Cross-Mod School Progression";
 

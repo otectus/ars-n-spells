@@ -3,12 +3,15 @@ package com.otectus.arsnspells.equipment;
 import com.google.common.collect.Multimap;
 import com.hollingsworth.arsnouveau.api.mana.IManaEquipment;
 import com.hollingsworth.arsnouveau.api.perk.PerkAttributes;
+import com.otectus.arsnspells.bridge.AnsFeatureCleanup;
+import com.otectus.arsnspells.bridge.AnsModifierIdentities;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.bridge.SharedPoolCeiling;
 import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
+import com.otectus.arsnspells.contract.AnsModifierIds;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -48,8 +51,20 @@ public class EquipmentIntegration {
     private static final Map<UUID, CachedEquipmentData> equipmentCache = new ConcurrentHashMap<>();
     private static final long CACHE_DURATION_MS = 1000; // 1 second cache
 
-    private static final UUID ARS_TO_IRON_MAX_MANA_ID = UUID.fromString("d3e1f1d1-6b39-4ec7-9a4a-7e6d706a8b9b");
-    private static final UUID ARS_TO_IRON_REGEN_ID = UUID.fromString("0c2c7e6a-44e8-4cc6-9b5d-5a43a0e5f23b");
+    // V07/V14: read from the shared registry rather than re-declaring the literal. These are
+    // the same two identities AnsFeatureCleanup walks, so a modifier applied here can never be
+    // one the cleanup path has never heard of.
+    private static final UUID ARS_TO_IRON_MAX_MANA_ID =
+        AnsModifierIdentities.uuid(AnsModifierIds.ARS_GEAR_MAX_MANA);
+    private static final UUID ARS_TO_IRON_REGEN_ID =
+        AnsModifierIdentities.uuid(AnsModifierIds.ARS_GEAR_MANA_REGEN);
+
+    /**
+     * V13: a throwaway identity used only to measure how much a third-party multiplier
+     * amplifies an additive point on MAX_MANA. It is never left on the player, so it is
+     * deliberately not an AnsModifierIds key.
+     */
+    private static final UUID CEILING_PROBE_ID = UUID.fromString("a45b0e17-0000-4000-8000-000000000013");
 
     private static final EquipmentSlot[] EQUIPPED_SLOTS = new EquipmentSlot[] {
         EquipmentSlot.HEAD,
@@ -171,12 +186,45 @@ public class EquipmentIntegration {
         if (existing != null) {
             instance.removeModifier(ARS_TO_IRON_MAX_MANA_ID);
         }
+        // V13: the isolated native snapshot, i.e. this attribute with every ANS-owned modifier
+        // taken out. The shortfall is measured against that, and then divided by what one
+        // additive point is actually worth here - never subtracted straight out of a total a
+        // third-party multiplier has already inflated.
         double ironsOwnMax = instance.getValue();
-        double needed = SharedPoolCeiling.modifierAmount(ironsOwnMax, arsMax);
+        double amplification = additiveAmplification(instance, ironsOwnMax);
+        double needed = SharedPoolCeiling.modifierAmount(ironsOwnMax, arsMax, amplification);
         if (needed != 0.0) {
             instance.addTransientModifier(new AttributeModifier(
                 ARS_TO_IRON_MAX_MANA_ID, "Ars Max Mana Sync", needed,
                 AttributeModifier.Operation.ADDITION));
+        }
+    }
+
+    /**
+     * What one additive point on {@code instance} is worth in final attribute value (audit V13).
+     *
+     * <p>Measured, not assumed: a probe modifier of exactly one point is added, the value read,
+     * and the probe removed. Any {@code MULTIPLY_BASE} / {@code MULTIPLY_TOTAL} another mod has
+     * put on this attribute shows up in the difference, which is the only way to know it
+     * without enumerating operations we do not own. The probe is transient and is removed on
+     * every path; nothing reads or writes mana in between.
+     *
+     * @param isolated the attribute's value with the ANS modifier already removed
+     * @return the amplification, or 1.0 when it could not be measured
+     */
+    private static double additiveAmplification(AttributeInstance instance, double isolated) {
+        try {
+            instance.addTransientModifier(new AttributeModifier(
+                CEILING_PROBE_ID, "Ars Ceiling Probe", 1.0, AttributeModifier.Operation.ADDITION));
+            double probed = instance.getValue();
+            return probed - isolated;
+        } catch (Exception e) {
+            LOGGER.debug("Could not measure max-mana amplification; assuming 1.0", e);
+            return 1.0;
+        } finally {
+            if (instance.getModifier(CEILING_PROBE_ID) != null) {
+                instance.removeModifier(CEILING_PROBE_ID);
+            }
         }
     }
 
@@ -237,16 +285,16 @@ public class EquipmentIntegration {
 
     /**
      * Remove Ars-derived mana bonuses from Iron's attributes.
+     *
+     * <p>V14: no gate. This used to return early when Iron's was not loaded, which is exactly
+     * the state a modifier gets stranded in - the feature that applied it is gone, so the
+     * feature can no longer take it off. {@link AnsFeatureCleanup} resolves the attributes by
+     * id, so an absent Iron's makes this a no-op instead of a crash, and it also sweeps the
+     * legacy identities older builds wrote these bonuses under.
      */
     public static void clearArsBonusesFromIrons(Player player) {
-        if (player == null) {
-            return;
-        }
-        if (!IronsCompat.isLoaded()) {
-            return;
-        }
-        removeAttributeModifier(player, AttributeRegistry.MAX_MANA.get(), ARS_TO_IRON_MAX_MANA_ID);
-        removeAttributeModifier(player, AttributeRegistry.MANA_REGEN.get(), ARS_TO_IRON_REGEN_ID);
+        AnsFeatureCleanup.removeKeys(player,
+            AnsModifierIds.ARS_GEAR_MAX_MANA, AnsModifierIds.ARS_GEAR_MANA_REGEN);
     }
 
     /**
@@ -255,10 +303,8 @@ public class EquipmentIntegration {
      * bonus the player opted out of, but the ceiling is a correctness invariant.
      */
     public static void clearArsRegenBonusFromIrons(Player player) {
-        if (player == null || !IronsCompat.isLoaded()) {
-            return;
-        }
-        removeAttributeModifier(player, AttributeRegistry.MANA_REGEN.get(), ARS_TO_IRON_REGEN_ID);
+        // V14: ungated, for the same reason as clearArsBonusesFromIrons above.
+        AnsFeatureCleanup.removeKeys(player, AnsModifierIds.ARS_GEAR_MANA_REGEN);
     }
     
     private static CachedEquipmentData calculateBonuses(Player player) {
@@ -457,8 +503,10 @@ public class EquipmentIntegration {
      * percentage-of-pool units when applied via {@link #applyArsBonusesToIrons}.
      *
      * <p>This path is load-bearing in {@code ISS_PRIMARY} / {@code HYBRID} mode where
-     * {@code MixinManaCapability.addMana} suppresses Ars's native regen tick — the
-     * enchantment's intended effect would otherwise be lost on the Iron's pool.
+     * {@code MixinManaRegenTick} suppresses Ars's native regen tick at its one caller,
+     * {@code ManaCapEvents.playerOnTick} (audit V06 moved it there from the blanket
+     * {@code MixinManaCapability.addMana} no-op) — the enchantment's intended effect would
+     * otherwise be lost on the Iron's pool.
      * In {@code ARS_PRIMARY} mode Ars handles its own enchantments natively, so the
      * value populated here is unused (the Ars-primary regen handler reads only the
      * Iron's-side bonus container).
@@ -684,14 +732,6 @@ public class EquipmentIntegration {
         }
     }
 
-    private static void removeAttributeModifier(Player player, Attribute attribute, UUID id) {
-        AttributeInstance instance = player.getAttribute(attribute);
-        if (instance == null) {
-            return;
-        }
-        AttributeModifier existing = instance.getModifier(id);
-        if (existing != null) {
-            instance.removeModifier(id);
-        }
-    }
+    // removeAttributeModifier was deleted here: every removal now goes through
+    // AnsFeatureCleanup, which is the only path that also walks the legacy identities.
 }

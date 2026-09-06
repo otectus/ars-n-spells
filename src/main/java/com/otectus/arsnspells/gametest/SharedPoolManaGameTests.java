@@ -4,9 +4,16 @@ import com.hollingsworth.arsnouveau.api.mana.IManaCap;
 import com.mojang.authlib.GameProfile;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.bridge.SharedPoolCeiling;
+import com.otectus.arsnspells.casting.CastLedger;
+import com.otectus.arsnspells.casting.QuoteService;
+import com.otectus.arsnspells.contract.CarrierPolicy;
+import com.otectus.arsnspells.contract.CastAttempt;
+import com.otectus.arsnspells.contract.CostQuote;
+import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
+import com.otectus.arsnspells.contract.ResourceUnit;
 import com.otectus.arsnspells.equipment.EquipmentIntegration;
 import com.otectus.arsnspells.util.ManaUtil;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
@@ -20,6 +27,7 @@ import net.minecraftforge.common.util.FakePlayerFactory;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 /**
@@ -41,9 +49,6 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public final class SharedPoolManaGameTests {
 
-    private static final GameProfile FAKE_PROFILE =
-        new GameProfile(UUID.fromString("0a000000-0000-0000-0000-00000000c3a5"), "ans_mana_test");
-
     /** Enough glyph bonus that Ars's max clears Iron's default pool by a wide margin. */
     private static final int GLYPH_BONUS = 40;
 
@@ -53,11 +58,18 @@ public final class SharedPoolManaGameTests {
     private static final UUID IRONS_OWN_GEAR_ID =
         UUID.fromString("0a000000-0000-0000-0000-0000000067ea");
 
-    private static ServerPlayer preparedPlayer(GameTestHelper helper) {
-        // FakePlayerFactory caches by profile, so the same instance is handed to every test
-        // in this class. Reset the state each test mutates, or an earlier test's leftover
-        // ceiling modifier silently becomes the next test's baseline.
-        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), FAKE_PROFILE);
+    private static GameProfile scenarioProfile(String scenario) {
+        String name = scenario.length() > 16 ? scenario.substring(0, 16) : scenario;
+        return new GameProfile(
+            UUID.nameUUIDFromBytes(("ans_gametest/" + scenario).getBytes(StandardCharsets.UTF_8)), name);
+    }
+
+    private static ServerPlayer preparedPlayer(GameTestHelper helper, String scenario) {
+        // FakePlayerFactory caches by profile, so a shared profile would hand the same instance
+        // to every test in this class. Each scenario takes its own profile, and still resets the
+        // state it mutates, or an earlier test's leftover ceiling modifier silently becomes the
+        // next test's baseline.
+        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), scenarioProfile(scenario));
         EquipmentIntegration.clearArsBonusesFromIrons(player);
         removeIronsOwnGear(player);
         ManaUtil.getNativeMana(player).ifPresent(cap -> {
@@ -110,14 +122,13 @@ public final class SharedPoolManaGameTests {
      * The reported bug, end to end: a full Ars-sized pool, a small spell, and a ceiling that
      * has drifted back down to Iron's own. The cast must cost the cost.
      */
-    @GameTest(template = "platform")
+    @GameTest(template = "platform", batch = "ans_mana_config")
     public static void ironsLoaded_hybridCast_deductsOnlyTheCost_afterTheCeilingDrifted(
             GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
-        ServerPlayer player = preparedPlayer(helper);
+        ServerPlayer player = preparedPlayer(helper, "mana_drift");
         IManaCap cap = ManaUtil.getNativeMana(player).orElse(null);
         if (cap == null) {
             helper.fail("Ars mana capability missing on the test player");
@@ -149,7 +160,7 @@ public final class SharedPoolManaGameTests {
             }
 
             float cost = 50.0f;
-            if (!BridgeManager.consumeManaForMode(player, cost, true)) {
+            if (!BridgeManager.consumeManaForMode(player, cost, ResourceUnit.ARS_MANA)) {
                 helper.fail("a " + cost + " cost must be affordable from a pool of " + poolBefore);
                 return;
             }
@@ -165,13 +176,12 @@ public final class SharedPoolManaGameTests {
     }
 
     /** Casting must not shrink a pool Iron's own gear made larger than Ars's max. */
-    @GameTest(template = "platform")
+    @GameTest(template = "platform", batch = "ans_mana_config")
     public static void ironsLoaded_hybridCast_leavesIronsOwnLargerPoolAlone(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
-        ServerPlayer player = preparedPlayer(helper);
+        ServerPlayer player = preparedPlayer(helper, "mana_glyph");
         IManaCap cap = ManaUtil.getNativeMana(player).orElse(null);
         if (cap == null) {
             helper.fail("Ars mana capability missing on the test player");
@@ -205,7 +215,7 @@ public final class SharedPoolManaGameTests {
                 float poolBefore = data.getMana();
 
                 float cost = 10.0f;
-                if (!BridgeManager.consumeManaForMode(player, cost, true)) {
+                if (!BridgeManager.consumeManaForMode(player, cost, ResourceUnit.ARS_MANA)) {
                     helper.fail("a " + cost + " cost must be affordable from a pool of " + poolBefore);
                     return;
                 }
@@ -221,14 +231,158 @@ public final class SharedPoolManaGameTests {
         helper.succeed();
     }
 
-    /** Repeated casts must stay loss-exact, not just the first one. */
-    @GameTest(template = "platform")
-    public static void ironsLoaded_hybridRepeatedCasts_stayLossExact(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+    /** Distinct carrier identities so the ledger scenarios cannot find each other's attempts. */
+    private static final String COST_READ_CARRIER = "ans_gametest:cost_reads";
+    private static final String COMMIT_CARRIER = "ans_gametest:commit";
+    private static final String CANCEL_CARRIER = "ans_gametest:cancel";
+
+    /**
+     * V01: asking the price must be free, however many times you ask.
+     *
+     * <p>Upstream Ars 4.12.7 builds a fresh {@code SpellCostCalcEvent} on every
+     * {@code getResolveCost()} call, and the SEPARATE-mode Iron's share used to be consumed
+     * inside that calculation. Ten reads took the Iron's leg ten times.
+     */
+    @GameTest(template = "platform", batch = "ans_mana_config")
+    public static void ironsLoaded_tenCostReadsChangeNoBalance(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
-        ServerPlayer player = preparedPlayer(helper);
+        ServerPlayer player = preparedPlayer(helper, "mana_reads");
+        runInHybrid(helper, () -> {
+            MagicData data = MagicData.getPlayerMagicData(player);
+            EquipmentIntegration.syncIronsMaxToArs(player, 500.0f);
+            data.setMana(400.0f);
+            float before = data.getMana();
+
+            int first = -1;
+            for (int i = 0; i < 10; i++) {
+                int quoted = CrossCastingHandler.quoteArsCostForEvent(new Object(),
+                    player.getUUID(), COST_READ_CARRIER, CarrierPolicy.NATIVE_ONLY, 100,
+                    QuoteService.currentRules(), player.level().getGameTime());
+                if (first < 0) {
+                    first = quoted;
+                } else if (quoted != first) {
+                    helper.fail("cost read " + (i + 1) + " answered " + quoted
+                        + " but the first answered " + first + "; a price must not depend on "
+                        + "how many times it was asked");
+                    return;
+                }
+            }
+
+            float after = data.getMana();
+            if (Math.abs(after - before) > 0.01f) {
+                helper.fail("ten cost reads moved the pool from " + before + " to " + after
+                    + "; asking the price must not cost money");
+            }
+            CastLedger.findOpen(player.getUUID(), COST_READ_CARRIER)
+                .ifPresent(a -> CastLedger.cancel(a, CastLedger.forPlayer(player)));
+        });
+        helper.succeed();
+    }
+
+    /** V01: a settled cast takes the quote, exactly, and never gives it back. */
+    @GameTest(template = "platform", batch = "ans_mana_config")
+    public static void ironsLoaded_successfulCastDebitsExactlyTheQuote(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
+            return;
+        }
+        ServerPlayer player = preparedPlayer(helper, "mana_commit");
+        runInHybrid(helper, () -> {
+            MagicData data = MagicData.getPlayerMagicData(player);
+            EquipmentIntegration.syncIronsMaxToArs(player, 500.0f);
+            data.setMana(400.0f);
+            float before = data.getMana();
+
+            CostQuote quote = QuoteService.quoteNativeCast(
+                ResourceUnit.ARS_MANA, 100, QuoteService.currentRules());
+            float expectedLeg = QuoteService.legAsFloat(quote, ResourceUnit.ARS_MANA);
+
+            CastAttempt attempt = CastLedger.open(player.getUUID(), COMMIT_CARRIER, 0, quote,
+                player.level().getGameTime());
+            CastLedger.reserve(attempt, CastLedger.forPlayer(player));
+
+            float afterReserve = data.getMana();
+            if (Math.abs((before - afterReserve) - expectedLeg) > 0.01f) {
+                helper.fail("reserving a " + expectedLeg + " quote moved the pool by "
+                    + (before - afterReserve));
+                return;
+            }
+
+            CastLedger.commitAndComplete(attempt);
+
+            float afterCommit = data.getMana();
+            if (Math.abs(afterCommit - afterReserve) > 0.01f) {
+                helper.fail("committing must not move the pool again: " + afterReserve
+                    + " became " + afterCommit + ". The reservation is the payment");
+            }
+        });
+        helper.succeed();
+    }
+
+    /**
+     * V01: a cancelled cast is refunded once, not once per exit path.
+     *
+     * <p>A long cast that was interrupted and then also ended normally used to run the release
+     * path twice and credit the player twice, because nothing tied a refund to the charge it
+     * reversed.
+     */
+    @GameTest(template = "platform", batch = "ans_mana_config")
+    public static void ironsLoaded_cancellationReleasesTheReservationExactlyOnce(
+            GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
+            return;
+        }
+        ServerPlayer player = preparedPlayer(helper, "mana_cancel");
+        runInHybrid(helper, () -> {
+            MagicData data = MagicData.getPlayerMagicData(player);
+            EquipmentIntegration.syncIronsMaxToArs(player, 500.0f);
+            data.setMana(400.0f);
+            float before = data.getMana();
+
+            CostQuote quote = QuoteService.quoteNativeCast(
+                ResourceUnit.ARS_MANA, 100, QuoteService.currentRules());
+            CastAttempt attempt = CastLedger.open(player.getUUID(), CANCEL_CARRIER, 0, quote,
+                player.level().getGameTime());
+            CastLedger.reserve(attempt, CastLedger.forPlayer(player));
+
+            CastLedger.cancel(attempt, CastLedger.forPlayer(player));
+            float afterFirstRelease = data.getMana();
+            if (Math.abs(afterFirstRelease - before) > 0.01f) {
+                helper.fail("a cancelled cast must return exactly what it took: " + before
+                    + " became " + afterFirstRelease);
+                return;
+            }
+
+            // A second exit path arrives. It must settle the attempt and pay nothing.
+            CastLedger.cancel(attempt, CastLedger.forPlayer(player));
+            float afterSecondRelease = data.getMana();
+            if (Math.abs(afterSecondRelease - afterFirstRelease) > 0.01f) {
+                helper.fail("the second release credited "
+                    + (afterSecondRelease - afterFirstRelease) + " more mana; a refund must "
+                    + "happen exactly once or a cancelled cast prints mana");
+            }
+        });
+        helper.succeed();
+    }
+
+    /**
+     * Repeated casts must stay loss-exact, not just the first one.
+     *
+     * <p>Owns its own batch (T0.4's rule). This is the one scenario here that deliberately
+     * strips the ceiling and then leans on {@code ensureSharedPoolCeiling} putting it back on
+     * the deduction path, and that guard only runs in HYBRID. The mana mode is a single global
+     * the whole run shares and every test in {@code ans_mana_config} ticks concurrently, so a
+     * sibling's {@code finally} restoring the mode landed between this test's casts: the
+     * ceiling was never re-applied, Iron's clamped the 700 pool to its own 100 max on the first
+     * write, and the remaining four casts spent that down to 20.
+     */
+    @GameTest(template = "platform", batch = "ans_mana_ceiling_drift")
+    public static void ironsLoaded_hybridRepeatedCasts_stayLossExact(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
+            return;
+        }
+        ServerPlayer player = preparedPlayer(helper, "mana_book");
         IManaCap cap = ManaUtil.getNativeMana(player).orElse(null);
         if (cap == null) {
             helper.fail("Ars mana capability missing on the test player");
@@ -248,7 +402,7 @@ public final class SharedPoolManaGameTests {
             float cost = 20.0f;
             int casts = 5;
             for (int i = 0; i < casts; i++) {
-                if (!BridgeManager.consumeManaForMode(player, cost, true)) {
+                if (!BridgeManager.consumeManaForMode(player, cost, ResourceUnit.ARS_MANA)) {
                     helper.fail("cast " + i + " should have been affordable");
                     return;
                 }

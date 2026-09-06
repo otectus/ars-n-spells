@@ -2,6 +2,7 @@ package com.otectus.arsnspells.events;
 
 import com.hollingsworth.arsnouveau.api.event.SpellCostCalcEvent;
 import com.hollingsworth.arsnouveau.api.event.SpellResolveEvent;
+import com.otectus.arsnspells.casting.RingPaymentLegs;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import net.minecraft.ChatFormatting;
@@ -187,6 +188,9 @@ public class VirtueRingHandler {
             LOGGER.debug("Virtue Ring no longer equipped on {} between cost calc and resolve - dropping pending costs",
                 player.getName().getString());
             pendingCosts.remove(player.getUUID());
+            // V24: releasing, not just forgetting. The aura was drained into a reservation at
+            // the pre-cast gate, so a carrier swap has to put it back.
+            RingPaymentLegs.release(player, event.context);
         }
     }
 
@@ -245,9 +249,10 @@ public class VirtueRingHandler {
             return;
         }
 
-        LOGGER.debug("Consuming {} aura from {}", pending.auraCost, player.getName().getString());
-
-        boolean success = SanctifiedLegacyCompat.consumeCovenantAura(player, pending.auraCost);
+        // V23/V24: the aura was drained into a reservation at the pre-cast gate and settles at
+        // the expend boundary. This is the backstop for resolve paths that never reach it;
+        // commit is idempotent and drains nothing.
+        boolean success = RingPaymentLegs.commit(player, event.context, pending.auraCost);
         if (!success) {
             // Either ambient aura was genuinely insufficient OR Nature's Aura reflection
             // failed to resolve at startup (degraded mode — already logged at boot). In
@@ -298,6 +303,8 @@ public class VirtueRingHandler {
     public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
         UUID id = event.getEntity().getUUID();
         pendingCosts.remove(id);
+        // V24: drop any leg still held for a player who is no longer here to refund.
+        com.otectus.arsnspells.casting.AlternativePayment.forgetPlayer(id);
         // ScrollAuraTracker cleanup removed: the tracker was deleted along with the
         // Iron's-aura-scroll intercept (Covenant handles Iron's scroll aura natively).
     }

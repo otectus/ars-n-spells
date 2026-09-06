@@ -18,6 +18,14 @@ Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for M
 
 If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior; all Iron's-dependent handlers, mixins, items, and recipes are gated on Iron's presence.
 
+**Scenarios with or without Iron's Spellbooks:**
+- **Fresh configuration** — starting a new world or creative session with Iron's never installed works correctly, as the mod runs as a pure Ars Nouveau addon.
+- **Dormant ANS payloads** — ANS cross-cast data already written to items in a saved world remains inert and does not break the world.
+- **Missing registry items** — items belonging to Iron's that the save references only affect those individual items, not the world itself.
+- **Whole-world dimension compatibility** — if the world references `irons_spellbooks:pocket_dimension_type`, an **upstream Iron's Spellbooks resource** that Iron's writes into level data, the world may fail to decode entirely. This is not an ANS defect, and ANS cannot repair it.
+
+**Always keep backups** when removing Iron's from an established world. ANS does not automatically delete dimensions or cross-cast payloads that refer to the mod.
+
 ¹ The Covenant aura-bar HUD mixin is verified against Covenant 2.2.6; other versions still work, but the client logs a warning if the overlay bytecode has drifted.
 ² No hard dependency — mana stats on curios are read generically through the Curios API (see [Gear perks and enchantments](#gear-perks-and-enchantments)).
 ³ The advertised range is verified rather than assumed: every Iron's API type Ars 'n' Spells uses is byte-identical between 3.15.0 and 3.16.2 (the only difference across the whole API package is five *added* spell-registry constants), and the automated GameTest suite runs against both.
@@ -62,7 +70,7 @@ Ars spell potency scales with Iron's spell power attributes. The base `SPELL_POW
 
 Since 3.1.0 the school comes from **Ars Nouveau's own glyph metadata** (`AbstractSpellPart.spellSchools`) rather than from guessing at the glyph's registry name, so addon glyphs classify correctly without ANS shipping a hardcoded list — see [Spell schools](#spell-schools).
 
-Implementation: scaling activates on each Ars `SpellCastEvent` and is applied within a 60-tick window to spell-flavored damage from the casting player. Iron's must be installed for the scaling path to fire — without Iron's, Ars spells use their native damage values.
+Implementation: scaling subscribes directly to Ars Nouveau's `SpellDamageEvent.Pre`, which carries the caster, target, spell context, and damage. A delayed projectile is scaled by the spell that fired it, not by whatever the player cast most recently, and the school is resolved from the spell that is actually being scaled. Iron's must be installed for the scaling path to fire — without Iron's, Ars spells use their native damage values.
 
 ### Resonance
 
@@ -448,18 +456,21 @@ Output jar: `build/libs/ars_n_spells-3.3.0.jar` (version tracks `mod_version` in
 
 ### Test profiles
 
-`./gradlew test` runs the JUnit suite (272 tests). GameTests run on a real server via `runGameTestServer`, with opt-in profiles that put real dependencies on the runtime classpath:
+**Tested versions (this release):** Ars Nouveau 4.12.7, Iron's Spellbooks 1.20.1-3.15.0, Ars Elemental 0.6.8.0, Ars Zero 2.0.2 (Forge).
+
+`./gradlew test` runs the JUnit suite (272 tests). GameTests run on a real server via `runGameTestServer`, with opt-in profiles:
 
 | Command | Covers |
 | --- | --- |
 | `./gradlew runGameTestServer` | Iron's-absent fallback and boot safety |
-| `./gradlew runGameTestServer -PwithIronsRuntimeGameTests` | The cross-cast pipeline against real Iron's: bind, cast from the Curios spellbook slot, unbind, inscription guard, legacy repair |
+| `./gradlew runGameTestServer -PwithIronsRuntimeGameTests` | The cross-cast pipeline against real Iron's 1.20.1-3.15.0 |
 | `./gradlew runGameTestServer -PwithArsElemental` | Ars Elemental 0.6.8.0 glyph round-trip and school resolution |
-| `./gradlew runGameTestServer -PwithArsZero` | Ars Zero 2.0.2 glyph round-trip and school resolution *(local-only: requires jar in `libs/`, which is git-ignored; needs Forge 47.4.10)* |
-| `./gradlew runGameTestServer -PwithTooManyGlyphs` | Too Many Glyphs equivalent |
+| `./gradlew runGameTestServer -PwithArsZero` | Ars Zero 2.0.2 glyph round-trip and school resolution (local-only: requires jar in `libs/`) |
 | Any combination of the above | Mixed-addon recipes |
 
-*(Covenant of the Seven has no dedicated runtime profile; its surface is verified by `CovenantJarSurfaceTest` instead, which reads the jar bytecode and skips when the jar is absent.)*
+*(Covenant of the Seven has no dedicated runtime profile; surface compatibility is verified by `CovenantJarSurfaceTest`, which reads the jar bytecode and skips when absent.)*
+
+**What is not tested this cycle:** No graphical client session, no real multiplayer session, no full Covenant dependency stack, no JEI/EMI client matrix, no performance load test, no cross-Minecraft-version world conversion.
 
 Gradle reports `BUILD SUCCESSFUL` even when a GameTest world fails to load, so assert on the log line instead: `All N required tests passed`. The profiles share the `run/` directory, and an Iron's-loaded run leaves an `irons_spellbooks:pocket_dimension` reference in `run/world` that a later Iron's-absent run cannot load — delete `run/world` between profile switches.
 

@@ -198,6 +198,14 @@ public class ArsNSpells {
             return;
         }
 
+        // 3.3.0 (T1.2): resolve the schema-migrated keys and log the migration report once,
+        // before anything downstream reads a policy that migration may have decided.
+        try {
+            com.otectus.arsnspells.config.AnsConfig.onConfigLoaded(event.getConfig().getFullPath());
+        } catch (Exception e) {
+            LOGGER.error("FAILED to resolve config schema migration", e);
+        }
+
         // ANS-HIGH-029: the config is SERVER-type (loaded at world/server start),
         // but BridgeManager.init runs at common setup and caches the mana mode from
         // an unloaded spec — i.e. from defaults. Without this refresh, the mode a
@@ -205,6 +213,9 @@ public class ArsNSpells {
         // someone ran /ans mode set. Re-select bridges now that real values exist.
         try {
             com.otectus.arsnspells.bridge.BridgeManager.refreshMode();
+            // V14: a SERVER config load can change the mode out from under players who are
+            // already online (a /reload, or a config edit applied mid-session).
+            com.otectus.arsnspells.bridge.ModeChangeCleanup.reconcileAll();
         } catch (Exception e) {
             LOGGER.error("FAILED to refresh mana bridge mode from loaded config", e);
         }

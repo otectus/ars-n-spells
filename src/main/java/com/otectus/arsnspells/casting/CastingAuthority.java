@@ -5,6 +5,9 @@ import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.contract.CostQuote;
+import com.otectus.arsnspells.contract.CostRules;
+import com.otectus.arsnspells.contract.ResourceUnit;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import org.slf4j.Logger;
@@ -71,7 +74,7 @@ public class CastingAuthority {
         // handlers (CursedRingHandler / VirtueRingHandler), not here.
         // Standard mana validation
         logDebug("canCastArsSpell: Using standard mana validation");
-        return validateManaResource(player, manaCost, true);
+        return validateManaResource(player, manaCost, ResourceUnit.ARS_MANA);
     }
     
     /**
@@ -145,45 +148,47 @@ public class CastingAuthority {
             return true;
         }
 
-        return validateManaResource(player, manaCost, false);
+        return validateManaResource(player, manaCost, ResourceUnit.IRONS_MANA);
     }
 
     /**
-     * The amount an Ars spell of {@code baseCost} actually costs under the current config.
+     * The amount an Ars spell of {@code baseCost} actually costs the Ars pool.
      *
-     * <p>Single source of truth for the Ars-side conversion, shared by pre-cast validation
-     * and by the expend-mana mixin. They used to compute it separately —
-     * {@code (float)(cost * rate)} here versus {@code (int) Math.round(cost * rate)} there —
-     * so the amount charged could differ from the amount checked by up to half a point, and
-     * at the config's 0.01 floor the rounding made every spell under 50 mana free.
+     * <p>V05: the conversion is no longer written out here. Validation and charging both
+     * quote through {@link QuoteService} and read the leg they are about to move, so the
+     * two cannot disagree on a rate, on a dual-cost share, or on the unit. They used to
+     * compute it separately - {@code (float)(cost * rate)} here versus
+     * {@code (int) Math.round(cost * rate)} there - so the amount charged could differ from
+     * the amount checked by up to half a point, and at the config's 0.01 floor the rounding
+     * made every spell under 50 mana free.
+     *
+     * <p>Snapshots the rules per call. A cast that spans ticks must instead take one
+     * snapshot and pass it to {@link #effectiveCost(ResourceUnit, int, CostRules)}.
      */
     public static float effectiveArsCost(int baseCost) {
-        if (baseCost <= 0) {
-            return 0.0f;
-        }
-        if (!BridgeManager.isUnificationEnabled()) {
-            return baseCost;
-        }
-        return (float) (baseCost * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+        return effectiveCost(ResourceUnit.ARS_MANA, baseCost, QuoteService.currentRules());
     }
 
     /** The Iron's-side counterpart of {@link #effectiveArsCost}. */
     public static float effectiveIronsCost(int baseCost) {
+        return effectiveCost(ResourceUnit.IRONS_MANA, baseCost, QuoteService.currentRules());
+    }
+
+    /** The leg of a native cast that {@code origin}'s own pool owes, under {@code rules}. */
+    public static float effectiveCost(ResourceUnit origin, int baseCost, CostRules rules) {
         if (baseCost <= 0) {
             return 0.0f;
         }
-        if (!BridgeManager.isUnificationEnabled()) {
-            return baseCost;
-        }
-        return (float) (baseCost * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
+        return QuoteService.legAsFloat(QuoteService.quoteNativeCast(origin, baseCost, rules), origin);
     }
 
     /**
      * ANS-MED-043: consume the mana previously validated by
      * {@link #canCastIronsSpell}. Iron's scrolls never deduct mana natively, so
-     * "full" scroll cost mode validated the cost and then charged nothing. The
-     * conversion here mirrors {@link #validateManaResource} exactly so the
-     * amount deducted equals the amount validated.
+     * "full" scroll cost mode validated the cost and then charged nothing.
+     *
+     * <p>The quote is what was checked and the quote is what is charged, so a dual-cost
+     * mode takes both legs instead of taking one leg twice.
      */
     public static boolean consumeIronsSpellMana(Player player, int manaCost) {
         if (player == null) {
@@ -192,41 +197,28 @@ public class CastingAuthority {
         if (player.isCreative() || manaCost <= 0) {
             return true;
         }
-        return BridgeManager.consumeManaForMode(player, effectiveIronsCost(manaCost), false);
+        CostQuote quote = QuoteService.quoteNativeCast(
+            ResourceUnit.IRONS_MANA, manaCost, QuoteService.currentRules());
+        return BridgeManager.consumeQuote(player, quote);
     }
 
     /**
-     * Validate mana resource availability.
+     * Validate mana resource availability against the same quote the charge will use.
      *
      * @param player The player
      * @param cost The mana cost
-     * @param fromArs True if this is an Ars spell, false for Iron's
+     * @param origin The unit the spell's own system quoted the cost in
      * @return true if player has sufficient mana
      */
-    private static boolean validateManaResource(Player player, int cost, boolean fromArs) {
-        float availableMana;
-        float effectiveCost = cost;
-
-        if (!BridgeManager.isUnificationEnabled()) {
-            // No unification - use native Ars mana for Ars spells
-            if (fromArs) {
-                availableMana = BridgeManager.getBridge().getMana(player);
-            } else {
-                // For Iron's spells without unification, use Iron's mana
-                availableMana = BridgeManager.isIronsSpellbooksLoaded() ?
-                    BridgeManager.getManaForMode(player, false) : 0;
-            }
-        } else {
-            // Same helper the deduction uses, so validated cost == charged cost.
-            effectiveCost = fromArs ? effectiveArsCost(cost) : effectiveIronsCost(cost);
-            availableMana = BridgeManager.getManaForMode(player, fromArs);
-        }
-
-        boolean canAfford = availableMana >= effectiveCost;
+    private static boolean validateManaResource(Player player, int cost, ResourceUnit origin) {
+        CostQuote quote = QuoteService.quoteNativeCast(origin, cost, QuoteService.currentRules());
+        boolean canAfford = BridgeManager.canAffordQuote(player, quote);
 
         if (!canAfford) {
-            logDebug("Mana validation failed for {}: cost={}, available={}, fromArs={}",
-                player.getName().getString(), effectiveCost, availableMana, fromArs);
+            float effectiveCost = QuoteService.legAsFloat(quote, origin);
+            float availableMana = BridgeManager.getManaForMode(player, origin);
+            logDebug("Mana validation failed for {}: cost={}, available={}, origin={}",
+                player.getName().getString(), effectiveCost, availableMana, origin);
 
             // Send denial message
             sendDenialMessage(player, "§cNot Enough Mana: Need " + (int)effectiveCost + ", have " + (int)availableMana);

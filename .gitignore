@@ -11,6 +11,8 @@ bin/
 out/
 logs/
 run/
+# per-profile gametest run directories (-PgametestRunDir)
+run-*/
 
 # Dependencies & local copies
 dependencies/

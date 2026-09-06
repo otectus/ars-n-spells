@@ -120,6 +120,20 @@ public class EquipmentHandler {
     // up to ~1 s of "ring just equipped but not active yet" latency on the cast hot-path.
     
     /**
+     * Re-apply whatever mana contributions the current mode and config actually enable.
+     *
+     * <p>V14: the reconciler in {@code ModeChangeCleanup} needs step 2 of its sequence, and
+     * step 2 is exactly what this handler already does on an equipment change. Exposed rather
+     * than duplicated so a mode switch and a helmet swap cannot drift apart.
+     */
+    public static void recomputeContributions(Player player) {
+        if (player == null) {
+            return;
+        }
+        updatePlayerMaxMana(player);
+    }
+
+    /**
      * Update player's max mana based on equipment
      */
     private static void updatePlayerMaxMana(Player player) {

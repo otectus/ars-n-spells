@@ -1,0 +1,398 @@
+{
+  "cases": [
+    {
+      "expectThrowAtOpIndex": -1,
+      "expectedBalances": {
+        "ARS_MANA": 470.0,
+        "IRONS_MANA": 480.0
+      },
+      "expectedFinalState": "COMPLETED",
+      "expectedOpenCount": 0,
+      "expectedReservedLegs": [
+        {
+          "amount": 30.0,
+          "unit": "ARS_MANA"
+        },
+        {
+          "amount": 20.0,
+          "unit": "IRONS_MANA"
+        }
+      ],
+      "legs": [
+        {
+          "amount": 30.0,
+          "unit": "ARS_MANA"
+        },
+        {
+          "amount": 20.0,
+          "unit": "IRONS_MANA"
+        }
+      ],
+      "name": "happy path: request to completion",
+      "ops": [
+        "validate",
+        "markQuoted",
+        "reserve",
+        "commit",
+        "complete"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": -1,
+      "expectedBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "FAILED",
+      "expectedOpenCount": 0,
+      "expectedReservedLegs": [
+        {
+          "amount": 30.0,
+          "unit": "ARS_MANA"
+        },
+        {
+          "amount": 20.0,
+          "unit": "IRONS_MANA"
+        }
+      ],
+      "legs": [
+        {
+          "amount": 30.0,
+          "unit": "ARS_MANA"
+        },
+        {
+          "amount": 20.0,
+          "unit": "IRONS_MANA"
+        }
+      ],
+      "name": "reserve then fail releases exactly once",
+      "ops": [
+        "validate",
+        "markQuoted",
+        "reserve",
+        "fail"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": -1,
+      "expectedBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "FAILED",
+      "expectedOpenCount": 0,
+      "expectedReservedLegs": [
+        {
+          "amount": 30.0,
+          "unit": "ARS_MANA"
+        },
+        {
+          "amount": 20.0,
+          "unit": "IRONS_MANA"
+        }
+      ],
+      "legs": [
+        {
+          "amount": 30.0,
+          "unit": "ARS_MANA"
+        },
+        {
+          "amount": 20.0,
+          "unit": "IRONS_MANA"
+        }
+      ],
+      "name": "a second release is a silent no-op, never a second refund",
+      "ops": [
+        "validate",
+        "markQuoted",
+        "reserve",
+        "fail",
+        "fail",
+        "cancel"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": -1,
+      "expectedBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "CANCELLED",
+      "expectedOpenCount": 0,
+      "expectedReservedLegs": [],
+      "legs": [
+        {
+          "amount": 30.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "name": "cancel before reserve refunds nothing",
+      "ops": [
+        "validate",
+        "cancel"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": -1,
+      "expectedBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "CANCELLED",
+      "expectedOpenCount": 0,
+      "expectedReservedLegs": [
+        {
+          "amount": 40.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "legs": [
+        {
+          "amount": 40.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "name": "TTL sweep cancels a leaked reservation and releases it once",
+      "ops": [
+        "validate",
+        "markQuoted",
+        "reserve",
+        "expire"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": -1,
+      "expectedBalances": {
+        "ARS_MANA": 10.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "FAILED",
+      "expectedOpenCount": 0,
+      "expectedReservedLegs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        },
+        {
+          "amount": 20.0,
+          "unit": "IRONS_MANA"
+        }
+      ],
+      "legs": [
+        {
+          "amount": 30.0,
+          "unit": "ARS_MANA"
+        },
+        {
+          "amount": 20.0,
+          "unit": "IRONS_MANA"
+        }
+      ],
+      "name": "partial drain reserves only what actually moved",
+      "ops": [
+        "validate",
+        "markQuoted",
+        "reserve",
+        "fail"
+      ],
+      "startBalances": {
+        "ARS_MANA": 10.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": 0,
+      "expectedBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "REQUESTED",
+      "expectedOpenCount": 1,
+      "expectedReservedLegs": [],
+      "legs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "name": "illegal: quote before validate",
+      "ops": [
+        "markQuoted"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": 1,
+      "expectedBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "VALIDATED",
+      "expectedOpenCount": 1,
+      "expectedReservedLegs": [],
+      "legs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "name": "illegal: reserve before quote",
+      "ops": [
+        "validate",
+        "reserve"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": 2,
+      "expectedBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "QUOTED",
+      "expectedOpenCount": 1,
+      "expectedReservedLegs": [],
+      "legs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "name": "illegal: commit before reserve",
+      "ops": [
+        "validate",
+        "markQuoted",
+        "commit"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": 3,
+      "expectedBalances": {
+        "ARS_MANA": 490.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "RESERVED",
+      "expectedOpenCount": 1,
+      "expectedReservedLegs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "legs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "name": "illegal: complete before commit",
+      "ops": [
+        "validate",
+        "markQuoted",
+        "reserve",
+        "complete"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": 4,
+      "expectedBalances": {
+        "ARS_MANA": 490.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "COMMITTED",
+      "expectedOpenCount": 1,
+      "expectedReservedLegs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "legs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "name": "illegal: cancel after commit throws before refunding",
+      "ops": [
+        "validate",
+        "markQuoted",
+        "reserve",
+        "commit",
+        "cancel"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    },
+    {
+      "expectThrowAtOpIndex": 5,
+      "expectedBalances": {
+        "ARS_MANA": 490.0,
+        "IRONS_MANA": 500.0
+      },
+      "expectedFinalState": "COMPLETED",
+      "expectedOpenCount": 0,
+      "expectedReservedLegs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "legs": [
+        {
+          "amount": 10.0,
+          "unit": "ARS_MANA"
+        }
+      ],
+      "name": "illegal: anything after completion",
+      "ops": [
+        "validate",
+        "markQuoted",
+        "reserve",
+        "commit",
+        "complete",
+        "validate"
+      ],
+      "startBalances": {
+        "ARS_MANA": 500.0,
+        "IRONS_MANA": 500.0
+      }
+    }
+  ]
+}

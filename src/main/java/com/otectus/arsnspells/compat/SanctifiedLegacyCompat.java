@@ -115,6 +115,10 @@ public class SanctifiedLegacyCompat {
     private static java.lang.reflect.Method auraChunkGetHighestSpotMethod = null;
     private static java.lang.reflect.Method auraChunkTriangulateMethod = null;
     private static java.lang.reflect.Method auraChunkDrainAuraMethod = null;
+    // V24: the refund half of the aura leg. A reservation that cannot be released is not a
+    // reservation, so storeAura is resolved alongside drainAura and its absence is reported
+    // rather than hidden.
+    private static java.lang.reflect.Method auraChunkStoreAuraMethod = null;
     private static boolean naturesAuraReflectionResolved = false;
 
     /**
@@ -298,6 +302,7 @@ public class SanctifiedLegacyCompat {
             auraChunkGetHighestSpotMethod = tryGetStatic(chunkCls, "getHighestSpot", levelCls, posCls, int.class, posCls);
             auraChunkTriangulateMethod = tryGetStatic(chunkCls, "triangulateAuraInArea", levelCls, posCls, int.class);
             auraChunkDrainAuraMethod = tryGetInstance(chunkCls, "drainAura", posCls, int.class);
+            auraChunkStoreAuraMethod = tryGetInstance(chunkCls, "storeAura", posCls, int.class);
 
             naturesAuraReflectionResolved = true;
             boolean ok = auraChunkGetAuraChunkMethod != null
@@ -469,6 +474,179 @@ public class SanctifiedLegacyCompat {
             LOGGER.debug("getCovenantAura reflection failed", t);
         }
         return 0;
+    }
+
+    // ------------------------------------------------------------------
+    // V24: amount-returning primitives.
+    //
+    // consumeLP / consumeCovenantAura answer a boolean, and both of them answer "true" for a
+    // move smaller than the one asked for - consumeCovenantAura returns true for any drain
+    // above zero, and the health fallback can only ever take what is there. A caller that
+    // then refunds, or charges a second leg against, the amount it *requested* is moving
+    // resources that were never moved. These report what actually happened, which is what
+    // ResourceAccess is specified to return and what lets a reservation be released for
+    // exactly what it took.
+    // ------------------------------------------------------------------
+
+    /**
+     * Take up to {@code lpCost} LP, and report how much was actually taken.
+     *
+     * @return the LP actually removed, between 0 and {@code lpCost}
+     */
+    public static int debitLP(Player player, int lpCost) {
+        if (player == null || lpCost <= 0) {
+            return 0;
+        }
+        LPSourceMode mode = getLPSourceMode();
+
+        if (mode == LPSourceMode.BLOOD_MAGIC_PRIORITY || mode == LPSourceMode.BLOOD_MAGIC_ONLY) {
+            if (isBloodMagicAvailable()) {
+                int before = getBloodMagicLP(player);
+                if (before > 0) {
+                    int want = Math.min(lpCost, before);
+                    if (consumeBloodMagicLP(player, want)) {
+                        return want;
+                    }
+                    // Syphon reported a short move; measure it rather than trusting the ask.
+                    return Math.max(0, before - getBloodMagicLP(player));
+                }
+                if (mode == LPSourceMode.BLOOD_MAGIC_ONLY) {
+                    return 0;
+                }
+            } else if (mode == LPSourceMode.BLOOD_MAGIC_ONLY) {
+                return 0;
+            }
+        }
+
+        // Health fallback. The 1 HP buffer is a floor, not a rounding: whatever sits above it
+        // is all that can honestly be taken.
+        float healthCost = lpCost / 10.0f;
+        float currentHealth = player.getHealth();
+        float spendable = Math.max(0.0f, currentHealth - 1.0f);
+        float taken = Math.min(healthCost, spendable);
+        if (taken <= 0.0f) {
+            return 0;
+        }
+        player.setHealth(Math.max(1.0f, currentHealth - taken));
+        return Math.round(taken * 10.0f);
+    }
+
+    /**
+     * Give back up to {@code lpAmount} LP, and report how much actually landed.
+     *
+     * <p>Blood Magic exposes no "add to soul network" on the reflection surface this class
+     * resolves, so a refund goes back the way the health fallback took it. When neither route
+     * is open the answer is 0, which the caller must treat as an unresolved release rather
+     * than a completed one.
+     */
+    public static int creditLP(Player player, int lpAmount) {
+        if (player == null || lpAmount <= 0) {
+            return 0;
+        }
+        float healthGain = lpAmount / 10.0f;
+        float before = player.getHealth();
+        float after = Math.min(player.getMaxHealth(), before + healthGain);
+        if (after <= before) {
+            return 0;
+        }
+        player.setHealth(after);
+        return Math.round((after - before) * 10.0f);
+    }
+
+    /**
+     * Drain up to {@code cost} aura from the world around the player, and report how much came
+     * out. {@code IAuraChunk.drainAura} already returns the amount actually drained; the
+     * boolean wrapper threw that number away, which is exactly how a partial drain became an
+     * apparent success.
+     */
+    public static int debitCovenantAura(Player player, int cost) {
+        if (player == null || cost <= 0) {
+            return 0;
+        }
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer)) {
+            return 0;
+        }
+        if (!naturesAuraReflectionResolved
+            || auraChunkGetAuraChunkMethod == null
+            || auraChunkGetHighestSpotMethod == null
+            || auraChunkDrainAuraMethod == null) {
+            return 0;
+        }
+        try {
+            net.minecraft.world.level.Level level = player.level();
+            net.minecraft.core.BlockPos playerPos = player.blockPosition();
+            Object highest = auraChunkGetHighestSpotMethod.invoke(
+                null, level, playerPos, COVENANT_AURA_RADIUS, playerPos);
+            if (!(highest instanceof net.minecraft.core.BlockPos spot)) {
+                return 0;
+            }
+            Object chunkObj = auraChunkGetAuraChunkMethod.invoke(null, level, spot);
+            if (chunkObj == null) {
+                return 0;
+            }
+            Object drainedObj = auraChunkDrainAuraMethod.invoke(chunkObj, spot, cost);
+            if (drainedObj instanceof Number drained) {
+                return Math.max(0, Math.min(cost, drained.intValue()));
+            }
+        } catch (Throwable t) {
+            LOGGER.error("debitCovenantAura: IAuraChunk drain failed", t);
+        }
+        return 0;
+    }
+
+    /**
+     * Put up to {@code amount} aura back into the world around the player, and report how much
+     * landed. Returns 0 when {@code IAuraChunk.storeAura} did not resolve, which the caller
+     * must treat as an unresolved release.
+     */
+    public static int creditCovenantAura(Player player, int amount) {
+        if (player == null || amount <= 0) {
+            return 0;
+        }
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer)) {
+            return 0;
+        }
+        if (!naturesAuraReflectionResolved
+            || auraChunkGetAuraChunkMethod == null
+            || auraChunkGetHighestSpotMethod == null
+            || auraChunkStoreAuraMethod == null) {
+            return 0;
+        }
+        try {
+            net.minecraft.world.level.Level level = player.level();
+            net.minecraft.core.BlockPos playerPos = player.blockPosition();
+            Object highest = auraChunkGetHighestSpotMethod.invoke(
+                null, level, playerPos, COVENANT_AURA_RADIUS, playerPos);
+            if (!(highest instanceof net.minecraft.core.BlockPos spot)) {
+                return 0;
+            }
+            Object chunkObj = auraChunkGetAuraChunkMethod.invoke(null, level, spot);
+            if (chunkObj == null) {
+                return 0;
+            }
+            Object storedObj = auraChunkStoreAuraMethod.invoke(chunkObj, spot, amount);
+            if (storedObj instanceof Number stored) {
+                return Math.max(0, Math.min(amount, stored.intValue()));
+            }
+        } catch (Throwable t) {
+            LOGGER.error("creditCovenantAura: IAuraChunk store failed", t);
+        }
+        return 0;
+    }
+
+    /** Whether the aura bridge resolved every method a reserve-and-release cycle needs. */
+    public static boolean isAuraBridgeComplete() {
+        return naturesAuraReflectionResolved
+            && auraChunkGetAuraChunkMethod != null
+            && auraChunkGetHighestSpotMethod != null
+            && auraChunkTriangulateMethod != null
+            && auraChunkDrainAuraMethod != null
+            && auraChunkStoreAuraMethod != null;
+    }
+
+    /** Whether Covenant of the Seven itself is installed, as opposed to Enigmatic Legacy. */
+    public static boolean isCovenantLoaded() {
+        return isLoaded;
     }
 
     /**

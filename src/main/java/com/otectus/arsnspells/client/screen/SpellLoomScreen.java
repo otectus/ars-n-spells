@@ -1,17 +1,18 @@
 package com.otectus.arsnspells.client.screen;
 
+import com.otectus.arsnspells.block.SpellLoomBlockEntity;
 import com.otectus.arsnspells.compat.IronsCompat;
+import com.otectus.arsnspells.contract.InscriptionPlan;
+import com.otectus.arsnspells.inscription.LoomInscription;
 import com.otectus.arsnspells.menu.SpellLoomMenu;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.network.SpellLoomExportPacket;
-import com.otectus.arsnspells.rituals.InscriptionInputs;
-import com.otectus.arsnspells.spell.ArsSpellExportUtil;
-import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -71,6 +72,9 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
     private static final int BTN_H = 20;
     private static final int OPTION_BTN_W = 78;
     private static final int ACTION_Y = 86;
+    /** The action row carries Inscribe plus the separate, explicit Convert action. */
+    private static final int INSCRIBE_BTN_W = 108;
+    private static final int CONVERT_BTN_W = CONTENT_W - INSCRIBE_BTN_W - 4;
     /** Wheel-icon preview: slot-sized, at the right end of the recipe row. */
     private static final int PREVIEW_X = 152;
     private static final int PREVIEW_Y = SpellLoomMenu.RECIPE_ROW_Y;
@@ -90,8 +94,19 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
     private Button natureButton;
     private Button iconButton;
     private Button inscribeButton;
+    private Button convertButton;
     private int natureIndex = 0;
     private int iconIndex = 0;
+    /**
+     * The last reason code the server sent back (audit V18). The client mirrors the plan
+     * locally to keep the button responsive, but this is the authoritative answer and it is
+     * what the status line under the buttons shows.
+     */
+    private String serverReason = InscriptionPlan.REASON_OK;
+    /** Whether {@link #serverReason} answered a preview or a real attempt. */
+    private boolean serverReasonIsPreview = true;
+    /** Fingerprint of the two input slots, so a preview is requested on change, not per tick. */
+    private String previewedInputs = null;
 
     public SpellLoomScreen(SpellLoomMenu menu, Inventory inv, Component title) {
         super(menu, inv, title);
@@ -132,10 +147,22 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         addRenderableWidget(iconButton);
 
         inscribeButton = Button.builder(
-                Component.translatable("ars_n_spells.spell_loom.export"), b -> sendExport())
-            .bounds(x + MARGIN, y + ACTION_Y, CONTENT_W, BTN_H)
+                Component.translatable("ars_n_spells.spell_loom.export"),
+                b -> sendAction(SpellLoomExportPacket.ACTION_INSCRIBE))
+            .bounds(x + MARGIN, y + ACTION_Y, INSCRIBE_BTN_W, BTN_H)
             .build();
         addRenderableWidget(inscribeButton);
+
+        // Audit V18: converting a scroll that already holds a spell is its own action, never a
+        // side effect of Inscribe. It only lights up once the preview has said the target is
+        // not blank, and its tooltip says outright that the existing spell is destroyed.
+        convertButton = Button.builder(
+                Component.translatable("ars_n_spells.spell_loom.convert"),
+                b -> sendAction(SpellLoomExportPacket.ACTION_CONVERT))
+            .bounds(x + MARGIN + INSCRIBE_BTN_W + 4, y + ACTION_Y, CONVERT_BTN_W, BTN_H)
+            .tooltip(Tooltip.create(Component.translatable("ars_n_spells.spell_loom.tooltip.convert")))
+            .build();
+        addRenderableWidget(convertButton);
         updateInscribeState();
     }
 
@@ -149,10 +176,24 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
             Component.translatable("ars_n_spells.icon." + ICONS[iconIndex]));
     }
 
-    private void sendExport() {
+    private void sendAction(int action) {
         String name = nameField.getValue() == null ? "" : nameField.getValue().trim();
         PacketHandler.sendToServer(new SpellLoomExportPacket(
-            name, NATURES[natureIndex], ICONS[iconIndex]));
+            name, NATURES[natureIndex], ICONS[iconIndex], action));
+    }
+
+    /**
+     * Receive a {@code SpellLoomResultPacket}. Static because the packet has no handle on the
+     * open screen; it resolves the current one and drops the result if the player has since
+     * closed the loom.
+     */
+    public static void acceptResult(String reasonCode, boolean preview) {
+        Screen open = Minecraft.getInstance().screen;
+        if (open instanceof SpellLoomScreen loom) {
+            loom.serverReason = reasonCode == null ? InscriptionPlan.REASON_OK : reasonCode;
+            loom.serverReasonIsPreview = preview;
+            loom.updateInscribeState();
+        }
     }
 
     // ---- Inscribe enablement (client-side mirror of the packet's validation) ----
@@ -163,7 +204,30 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         // AbstractContainerScreen does not tick widgets; without this the
         // name field's caret never blinks.
         nameField.tick();
+        requestPreviewOnInputChange();
         updateInscribeState();
+    }
+
+    /**
+     * Ask the server what it would do, once per change of the input slots.
+     *
+     * <p>A preview is a pure read on both sides -- the server plans and replies, moving
+     * nothing -- so the only cost worth avoiding is sending one every tick.
+     */
+    private void requestPreviewOnInputChange() {
+        if (this.menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) {
+            return;
+        }
+        ItemStack source = this.menu.getSlot(SpellLoomBlockEntity.SLOT_SOURCE).getItem();
+        ItemStack scroll = this.menu.getSlot(SpellLoomBlockEntity.SLOT_SCROLL).getItem();
+        String fingerprint = source.getCount() + ":" + source.getDescriptionId() + ":"
+            + source.getTag() + "|" + scroll.getCount() + ":" + scroll.getDescriptionId() + ":"
+            + scroll.getTag();
+        if (fingerprint.equals(previewedInputs)) {
+            return;
+        }
+        previewedInputs = fingerprint;
+        sendAction(SpellLoomExportPacket.ACTION_PREVIEW);
     }
 
     @Override
@@ -176,42 +240,67 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
     }
 
     /**
-     * Enables Inscribe only when the export can succeed, and puts the first
-     * failing reason in its tooltip. Mirrors — never replaces — the
-     * server-authoritative checks in {@code SpellLoomExportPacket}; the same
-     * lang keys are reused so the two can't drift.
+     * Enables Inscribe only when the inscription can succeed, and puts the reason in its
+     * tooltip. Mirrors -- never replaces -- the server's own decision: the same
+     * {@link LoomInscription} planner runs here against the synced slots, and what the server
+     * sends back is the authority. There is no second copy of the blankness rule anywhere.
      */
     private void updateInscribeState() {
-        if (inscribeButton == null) {
+        if (inscribeButton == null || convertButton == null) {
             return;
         }
-        Component reason = firstInscribeProblem();
-        inscribeButton.active = reason == null;
-        inscribeButton.setTooltip(Tooltip.create(reason != null
-            ? reason
-            : Component.translatable("ars_n_spells.spell_loom.tooltip.inscribe")));
+        String reasonCode = currentReasonCode();
+        boolean ok = InscriptionPlan.REASON_OK.equals(reasonCode);
+        inscribeButton.active = ok;
+        inscribeButton.setTooltip(Tooltip.create(ok
+            ? Component.translatable("ars_n_spells.spell_loom.tooltip.inscribe")
+            : reasonMessage(reasonCode)));
+        // Convert only offers itself for the one refusal it can actually fix, and it is the
+        // only route by which a filled scroll is ever overwritten.
+        convertButton.active = InscriptionPlan.REASON_NOT_BLANK.equals(reasonCode)
+            || InscriptionPlan.REASON_TARGET_NOT_EMPTY.equals(reasonCode);
     }
 
-    private Component firstInscribeProblem() {
+    /**
+     * The reason code to show: the plan for the slots as they stand, falling back to the
+     * server's last word when there is no client-side block entity to plan against.
+     */
+    private String currentReasonCode() {
+        SpellLoomBlockEntity be = this.menu.getBlockEntity();
+        if (be == null || this.menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) {
+            // Desynced menu: nothing local to plan against. A reply to a finished attempt says
+            // nothing about what the slots hold now, so only a preview answer is reusable and
+            // anything else keeps the button disabled, as it was before.
+            return serverReasonIsPreview ? serverReason : LoomInscription.REASON_CARRIER_FAILED;
+        }
+        if (!this.menu.getSlot(SpellLoomBlockEntity.SLOT_OUTPUT).getItem().isEmpty()) {
+            return LoomInscription.REASON_OUTPUT_OCCUPIED;
+        }
         if (!IronsCompat.isLoaded()) {
-            return Component.translatable("ars_n_spells.spell_loom.error.irons_missing");
+            return LoomInscription.REASON_IRONS_MISSING;
         }
-        if (this.menu.getBlockEntity() == null || this.menu.slots.size() < 3) {
-            // Desynced menu (block entity missing client-side) — keep disabled.
-            return Component.translatable("ars_n_spells.spell_loom.error.failed");
+        if (this.menu.getSlot(SpellLoomBlockEntity.SLOT_SOURCE).getItem().isEmpty()) {
+            return LoomInscription.REASON_NO_ARS_SPELL;
         }
-        if (!this.menu.getSlot(2).getItem().isEmpty()) {
-            return Component.translatable("ars_n_spells.spell_loom.error.output_full");
-        }
-        ItemStack source = this.menu.getSlot(0).getItem();
-        if (ArsSpellExportUtil.extractArsSpell(source).isEmpty()) {
-            return Component.translatable("ars_n_spells.spell_loom.error.no_source");
-        }
-        ItemStack scroll = this.menu.getSlot(1).getItem();
-        if (!IronsBookBindingUtil.isIronsScroll(scroll) || InscriptionInputs.isInscribed(scroll)) {
-            return Component.translatable("ars_n_spells.spell_loom.error.no_scroll");
-        }
-        return null;
+        return LoomInscription.plan(be).reasonCode();
+    }
+
+    /** Reason code to player-facing text. Codes are stable strings; the keys are shipped lang. */
+    private static Component reasonMessage(String reasonCode) {
+        String key = switch (reasonCode) {
+            case InscriptionPlan.REASON_NOT_BLANK -> "ars_n_spells.spell_loom.error.not_blank";
+            case InscriptionPlan.REASON_TARGET_NOT_EMPTY ->
+                "ars_n_spells.spell_loom.error.target_not_empty";
+            case InscriptionPlan.REASON_INSUFFICIENT_STACK ->
+                "ars_n_spells.spell_loom.error.insufficient_stack";
+            case LoomInscription.REASON_OUTPUT_OCCUPIED ->
+                "ars_n_spells.spell_loom.error.output_full";
+            case LoomInscription.REASON_IRONS_MISSING ->
+                "ars_n_spells.spell_loom.error.irons_missing";
+            case LoomInscription.REASON_NO_ARS_SPELL -> "ars_n_spells.spell_loom.error.no_source";
+            default -> "ars_n_spells.spell_loom.error.failed";
+        };
+        return Component.translatable(key);
     }
 
     // ---- Rendering ----

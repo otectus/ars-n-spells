@@ -156,7 +156,7 @@ public final class RitualLifecycleGameTests {
         List<RitualBrazierTile> tiles = new ArrayList<>();
         for (int i = 0; i < paths.size(); i++) {
             RitualBrazierTile tile = lightAnsBrazier(helper, spots[i], paths.get(i));
-            tile.startRitual(CrossCastGameTests.emptyHandedPlayer(helper));
+            tile.startRitual(CrossCastGameTests.scenarioPlayer(helper, "ritual_finish"));
             tiles.add(tile);
         }
         helper.startSequence()
@@ -175,8 +175,7 @@ public final class RitualLifecycleGameTests {
     /** The happy path: dropped carrier scroll + dropped Iron's book, bound by the ritual itself. */
     @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals")
     public static void bindingRitual_bindsDroppedScrollOntoDroppedBook(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         // Count 2 proves the ritual consumes ONE scroll rather than the whole stack: Iron's scrolls
@@ -185,7 +184,7 @@ public final class RitualLifecycleGameTests {
         ItemEntity book = dropNear(helper, new Vec3(2.5, 1.3, 3.5), ironsBookStack(helper));
         RitualBrazierTile tile = lightAnsBrazier(helper, BRAZIER, SpellbookBindingRitual.REGISTRY_PATH);
 
-        tile.startRitual(CrossCastGameTests.emptyHandedPlayer(helper));
+        tile.startRitual(CrossCastGameTests.scenarioPlayer(helper, "ritual_bind"));
 
         helper.startSequence()
             .thenExecuteAfter(RITUAL_SETTLE_TICKS, () -> {
@@ -212,8 +211,7 @@ public final class RitualLifecycleGameTests {
      */
     @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals")
     public static void bindingRitual_strayItemInRangeAbortsWithoutMutating(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemEntity scroll = dropNear(helper, new Vec3(2.5, 1.3, 1.5), carrierScrollStack(helper, 2));
@@ -221,7 +219,7 @@ public final class RitualLifecycleGameTests {
         dropNear(helper, new Vec3(1.5, 1.3, 2.5), new ItemStack(Items.TORCH));
         RitualBrazierTile tile = lightAnsBrazier(helper, BRAZIER, SpellbookBindingRitual.REGISTRY_PATH);
 
-        tile.startRitual(CrossCastGameTests.emptyHandedPlayer(helper));
+        tile.startRitual(CrossCastGameTests.scenarioPlayer(helper, "ritual_stray"));
 
         helper.startSequence()
             .thenExecuteAfter(RITUAL_SETTLE_TICKS, () -> {
@@ -242,34 +240,43 @@ public final class RitualLifecycleGameTests {
      * With {@code allow_ars_spells_in_irons_spellbooks=false} the ritual must refuse and leave both
      * items untouched.
      */
-    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals")
+    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals_config")
     public static void bindingRitual_honoursTheConfigKillSwitch(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ItemEntity scroll = dropNear(helper, new Vec3(2.5, 1.3, 1.5), carrierScrollStack(helper, 2));
         ItemEntity book = dropNear(helper, new Vec3(2.5, 1.3, 3.5), ironsBookStack(helper));
         RitualBrazierTile tile = lightAnsBrazier(helper, BRAZIER, SpellbookBindingRitual.REGISTRY_PATH);
 
+        // The kill switch is a single global the whole run shares, so this scenario owns its own
+        // batch (ans_rituals_config) and restores the previous value from a finally. Before the
+        // split it ticked concurrently with the happy-path bind above, which then observed
+        // binding disabled and found 0 entries (audit V26/T0.4).
+        boolean previous = AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.get();
         AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.set(false);
-        tile.startRitual(CrossCastGameTests.emptyHandedPlayer(helper));
+        try {
+            tile.startRitual(CrossCastGameTests.scenarioPlayer(helper, "ritual_cfg"));
 
-        helper.startSequence()
-            .thenExecuteAfter(RITUAL_SETTLE_TICKS, () -> {
-                // Restored FIRST, before any assertion can bail out: the config spec is shared
-                // across every test in the run, so leaving this false would silently break
-                // unrelated tests later in the batch.
-                AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.set(true);
-                assertRitualFinished(helper, tile, "Spellbook Binding");
-                if (arsEntryCount(book) != 0) {
-                    helper.fail("binding is disabled in config, but the book gained "
-                        + arsEntryCount(book) + " Ars entries");
-                }
-                if (!scroll.isAlive() || scroll.getItem().getCount() != 2) {
-                    helper.fail("a config-refused bind must not consume the carrier scroll");
-                }
-            })
-            .thenSucceed();
+            helper.startSequence()
+                .thenExecuteAfter(RITUAL_SETTLE_TICKS, () -> {
+                    try {
+                        assertRitualFinished(helper, tile, "Spellbook Binding");
+                        if (arsEntryCount(book) != 0) {
+                            helper.fail("binding is disabled in config, but the book gained "
+                                + arsEntryCount(book) + " Ars entries");
+                        }
+                        if (!scroll.isAlive() || scroll.getItem().getCount() != 2) {
+                            helper.fail("a config-refused bind must not consume the carrier scroll");
+                        }
+                    } finally {
+                        AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.set(previous);
+                    }
+                })
+                .thenSucceed();
+        } catch (Throwable failedBeforeTheSequenceRan) {
+            AnsConfig.ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS.set(previous);
+            throw failedBeforeTheSequenceRan;
+        }
     }
 }

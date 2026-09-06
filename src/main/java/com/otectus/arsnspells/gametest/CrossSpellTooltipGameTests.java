@@ -151,8 +151,7 @@ public final class CrossSpellTooltipGameTests {
     /** The exact stack the Spell Loom hands the player must render its tooltip cleanly. */
     @GameTest(template = "platform")
     public static void ironsLoaded_tooltip_onRealLoomCarrier_survives(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
@@ -185,8 +184,7 @@ public final class CrossSpellTooltipGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_undecodableContainer_isRepaired(GameTestHelper helper) {
-        if (!IronsCompat.isLoaded()) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);

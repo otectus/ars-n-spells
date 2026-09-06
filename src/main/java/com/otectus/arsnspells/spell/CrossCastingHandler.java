@@ -5,6 +5,13 @@ import com.hollingsworth.arsnouveau.api.spell.ISpellCaster;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.hollingsworth.arsnouveau.api.spell.SpellCaster;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.casting.CastLedger;
+import com.otectus.arsnspells.casting.QuoteService;
+import com.otectus.arsnspells.contract.CarrierPolicy;
+import com.otectus.arsnspells.contract.CastAttempt;
+import com.otectus.arsnspells.contract.CostQuote;
+import com.otectus.arsnspells.contract.CostRules;
+import com.otectus.arsnspells.contract.ResourceUnit;
 import com.otectus.arsnspells.bridge.IManaBridge;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
@@ -263,24 +270,14 @@ public class CrossCastingHandler {
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
                 CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "ARS", "success", success);
             if (!success) {
-                // ANS-HIGH-030: SEPARATE mode pre-pays the Iron's share during
-                // cost-calc. If the Ars leg then failed, compensate — matching the
-                // BridgeManager rollback contract (ANS-CRIT-003). take() drains the
-                // entry atomically; blocked paths that already cleared it consumed
-                // nothing, so a missing entry means nothing to refund.
-                CrossCastContext.Entry entry = CrossCastContext.take(player);
-                if (entry != null && entry.issPaid > 0.0f) {
-                    IManaBridge issBridge = BridgeManager.getSecondaryBridge();
-                    if (issBridge != null) {
-                        issBridge.addMana(player, entry.issPaid);
-                        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                            CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "ARS",
-                            "refundIss", entry.issPaid);
-                    } else {
-                        LOGGER.warn("Cross-cast failed after Iron's mana was consumed but no "
-                            + "secondary bridge is available to refund {} mana", entry.issPaid);
-                    }
-                }
+                // V01: nothing is pre-paid during cost calculation any more, so there is
+                // no compensating refund to make here. A reservation that was taken at the
+                // pre-cast gate and never committed is released by the ledger - exactly
+                // once, whether this path or the TTL sweep gets there first.
+                CrossCastContext.take(player);
+                CastLedger.findOpen(player.getUUID(),
+                        CastLedger.carrierIdentity(item))
+                    .ifPresent(attempt -> CastLedger.cancel(attempt, CastLedger.forPlayer(player)));
             }
         }
     }
@@ -395,10 +392,69 @@ public class CrossCastingHandler {
     }
 
     /**
+     * Cost events already answered, so one event instance gets one stamp.
+     *
+     * <p>Idempotence is <em>per event</em>, not per attempt. That distinction is the whole
+     * of V01: the old {@code tryMarkMultiplierApplied} suppressed every later <em>new</em>
+     * event for the attempt, so the first query returned 200 and the second returned 100.
+     * Upstream Ars builds a fresh event on every {@code getResolveCost()} call, and both
+     * {@code canCast()} and {@code expendMana()} call it, so "once per attempt" was never
+     * the right unit. Weak keys: an event that was collected can never be re-posted.
+     */
+    private static final java.util.Map<Object, Integer> ANSWERED_COST_EVENTS =
+        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /**
+     * Price one Ars cost query. Repeatable, and it never debits.
+     *
+     * <p>This is the whole body of {@link #onArsSpellCost}; the handler below does nothing
+     * but unwrap the event. Kept separate so the repeatability regression can be exercised
+     * without a Minecraft bootstrap - a "fresh cost event" is exactly a fresh
+     * {@code eventKey} carrying the same {@code baseCost}, which is what upstream produces.
+     *
+     * <p>The first query for a player and carrier quotes from the policy and opens the
+     * attempt that holds the quote. Every later query reads that attempt and answers
+     * identically. Nothing here moves a resource: the SEPARATE-mode Iron's share used to be
+     * consumed inside this calculation, which made asking the price cost money.
+     *
+     * @return the Ars-pool leg, in whole units, that the event should report
+     */
+    public static int quoteArsCostForEvent(Object eventKey, UUID playerId, String carrierIdentity,
+                                           CarrierPolicy carrier, int baseCost, CostRules rules,
+                                           long gameTick) {
+        Integer alreadyAnswered = ANSWERED_COST_EVENTS.get(eventKey);
+        if (alreadyAnswered != null) {
+            return alreadyAnswered;
+        }
+
+        CostQuote quote = CastLedger.findOpen(playerId, carrierIdentity)
+            .map(CastAttempt::quote)
+            .orElseGet(() -> {
+                CostQuote fresh = QuoteService.quote(
+                    ResourceUnit.ARS_MANA, Math.max(0, baseCost), rules, carrier);
+                // payloadRevision 0: this wave changes no stack NBT, so there is no revision
+                // counter to read yet. The field exists for the carrier-edited-mid-cast check
+                // a later wave adds.
+                CastLedger.open(playerId, carrierIdentity, 0, fresh, gameTick);
+                return fresh;
+            });
+
+        long rounded = rules.rounding().apply(quote.total(ResourceUnit.ARS_MANA));
+        int answer = (int) Math.max(0L, Math.min(Integer.MAX_VALUE, rounded));
+        ANSWERED_COST_EVENTS.put(eventKey, answer);
+        return answer;
+    }
+
+    /**
      * ANS-CRIT-004: runs at HIGHEST so the cross-cast multiplier applies to the
      * unmodified base cost, BEFORE CursedRingHandler / VirtueRingHandler zero out
      * event.currentCost to stamp pending LP/aura. Without this, ring wearers paid
      * zero cross-cast overhead — the documented 1.25× premium silently became 0×1.25.
+     *
+     * <p>V01: a thin adapter over {@link #quoteArsCostForEvent}. It answers; it does not
+     * charge. A native cast's event is left reporting Ars's own base cost - the conversion
+     * lives on the attempt's quote and is applied when the reservation is taken, and
+     * rewriting the event as well would convert it twice.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onArsSpellCost(SpellCostCalcEvent event) {
@@ -406,92 +462,38 @@ public class CrossCastingHandler {
         if (!(caster instanceof Player player)) {
             return;
         }
+        if (player.level().isClientSide()) {
+            return;
+        }
 
         CrossCastContext.Entry entry = CrossCastContext.peek(player);
-        if (entry == null || entry.type != CrossSpellType.ARS_NOUVEAU) {
+        boolean crossCast = entry != null && entry.type == CrossSpellType.ARS_NOUVEAU;
+        if (!crossCast && !BridgeManager.isUnificationEnabled()) {
+            // Ars prices and charges its own cast; ANS has no opinion and opens no attempt.
             return;
         }
 
-        // ANS-HIGH-004: atomic check-and-mark. The Ars cost-calc event can fire more
-        // than once during a resolve (preview vs. actual deduction). compareAndSet
-        // ensures exactly one caller applies the multiplier even under overlapping
-        // cross-casts on different threads.
-        if (!entry.tryMarkMultiplierApplied()) {
-            return;
-        }
-
-        ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        boolean unified = BridgeManager.isUnificationEnabled();
-        float multiplier = (float) Math.max(0.0, AnsConfig.CROSS_CAST_COST_MULTIPLIER.get());
+        CarrierPolicy carrier = crossCast
+            ? CarrierPolicy.REUSABLE_BOOK_SEMANTICS
+            : CarrierPolicy.NATIVE_ONLY;
+        String carrierIdentity = CastLedger.carrierIdentity(event.context.getCasterTool());
         int baseEventCost = Math.max(0, event.currentCost);
-        // Apply the cross-cast multiplier to the Ars-computed base cost first;
-        // the SEPARATE-mode dual-cost split (below) then operates on the
-        // already-multiplied total, matching the Iron's-side accounting where
-        // the multiplier is applied before the split.
-        int totalCost = Math.max(0, Math.round(baseEventCost * multiplier));
 
-        if (unified && mode == ManaUnificationMode.SEPARATE) {
-            float arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
-            float issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
-            float arsCost = totalCost * arsPercent;
-            float issCost = (float) (totalCost * issPercent * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+        int quoted = quoteArsCostForEvent(event, player.getUUID(), carrierIdentity, carrier,
+            baseEventCost, QuoteService.currentRules(), player.level().getGameTime());
 
-            entry.arsCost = arsCost;
-            entry.issCost = issCost;
-            entry.costsReady = true;
-            // ANS-HIGH-004: multiplierApplied was already set atomically at the top of
-            // this handler via tryMarkMultiplierApplied. No further write needed here.
-
-            if (!player.isCreative() && issCost > 0.0f) {
-                IManaBridge issBridge = BridgeManager.getSecondaryBridge();
-                float issMana = issBridge != null ? issBridge.getMana(player) : 0.0f;
-                if (issMana < issCost) {
-                    entry.blocked = true;
-                    event.currentCost = Integer.MAX_VALUE;
-                    CrossCastContext.clear(player);
-                    logDebug("Insufficient Iron mana for cross-cast: need {}, have {}", issCost, issMana);
-                    return;
-                }
-                // ANS-CRIT-002: pre-consume Iron's atomically with the Ars cost-calc.
-                // The previous design deferred the Iron's-side consume to the @TAIL of
-                // MixinSpellResolverMana, but the TAIL silently swallowed consume failures,
-                // letting Ars mana drain one-way. Consuming here makes the dual-cost
-                // atomic with the sufficiency check above, and the TAIL is now a no-op
-                // for entries that have already paid (issCost = 0).
-                if (issBridge != null && !issBridge.consumeMana(player, issCost)) {
-                    entry.blocked = true;
-                    event.currentCost = Integer.MAX_VALUE;
-                    CrossCastContext.clear(player);
-                    logDebug("Iron mana consume failed for cross-cast: need {}, have {}", issCost, issMana);
-                    return;
-                }
-                // ANS-HIGH-030: remember what was pre-paid so castArsSpell can
-                // refund it if the Ars leg fails (insufficient Ars mana or a
-                // downstream cancel). issCost must still go to 0 for the TAIL
-                // mixin's already-paid contract (ANS-CRIT-002).
-                entry.issPaid = issCost;
-                entry.issCost = 0.0f;
-            }
-
-            event.currentCost = Math.max(0, Math.round(arsCost));
-            CrossCastTrace.log(entry.attemptId, player, CrossCastTrace.Side.S,
-                CrossCastTrace.Stage.ARS_COST_APPLIED,
-                "mode", "SEPARATE", "unified", true, "base", baseEventCost,
-                "final", event.currentCost, "issSecondary", issCost);
-            logDebug("Ars cross-cast (SEPARATE): base={} multiplier={} total={} ars={} iss={}",
-                baseEventCost, multiplier, totalCost, arsCost, issCost);
+        if (!crossCast) {
+            // Native cast: the attempt now holds the quote, but the event keeps reporting
+            // Ars's own number. See the method note above.
             return;
         }
 
-        // Non-SEPARATE (or unified=false): Ars deducts the full multiplied
-        // cost from its own pool. The multiplier is the only adjustment we
-        // make. multiplierApplied was set atomically at the top.
-        event.currentCost = totalCost;
+        event.currentCost = quoted;
         CrossCastTrace.log(entry.attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.ARS_COST_APPLIED,
-            "mode", mode, "unified", unified, "base", baseEventCost, "final", totalCost);
-        logDebug("Ars cross-cast ({}, unified={}): base={} multiplier={} total={}",
-            mode, unified, baseEventCost, multiplier, totalCost);
+            "mode", BridgeManager.getCurrentMode(), "unified", BridgeManager.isUnificationEnabled(),
+            "base", baseEventCost, "final", quoted);
+        logDebug("Ars cross-cast: base={} quoted={}", baseEventCost, quoted);
     }
 
     @SubscribeEvent

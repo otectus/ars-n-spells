@@ -4,6 +4,7 @@ import com.hollingsworth.arsnouveau.api.event.SpellCostCalcEvent;
 import com.hollingsworth.arsnouveau.api.event.SpellResolveEvent;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.otectus.arsnspells.casting.RingPaymentLegs;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.compat.ScrollLPTracker;
 import com.otectus.arsnspells.config.AnsConfig;
@@ -210,6 +211,10 @@ public class CursedRingHandler {
             LOGGER.debug("Cursed Ring no longer equipped on {} between cost calc and resolve - dropping pending costs",
                 player.getName().getString());
             pendingCosts.remove(player.getUUID());
+            // V24: a carrier swap or an interrupt cancels the attempt, which means releasing
+            // the reservation rather than merely forgetting it. The LP was already taken at the
+            // pre-cast gate; dropping the staged cost without a release would keep it.
+            RingPaymentLegs.release(player, event.context);
         }
     }
 
@@ -271,9 +276,12 @@ public class CursedRingHandler {
             return;
         }
 
-        LOGGER.debug("Consuming {} LP from {}'s Soul Network", pending.lpCost, player.getName().getString());
-
-        boolean success = SanctifiedLegacyCompat.consumeLP(player, pending.lpCost);
+        // V23/V24: the LP was reserved at the pre-cast gate and is settled at the expend
+        // boundary, as a leg of the same CastAttempt. This is the backstop for the paths that
+        // reach a resolve without passing through expendMana; commit is idempotent, so a cast
+        // that goes through both settles once. Nothing is drained here - draining at Post is
+        // exactly the uncorrelated second query queue V23 names.
+        boolean success = RingPaymentLegs.commit(player, event.context, pending.lpCost);
 
         if (!success) {
             LOGGER.warn("LP consumption failed at Post for {} (spell already cast)",
@@ -377,6 +385,9 @@ public class CursedRingHandler {
         UUID id = event.getEntity().getUUID();
         pendingCosts.remove(id);
         ringConflictNotified.remove(id);
+        // V24: a held leg belongs to a cast that will never resolve now. Drop it rather than
+        // refunding into an offline player.
+        com.otectus.arsnspells.casting.AlternativePayment.forgetPlayer(id);
         SanctifiedLegacyCompat.clearCacheFor(id);
         // ANS-HIGH-025: also drain the scroll LP tracker. Without this, a scroll cast
         // whose MixinScrollItem RETURN inject is suppressed by another mod's cancel

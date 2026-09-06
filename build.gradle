@@ -9,13 +9,20 @@ archivesBaseName = mod_id
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
+// -PgametestRunDir=<path> gives a run profile its own world folder; the default keeps the
+// historical `run/`. The Iron's-absent and Iron's-loaded gametest profiles must never share one:
+// a world written by the loaded profile cannot be decoded by the absent one (its dimension types
+// are gone with the mod), and `runGameTestServer` still exits 0 / BUILD SUCCESSFUL over the top
+// of that failure. Separate directories make each profile a fresh world (audit V26/T0.1).
+ext.gametestRunDir = project.findProperty('gametestRunDir') ?: 'run'
+
 minecraft {
     mappings channel: 'official', version: minecraft_version
     copyIdeResources = true
 
     runs {
         configureEach {
-            workingDirectory project.file('run')
+            workingDirectory project.file(gametestRunDir)
             mods {
                 ars_n_spells {
                     source sourceSets.main
@@ -147,7 +154,7 @@ test {
 // stage the committed ones into the run dir before any game run.
 tasks.register('stageGameTestStructures', Copy) {
     from 'src/test/resources/gameteststructures'
-    into 'run/gameteststructures'
+    into "${gametestRunDir}/gameteststructures"
 }
 tasks.matching { it.name in ['runGameTestServer', 'runClient', 'runServer'] }.configureEach {
     dependsOn 'stageGameTestStructures'

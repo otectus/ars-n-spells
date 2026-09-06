@@ -1,10 +1,12 @@
 package com.otectus.arsnspells.mixin.ars;
 
 import com.hollingsworth.arsnouveau.common.event.ManaCapEvents;
+import com.otectus.arsnspells.bridge.AnsModifierIdentities;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.bridge.ManaRegenBridge;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
+import com.otectus.arsnspells.contract.AnsModifierIds;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
@@ -31,10 +33,14 @@ import java.util.UUID;
 @Mixin(value = ManaCapEvents.class, remap = false)
 public abstract class MixinArsPotionEffects {
 
+    // V07/V14: the two potion identities come from the shared registry, so the cleanup that
+    // runs when this redirect stops applying removes the same UUIDs this redirect writes.
     @Unique
-    private static final UUID POTION_MANA_REGEN_ID = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    private static final UUID POTION_MANA_REGEN_ID =
+        AnsModifierIdentities.uuid(AnsModifierIds.ARS_POTION_MANA_REGEN);
     @Unique
-    private static final UUID POTION_MAX_MANA_ID = UUID.fromString("b2c3d4e5-f6a7-8901-bcde-f12345678901");
+    private static final UUID POTION_MAX_MANA_ID =
+        AnsModifierIdentities.uuid(AnsModifierIds.ARS_POTION_MAX_MANA);
 
     /**
      * Intercept mana regeneration tick to apply potion effects to unified pool.
@@ -47,23 +53,48 @@ public abstract class MixinArsPotionEffects {
     private static void arsnspells$redirectPotionEffects(PlayerTickEvent event, CallbackInfo ci) {
         Player player = event.player;
 
-        if (!BridgeManager.isUnificationEnabled()) {
+        if (player.level().isClientSide()) {
             return;
         }
 
         ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        if (mode == null || !mode.isIssPrimary()) {
-            // Only redirect if Iron's is primary (otherwise Ars handles it natively)
-            return;
-        }
+        boolean redirecting = BridgeManager.isUnificationEnabled()
+            && mode != null && mode.isIssPrimary();
 
-        if (player.level().isClientSide()) {
+        // V14: removal is NOT gated on the redirect being on. This used to return above,
+        // before either helper ran, so switching away from ISS_PRIMARY (or disabling
+        // unification) left the last potion modifier sitting on the Iron's attributes with
+        // nothing left running that could take it off. The redirect is conditional; the
+        // cleanup is not.
+        if (!redirecting) {
+            arsnspells$clearPotionModifiers(player);
             return;
         }
 
         // Check for Ars potion effects and apply them to Iron's mana system
         arsnspells$redirectManaRegenPotions(player);
         arsnspells$redirectMaxManaPotions(player);
+    }
+
+    /**
+     * Drop both potion-derived modifiers, whatever the current mode. Cheap enough for the
+     * per-tick path: two attribute lookups and a null test each, and nothing is dirtied
+     * unless a modifier is genuinely present.
+     */
+    @Unique
+    private static void arsnspells$clearPotionModifiers(Player player) {
+        try {
+            AttributeInstance regenAttr = player.getAttribute(AttributeRegistry.MANA_REGEN.get());
+            if (regenAttr != null && regenAttr.getModifier(POTION_MANA_REGEN_ID) != null) {
+                regenAttr.removeModifier(POTION_MANA_REGEN_ID);
+            }
+            AttributeInstance maxManaAttr = player.getAttribute(AttributeRegistry.MAX_MANA.get());
+            if (maxManaAttr != null && maxManaAttr.getModifier(POTION_MAX_MANA_ID) != null) {
+                maxManaAttr.removeModifier(POTION_MAX_MANA_ID);
+            }
+        } catch (Exception e) {
+            // Iron's absent or its attributes unresolvable: nothing of ours can be on them.
+        }
     }
 
     /**

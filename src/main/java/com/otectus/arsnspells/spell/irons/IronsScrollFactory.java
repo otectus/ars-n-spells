@@ -89,6 +89,46 @@ public final class IronsScrollFactory {
     }
 
     /**
+     * True when {@code stack}'s <em>own</em> Iron's container reports itself empty.
+     *
+     * <p>Audit V18's whole point: "ANS has not written here" and "this is blank" are different
+     * questions, and answering the second with the first is what destroyed scrolls another mod
+     * had already filled. The answer comes from Iron's own accessor,
+     * {@code io.redspace.ironsspellbooks.api.spells.ISpellContainer#isEmpty()Z}, confirmed
+     * against the pinned jar (Iron's 1.20.1-3.15.0, CurseForge file 7402504, sha256
+     * {@code 92c046383b4960c655f840d8846732a481edcf7c5ed89028b3d7b2cc2910b224}).
+     *
+     * <p>A stack with no container at all holds no native spell, so it is empty. A container
+     * that will not decode is <em>not</em> reported empty: the only safe reading of an
+     * unreadable container is that something is in there, and refusing to inscribe over it
+     * costs a player nothing.
+     */
+    public static boolean isNativeContainerEmpty(ItemStack stack) {
+        if (!hasNativeContainer(stack)) {
+            return true;
+        }
+        try {
+            ISpellContainer container = ISpellContainer.get(stack);
+            return container == null || container.isEmpty();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Strip {@code stack}'s native container back to the empty single-slot shape, for the
+     * explicit filled-scroll conversion route. Callers pass a copy: this destroys the spell
+     * that was in there, so it may only ever run on a stack the player has chosen to convert.
+     */
+    public static boolean clearNativeContainer(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        ISpellContainer.remove(stack);
+        return initializeCarrierContainer(stack);
+    }
+
+    /**
      * True when {@code stack} is an Iron's spell book, by Iron's own published interface.
      *
      * <p>Replaces a registry-path substring test ({@code path.contains("spell_book")}), which

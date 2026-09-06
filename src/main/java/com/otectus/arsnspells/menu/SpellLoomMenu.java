@@ -1,6 +1,8 @@
 package com.otectus.arsnspells.menu;
 
 import com.otectus.arsnspells.block.SpellLoomBlockEntity;
+import com.otectus.arsnspells.contract.InscriptionSourceKind;
+import com.otectus.arsnspells.inscription.InscriptionClassifier;
 import com.otectus.arsnspells.registry.ModBlocksRegistry;
 import com.otectus.arsnspells.registry.ModMenus;
 import net.minecraft.core.BlockPos;
@@ -53,10 +55,26 @@ public class SpellLoomMenu extends AbstractContainerMenu {
             : ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
 
         if (be != null) {
+            // Audit V18: which slot an item may enter is decided by what the item is, through
+            // the same classifier the planner reads. A blank cannot be a source and a reusable
+            // book cannot be a target -- the latter is how one got consumed in the first place.
             addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SOURCE,
-                SLOT_SOURCE_X, RECIPE_ROW_Y));
+                SLOT_SOURCE_X, RECIPE_ROW_Y) {
+                @Override
+                public boolean mayPlace(ItemStack stack) {
+                    return InscriptionClassifier.classify(stack)
+                        != InscriptionSourceKind.BLANK_PARCHMENT;
+                }
+            });
             addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SCROLL,
-                SLOT_SCROLL_X, RECIPE_ROW_Y));
+                SLOT_SCROLL_X, RECIPE_ROW_Y) {
+                @Override
+                public boolean mayPlace(ItemStack stack) {
+                    // A filled scroll is allowed in, so the explicit Convert route can reach
+                    // it; what it is never allowed to be is silently treated as blank.
+                    return !InscriptionClassifier.classify(stack).isReusable();
+                }
+            });
             addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_OUTPUT,
                 SLOT_OUTPUT_X, RECIPE_ROW_Y) {
                 @Override

@@ -33,11 +33,46 @@ public final class SharedPoolCeiling {
      * @return the additive modifier amount; never negative, and 0 when Iron's already fits Ars
      */
     public static double modifierAmount(double ironsOwnMax, double arsMax) {
+        return modifierAmount(ironsOwnMax, arsMax, 1.0);
+    }
+
+    /**
+     * The same amount, for an attribute whose additive modifiers are amplified downstream
+     * (audit V13).
+     *
+     * <p>An {@code ADDITION} modifier is applied before any {@code MULTIPLY_BASE} or
+     * {@code MULTIPLY_TOTAL} on the same attribute, so on an attribute a third-party mod has
+     * doubled, one additive point is worth two points of final value. Subtracting the raw
+     * shortfall from the already-multiplied total - which is what this method used to do -
+     * therefore overshot by exactly that factor and never converged: the recompute measured
+     * the native total again, asked for the same shortfall again, and the ceiling stayed a
+     * third above where either system wanted it.
+     *
+     * <p>{@code ironsOwnMax} must be the <em>isolated native snapshot</em>: the attribute's
+     * value with every ANS-owned modifier removed. {@code amplification} is what one additive
+     * point is worth on that same isolated attribute, measured rather than assumed. An
+     * amplification that could not be measured degrades to {@code 1.0}, which reproduces the
+     * historical arithmetic - wrong, but bounded, and never a division by zero.
+     *
+     * <p>This is the minimal V13 fix. A full contribution ledger that separates base, gear,
+     * perk and effect sources is 3.4.0 work and is deliberately not built here.
+     *
+     * @param ironsOwnMax   Iron's max mana with every ANS modifier removed
+     * @param arsMax        Ars's real max
+     * @param amplification final value gained per additive point on this attribute
+     */
+    public static double modifierAmount(double ironsOwnMax, double arsMax, double amplification) {
         if (Double.isNaN(arsMax) || arsMax <= 0.0) {
             return 0.0;
         }
         double own = Double.isNaN(ironsOwnMax) ? 0.0 : ironsOwnMax;
-        return Math.max(0.0, arsMax - own);
+        double shortfall = Math.max(0.0, arsMax - own);
+        if (shortfall == 0.0) {
+            return 0.0;
+        }
+        double factor = (Double.isNaN(amplification) || Double.isInfinite(amplification)
+            || amplification <= 0.0) ? 1.0 : amplification;
+        return shortfall / factor;
     }
 
     /**
@@ -46,7 +81,14 @@ public final class SharedPoolCeiling {
      * {@code max(ironsOwnMax, arsMax)}.
      */
     public static double resultingCeiling(double ironsOwnMax, double arsMax) {
-        return ironsOwnMax + modifierAmount(ironsOwnMax, arsMax);
+        return resultingCeiling(ironsOwnMax, arsMax, 1.0);
+    }
+
+    /** {@link #resultingCeiling(double, double)} for an amplified attribute (audit V13). */
+    public static double resultingCeiling(double ironsOwnMax, double arsMax, double amplification) {
+        double factor = (Double.isNaN(amplification) || Double.isInfinite(amplification)
+            || amplification <= 0.0) ? 1.0 : amplification;
+        return ironsOwnMax + factor * modifierAmount(ironsOwnMax, arsMax, amplification);
     }
 
     /**

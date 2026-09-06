@@ -7,6 +7,26 @@ public class AnsConfig {
     public static final ForgeConfigSpec SPEC;
 
     // ========================================
+    // SCHEMA MIGRATION
+    // ========================================
+    // 3.3.0: the config file now says which schema wrote it, so a key added in this release
+    // can resolve a different default for an existing world than for a new install. Without
+    // that distinction every migration is a forced choice between breaking existing worlds
+    // and shipping the unsafe behaviour to everyone forever.
+    public static final ForgeConfigSpec.IntValue CONFIG_SCHEMA_VERSION;
+    public static final ForgeConfigSpec.ConfigValue<String> CONVERSION_POLICY;
+    public static final ForgeConfigSpec.ConfigValue<String> PAYMENT_OPEN_FAILURE_POLICY;
+
+    /** The schema this build writes. A file that reads back lower than this predates 3.3.0. */
+    public static final int CURRENT_SCHEMA_VERSION = 1;
+
+    /**
+     * The {@code payment_open_failure_policy} value that means "let the migration decide".
+     * Anything else in the file is an explicit choice and is never overridden.
+     */
+    public static final String PAYMENT_POLICY_AUTO = "auto";
+
+    // ========================================
     // MASTER TOGGLES
     // ========================================
     public static final ForgeConfigSpec.ConfigValue<String> MANA_UNIFICATION_MODE;
@@ -187,6 +207,54 @@ public class AnsConfig {
     // constants (e.g. EquipmentIntegration.CACHE_DURATION_MS).
 
     static {
+        // ========================================
+        // SCHEMA MIGRATION
+        // ========================================
+        BUILDER.push("Schema Migration");
+        BUILDER.comment(
+            "How this file is migrated between Ars 'n' Spells versions.",
+            "Do not edit config_schema_version by hand: it is how the mod tells an existing",
+            "world apart from a new install when it resolves a new key's default."
+        );
+
+        CONFIG_SCHEMA_VERSION = BUILDER
+            .comment(
+                "Schema version of this config file. 0 means the file was written before 3.3.0,",
+                "when this key did not exist; a freshly generated file is stamped with the",
+                "current version instead. Keys added in a later release read this to decide",
+                "whether to preserve the old behaviour or adopt the new default."
+            )
+            .defineInRange("config_schema_version", 0, 0, Integer.MAX_VALUE);
+
+        CONVERSION_POLICY = BUILDER
+            .comment(
+                "Which policy prices a cross-system mana leg:",
+                "  flat_legacy   - Multiply the cross leg by the configured directional rate.",
+                "                  The historical arithmetic (DEFAULT; preserves current pricing).",
+                "  equal_percent - Each pool pays the same percentage of the spell's own price;",
+                "                  the directional rates are not consulted.",
+                "These are deliberately separate policies, not two spellings of one. They agree",
+                "only while both conversion rates are 1.0."
+            )
+            .define("conversion_policy", "flat_legacy");
+
+        PAYMENT_OPEN_FAILURE_POLICY = BUILDER
+            .comment(
+                "What happens when an alternative payment (Cursed Ring LP, Virtue Ring aura)",
+                "cannot be confirmed because its backing mod's adapter did not verify:",
+                "  legacy_open     - Log and cast anyway. The pre-3.3.0 behaviour, which made the",
+                "                    spell free whenever the adapter was broken.",
+                "  refuse          - Refuse the cast. The safe policy.",
+                "  native_fallback - Charge the native mana cost instead.",
+                "  auto            - Resolve at load time (DEFAULT): legacy_open for a config file",
+                "                    written before 3.3.0, refuse for a freshly generated one.",
+                "                    Existing worlds keep their behaviour; new installs get the",
+                "                    safe policy."
+            )
+            .define("payment_open_failure_policy", PAYMENT_POLICY_AUTO);
+
+        BUILDER.pop();
+
         // ========================================
         // MASTER TOGGLES
         // ========================================
@@ -877,6 +945,171 @@ public class AnsConfig {
         }
     }
     
+    // ========================================
+    // SCHEMA MIGRATION (3.3.0)
+    // ========================================
+
+    private static final org.slf4j.Logger MIGRATION_LOG =
+        org.slf4j.LoggerFactory.getLogger(AnsConfig.class);
+
+    private static final java.util.concurrent.atomic.AtomicBoolean MIGRATION_REPORTED =
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    private static volatile com.otectus.arsnspells.contract.ConversionKind EFFECTIVE_CONVERSION_KIND =
+        com.otectus.arsnspells.contract.ConversionKind.FLAT_LEGACY;
+
+    private static volatile com.otectus.arsnspells.contract.PaymentOpenFailurePolicy EFFECTIVE_PAYMENT_POLICY =
+        com.otectus.arsnspells.contract.PaymentOpenFailurePolicy.LEGACY_OPEN;
+
+    /** The conversion policy in force, resolved at config load. */
+    public static com.otectus.arsnspells.contract.ConversionKind getConversionKind() {
+        return EFFECTIVE_CONVERSION_KIND;
+    }
+
+    /** The alternative-payment failure policy in force, resolved at config load. */
+    public static com.otectus.arsnspells.contract.PaymentOpenFailurePolicy getPaymentOpenFailurePolicy() {
+        return EFFECTIVE_PAYMENT_POLICY;
+    }
+
+    /**
+     * Parse {@code conversion_policy}. An unrecognised value falls back to the shipped default
+     * rather than to whichever enum constant happens to be first, so a typo cannot silently
+     * reprice every spell in the pack.
+     */
+    public static com.otectus.arsnspells.contract.ConversionKind parseConversionPolicy(String raw) {
+        String value = raw == null ? "" : raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("equal_percent".equals(value)) {
+            return com.otectus.arsnspells.contract.ConversionKind.EQUAL_PERCENT;
+        }
+        if (!"flat_legacy".equals(value)) {
+            MIGRATION_LOG.warn(
+                "Unknown conversion_policy '{}', falling back to flat_legacy. "
+                    + "Valid values: flat_legacy, equal_percent.", raw);
+        }
+        return com.otectus.arsnspells.contract.ConversionKind.FLAT_LEGACY;
+    }
+
+    /**
+     * Resolve {@code payment_open_failure_policy}.
+     *
+     * <p>An explicit value in the file always wins. {@link #PAYMENT_POLICY_AUTO} is the
+     * migration case: a file written before 3.3.0 keeps {@code legacy_open} so an existing
+     * world behaves exactly as it did, and a freshly generated file gets {@code refuse} so a
+     * new install is not shipped the free-cast behaviour.
+     *
+     * <p>Pure, so the migration decision is unit-testable without a mod loading context.
+     *
+     * @param raw          the value read from the file
+     * @param schemaRead   the {@code config_schema_version} read from the file
+     * @param freshlyGenerated whether the file was created by this load
+     */
+    public static com.otectus.arsnspells.contract.PaymentOpenFailurePolicy resolvePaymentOpenFailurePolicy(
+            String raw, int schemaRead, boolean freshlyGenerated) {
+        String value = raw == null ? "" : raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("legacy_open".equals(value)) {
+            return com.otectus.arsnspells.contract.PaymentOpenFailurePolicy.LEGACY_OPEN;
+        }
+        if ("refuse".equals(value)) {
+            return com.otectus.arsnspells.contract.PaymentOpenFailurePolicy.REFUSE;
+        }
+        if ("native_fallback".equals(value)) {
+            return com.otectus.arsnspells.contract.PaymentOpenFailurePolicy.NATIVE_FALLBACK;
+        }
+        if (!PAYMENT_POLICY_AUTO.equals(value)) {
+            MIGRATION_LOG.warn(
+                "Unknown payment_open_failure_policy '{}', resolving it as 'auto'. "
+                    + "Valid values: legacy_open, refuse, native_fallback, auto.", raw);
+        }
+        boolean writtenByThisSchema = freshlyGenerated || schemaRead >= CURRENT_SCHEMA_VERSION;
+        return writtenByThisSchema
+            ? com.otectus.arsnspells.contract.PaymentOpenFailurePolicy.REFUSE
+            : com.otectus.arsnspells.contract.PaymentOpenFailurePolicy.LEGACY_OPEN;
+    }
+
+    /**
+     * Whether {@code configFile} was created by the load that is running right now.
+     *
+     * <p>This is the one thing Forge does not tell us. A SERVER config lives in the world's
+     * {@code serverconfig} directory, which does not exist until the server is already starting,
+     * so no mod code runs between "the path is knowable" and "Forge has written the file". By
+     * the time {@code ModConfigEvent.Loading} fires, a brand-new file and a corrected 3.2.x file
+     * look identical: both contain {@code config_schema_version = 0}, one because the spec
+     * default was written and one because the missing key was corrected to the spec default.
+     *
+     * <p>The file's creation timestamp does separate them: a pre-existing file was created in an
+     * earlier session, even though the correction pass just rewrote its contents.
+     *
+     * <p>Every failure mode resolves to "not fresh", which is the direction that preserves an
+     * existing world's behaviour. A filesystem with no birth time (some ext4 configurations)
+     * reports the modification time instead; in that case the answer may be wrong once, on the
+     * first 3.3.0 load, and a pack author who cares should set
+     * {@code payment_open_failure_policy} explicitly.
+     */
+    public static boolean isFreshlyGeneratedConfig(java.nio.file.Path configFile) {
+        if (configFile == null) {
+            return false;
+        }
+        try {
+            java.nio.file.attribute.BasicFileAttributes attrs =
+                java.nio.file.Files.readAttributes(configFile, java.nio.file.attribute.BasicFileAttributes.class);
+            long created = attrs.creationTime().toMillis();
+            long jvmStart = java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime();
+            return created >= jvmStart;
+        } catch (Exception unreadable) {
+            return false;
+        }
+    }
+
+    /**
+     * Resolve the migrated keys and log the migration report once per game session.
+     *
+     * <p>Called from the mod's {@code ModConfigEvent.Loading} listener (MOD bus). The report
+     * names only the keys whose effective value came from migration rather than from the file,
+     * with the previous and the new effective value, so a server owner reading the log can see
+     * exactly what the upgrade decided on their behalf.
+     *
+     * @param configFile the path Forge loaded, used only for the freshness probe
+     */
+    public static void onConfigLoaded(java.nio.file.Path configFile) {
+        int schemaRead = AnsConfig.CONFIG_SCHEMA_VERSION.get();
+        boolean fresh = schemaRead < CURRENT_SCHEMA_VERSION && isFreshlyGeneratedConfig(configFile);
+
+        String rawConversion = AnsConfig.CONVERSION_POLICY.get();
+        String rawPayment = AnsConfig.PAYMENT_OPEN_FAILURE_POLICY.get();
+        EFFECTIVE_CONVERSION_KIND = parseConversionPolicy(rawConversion);
+        EFFECTIVE_PAYMENT_POLICY = resolvePaymentOpenFailurePolicy(rawPayment, schemaRead, fresh);
+
+        java.util.List<String> migrated = new java.util.ArrayList<>();
+        if (schemaRead < CURRENT_SCHEMA_VERSION) {
+            migrated.add("  conversion_policy: (absent) -> " + rawConversion
+                + " (effective " + EFFECTIVE_CONVERSION_KIND + "; preserves pre-3.3.0 pricing)");
+        }
+        if (PAYMENT_POLICY_AUTO.equalsIgnoreCase(rawPayment)) {
+            migrated.add("  payment_open_failure_policy: " + PAYMENT_POLICY_AUTO + " -> "
+                + EFFECTIVE_PAYMENT_POLICY + (fresh
+                    ? " (freshly generated config: the safe policy)"
+                    : " (config written before 3.3.0: existing behaviour preserved)"));
+        }
+        if (fresh) {
+            // Stamp the schema so the next load reads it from the file instead of probing the
+            // filesystem again. Without this the same world would resolve differently on its
+            // second start, when the file is no longer new.
+            migrated.add("  config_schema_version: " + schemaRead + " -> " + CURRENT_SCHEMA_VERSION
+                + " (freshly generated config stamped with the current schema)");
+            AnsConfig.CONFIG_SCHEMA_VERSION.set(CURRENT_SCHEMA_VERSION);
+            safeSave();
+        }
+
+        if (migrated.isEmpty() || !MIGRATION_REPORTED.compareAndSet(false, true)) {
+            return;
+        }
+        MIGRATION_LOG.info("Ars 'n' Spells config migration report (schema {} -> {}):",
+            schemaRead, CURRENT_SCHEMA_VERSION);
+        for (String line : migrated) {
+            MIGRATION_LOG.info(line);
+        }
+    }
+
     /**
      * ANS-HIGH-017: async config save.
      *

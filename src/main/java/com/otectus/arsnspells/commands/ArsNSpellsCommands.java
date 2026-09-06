@@ -401,6 +401,11 @@ public class ArsNSpellsCommands {
         // mode needs Iron's and it is absent (e.g. ISS_PRIMARY -> ARS_PRIMARY), so we
         // echo both the requested and the now-active mode.
         BridgeManager.refreshMode();
+        // V14: the routing generation has moved, so every online player's transient state is
+        // now describing the old mode. Strip it, rebuild whatever the new mode enables, clamp
+        // and re-sync — otherwise a bonus the new mode does not grant stays applied until the
+        // player next swapped gear or died.
+        com.otectus.arsnspells.bridge.ModeChangeCleanup.reconcileAll();
 
         final String requestedName = parsed.getConfigName();
         final String effectiveName = BridgeManager.getCurrentMode().getConfigName();

@@ -142,22 +142,12 @@ public final class CrossCastContext {
         public volatile boolean blocked;
         public volatile String spellId;
         /**
-         * ANS-HIGH-030: Iron's mana already consumed for this attempt (SEPARATE
-         * mode pre-pays the Iron's share during cost-calc). Recorded so the cast
-         * entry point can refund it if the Ars leg subsequently fails — zeroing
-         * {@link #issCost} alone erased the only record of the payment and made
-         * a failed cross-cast a one-way Iron's-mana drain.
+         * V01: {@code issPaid} and the {@code multiplierApplied} latch are gone. Nothing
+         * is pre-paid during cost calculation any more, so there is no payment to record
+         * here, and cost-query idempotence is now per cost event rather than per attempt -
+         * a per-attempt latch is what made the second query of a cast answer a different
+         * price from the first. The money lives on the ledger's CastAttempt.
          */
-        public volatile float issPaid;
-        /**
-         * ANS-HIGH-004: one-shot guard via AtomicBoolean. The Ars cost-calc event can
-         * fire more than once during a resolve (preview vs. actual deduction). The
-         * previous boolean read-then-write was racy under overlapping cross-casts;
-         * {@link #tryMarkMultiplierApplied()} uses compareAndSet so exactly one
-         * caller wins the first-application slot.
-         */
-        private final java.util.concurrent.atomic.AtomicBoolean multiplierApplied =
-            new java.util.concurrent.atomic.AtomicBoolean(false);
 
         private Entry(CrossSpellType type, long expiresAt, UUID attemptId) {
             this.type = type;
@@ -167,15 +157,6 @@ public final class CrossCastContext {
 
         public boolean isExpired(long gameTime) {
             return gameTime >= expiresAt;
-        }
-
-        /** Atomic check-and-mark. Returns true iff this is the first caller. */
-        public boolean tryMarkMultiplierApplied() {
-            return multiplierApplied.compareAndSet(false, true);
-        }
-
-        public boolean isMultiplierApplied() {
-            return multiplierApplied.get();
         }
     }
 

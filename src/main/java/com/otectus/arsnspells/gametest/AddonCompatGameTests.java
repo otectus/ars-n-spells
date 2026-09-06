@@ -11,7 +11,6 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.fml.ModList;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -44,10 +43,6 @@ public final class AddonCompatGameTests {
     private static final String TOO_MANY_GLYPHS = "toomanyglyphs";
 
     private AddonCompatGameTests() {}
-
-    private static boolean loaded(String modid) {
-        return ModList.get().isLoaded(modid);
-    }
 
     /** Every registered glyph belonging to {@code modid}. */
     private static List<AbstractSpellPart> glyphsOf(String modid) {
@@ -159,8 +154,7 @@ public final class AddonCompatGameTests {
 
     @GameTest(template = "platform")
     public static void arsElemental_glyphsRoundTrip(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ELEMENTAL)) {
             return;
         }
         assertRoundTrips(helper, ARS_ELEMENTAL);
@@ -169,8 +163,7 @@ public final class AddonCompatGameTests {
 
     @GameTest(template = "platform")
     public static void arsElemental_schoolsResolveFromDeclaredMetadata(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ELEMENTAL)) {
             return;
         }
         assertSchoolsComeFromMetadata(helper, ARS_ELEMENTAL);
@@ -179,8 +172,7 @@ public final class AddonCompatGameTests {
 
     @GameTest(template = "platform")
     public static void arsElemental_everyGlyphResolvesWithoutThrowing(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ELEMENTAL)) {
             return;
         }
         assertResolutionIsTotal(helper, ARS_ELEMENTAL);
@@ -193,8 +185,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsElemental_namedEffectsAreUsable(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ELEMENTAL)) {
             return;
         }
         // Verified against ars_elemental-1.20.1-0.6.8.0: the brief calls the first one
@@ -273,8 +264,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsElemental_filterBeforeEffect_doesNotDecideTheSchool(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ELEMENTAL)) {
             return;
         }
         AbstractSpellPart filter = findGlyph(ARS_ELEMENTAL, "_filter");
@@ -302,8 +292,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsElemental_necromancyGlyphsResolve(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ELEMENTAL)) {
             return;
         }
         assertGlyphSchool(helper, ARS_ELEMENTAL, "glyph_phantom_grasp", SpellSchoolId.ELDRITCH);
@@ -320,8 +309,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsElemental_filtersResolveGeneric(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ELEMENTAL)) {
             return;
         }
         // Verified against ars_elemental-1.20.1-0.6.8.0.
@@ -353,8 +341,7 @@ public final class AddonCompatGameTests {
 
     @GameTest(template = "platform")
     public static void arsZero_glyphsRoundTrip(GameTestHelper helper) {
-        if (!loaded(ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
             return;
         }
         assertRoundTrips(helper, ARS_ZERO);
@@ -363,8 +350,7 @@ public final class AddonCompatGameTests {
 
     @GameTest(template = "platform")
     public static void arsZero_everyGlyphResolvesWithoutThrowing(GameTestHelper helper) {
-        if (!loaded(ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
             return;
         }
         assertResolutionIsTotal(helper, ARS_ZERO);
@@ -378,8 +364,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsZero_schoolsResolveFromDeclaredMetadata(GameTestHelper helper) {
-        if (!loaded(ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
             return;
         }
         assertSchoolsComeFromMetadata(helper, ARS_ZERO);
@@ -401,8 +386,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsZero_controlFlowGlyphsAreGeneric(GameTestHelper helper) {
-        if (!loaded(ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
             return;
         }
         String[] controlFlow = {"anchor_effect", "select_effect", "sustain_effect",
@@ -428,8 +412,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsZero_augmentsAndFormsDoNotDecideTheSchool(GameTestHelper helper) {
-        if (!loaded(ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
             return;
         }
         AbstractSpellPart form = glyphById(ARS_ZERO, "near_form");
@@ -457,8 +440,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void arsZero_namedEffectsAreUsable(GameTestHelper helper) {
-        if (!loaded(ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
             return;
         }
         String[] wanted = {"effect_geometrize", "push_effect", "effect_beam",
@@ -492,8 +474,7 @@ public final class AddonCompatGameTests {
 
     @GameTest(template = "platform")
     public static void tooManyGlyphs_glyphsRoundTrip(GameTestHelper helper) {
-        if (!loaded(TOO_MANY_GLYPHS)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, TOO_MANY_GLYPHS)) {
             return;
         }
         assertRoundTrips(helper, TOO_MANY_GLYPHS);
@@ -502,8 +483,7 @@ public final class AddonCompatGameTests {
 
     @GameTest(template = "platform")
     public static void tooManyGlyphs_everyGlyphResolvesWithoutThrowing(GameTestHelper helper) {
-        if (!loaded(TOO_MANY_GLYPHS)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, TOO_MANY_GLYPHS)) {
             return;
         }
         assertResolutionIsTotal(helper, TOO_MANY_GLYPHS);
@@ -521,8 +501,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void mixedAddonRecipe_survivesSerialization(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL) || !loaded(TOO_MANY_GLYPHS)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ELEMENTAL) || OptionalModGate.skipIfAbsent(helper, TOO_MANY_GLYPHS)) {
             return;
         }
         List<AbstractSpellPart> elemental = glyphsOf(ARS_ELEMENTAL);
@@ -557,8 +536,7 @@ public final class AddonCompatGameTests {
      */
     @GameTest(template = "platform")
     public static void mixedArsElementalArsZero_recipe_survivesSerialization(GameTestHelper helper) {
-        if (!loaded(ARS_ELEMENTAL) || !loaded(ARS_ZERO)) {
-            helper.succeed();
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ELEMENTAL) || OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
             return;
         }
         List<AbstractSpellPart> elemental = glyphsOf(ARS_ELEMENTAL);

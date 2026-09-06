@@ -13,7 +13,11 @@ public class PacketHandler {
     // running the old jar would mis-parse our packets — hard-fail at connect instead.
     // Bumped 2 -> 3 in 3.0.0: added SpellLoomExportPacket (C2S). New packet id,
     // so an old client would mis-parse the channel — hard-fail at connect.
-    private static final String PROTOCOL_VERSION = "3";
+    // Bumped 3 -> 4 in 3.3.0 (audit V18): SpellLoomExportPacket gained an action field
+    // (preview / inscribe / convert) and SpellLoomResultPacket (S2C) was added to carry
+    // the inscription reason code back. Both the payload shape and the id set changed, so
+    // a mismatched client must be rejected at connect rather than silently misdecoding.
+    private static final String PROTOCOL_VERSION = "4";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ArsNSpells.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -52,6 +56,9 @@ public class PacketHandler {
         INSTANCE.registerMessage(id++, SpellLoomExportPacket.class,
             SpellLoomExportPacket::toBytes, SpellLoomExportPacket::new, SpellLoomExportPacket::handle,
             java.util.Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        INSTANCE.registerMessage(id++, SpellLoomResultPacket.class,
+            SpellLoomResultPacket::toBytes, SpellLoomResultPacket::new, SpellLoomResultPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 
     /** ANS-LOW-015: defensive null-checks for early-login / mid-disconnect edge cases. */

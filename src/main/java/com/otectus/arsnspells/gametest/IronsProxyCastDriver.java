@@ -1,5 +1,6 @@
 package com.otectus.arsnspells.gametest;
 
+import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
 import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
@@ -27,6 +28,12 @@ import net.minecraft.world.item.ItemStack;
  * player actually does: equip a book into the Curios spellbook slot, select a wheel entry,
  * and cast. Both symbols are present and identical in Iron's 3.15.0 and 3.16.2.
  *
+ * <p><b>Guards here are defence in depth, not the mechanism.</b> Every entry below re-checks
+ * {@code IronsCompat.isLoaded()} and no-ops, but that check runs only once the JVM has already
+ * resolved this class -- and resolving it needs Iron's on the classpath. No method's signature
+ * names an Iron's type, so the class as a whole is the isolation holder and the guard that
+ * actually matters stays in the caller. See {@code CrossCastGameTests#emptyHandedPlayer}.
+ *
  * <p>Failures throw rather than returning a status, so a broken harness reports as a test
  * error at the offending step instead of as a silent false pass further down.
  */
@@ -40,6 +47,9 @@ final class IronsProxyCastDriver {
      * have Iron's arm the cast, then fire the proxy for {@code poolId}.
      */
     static void castViaEquippedSpellbook(ServerPlayer player, ItemStack book, int poolId) {
+        if (!IronsCompat.isLoaded()) {
+            return;
+        }
         AbstractSpell proxy = requireProxy(poolId);
         equipSpellbook(player, book);
         armCast(player, proxy);
@@ -51,6 +61,9 @@ final class IronsProxyCastDriver {
      * is the main/off-hand fallback in {@code ArsCrossProxySpell.resolveCastingBook}.
      */
     static void castViaArmedProxyWithoutEquipping(ServerPlayer player, int poolId) {
+        if (!IronsCompat.isLoaded()) {
+            return;
+        }
         AbstractSpell proxy = requireProxy(poolId);
         armCast(player, proxy);
         proxy.castSpell(player.serverLevel(), 1, player, CastSource.SPELLBOOK, true);
@@ -80,6 +93,9 @@ final class IronsProxyCastDriver {
 
     /** Put {@code book} in the Curios spellbook slot, failing loudly if the slot is absent. */
     static void equipSpellbook(ServerPlayer player, ItemStack book) {
+        if (!IronsCompat.isLoaded()) {
+            return;
+        }
         Utils.setPlayerSpellbookStack(player, book);
         if (!book.isEmpty() && Utils.getPlayerSpellbookStack(player) == null) {
             throw new IllegalStateException("failed to equip the spellbook into the Curios '"
@@ -93,6 +109,9 @@ final class IronsProxyCastDriver {
      * server-side entry point start the cast — the closest thing to a real keypress.
      */
     static boolean initiateViaSpellSelection(ServerPlayer player, ItemStack book, int index) {
+        if (!IronsCompat.isLoaded()) {
+            return false;
+        }
         equipSpellbook(player, book);
         MagicData.getPlayerMagicData(player).getSyncedData()
             .setSpellSelection(new SpellSelection(Curios.SPELLBOOK_SLOT, index));
@@ -101,12 +120,18 @@ final class IronsProxyCastDriver {
 
     /** True when Iron's recorded no casting item for the in-flight cast. */
     static boolean castingItemIsEmpty(ServerPlayer player) {
+        if (!IronsCompat.isLoaded()) {
+            return true;
+        }
         ItemStack stack = MagicData.getPlayerMagicData(player).getPlayerCastingItem();
         return stack == null || stack.isEmpty();
     }
 
     /** Index of the {@code ars_cross_<poolId>} proxy in {@code book}'s native container, or -1. */
     static int proxySlotIndex(ItemStack book, int poolId) {
+        if (!IronsCompat.isLoaded()) {
+            return -1;
+        }
         if (!ISpellContainer.isSpellContainer(book)) {
             return -1;
         }
@@ -130,6 +155,9 @@ final class IronsProxyCastDriver {
      * is present but fails to decode.
      */
     static boolean scrollContainerDereferenceSucceeds(ItemStack stack) {
+        if (!IronsCompat.isLoaded()) {
+            return false;
+        }
         try {
             ISpellContainer container = ISpellContainer.get(stack);
             if (container == null) {
@@ -147,6 +175,9 @@ final class IronsProxyCastDriver {
      * Iron's creative-tab and JEI generators produce for a registered spell.
      */
     static ItemStack makeProxyScroll(int poolId) {
+        if (!IronsCompat.isLoaded()) {
+            return ItemStack.EMPTY;
+        }
         ItemStack scroll = new ItemStack(ItemRegistry.SCROLL.get());
         ISpellContainer.createScrollContainer(requireProxy(poolId), 1, scroll);
         return scroll;
@@ -154,6 +185,9 @@ final class IronsProxyCastDriver {
 
     /** A scroll carrying a genuine (non-proxy) Iron's spell, or EMPTY if none is registered. */
     static ItemStack makeNativeScroll() {
+        if (!IronsCompat.isLoaded()) {
+            return ItemStack.EMPTY;
+        }
         for (AbstractSpell spell : SpellRegistry.getEnabledSpells()) {
             if (spell == SpellRegistry.none()
                 || ArsCrossProxyRegistry.poolIdOf(spell.getSpellResource()) >= 0) {
@@ -168,6 +202,9 @@ final class IronsProxyCastDriver {
 
     /** Add a genuine Iron's spell into {@code book}'s native container, alongside whatever is there. */
     static boolean addNativeSpellToBook(ItemStack book) {
+        if (!IronsCompat.isLoaded()) {
+            return false;
+        }
         for (AbstractSpell spell : SpellRegistry.getEnabledSpells()) {
             if (spell == SpellRegistry.none()
                 || ArsCrossProxyRegistry.poolIdOf(spell.getSpellResource()) >= 0) {
@@ -193,6 +230,9 @@ final class IronsProxyCastDriver {
      * use.
      */
     static int nativeSpellCount(ItemStack book) {
+        if (!IronsCompat.isLoaded()) {
+            return 0;
+        }
         if (!ISpellContainer.isSpellContainer(book)) {
             return 0;
         }
@@ -209,10 +249,16 @@ final class IronsProxyCastDriver {
     }
 
     static void setIronsMana(ServerPlayer player, float mana) {
+        if (!IronsCompat.isLoaded()) {
+            return;
+        }
         MagicData.getPlayerMagicData(player).setMana(mana);
     }
 
     static void resetCastingState(ServerPlayer player) {
+        if (!IronsCompat.isLoaded()) {
+            return;
+        }
         MagicData.getPlayerMagicData(player).resetCastingState();
     }
 }

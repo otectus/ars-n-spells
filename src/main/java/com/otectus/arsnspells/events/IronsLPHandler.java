@@ -247,9 +247,14 @@ public class IronsLPHandler {
                 return;
             }
 
-            // Safe mode: Set immune flag to block residual damage from native Cursed Ring
+            // V24: no setCanceled here. Iron's SpellOnCastEvent is NOT annotated
+            // @Cancelable on the pinned 1.20.1-3.15.0 jar (it extends PlayerEvent and carries
+            // no Cancelable annotation), so this call raised UnsupportedOperationException
+            // inside Iron's own cast pipeline every time an LP debit failed at OnCast. The
+            // cast cannot be stopped this late in any case - the mana cost has already been
+            // zeroed above and the spell is committed - so the safe-mode contract here is the
+            // health penalty and the message, and nothing else.
             LPDeathPrevention.setLPImmune(player);
-            event.setCanceled(true);
             SanctifiedLegacyCompat.applySilentHealthLoss(player, 2.0f);
             if (AnsConfig.SHOW_LP_COST_MESSAGES.get()) {
                 player.displayClientMessage(
