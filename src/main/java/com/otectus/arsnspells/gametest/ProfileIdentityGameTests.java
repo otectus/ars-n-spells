@@ -1,6 +1,7 @@
 package com.otectus.arsnspells.gametest;
 
 import com.otectus.arsnspells.compat.IronsCompat;
+import com.otectus.arsnspells.ArsNSpells;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraftforge.forgespi.language.IModInfo;
@@ -36,10 +37,37 @@ public final class ProfileIdentityGameTests {
 
     @GameTest(template = "platform", batch = "ans_profile_identity")
     public static void arsNouveau_isThePinnedAuditVersion(GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, ARS_NOUVEAU)) {
-            return;
-        }
+        // This required dependency is never an optional pass/skip.
+        ScenarioReport.executed("ProfileIdentityGameTests#arsNouveau_isThePinnedAuditVersion");
         assertVersion(helper, ARS_NOUVEAU, ARS_NOUVEAU_PINNED);
+        helper.succeed();
+    }
+
+    @GameTest(template = "platform", batch = "ans_profile_identity")
+    public static void requestedProfile_matchesRuntimeMods(GameTestHelper helper) {
+        for (String modId : new String[] {IronsCompat.MODID, ARS_ELEMENTAL, "ars_zero", "toomanyglyphs", "covenant_of_the_seven"}) {
+            String expectedValue = System.getProperty("ans.gametest.expected." + modId);
+            if (!"true".equals(expectedValue) && !"false".equals(expectedValue)) {
+                helper.fail("Missing expected profile property for " + modId
+                    + "; run the Gradle runGameTestServer target so absent jars cannot silently pass");
+            }
+            boolean expected = Boolean.parseBoolean(expectedValue);
+            boolean actual = ModList.get().isLoaded(modId);
+            if (actual != expected) {
+                helper.fail("Profile requires " + modId + (expected ? " present" : " absent")
+                    + ", but runtime reports " + loadedVersion(modId));
+            }
+            ArsNSpells.LOGGER.info("ANS-PROFILE mod={} expected={} version={}", modId,
+                expected ? "present" : "absent", loadedVersion(modId));
+        }
+        String covenantMods = System.getProperty("ans.gametest.covenant.mods", "");
+        if (!covenantMods.isEmpty()) {
+            for (String modId : covenantMods.split(",")) {
+                assertVersion(helper, modId, System.getProperty("ans.gametest.covenant.version." + modId, "<unresolved>"));
+                if (!"covenant_of_the_seven".equals(modId)) ArsNSpells.LOGGER.info(
+                    "ANS-PROFILE mod={} expected=present version={}", modId, loadedVersion(modId));
+            }
+        }
         helper.succeed();
     }
 

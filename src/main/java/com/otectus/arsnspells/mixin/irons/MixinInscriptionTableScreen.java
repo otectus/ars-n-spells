@@ -30,7 +30,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * identical in Iron's 3.15.0 and 3.16.2). Any ANS carrier created before the export fix
  * therefore crashes this screen — the reported NPE.
  *
- * <p>This cancels before that dereference and tells the player why. The server-side twin
+ * <p>This cancels before that dereference and tells the player why. A well-formed ANS
+ * carrier is <em>not</em> cancelled any more: as of 3.3.3 the click is what asks the server
+ * to bind, and javap confirms the screen is safe for it — Iron's dead-store SpellData fetch
+ * tolerates {@code SpellData.EMPTY}, and the inscribe button is active for any {@code Scroll}.
+ * Only the two malformed-scroll verdicts still stop the click. The server-side twin
  * ({@link MixinInscriptionTableMenu}) is the one that actually protects the world: a client
  * mixin cannot stop an older or modified client from sending the packet.
  *
@@ -51,6 +55,8 @@ public abstract class MixinInscriptionTableScreen {
     private void arsnspells$guardInscription(CallbackInfo ci) {
         IronsInscriptionPolicy.Verdict verdict =
             IronsInscriptionPolicy.evaluate(arsnspells$scrollSlotItem());
+        // ALLOW and BIND_CARRIER both let the click through: the first is Iron's own
+        // inscription, the second is the packet the server-side router turns into a bind.
         if (!verdict.isRejection()) {
             return;
         }

@@ -28,9 +28,8 @@ public final class ModTags {
         ItemTags.create(new ResourceLocation(ArsNSpells.MODID, "virtue_rings"));
 
     /**
-     * Blasphemy curios granting school discounts. School matching is by item
-     * path suffix {@code <school>_blasphemy} (any namespace), so pack-added
-     * entries school-match by following that naming convention.
+     * Blasphemy curios granting generic discounts. Matching-school membership is explicit
+     * in ars_n_spells:blasphemy/<school>; item names never imply a school.
      */
     public static final TagKey<Item> BLASPHEMY_CURIOS =
         ItemTags.create(new ResourceLocation(ArsNSpells.MODID, "blasphemy_curios"));

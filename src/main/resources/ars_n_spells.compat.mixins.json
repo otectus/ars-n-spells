@@ -9,14 +9,18 @@
     "ars.MixinArsPotionEffects",
     "irons.MagicDataAccessor",
     "irons.MixinIronsCastValidation",
+    "irons.MixinIronsCastPayment",
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem",
     "irons.MixinInscriptionTableMenu",
-    "sanctified.MixinSanctifiedAbstractSpell"
+    "sanctified.MixinSanctifiedAbstractSpell",
+    "sanctified.MixinCovenantSpellEvents"
   ],
   "client": [
+    "irons.MixinIronsManaBarVisibility",
     "irons.MixinAbstractSpellArsIcon",
+    "irons.MixinItemStackIconContext",
     "irons.MixinInscriptionTableScreen",
     "covenant.MixinResourceBarOverlay"
   ],

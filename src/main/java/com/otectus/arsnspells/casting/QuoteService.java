@@ -86,6 +86,14 @@ public final class QuoteService {
         return StandardQuotePolicy.INSTANCE.quote(new ResourceAmount(origin, clamped), rules, carrier);
     }
 
+    public static CostQuote quote(net.minecraft.world.entity.player.Player player, ResourceUnit origin,
+                                  double baseCost, CostRules rules, CarrierPolicy carrier) {
+        double arsMax = BridgeManager.getNativeArsBridge().getMaxMana(player);
+        var irons = BridgeManager.getNativeIronsBridge();
+        double ironsMax = irons == null ? arsMax : irons.getMaxMana(player);
+        return StandardQuotePolicy.INSTANCE.quote(new ResourceAmount(origin, Math.max(0, baseCost)),
+            rules, carrier, arsMax, ironsMax);
+    }
     /**
      * The quoted total in {@code unit}, narrowed to the {@code float} the mana bridges speak.
      *

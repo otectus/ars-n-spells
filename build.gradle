@@ -15,6 +15,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 // are gone with the mod), and `runGameTestServer` still exits 0 / BUILD SUCCESSFUL over the top
 // of that failure. Separate directories make each profile a fresh world (audit V26/T0.1).
 ext.gametestRunDir = project.findProperty('gametestRunDir') ?: 'run'
+apply from: 'gradle/covenant-profile.gradle'
 
 minecraft {
     mappings channel: 'official', version: minecraft_version
@@ -30,7 +31,11 @@ minecraft {
             }
         }
 
-        client {}
+        client {
+            property 'ans.iconSmoke', project.hasProperty('withIconClientSmoke').toString()
+            property 'ans.iconSmoke.packs', project.hasProperty('withIconPackReview').toString()
+            property 'ans.worldUiSmoke', project.hasProperty('withWorldUiSmoke').toString()
+        }
         server { args '--nogui' }
 
         // 2.0.0: gameTestServer run target for headless gameplay tests
@@ -39,6 +44,15 @@ minecraft {
         // `ars_n_spells` namespace property so other mods' tests do not run.
         gameTestServer {
             args '--nogui'
+            // Verify the requested profile against the actual mod list before accepting a green
+            // run. Optional tests self-skip, which alone cannot detect a missing runtime jar.
+            property 'ans.gametest.expected.irons_spellbooks', project.hasProperty('withIronsRuntimeGameTests').toString()
+            property 'ans.gametest.expected.ars_elemental', project.hasProperty('withArsElemental').toString()
+            property 'ans.gametest.expected.ars_zero', project.hasProperty('withArsZero').toString()
+            property 'ans.gametest.expected.toomanyglyphs', project.hasProperty('withTooManyGlyphs').toString()
+            property 'ans.gametest.expected.covenant_of_the_seven', project.hasProperty('withCovenantRuntimeGameTests').toString()
+            property 'ans.gametest.covenant.mods', covenantProfileVersions.keySet().join(',')
+            covenantProfileVersions.each { id, expected -> property 'ans.gametest.covenant.version.' + id, expected }
             property 'forge.enabledGameTestNamespaces', 'ars_n_spells'
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
@@ -47,6 +61,14 @@ minecraft {
 }
 
 repositories {
+    if (covenantProfileDirectory != null) {
+        ivy {
+            url = covenantProfileDirectory.toURI()
+            patternLayout { artifact '[artifact].[ext]' }
+            metadataSources { artifact() }
+            content { includeGroup 'ans.local.integration' }
+        }
+    }
     mavenCentral()
     maven {
         name = 'CurseMaven'
@@ -116,9 +138,11 @@ dependencies {
         runtimeOnly fg.deobf("blank:ars_zero-1.20.1:2.0.2HOTFIX")
         runtimeOnly fg.deobf("com.github.glitchfiend:TerraBlender-forge:${terrablender_version}")
     }
-    // Covenant of the Seven has no runtime profile: its own hard deps (Blood Magic,
-    // Enigmatic Legacy, Nature's Aura, Iron's, Curios 5.14) are not resolvable here.
-    // Its surface is verified against the jar by CovenantJarSurfaceTest instead.
+    // The explicit Covenant profile accepts only the bounded, inspected hash lock.
+    // Keep these artifacts out of every ordinary run and all published dependency metadata.
+    covenantProfileJars.each { row ->
+        runtimeOnly fg.deobf("ans.local.integration:${row.filename[0..-5]}:${row.sha256.substring(0, 16)}")
+    }
     // Curios API only (matches the version Ars Nouveau bundles at runtime).
     compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${curios_version}:api")
     // JEI API, compile-only. ANS never requires JEI: the plugin class is annotated

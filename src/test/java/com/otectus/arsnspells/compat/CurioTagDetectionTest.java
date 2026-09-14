@@ -60,16 +60,15 @@ class CurioTagDetectionTest {
     }
 
     @Test
-    void blasphemySchoolMatch_isNamespaceAgnostic() throws IOException {
-        String src = read("src/main/java/com/otectus/arsnspells/compat/SanctifiedLegacyCompat.java");
-        int idx = src.indexOf("public static boolean hasMatchingBlasphemy");
-        assertTrue(idx > 0, "hasMatchingBlasphemy must exist");
-        int end = src.indexOf("\n    }", idx);
-        String body = src.substring(idx, end);
-        assertTrue(body.contains("getPath().equals(wantedPath)"),
-            "school matching must compare item PATH only, so pack-added "
-                + "blasphemies in any namespace can school-match (audit F-1)");
-        assertFalse(body.contains("new ResourceLocation(MOD_ID"),
-            "school matching must not pin the Covenant namespace anymore");
+    void schoolTagsDeclareExplicitOptionalMembershipForEveryCanonicalSchool() throws IOException {
+        for (String school : BlasphemySchools.SUPPORTED) {
+            Path path = Paths.get("src/main/resources/data/ars_n_spells/tags/items/blasphemy/" + school + ".json");
+            var json = com.google.gson.JsonParser.parseString(Files.readString(path)).getAsJsonObject();
+            assertFalse(json.get("replace").getAsBoolean());
+            for (var entry : json.getAsJsonArray("values")) {
+                assertFalse(entry.getAsJsonObject().get("required").getAsBoolean());
+                assertTrue(entry.getAsJsonObject().get("id").getAsString().contains(":"));
+            }
+        }
     }
 }

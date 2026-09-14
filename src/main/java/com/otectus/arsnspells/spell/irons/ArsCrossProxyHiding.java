@@ -42,6 +42,10 @@ public final class ArsCrossProxyHiding {
      * alongside genuine Iron's spells is never mistaken for a generated ghost.
      */
     public static boolean isProxyOnlyStack(ItemStack stack) {
+        // A player's book or an inscription-bearing carrier is never generated proxy debris,
+        // even when its only native slots are ANS proxies. Preserve recoverable payloads too.
+        if (stack != null && !stack.isEmpty() && (IronsBookBindingUtil.isIronsSpellBook(stack)
+            || com.otectus.arsnspells.spell.CrossCastNbt.hasCrossModSpells(stack.getTag()))) return false;
         if (stack == null || stack.isEmpty() || !ISpellContainer.isSpellContainer(stack)) {
             return false;
         }

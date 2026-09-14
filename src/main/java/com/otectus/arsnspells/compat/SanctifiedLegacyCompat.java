@@ -64,21 +64,24 @@ public class SanctifiedLegacyCompat {
         final boolean cursedRing;
         final boolean virtueRing;
         final Set<ResourceLocation> blasphemies; // immutable
+        final Set<String> schools;
         final long cachedAtTick;
 
-        CurioState(boolean cursedRing, boolean virtueRing, Set<ResourceLocation> blasphemies, long cachedAtTick) {
+        CurioState(boolean cursedRing, boolean virtueRing, Set<ResourceLocation> blasphemies, Set<String> schools, long cachedAtTick) {
             this.cursedRing = cursedRing;
             this.virtueRing = virtueRing;
             this.blasphemies = blasphemies;
+            this.schools = schools;
             this.cachedAtTick = cachedAtTick;
         }
     }
 
-    private static final CurioState EMPTY_STATE = new CurioState(false, false, Collections.emptySet(), Long.MIN_VALUE);
+    private static final CurioState EMPTY_STATE = new CurioState(false, false, Collections.emptySet(), Collections.emptySet(), Long.MIN_VALUE);
 
     // Blood Magic reflection cache
     private static Class<?> bloodMagicNetworkClass = null;
     private static java.lang.reflect.Method getSoulNetworkMethod = null;
+    private static java.lang.reflect.Method setCurrentEssenceMethod = null;
     private static java.lang.reflect.Method getCurrentEssenceMethod = null;
     private static java.lang.reflect.Method syphonMethod = null;
 
@@ -96,7 +99,6 @@ public class SanctifiedLegacyCompat {
     // never populated on a dedicated server, so it must not decide a cast. It resolves on
     // the client dist only and is read exclusively by getCovenantAura's display path.
     private static java.lang.reflect.Method clientResourceDataGetCurrentAuraMethod = null; // HUD only
-    private static java.lang.reflect.Method covenantGetVirtuousFractionMethod = null;
     private static boolean covenantAuraReflectionResolved = false;
 
     // Covenant's own sampling radius, read off `javap -c` of
@@ -187,6 +189,7 @@ public class SanctifiedLegacyCompat {
             // Get SoulNetwork class methods
             Class<?> soulNetworkClass = Class.forName("wayoftime.bloodmagic.core.data.SoulNetwork");
             getCurrentEssenceMethod = soulNetworkClass.getMethod("getCurrentEssence");
+            setCurrentEssenceMethod = soulNetworkClass.getMethod("setCurrentEssence", int.class);
             syphonMethod = soulNetworkClass.getMethod("syphon", int.class);
 
             LOGGER.info("  [OK] Blood Magic Soul Network API initialized via reflection");
@@ -206,7 +209,24 @@ public class SanctifiedLegacyCompat {
      * Check if Blood Magic is available for LP consumption.
      */
     public static boolean isBloodMagicAvailable() {
-        return isBloodMagicLoaded && bloodMagicNetworkClass != null;
+        return isBloodMagicLoaded && bloodMagicNetworkClass != null && getSoulNetworkMethod != null
+            && getCurrentEssenceMethod != null && syphonMethod != null && setCurrentEssenceMethod != null;
+    }
+
+    /** Return a reservation to the same Soul Network; never substitute health for LP. */
+    public static int creditBloodMagicLP(Player player, int amount) {
+        if (!isBloodMagicAvailable() || player == null || amount <= 0) return 0;
+        try {
+            Object network = getSoulNetworkMethod.invoke(null, player.getUUID());
+            if (network == null) return 0;
+            int before = ((Number) getCurrentEssenceMethod.invoke(network)).intValue();
+            int target = (int) Math.min(Integer.MAX_VALUE, (long) before + amount);
+            setCurrentEssenceMethod.invoke(network, target);
+            return Math.max(0, ((Number) getCurrentEssenceMethod.invoke(network)).intValue() - before);
+        } catch (ReflectiveOperationException error) {
+            LOGGER.error("Could not release the Blood Magic LP reservation", error);
+            return 0;
+        }
     }
 
     /**
@@ -237,12 +257,8 @@ public class SanctifiedLegacyCompat {
                 }
             }
 
-            Class<?> modUtils = Class.forName("net.llenzzz.covenant_of_the_seven.util.ModUtils");
-            covenantGetVirtuousFractionMethod = tryGetStatic(modUtils, "getVirtuousFraction", Player.class);
-
             covenantAuraReflectionResolved = true;
-            LOGGER.info("  [OK] Covenant reflection initialized — virtuousFraction={}, clientHudAura={} (dist={})",
-                covenantGetVirtuousFractionMethod != null,
+            LOGGER.info("  [OK] Covenant reflection initialized — clientHudAura={} (dist={})",
                 clientResourceDataGetCurrentAuraMethod != null,
                 FMLEnvironment.dist);
             LOGGER.info("  Covenant exposes no per-player aura API; the aura read and drain both go "
@@ -634,6 +650,36 @@ public class SanctifiedLegacyCompat {
         return 0;
     }
 
+    /** Receipt fixes both the world and the exact aura spot so cancellation cannot move aura. */
+    public record AuraReceipt(Object chunk, net.minecraft.core.BlockPos spot, int amount) {}
+
+    public static AuraReceipt reserveCovenantAura(Player player, int amount) {
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer) || amount <= 0 || !isAuraBridgeComplete()) return null;
+        try {
+            var pos = player.blockPosition();
+            Object highest = auraChunkGetHighestSpotMethod.invoke(null, player.level(), pos, COVENANT_AURA_RADIUS, pos);
+            if (!(highest instanceof net.minecraft.core.BlockPos spot) || !player.level().hasChunkAt(spot)) return null;
+            Object chunk = auraChunkGetAuraChunkMethod.invoke(null, player.level(), spot);
+            if (chunk == null) return null;
+            Object result = auraChunkDrainAuraMethod.invoke(chunk, spot, amount);
+            return result instanceof Number moved ? new AuraReceipt(chunk, spot.immutable(), Math.max(0, moved.intValue())) : null;
+        } catch (ReflectiveOperationException error) {
+            LOGGER.error("Could not reserve aura at its native source", error);
+            return null;
+        }
+    }
+
+    public static int releaseCovenantAura(AuraReceipt receipt, int amount) {
+        if (receipt == null || amount <= 0 || auraChunkStoreAuraMethod == null) return 0;
+        try {
+            Object result = auraChunkStoreAuraMethod.invoke(receipt.chunk(), receipt.spot(), Math.min(amount, receipt.amount()));
+            return result instanceof Number moved ? Math.max(0, moved.intValue()) : 0;
+        } catch (ReflectiveOperationException error) {
+            LOGGER.error("Could not release aura to its original native source", error);
+            return 0;
+        }
+    }
+
     /** Whether the aura bridge resolved every method a reserve-and-release cycle needs. */
     public static boolean isAuraBridgeComplete() {
         return naturesAuraReflectionResolved
@@ -762,6 +808,7 @@ public class SanctifiedLegacyCompat {
     private static CurioState scanCurios(Player player, long tick) {
         boolean[] cursed = {false};
         boolean[] virtue = {false};
+        Set<String> schools = new HashSet<>();
         @SuppressWarnings("unchecked")
         Set<ResourceLocation>[] blasphemiesRef = new Set[]{null};
         try {
@@ -779,6 +826,10 @@ public class SanctifiedLegacyCompat {
                         if (itemId == null) continue;
                         if (blasphemiesRef[0] == null) blasphemiesRef[0] = new HashSet<>(2);
                         blasphemiesRef[0].add(itemId);
+                        for (String school : BlasphemySchools.SUPPORTED) {
+                            if (stack.is(net.minecraft.tags.ItemTags.create(new ResourceLocation(
+                                    "ars_n_spells", "blasphemy/" + school)))) schools.add(school);
+                        }
                     }
                 }
             });
@@ -788,7 +839,7 @@ public class SanctifiedLegacyCompat {
         Set<ResourceLocation> blasphemies = blasphemiesRef[0];
         return new CurioState(cursed[0], virtue[0],
             blasphemies == null ? Collections.emptySet() : Collections.unmodifiableSet(blasphemies),
-            tick);
+            Set.copyOf(schools), tick);
     }
 
     /**
@@ -1112,16 +1163,8 @@ public class SanctifiedLegacyCompat {
         if (!isAvailable() || schoolType == null) {
             return false;
         }
-        // Audit F-1: match by path so pack-added blasphemies (any namespace,
-        // named "<school>_blasphemy", tagged ars_n_spells:blasphemy_curios)
-        // school-match exactly like Covenant's own.
-        String wantedPath = schoolType.toLowerCase(Locale.ROOT) + "_blasphemy";
-        for (ResourceLocation worn : getState(player).blasphemies) {
-            if (worn.getPath().equals(wantedPath)) {
-                return true;
-            }
-        }
-        return false;
+        String school = BlasphemySchools.canonical(schoolType);
+        return school != null && getState(player).schools.contains(school);
     }
     
     /**
@@ -1188,10 +1231,8 @@ public class SanctifiedLegacyCompat {
      * @return true if wearing that specific Blasphemy
      */
     public static boolean hasBlasphemyType(Player player, String blasphemyType) {
-        if (!isLoaded || blasphemyType == null) {
-            return false;
-        }
-        return getState(player).blasphemies.contains(new ResourceLocation(MOD_ID, blasphemyType));
+        if (blasphemyType == null || !blasphemyType.endsWith("_blasphemy")) return false;
+        return hasMatchingBlasphemy(player, blasphemyType.substring(0, blasphemyType.length() - "_blasphemy".length()));
     }
     
     /**
@@ -1201,53 +1242,9 @@ public class SanctifiedLegacyCompat {
      * @return The matching Blasphemy type, or null if no match
      */
     public static String getMatchingBlasphemyType(String spellSchool) {
-        if (spellSchool == null) {
-            return null;
-        }
-        
-        String school = spellSchool.toLowerCase();
-        
-        // Direct mapping for most schools
-        if (school.contains("fire") || school.contains("flame")) {
-            return "fire_blasphemy";
-        }
-        if (school.contains("ice") || school.contains("frost") || school.contains("cold")) {
-            return "ice_blasphemy";
-        }
-        if (school.contains("lightning") || school.contains("shock") || school.contains("storm")) {
-            return "lightning_blasphemy";
-        }
-        if (school.contains("holy") || school.contains("light") || school.contains("heal")) {
-            return "holy_blasphemy";
-        }
-        if (school.contains("ender") || school.contains("void") || school.contains("teleport")) {
-            return "ender_blasphemy";
-        }
-        if (school.contains("blood") || school.contains("essence") || school.contains("drain")) {
-            return "blood_blasphemy";
-        }
-        if (school.contains("evocation") || school.contains("machina") || school.contains("projectile")) {
-            return "evocation_blasphemy";
-        }
-        if (school.contains("nature") || school.contains("wilds") || school.contains("earth") || school.contains("grow")) {
-            return "nature_blasphemy";
-        }
-        if (school.contains("eldritch") || school.contains("anomaly") || school.contains("dark")) {
-            return "eldritch_blasphemy";
-        }
-        if (school.contains("aqua") || school.contains("ocean") || school.contains("water")) {
-            return "aqua_blasphemy";
-        }
-        if (school.contains("geo") || school.contains("stone") || school.contains("rock")) {
-            return "geo_blasphemy";
-        }
-        if (school.contains("wind") || school.contains("air") || school.contains("sky") || school.contains("gust")) {
-            return "wind_blasphemy";
-        }
-        
-        return null;
+        String school = BlasphemySchools.canonical(spellSchool);
+        return school == null ? null : school + "_blasphemy";
     }
-    
     /**
      * Determine the spell school from an Ars Nouveau spell part.
      * 

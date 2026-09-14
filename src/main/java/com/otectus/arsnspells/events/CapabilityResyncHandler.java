@@ -71,40 +71,37 @@ public final class CapabilityResyncHandler {
     }
 
     private static void syncAffinity(ServerPlayer player) {
-        if (!AnsConfig.ENABLE_AFFINITY_SYSTEM.get()) {
-            return;
-        }
-        player.getCapability(AffinityData.AFFINITY_DATA).ifPresent(data -> {
-            for (AffinityType type : AffinityType.values()) {
-                int level = data.getLevel(type);
-                if (level > 0) {
-                    PacketHandler.sendToClient(new AffinitySyncPacket(type, level), player);
-                }
-            }
-        });
+        java.util.Map<String, Integer> levels = AnsConfig.ENABLE_AFFINITY_SYSTEM.get()
+            ? player.getCapability(AffinityData.AFFINITY_DATA).map(AffinityData::getAllLevels).orElse(java.util.Map.of())
+            : java.util.Map.of();
+        PacketHandler.sendToClient(new AffinitySyncPacket(levels, true), player);
     }
 
     private static void syncCooldowns(ServerPlayer player) {
-        if (!AnsConfig.ENABLE_COOLDOWN_SYSTEM.get()) {
-            return;
-        }
         long now = player.level().getGameTime();
         player.getCapability(CooldownData.COOLDOWN_CAP).ifPresent(data -> {
             for (CooldownCategory cat : CooldownCategory.values()) {
                 long end = data.getLastCast(cat);
-                if (end > now) {
-                    PacketHandler.sendToClient(new CooldownSyncPacket(cat, end), player);
-                }
+                PacketHandler.sendToClient(new CooldownSyncPacket(cat,
+                    AnsConfig.ENABLE_COOLDOWN_SYSTEM.get() && end > now ? end : 0), player);
             }
         });
     }
 
     private static void syncResonance(ServerPlayer player) {
         if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !ModList.get().isLoaded("irons_spellbooks")) {
+            PacketHandler.sendToClient(new ResonanceSyncPacket(1.0f), player);
             return;
         }
         ResonanceManager.computeResonance(player);
         PacketHandler.sendToClient(
             new ResonanceSyncPacket((float) ResonanceManager.getResonance(player)), player);
+    }
+
+    /** Called after every server config transition as well as ordinary player lifecycle events. */
+    public static void syncAll(ServerPlayer player) {
+        syncAffinity(player);
+        syncCooldowns(player);
+        syncResonance(player);
     }
 }

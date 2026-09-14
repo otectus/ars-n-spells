@@ -1,0 +1,53 @@
+// Explicit, local, hash-locked development profile. Never changes published dependencies.
+ext.covenantProfileJars = []
+ext.covenantProfileVersions = [:]
+ext.covenantProfileDirectory = null
+if (project.hasProperty('withCovenantRuntimeGameTests')) {
+    if (!project.hasProperty('withIronsRuntimeGameTests')) {
+        throw new GradleException('Covenant requires -PwithIronsRuntimeGameTests as well')
+    }
+    def directory = project.file(project.findProperty('covenantRuntimeDir') ?: 'libs/covenant-3.3.0').canonicalFile
+    def lock = new File(directory, 'covenant-profile.json')
+    if (!lock.isFile() || lock.length() > 262144) {
+        throw new GradleException('Prepare the complete local dependency directory first: python tools/covenant_profile.py "' + directory + '" --write-lock. See docs/3.3.0/integration-matrix.md')
+    }
+    def profile = new groovy.json.JsonSlurper().parse(lock)
+    def required = ['covenant_of_the_seven', 'bloodmagic', 'enigmaticlegacy', 'naturesaura', 'caelus', 'patchouli']
+    if (profile.schema != 1 || profile.loader != 'forge' || profile.minecraft != '1.20.1'
+        || !(profile.jars instanceof List) || profile.jars.size() < 1 || profile.jars.size() > 16
+        || !(profile.versions instanceof Map) || !profile.versions.keySet().containsAll(required)) {
+        throw new GradleException('Invalid/incomplete Covenant profile lock; regenerate with tools/covenant_profile.py')
+    }
+    long total = 0
+    def identities = [:]
+    profile.jars.each { row ->
+        if (!(row.filename instanceof String) || !(row.filename ==~ /[A-Za-z0-9_.+\-]+\.jar/)
+            || !(row.sha256 instanceof String) || !(row.sha256 ==~ /[a-f0-9]{64}/)) {
+            throw new GradleException('Invalid Covenant artifact identity')
+        }
+        def jar = new File(directory, row.filename).canonicalFile
+        if (jar.parentFile != directory || !jar.isFile() || jar.length() < 1 || jar.length() > 128 * 1024 * 1024) {
+            throw new GradleException('Missing, oversized or escaped Covenant artifact: ' + row.filename)
+        }
+        total += jar.length()
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+        jar.withInputStream { stream ->
+            byte[] buffer = new byte[65536]
+            int read
+            while ((read = stream.read(buffer)) != -1) digest.update(buffer, 0, read)
+        }
+        if (digest.digest().encodeHex().toString() != row.sha256 || jar.length() != row.bytes) {
+            throw new GradleException('Covenant artifact changed since inspection: ' + row.filename)
+        }
+        row.mods.each { id, version ->
+            if (!(id ==~ /[a-z][a-z0-9_]{1,63}/) || !(version instanceof String) || version.length() > 128 || identities.containsKey(id)) {
+                throw new GradleException('Invalid/duplicate Covenant mod identity')
+            }
+            identities[id] = version
+        }
+    }
+    if (total > 512 * 1024 * 1024 || identities != profile.versions) throw new GradleException('Covenant profile identity/size mismatch')
+    ext.covenantProfileJars = profile.jars
+    ext.covenantProfileVersions = profile.versions
+    ext.covenantProfileDirectory = directory
+}

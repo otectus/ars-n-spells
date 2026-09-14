@@ -93,6 +93,27 @@ class ConfigSchemaMigrationTest {
     }
 
     @Test
+    void schemaOneExplicitPolicySurvivesSourceMigration() {
+        assertSame(PaymentOpenFailurePolicy.LEGACY_OPEN,
+            AnsConfig.resolvePaymentOpenFailurePolicy("legacy_open", 1, false));
+        assertSame(PaymentOpenFailurePolicy.REFUSE,
+            AnsConfig.resolvePaymentOpenFailurePolicy("refuse", 1, false));
+    }
+
+    @Test
+    void sourceRateMigrationPreservesNondefaultIncomeAtOldCadence() {
+        for (int ticks : new int[]{1, 20, 100, 200}) {
+            for (double oldMultiplier : new double[]{.1, 5, 100}) {
+                double migrated = com.otectus.arsnspells.util.SourceSynergyPolicy.migratePerScanMultiplier(oldMultiplier, ticks);
+                double oneOldScanIncome = com.otectus.arsnspells.util.SourceSynergyPolicy.income(migrated, 1) * ticks;
+                assertEquals(oldMultiplier, oneOldScanIncome, 1e-9,
+                    "new per-tick income must equal one historical payment over its configured scan interval");
+                assertTrue(migrated >= .01 && migrated <= 2000, "migration must fit the persisted config bounds");
+            }
+        }
+    }
+
+    @Test
     void schemaKeys_exist() {
         for (String name : new String[] {
             "CONFIG_SCHEMA_VERSION", "CONVERSION_POLICY", "PAYMENT_OPEN_FAILURE_POLICY",
@@ -103,7 +124,7 @@ class ConfigSchemaMigrationTest {
                 fail("AnsConfig." + name + " must exist (3.3.0 T1.2)");
             }
         }
-        assertEquals(1, AnsConfig.CURRENT_SCHEMA_VERSION,
-            "3.3.0 is schema 1; bumping this is a migration, not a version bump");
+        assertEquals(2, AnsConfig.CURRENT_SCHEMA_VERSION,
+            "schema 2 migrates Source income from per scan to per second");
     }
 }

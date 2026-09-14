@@ -147,6 +147,7 @@ public final class AlternativePayment {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(unit, "unit");
         Objects.requireNonNull(policy, "policy");
+        if (!Double.isFinite(amount) || amount < 0) return new Result(Outcome.DENIED, null);
         if (amount <= 0.0d) {
             return new Result(Outcome.RESERVED, null);
         }
@@ -177,6 +178,15 @@ public final class AlternativePayment {
         }
 
         double moved = access.debit(playerId, unit, amount);
+        if (!Double.isFinite(moved) || moved < 0) {
+            LOGGER.error("{} adapter reported an invalid debit {}; refusing the cast", unit, moved);
+            return new Result(Outcome.DENIED, null);
+        }
+        if (moved > amount + SHORTFALL_TOLERANCE) {
+            access.credit(playerId, unit, moved);
+            LOGGER.error("{} adapter debited {} against quote {}; released and refused the cast", unit, moved, amount);
+            return new Result(Outcome.DENIED, null);
+        }
         Leg leg = new Leg(attemptId, playerId, unit, amount, Math.max(0.0d, moved), policy);
         if (!leg.isShort()) {
             OPEN.put(attemptId, leg);

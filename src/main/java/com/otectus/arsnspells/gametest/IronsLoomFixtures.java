@@ -68,4 +68,43 @@ final class IronsLoomFixtures {
         }
         return null;
     }
+    static void assertNativeBookRoundTrip(net.minecraft.gametest.framework.GameTestHelper helper) {
+        var item = CrossCastGameTests.findIronsSpellBook();
+        if (item == null) { helper.fail("real Iron book missing"); return; }
+        ItemStack book = new ItemStack(item);
+        var nativeSpells = ISpellContainer.getOrCreate(book).mutableCopy();
+        if (nativeSpells.getMaxSpellCount() < 1) nativeSpells.setMaxSpellCount(1);
+        if (!nativeSpells.addSpellAtIndex(firstRealSpell(), 1, 0, false)) {
+            helper.fail("fixture must contain a real native spell"); return;
+        }
+        ISpellContainer.set(book, nativeSpells.toImmutable());
+        book.setHoverName(net.minecraft.network.chat.Component.literal("Preserve this name"));
+        ItemStack original = book.copy();
+        var payload = new com.hollingsworth.arsnouveau.api.spell.Spell(
+            com.hollingsworth.arsnouveau.common.spell.method.MethodSelf.INSTANCE,
+            com.hollingsworth.arsnouveau.common.spell.effect.EffectHeal.INSTANCE).serialize();
+        var added = com.otectus.arsnspells.spell.IronsBookBindingUtil.appendArsSpellToBook(book, payload);
+        if (!added) { helper.fail("native book binding failed"); return; }
+        ItemStack bound = book.copy();
+        if (com.otectus.arsnspells.spell.IronsBookBindingUtil.appendArsSpellToBook(book, payload)) {
+            helper.fail("duplicate spell was added"); return;
+        }
+        if (!ItemStack.isSameItemSameTags(book, bound)) { helper.fail("duplicate refusal mutated native book"); return; }
+        com.otectus.arsnspells.spell.IronsBookBindingUtil.removeAllArsEntries(book);
+        if (!ItemStack.isSameItemSameTags(book, original)) {
+            helper.fail("unbind changed native spell, name, capacity, or non-ANS metadata"); return;
+        }
+        helper.succeed();
+    }
+
+    static void assertNativeSchoolBinding(net.minecraft.gametest.framework.GameTestHelper helper) {
+        var fire = com.otectus.arsnspells.compat.IronsSchoolAttributes.power("irons_spellbooks:fire");
+        var resistance = com.otectus.arsnspells.compat.IronsSchoolAttributes.resistance("irons_spellbooks:fire");
+        if (fire == null || resistance == null) { helper.fail("native SchoolType attribute binding missing"); return; }
+        if (com.otectus.arsnspells.compat.IronsSchoolAttributes.power("audit_absent:fire") != null) {
+            helper.fail("unregistered custom school aliased built-in fire"); return;
+        }
+        helper.succeed();
+    }
+
 }

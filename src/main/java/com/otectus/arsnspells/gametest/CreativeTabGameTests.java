@@ -4,6 +4,7 @@ import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.registry.ModBlocksRegistry;
 import com.otectus.arsnspells.registry.ModCreativeTabs;
+import com.otectus.arsnspells.registry.ModItemsRegistry;
 import com.otectus.arsnspells.rituals.ManaInfusionRitual;
 import com.otectus.arsnspells.rituals.ManaWellRitual;
 import com.otectus.arsnspells.rituals.SpellTranscriptionRitual;
@@ -194,6 +195,10 @@ public final class CreativeTabGameTests {
         Set<String> paths = new TreeSet<>();
         paths.add(ModBlocksRegistry.SPELL_LOOM_ITEM.getId().getPath());
         paths.add(SpellUninscriptionRitual.REGISTRY_PATH);
+        // 3.3.3: the blank scroll is registered unconditionally (it is the Spell Loom's own
+        // substrate, and stock Iron's ships no recipe for a bare scroll), so it is expected in
+        // the tab on both profiles.
+        paths.add(ModItemsRegistry.blankScroll().getId().getPath());
         if (IronsCompat.isLoaded()) {
             paths.add(SpellTranscriptionRitual.REGISTRY_PATH);
             paths.add(SpellbookBindingRitual.REGISTRY_PATH);

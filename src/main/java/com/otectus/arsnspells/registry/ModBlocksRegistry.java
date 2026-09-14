@@ -26,6 +26,7 @@ public final class ModBlocksRegistry {
     public static final RegistryObject<Block> SPELL_LOOM = BLOCKS.register("spell_loom",
         () -> new SpellLoomBlock(BlockBehaviour.Properties.of()
             .mapColor(MapColor.COLOR_PURPLE)
+            .noOcclusion()
             .strength(2.5f)
             .sound(SoundType.WOOD)));
 

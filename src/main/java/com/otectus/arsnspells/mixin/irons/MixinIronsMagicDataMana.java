@@ -34,7 +34,8 @@ public abstract class MixinIronsMagicDataMana {
     @Inject(method = "getMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$getMana(CallbackInfoReturnable<Float> cir) {
         ServerPlayer player = serverPlayer;
-        if (player == null) {
+        if (player == null || com.otectus.arsnspells.bridge.NativeManaAccess.active(player,
+                com.otectus.arsnspells.contract.ResourceUnit.IRONS_MANA)) {
             return;
         }
 
@@ -71,7 +72,8 @@ public abstract class MixinIronsMagicDataMana {
      */
     @Inject(method = "getMana", at = @At("RETURN"), cancellable = true, require = 0)
     private void arsnspells$scaleManaForCastGate(CallbackInfoReturnable<Float> cir) {
-        if (serverPlayer == null) {
+        if (serverPlayer == null || com.otectus.arsnspells.bridge.NativeManaAccess.active(serverPlayer,
+                com.otectus.arsnspells.contract.ResourceUnit.IRONS_MANA)) {
             return;
         }
         if (!CastValidationScope.isActive(this)) {
@@ -87,21 +89,23 @@ public abstract class MixinIronsMagicDataMana {
     @Inject(method = "setMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$setMana(float amount, CallbackInfo ci) {
         ServerPlayer player = serverPlayer;
-        if (player == null) {
+        if (player == null || com.otectus.arsnspells.bridge.NativeManaAccess.active(player,
+                com.otectus.arsnspells.contract.ResourceUnit.IRONS_MANA)) {
             return;
         }
         if (!shouldRedirectToArs()) {
             return;
         }
         BridgeManager.getBridge().setMana(player, amount);
-        this.mana = BridgeManager.getBridge().getMana(player);
+
         ci.cancel();
     }
 
     @Inject(method = "addMana", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$addMana(float amount, CallbackInfo ci) {
         ServerPlayer player = serverPlayer;
-        if (player == null) {
+        if (player == null || com.otectus.arsnspells.bridge.NativeManaAccess.active(player,
+                com.otectus.arsnspells.contract.ResourceUnit.IRONS_MANA)) {
             return;
         }
         if (!shouldRedirectToArs()) {
@@ -111,10 +115,14 @@ public abstract class MixinIronsMagicDataMana {
         // concurrent regen/buff landing between the read and the write (the exact race
         // ArsNativeBridge/IronsBridge.addMana were written to avoid).
         BridgeManager.getBridge().addMana(player, amount);
-        this.mana = BridgeManager.getBridge().getMana(player);
+
         ci.cancel();
     }
 
+    @Inject(method = "resetCastingState", at = @At("RETURN"), require = 1)
+    private void arsnspells$clearCastQuote(CallbackInfo ci) {
+        com.otectus.arsnspells.casting.IronsCastPayments.clear((MagicData)(Object)this);
+    }
     private static boolean shouldRedirectToArs() {
         if (!BridgeManager.isUnificationEnabled()) {
             return false;

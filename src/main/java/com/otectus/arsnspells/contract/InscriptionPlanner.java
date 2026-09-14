@@ -30,9 +30,9 @@ public final class InscriptionPlanner {
         InscriptionSourceKind source = Objects.requireNonNull(view.sourceKind(), "sourceKind");
         InscriptionSourceKind target = Objects.requireNonNull(view.targetKind(), "targetKind");
 
-        // A filled scroll is a filled scroll on either side of the operation. Checked before
-        // anything else so no path can reach the "is it empty?" question with one in hand.
-        if (target == InscriptionSourceKind.FILLED_SCROLL || source == InscriptionSourceKind.FILLED_SCROLL) {
+        // A filled scroll is a valid disposable source (native Iron's transcription),
+        // but it must never be mistaken for a blank target.
+        if (target == InscriptionSourceKind.FILLED_SCROLL) {
             return new InscriptionPlan(source, target, 0, 0, InscriptionPlan.REASON_NOT_BLANK);
         }
 
@@ -40,12 +40,12 @@ public final class InscriptionPlanner {
             return new InscriptionPlan(source, target, 0, 0, InscriptionPlan.REASON_TARGET_NOT_EMPTY);
         }
 
-        if (source.isReusable()) {
-            return new InscriptionPlan(source, target, 0, 1, InscriptionPlan.REASON_OK);
-        }
-
         if (view.sourceStackCount() < 1) {
             return new InscriptionPlan(source, target, 0, 0, InscriptionPlan.REASON_INSUFFICIENT_STACK);
+        }
+
+        if (source.isReusable()) {
+            return new InscriptionPlan(source, target, 0, 1, InscriptionPlan.REASON_OK);
         }
 
         return new InscriptionPlan(source, target, 1, 1, InscriptionPlan.REASON_OK);

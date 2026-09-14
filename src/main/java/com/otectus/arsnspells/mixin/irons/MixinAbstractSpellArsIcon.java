@@ -56,31 +56,18 @@ public abstract class MixinAbstractSpellArsIcon {
         // missing texture (purple checkerboard in the wheel).
         String symbol = entry == null ? "" : entry.getString(CrossCastNbt.TAG_ICON_SYMBOL);
         String nature = entry == null ? "" : entry.getString(CrossCastNbt.TAG_NATURE);
-        String path;
-        if (symbol != null && CrossCastNbt.ICON_SYMBOLS.contains(symbol)) {
-            path = "textures/gui/icons/spell/icon_" + symbol + ".png";
-        } else if (nature != null && nature.matches("[a-z_]{1,32}")) {
-            path = "textures/gui/icons/spell/nature_" + nature + ".png";
-        } else {
-            path = "textures/gui/icons/spell/ars_cross_default.png";
-        }
-        cir.setReturnValue(new ResourceLocation("ars_n_spells", path));
+        cir.setReturnValue(com.otectus.arsnspells.client.icons.SpellIconRegistry.INSTANCE.resolve(symbol, nature));
     }
 
     private static CompoundTag arsnspells$entry(Player player, int poolId) {
         if (player == null) {
             return null;
         }
-        // Check the equipped spellbook slot first: that is where a bound book normally
-        // lives while its entries are being rendered in the wheel, and neither hand
-        // holds it. Without this the wheel fell back to the default icon and name.
-        CompoundTag fromEquipped =
-            arsnspells$entryFrom(Utils.getPlayerSpellbookStack(player), poolId);
-        if (fromEquipped != null) {
-            return fromEquipped;
-        }
-        CompoundTag fromMain = arsnspells$entryFrom(player.getMainHandItem(), poolId);
-        return fromMain != null ? fromMain : arsnspells$entryFrom(player.getOffhandItem(), poolId);
+        var hovered = com.otectus.arsnspells.client.icons.CarrierRenderContext.current();
+        var carrier = hovered != null
+            ? com.otectus.arsnspells.spell.irons.ProxyCarrierResolver.from(hovered, poolId)
+            : com.otectus.arsnspells.spell.irons.ProxyCarrierResolver.unambiguous(player, poolId);
+        return carrier == null ? null : carrier.entry();
     }
 
     private static CompoundTag arsnspells$entryFrom(ItemStack stack, int poolId) {

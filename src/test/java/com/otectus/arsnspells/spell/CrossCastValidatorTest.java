@@ -201,8 +201,12 @@ class CrossCastValidatorTest {
 
     private static CompoundTag nonEmptyArsTag() {
         CompoundTag tag = new CompoundTag();
-        // Any non-empty inner tag; the validator only checks isEmpty().
-        tag.putString("placeholder", "x");
+        // Ars 4's real recipe envelope, without needing a live glyph registry.
+        CompoundTag recipe = new CompoundTag();
+        recipe.putInt("size", 2);
+        recipe.putString("part0", "ars_nouveau:glyph_self");
+        recipe.putString("part1", "ars_nouveau:glyph_heal");
+        tag.put("recipe", recipe);
         return tag;
     }
 }

@@ -125,74 +125,61 @@ public final class AlternativeResourceAccess {
      * actually moved instead of a boolean that was true for a short move.
      */
     public static final class LpAccess extends PlayerBoundAccess {
+        private final SanctifiedLegacyCompat.LPSourceMode sourceMode;
+        private boolean bloodReceipt;
+        private double remainingReceipt;
 
         LpAccess(Function<UUID, Player> resolver) {
             super(resolver, ResourceUnit.LP);
+            sourceMode = SanctifiedLegacyCompat.getLPSourceMode();
         }
-
-        /** What this adapter knows about itself right now. */
-        public CompatibilityStatus status() {
-            return lpStatus();
-        }
-
-        @Override
-        public double current(UUID playerId, ResourceUnit askedUnit) {
+        public CompatibilityStatus status() { return lpStatus(); }
+        private double healthBalance(Player player) { return Math.max(0, player.getHealth() - 1) * 10.0; }
+        private boolean bloodEnabled() { return sourceMode != SanctifiedLegacyCompat.LPSourceMode.HEALTH_ONLY
+            && SanctifiedLegacyCompat.isBloodMagicAvailable(); }
+        private boolean healthEnabled() { return sourceMode != SanctifiedLegacyCompat.LPSourceMode.BLOOD_MAGIC_ONLY; }
+        @Override public double current(UUID playerId, ResourceUnit unit) {
             Player player = player(playerId);
-            if (player == null || !handles(askedUnit)) {
-                return 0.0d;
-            }
-            if (SanctifiedLegacyCompat.isBloodMagicAvailable()) {
-                return SanctifiedLegacyCompat.getBloodMagicLP(player);
-            }
-            // The health fallback's spendable balance, in the same 100 LP = 10 HP units the
-            // cost calculator uses.
-            return Math.max(0.0f, player.getHealth() - 1.0f) * 10.0d;
+            if (player == null || !handles(unit)) return 0;
+            double blood = bloodEnabled() ? SanctifiedLegacyCompat.getBloodMagicLP(player) : 0;
+            // Priority is a choice of one complete source, never a sum of partial sources.
+            return LpSourcePolicy.available(sourceMode.name(), bloodEnabled(), blood, healthBalance(player));
         }
-
-        @Override
-        public double max(UUID playerId, ResourceUnit askedUnit) {
+        @Override public double max(UUID playerId, ResourceUnit unit) {
             Player player = player(playerId);
-            if (player == null || !handles(askedUnit)) {
-                return 0.0d;
-            }
-            if (SanctifiedLegacyCompat.isBloodMagicAvailable()) {
-                // Blood Magic exposes no per-player ceiling on this reflection surface, so the
-                // current balance is the only honest answer.
-                return SanctifiedLegacyCompat.getBloodMagicLP(player);
-            }
-            return Math.max(0.0f, player.getMaxHealth() - 1.0f) * 10.0d;
+            if (player == null || !handles(unit)) return 0;
+            return Math.max(bloodEnabled() ? SanctifiedLegacyCompat.getBloodMagicLP(player) : 0,
+                healthEnabled() ? Math.max(0, player.getMaxHealth() - 1) * 10.0 : 0);
         }
-
-        @Override
-        public double debit(UUID playerId, ResourceUnit askedUnit, double amount) {
+        @Override public double debit(UUID playerId, ResourceUnit unit, double amount) {
             Player player = player(playerId);
-            if (player == null || !handles(askedUnit) || amount <= 0.0d) {
-                return 0.0d;
-            }
-            return SanctifiedLegacyCompat.debitLP(player, (int) Math.ceil(amount));
+            if (player == null || !handles(unit) || !Double.isFinite(amount) || amount <= 0) return 0;
+            int wanted = (int) Math.min(Integer.MAX_VALUE, Math.ceil(amount));
+            int blood = bloodEnabled() ? SanctifiedLegacyCompat.getBloodMagicLP(player) : 0;
+            LpSourcePolicy.Source source = LpSourcePolicy.select(sourceMode.name(), bloodEnabled(), blood, wanted);
+            bloodReceipt = source == LpSourcePolicy.Source.BLOOD_MAGIC;
+            if (bloodReceipt) {
+                SanctifiedLegacyCompat.consumeBloodMagicLP(player, Math.min(wanted, blood));
+                remainingReceipt = Math.max(0, blood - SanctifiedLegacyCompat.getBloodMagicLP(player));
+            } else if (source == LpSourcePolicy.Source.HEALTH) {
+                float before = player.getHealth();
+                player.setHealth(Math.max(1, before - wanted / 10.0f));
+                remainingReceipt = Math.round(Math.max(0, before - player.getHealth()) * 10.0f);
+            } else remainingReceipt = 0;
+            return remainingReceipt;
         }
-
-        @Override
-        public double credit(UUID playerId, ResourceUnit askedUnit, double amount) {
+        @Override public double credit(UUID playerId, ResourceUnit unit, double amount) {
             Player player = player(playerId);
-            if (player == null || !handles(askedUnit) || amount <= 0.0d) {
-                return 0.0d;
-            }
-            return SanctifiedLegacyCompat.creditLP(player, (int) Math.floor(amount));
+            if (player == null || !handles(unit) || amount <= 0 || !Double.isFinite(amount)) return 0;
+            int refund = (int) Math.min(remainingReceipt, Math.floor(amount));
+            int moved = bloodReceipt ? SanctifiedLegacyCompat.creditBloodMagicLP(player, refund)
+                : SanctifiedLegacyCompat.creditLP(player, refund);
+            remainingReceipt = Math.max(0, remainingReceipt - moved);
+            return moved;
         }
     }
-
-    /**
-     * Covenant aura, as spent by the Ring of the Seven Virtues.
-     *
-     * <p>Covenant 2.2.6 has no per-player aura API at all - what it calls aura is a sample of
-     * the world's ambient Nature's Aura within a fixed radius of the player. Reads and writes
-     * therefore go to Nature's Aura at the same radius Covenant samples at, which is what makes
-     * the green HUD bar agree with what was charged. A drain that comes up short reports the
-     * short number, and it is the payment policy - not this class - that decides what that
-     * means for the cast.
-     */
     public static final class AuraAccess extends PlayerBoundAccess {
+        private SanctifiedLegacyCompat.AuraReceipt receipt;
 
         AuraAccess(Function<UUID, Player> resolver) {
             super(resolver, ResourceUnit.AURA);
@@ -225,7 +212,8 @@ public final class AlternativeResourceAccess {
             if (player == null || !handles(askedUnit) || amount <= 0.0d) {
                 return 0.0d;
             }
-            return SanctifiedLegacyCompat.debitCovenantAura(player, (int) Math.ceil(amount));
+            receipt = SanctifiedLegacyCompat.reserveCovenantAura(player, (int) Math.ceil(amount));
+            return receipt == null ? 0 : receipt.amount();
         }
 
         @Override
@@ -234,7 +222,9 @@ public final class AlternativeResourceAccess {
             if (player == null || !handles(askedUnit) || amount <= 0.0d) {
                 return 0.0d;
             }
-            return SanctifiedLegacyCompat.creditCovenantAura(player, (int) Math.floor(amount));
+            int moved = SanctifiedLegacyCompat.releaseCovenantAura(receipt, (int) Math.floor(amount));
+            receipt = null;
+            return moved;
         }
     }
 }

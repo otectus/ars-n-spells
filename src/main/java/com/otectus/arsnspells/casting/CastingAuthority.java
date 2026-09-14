@@ -1,251 +1,40 @@
 package com.otectus.arsnspells.casting;
 
-import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
 import com.otectus.arsnspells.bridge.BridgeManager;
-import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
-import com.otectus.arsnspells.config.AnsConfig;
-import com.otectus.arsnspells.contract.CostQuote;
-import com.otectus.arsnspells.contract.CostRules;
-import com.otectus.arsnspells.contract.ResourceUnit;
+import com.otectus.arsnspells.contract.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/**
- * Central authority for spell casting validation.
- * Validates resource availability BEFORE spell execution.
- * Handles mana, health, aura, and other alternate resource costs.
- * Integrates with Sanctified Legacy for Cursed Ring / Virtue Ring support.
- */
-public class CastingAuthority {
-    private static final Logger LOGGER = LoggerFactory.getLogger(CastingAuthority.class);
-
-    /**
-     * Validate if a player can cast an Ars Nouveau spell.
-     * This is the HARD GATE - if this returns false, the spell MUST NOT execute.
-     * 
-     * @param player The player attempting to cast
-     * @param resolver The spell resolver containing cost information
-     * @return true if the player has sufficient resources, false otherwise
-     */
+/** Compatibility facade; native cast lifecycles own their immutable quote and payment. */
+public final class CastingAuthority {
+    private CastingAuthority() {}
     public static boolean canCastArsSpell(Player player, SpellResolver resolver) {
-        if (player == null || resolver == null) {
-            logDebug("canCastArsSpell: player or resolver is null");
-            return false;
-        }
-
-        // Creative mode bypass
-        if (player.isCreative()) {
-            logDebug("canCastArsSpell: Creative mode - allowing cast");
-            return true;
-        }
-
-        // Get the spell cost
-        int manaCost = resolver.getResolveCost();
-        logDebug("canCastArsSpell: Spell cost = {} mana for player {}", manaCost, player.getName().getString());
-        
-        if (manaCost <= 0) {
-            // Zero cost spells are always allowed
-            logDebug("canCastArsSpell: Zero cost spell - allowing cast");
-            return true;
-        }
-
-        // SANCTIFIED LEGACY INTEGRATION: Check for Cursed Ring
-        if (SanctifiedLegacyCompat.isAvailable()) {
-            boolean hasCursed = SanctifiedLegacyCompat.isWearingCursedRing(player);
-            logDebug("canCastArsSpell: Cursed Ring check = {}", hasCursed);
-            
-            if (hasCursed) {
-                // Cursed Ring replaces mana cost with Blood Magic LP
-                LOGGER.debug("Cursed Ring detected - Using LP instead of mana for {}", player.getName().getString());
-                return validateCursedRingCost(player, resolver, manaCost);
-            }
-        } else {
-            logDebug("canCastArsSpell: Sanctified Legacy not available");
-        }
-
-        // SANCTIFIED LEGACY INTEGRATION: Virtue Ring is handled by VirtueRingHandler
-        // (mana cost zeroed at SpellCostCalcEvent; aura consumed at SpellResolveEvent.Post).
-        // The aura sufficiency check happens in MixinSpellResolverPreCast.
-
-        // Alternate-resource rings (Cursed/Virtue) are handled by their dedicated event
-        // handlers (CursedRingHandler / VirtueRingHandler), not here.
-        // Standard mana validation
-        logDebug("canCastArsSpell: Using standard mana validation");
-        return validateManaResource(player, manaCost, ResourceUnit.ARS_MANA);
+        if (player == null || resolver == null) return false;
+        return ArsCastPayments.canAfford(player, resolver);
     }
-    
-    /**
-     * Validate and consume LP cost for Cursed Ring users.
-     * 
-     * @param player The player
-     * @param resolver The spell resolver
-     * @param manaCost The base mana cost
-     * @return true if LP was successfully consumed
-     */
-    private static boolean validateCursedRingCost(Player player, SpellResolver resolver, int manaCost) {
-        LOGGER.debug("validateCursedRingCost called for player: {}, mana cost: {}",
-            player.getName().getString(), manaCost);
-
-        // Get first effect glyph for tier/rarity info
-        com.otectus.arsnspells.util.SpellAnalysis.Result analysis =
-            com.otectus.arsnspells.util.SpellAnalysis.analyze(resolver.spell);
-        AbstractSpellPart spellPart = analysis.firstEffect();
-        LOGGER.debug("Spell part: {}", spellPart != null ? spellPart.getRegistryName() : "none");
-
-        // Calculate LP cost
-        int lpCost = SanctifiedLegacyCompat.calculateLPCost(manaCost, spellPart);
-        LOGGER.debug("Calculated LP cost: {} (base mana: {})", lpCost, manaCost);
-
-        // Determine spell school for Blasphemy multiplier
-        String spellSchool = analysis.dominantSchool();
-        LOGGER.debug("Detected spell school: {}", spellSchool);
-
-        // Apply Blasphemy multiplier if applicable
-        double blasphemyMultiplier = SanctifiedLegacyCompat.getBlasphemyMultiplier(player, spellSchool);
-        if (blasphemyMultiplier < 1.0) {
-            int originalCost = lpCost;
-            lpCost = (int) Math.max(100, Math.round(lpCost * blasphemyMultiplier));
-            LOGGER.debug("Blasphemy multiplier applied: {} ({} LP -> {} LP)",
-                blasphemyMultiplier, originalCost, lpCost);
-        }
-
-        LOGGER.debug("Final LP cost: {}", lpCost);
-
-        // Check if player has enough LP (don't consume yet - event handlers will do that)
-        boolean hasEnough = SanctifiedLegacyCompat.hasEnoughLP(player, lpCost);
-
-        if (hasEnough) {
-            LOGGER.debug("Player has sufficient LP");
-        } else {
-            LOGGER.debug("Insufficient LP");
-            sendDenialMessage(player, "\u00a7cInsufficient Life Points (LP): Need " + lpCost + " LP");
-        }
-
-        return hasEnough;
-    }
-
-    /**
-     * Validate if a player can cast an Iron's Spellbooks spell.
-     * 
-     * @param player The player attempting to cast
-     * @param manaCost The mana cost of the spell
-     * @return true if the player has sufficient resources, false otherwise
-     */
     public static boolean canCastIronsSpell(Player player, int manaCost) {
-        if (player == null) {
-            return false;
-        }
-
-        // Creative mode bypass
-        if (player.isCreative()) {
-            return true;
-        }
-
-        if (manaCost <= 0) {
-            return true;
-        }
-
-        return validateManaResource(player, manaCost, ResourceUnit.IRONS_MANA);
+        if (player == null) return false;
+        return player.isCreative() || BridgeManager.canAffordQuote(player,
+            QuoteService.quote(player, ResourceUnit.IRONS_MANA, manaCost, QuoteService.currentRules(), CarrierPolicy.NATIVE_ONLY));
     }
-
-    /**
-     * The amount an Ars spell of {@code baseCost} actually costs the Ars pool.
-     *
-     * <p>V05: the conversion is no longer written out here. Validation and charging both
-     * quote through {@link QuoteService} and read the leg they are about to move, so the
-     * two cannot disagree on a rate, on a dual-cost share, or on the unit. They used to
-     * compute it separately - {@code (float)(cost * rate)} here versus
-     * {@code (int) Math.round(cost * rate)} there - so the amount charged could differ from
-     * the amount checked by up to half a point, and at the config's 0.01 floor the rounding
-     * made every spell under 50 mana free.
-     *
-     * <p>Snapshots the rules per call. A cast that spans ticks must instead take one
-     * snapshot and pass it to {@link #effectiveCost(ResourceUnit, int, CostRules)}.
-     */
+    public static boolean consumeIronsSpellMana(Player player, int manaCost) {
+        if (player == null) return false;
+        return player.isCreative() || BridgeManager.consumeQuote(player,
+            QuoteService.quote(player, ResourceUnit.IRONS_MANA, manaCost, QuoteService.currentRules(), CarrierPolicy.NATIVE_ONLY));
+    }
     public static float effectiveArsCost(int baseCost) {
         return effectiveCost(ResourceUnit.ARS_MANA, baseCost, QuoteService.currentRules());
     }
-
-    /** The Iron's-side counterpart of {@link #effectiveArsCost}. */
     public static float effectiveIronsCost(int baseCost) {
         return effectiveCost(ResourceUnit.IRONS_MANA, baseCost, QuoteService.currentRules());
     }
-
-    /** The leg of a native cast that {@code origin}'s own pool owes, under {@code rules}. */
+    /** Flat-policy scalar compatibility API. Runtime callers use the typed player-aware quote. */
     public static float effectiveCost(ResourceUnit origin, int baseCost, CostRules rules) {
-        if (baseCost <= 0) {
-            return 0.0f;
-        }
-        return QuoteService.legAsFloat(QuoteService.quoteNativeCast(origin, baseCost, rules), origin);
+        return (float) QuoteService.quoteNativeCast(origin, baseCost, rules).legs().stream()
+            .mapToDouble(ResourceAmount::amount).sum();
     }
-
-    /**
-     * ANS-MED-043: consume the mana previously validated by
-     * {@link #canCastIronsSpell}. Iron's scrolls never deduct mana natively, so
-     * "full" scroll cost mode validated the cost and then charged nothing.
-     *
-     * <p>The quote is what was checked and the quote is what is charged, so a dual-cost
-     * mode takes both legs instead of taking one leg twice.
-     */
-    public static boolean consumeIronsSpellMana(Player player, int manaCost) {
-        if (player == null) {
-            return false;
-        }
-        if (player.isCreative() || manaCost <= 0) {
-            return true;
-        }
-        CostQuote quote = QuoteService.quoteNativeCast(
-            ResourceUnit.IRONS_MANA, manaCost, QuoteService.currentRules());
-        return BridgeManager.consumeQuote(player, quote);
-    }
-
-    /**
-     * Validate mana resource availability against the same quote the charge will use.
-     *
-     * @param player The player
-     * @param cost The mana cost
-     * @param origin The unit the spell's own system quoted the cost in
-     * @return true if player has sufficient mana
-     */
-    private static boolean validateManaResource(Player player, int cost, ResourceUnit origin) {
-        CostQuote quote = QuoteService.quoteNativeCast(origin, cost, QuoteService.currentRules());
-        boolean canAfford = BridgeManager.canAffordQuote(player, quote);
-
-        if (!canAfford) {
-            float effectiveCost = QuoteService.legAsFloat(quote, origin);
-            float availableMana = BridgeManager.getManaForMode(player, origin);
-            logDebug("Mana validation failed for {}: cost={}, available={}, origin={}",
-                player.getName().getString(), effectiveCost, availableMana, origin);
-
-            // Send denial message
-            sendDenialMessage(player, "§cNot Enough Mana: Need " + (int)effectiveCost + ", have " + (int)availableMana);
-        }
-
-        return canAfford;
-    }
-
-    /**
-     * Send a denial message to the player.
-     * 
-     * @param player The player
-     * @param reason The reason for denial
-     */
     public static void sendDenialMessage(Player player, String reason) {
-        if (player != null && !player.level().isClientSide()) {
-            player.displayClientMessage(Component.literal(reason), true);
-        }
+        if (player != null && !player.level().isClientSide()) player.displayClientMessage(Component.literal(reason), true);
     }
-
-    /**
-     * Log debug message if debug mode is enabled.
-     */
-    private static void logDebug(String message, Object... args) {
-        if (AnsConfig.DEBUG_MODE != null && AnsConfig.DEBUG_MODE.get()) {
-            LOGGER.info("[CastingAuthority] [DEBUG] " + message, args);
-        }
-    }
-
 }

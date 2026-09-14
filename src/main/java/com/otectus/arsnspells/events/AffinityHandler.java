@@ -21,7 +21,16 @@ public class AffinityHandler {
             return;
         }
         if (event.getEntity() instanceof ServerPlayer player) {
-            String school = SpellAnalysis.analyze(event.spell).dominantSchool();
+            String key = SpellAnalysis.analyze(event.spell).schoolKey();
+            if (!com.otectus.arsnspells.util.SchoolKeys.GENERIC.equals(key)
+                && com.otectus.arsnspells.util.SchoolKeys.builtin(key).isGeneric()) {
+                player.getCapability(AffinityData.AFFINITY_DATA).ifPresent(data -> {
+                    data.addLevel(key, 1);
+                    PacketHandler.sendToClient(new AffinitySyncPacket(key, data.getLevel(key)), player);
+                });
+                return;
+            }
+            String school = com.otectus.arsnspells.util.SchoolKeys.builtin(key).id();
             if (!"generic".equals(school)) {
                 player.getCapability(AffinityData.AFFINITY_DATA).ifPresent(data -> {
                     AffinityType type;

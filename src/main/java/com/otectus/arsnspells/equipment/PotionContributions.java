@@ -1,0 +1,220 @@
+package com.otectus.arsnspells.equipment;
+
+import com.hollingsworth.arsnouveau.common.event.ManaCapEvents;
+import com.otectus.arsnspells.bridge.AnsModifierIdentities;
+import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.bridge.ManaRegenBridge;
+import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.config.ManaUnificationMode;
+import com.otectus.arsnspells.contract.AnsModifierIds;
+import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.event.TickEvent.PlayerTickEvent;
+import net.minecraftforge.registries.ForgeRegistries;
+
+import java.util.UUID;
+
+/**
+ * Redirects Ars Nouveau potion effects to the unified mana system.
+ *
+ * This fixes the issue where Ars potions (mana regen, spell damage) don't work
+ * because they modify the Ars native pool which is no longer being read.
+ */
+
+public final class PotionContributions {
+
+    // V07/V14: the two potion identities come from the shared registry, so the cleanup that
+    // runs when this redirect stops applying removes the same UUIDs this redirect writes.
+    private static final UUID POTION_MANA_REGEN_ID =
+        AnsModifierIdentities.uuid(AnsModifierIds.ARS_POTION_MANA_REGEN);
+    private static final UUID POTION_MAX_MANA_ID =
+        AnsModifierIdentities.uuid(AnsModifierIds.ARS_POTION_MAX_MANA);
+
+    /**
+     * Intercept mana regeneration tick to apply potion effects to unified pool.
+     */
+    // require = 0: this mixin lives in the non-required compat config because it
+    // depends on Iron's AttributeRegistry. A missing target must skip this one inject
+    // rather than drop the whole mixin - and note that the require-count failure throws
+    // InjectionError, which "required": false does NOT downgrade.
+    public static void reconcile(Player player) {
+
+        if (player.level().isClientSide()) {
+            return;
+        }
+
+        ManaUnificationMode mode = BridgeManager.getCurrentMode();
+        boolean redirecting = BridgeManager.isUnificationEnabled()
+            && mode != null && mode.isIssPrimary();
+
+        // V14: removal is NOT gated on the redirect being on. This used to return above,
+        // before either helper ran, so switching away from ISS_PRIMARY (or disabling
+        // unification) left the last potion modifier sitting on the Iron's attributes with
+        // nothing left running that could take it off. The redirect is conditional; the
+        // cleanup is not.
+        if (!redirecting) {
+            arsnspells$clearPotionModifiers(player);
+            return;
+        }
+
+        // Check for Ars potion effects and apply them to Iron's mana system
+        arsnspells$redirectManaRegenPotions(player);
+        arsnspells$redirectMaxManaPotions(player);
+    }
+
+    /**
+     * Drop both potion-derived modifiers, whatever the current mode. Cheap enough for the
+     * per-tick path: two attribute lookups and a null test each, and nothing is dirtied
+     * unless a modifier is genuinely present.
+     */
+    private static void arsnspells$clearPotionModifiers(Player player) {
+        try {
+            AttributeInstance regenAttr = player.getAttribute(AttributeRegistry.MANA_REGEN.get());
+            if (regenAttr != null && regenAttr.getModifier(POTION_MANA_REGEN_ID) != null) {
+                regenAttr.removeModifier(POTION_MANA_REGEN_ID);
+            }
+            AttributeInstance maxManaAttr = player.getAttribute(AttributeRegistry.MAX_MANA.get());
+            if (maxManaAttr != null && maxManaAttr.getModifier(POTION_MAX_MANA_ID) != null) {
+                maxManaAttr.removeModifier(POTION_MAX_MANA_ID);
+            }
+        } catch (Exception e) {
+            // Iron's absent or its attributes unresolvable: nothing of ours can be on them.
+        }
+    }
+
+    /**
+     * Redirect mana regeneration potion effects to Iron's mana regen attribute.
+     */
+    private static void arsnspells$redirectManaRegenPotions(Player player) {
+        try {
+            // Check if player has any Ars mana regen effects
+            double arsRegenBonus = arsnspells$calculateArsRegenBonus(player);
+
+            AttributeInstance regenAttr = player.getAttribute(AttributeRegistry.MANA_REGEN.get());
+            if (regenAttr == null) return;
+
+            if (arsRegenBonus > 0) {
+                // arsRegenBonus is absolute mana/sec; Iron's MANA_REGEN is a percentage-of-pool
+                // multiplier. Going through ManaRegenBridge converts units; the pool conversion
+                // rate is then layered on top.
+                double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
+                double absRegenPerSec = arsRegenBonus * conversionRate;
+                double ironRegenBonus = ManaRegenBridge.convertArsToIrons(absRegenPerSec, player);
+
+                // OPT-008: this runs every server tick; only churn the attribute (which
+                // dirties the attribute map and forces a recompute) when the value changed.
+                // The existing modifier carries the last-applied value, so no extra state
+                // is needed — and nothing leaks for disconnected players.
+                AttributeModifier existing = regenAttr.getModifier(POTION_MANA_REGEN_ID);
+                if (existing == null || existing.getAmount() != ironRegenBonus) {
+                    regenAttr.removeModifier(POTION_MANA_REGEN_ID);
+                    regenAttr.addTransientModifier(new AttributeModifier(
+                        POTION_MANA_REGEN_ID,
+                        "Ars Potion Mana Regen",
+                        ironRegenBonus,
+                        AttributeModifier.Operation.ADDITION
+                    ));
+                }
+            } else if (regenAttr.getModifier(POTION_MANA_REGEN_ID) != null) {
+                // Remove the modifier only when one is actually present.
+                regenAttr.removeModifier(POTION_MANA_REGEN_ID);
+            }
+        } catch (Exception e) {
+            // Silently fail if Iron's API is unavailable
+        }
+    }
+
+    /**
+     * Redirect max mana potion effects to Iron's max mana attribute.
+     */
+    private static void arsnspells$redirectMaxManaPotions(Player player) {
+        try {
+            double arsMaxManaBonus = arsnspells$calculateArsMaxManaBonus(player);
+
+            AttributeInstance maxManaAttr = player.getAttribute(AttributeRegistry.MAX_MANA.get());
+            if (maxManaAttr == null) return;
+
+            if (arsMaxManaBonus > 0) {
+                double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
+                double ironMaxManaBonus = arsMaxManaBonus * conversionRate;
+
+                // OPT-008: skip the per-tick remove/add when the value is unchanged.
+                AttributeModifier existing = maxManaAttr.getModifier(POTION_MAX_MANA_ID);
+                if (existing == null || existing.getAmount() != ironMaxManaBonus) {
+                    maxManaAttr.removeModifier(POTION_MAX_MANA_ID);
+                    maxManaAttr.addTransientModifier(new AttributeModifier(
+                        POTION_MAX_MANA_ID,
+                        "Ars Potion Max Mana",
+                        ironMaxManaBonus,
+                        AttributeModifier.Operation.ADDITION
+                    ));
+                }
+            } else if (maxManaAttr.getModifier(POTION_MAX_MANA_ID) != null) {
+                maxManaAttr.removeModifier(POTION_MAX_MANA_ID);
+            }
+        } catch (Exception e) {
+            // Silently fail
+        }
+    }
+
+    private static final ResourceLocation ARS_MANA_REGEN_EFFECT = new ResourceLocation("ars_nouveau", "mana_regen");
+    private static final ResourceLocation ARS_MANA_BOOST_EFFECT = new ResourceLocation("ars_nouveau", "mana_boost");
+
+    // OPT-019: the two target MobEffect instances are resolved from the registry
+    // once and cached. The previous implementation iterated getActiveEffects()
+    // twice per player tick with a reverse registry lookup per active effect —
+    // pure per-tick churn for players stacked with effects (common in modpacks).
+    // Registry objects are stable after registry load, and this mixin can only
+    // run with Ars present (it targets an Ars class), so a one-shot resolve is safe.
+    private static MobEffect arsnspells$manaRegenEffect;
+    private static MobEffect arsnspells$manaBoostEffect;
+    private static volatile boolean arsnspells$effectsResolved;
+
+    private static void arsnspells$resolveEffects() {
+        if (!arsnspells$effectsResolved) {
+            arsnspells$manaRegenEffect = ForgeRegistries.MOB_EFFECTS.getValue(ARS_MANA_REGEN_EFFECT);
+            arsnspells$manaBoostEffect = ForgeRegistries.MOB_EFFECTS.getValue(ARS_MANA_BOOST_EFFECT);
+            arsnspells$effectsResolved = true;
+        }
+    }
+
+    /**
+     * Calculate total mana regen bonus from Ars potion effects.
+     * Semantics unchanged from the scan-based version: both mana_regen and
+     * mana_boost contribute 0.5/level to regen.
+     */
+    private static double arsnspells$calculateArsRegenBonus(Player player) {
+        arsnspells$resolveEffects();
+        double bonus = 0.0;
+        if (arsnspells$manaRegenEffect != null) {
+            MobEffectInstance regen = player.getEffect(arsnspells$manaRegenEffect);
+            if (regen != null) {
+                bonus += (regen.getAmplifier() + 1) * 0.5;
+            }
+        }
+        if (arsnspells$manaBoostEffect != null) {
+            MobEffectInstance boost = player.getEffect(arsnspells$manaBoostEffect);
+            if (boost != null) {
+                bonus += (boost.getAmplifier() + 1) * 0.5;
+            }
+        }
+        return bonus;
+    }
+
+    /**
+     * Calculate total max mana bonus from Ars potion effects.
+     */
+    private static double arsnspells$calculateArsMaxManaBonus(Player player) {
+        arsnspells$resolveEffects();
+        if (arsnspells$manaBoostEffect == null) {
+            return 0.0;
+        }
+        MobEffectInstance boost = player.getEffect(arsnspells$manaBoostEffect);
+        return boost == null ? 0.0 : (boost.getAmplifier() + 1) * 10.0;
+    }
+}

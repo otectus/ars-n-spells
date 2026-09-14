@@ -103,7 +103,9 @@ public final class InscriptionInputs {
         // ANS-MED-020 / ANS-LOW-019: narrow from Throwable to Exception so
         // LinkageError / OutOfMemoryError propagate instead of being silently masked.
         try {
-            Spell arsSpell = new SpellCaster(stack).getSpell();
+            // SpellCaster(ItemStack) creates a tag on a blank item. Source discovery and
+            // previews must be read-only, including for untagged stacks.
+            Spell arsSpell = new SpellCaster(stack.hasTag() ? stack.getTag().copy() : new CompoundTag()).getSpell();
             if (arsSpell != null && arsSpell.recipe != null && !arsSpell.recipe.isEmpty()) {
                 return InscriptionSource.ars(arsSpell);
             }

@@ -1,0 +1,25 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_parchment": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          { "items": [ "ars_nouveau:blank_parchment" ] }
+        ]
+      }
+    },
+    "has_the_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": {
+        "recipe": "ars_n_spells:blank_scroll"
+      }
+    }
+  },
+  "requirements": [
+    [ "has_parchment", "has_the_recipe" ]
+  ],
+  "rewards": {
+    "recipes": [ "ars_n_spells:blank_scroll" ]
+  }
+}

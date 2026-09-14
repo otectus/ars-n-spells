@@ -29,7 +29,7 @@ public final class IronsProxySlotWriter {
      */
     public static boolean addProxySlot(ItemStack book, int poolId, int level) {
         AbstractSpell proxy = ArsCrossProxyRegistry.get(poolId);
-        if (proxy == null || book == null || book.isEmpty()) {
+        if (proxy == null || book == null || book.isEmpty() || !com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsSpellBook(book)) {
             return false;
         }
         ISpellContainer container = ISpellContainer.getOrCreate(book);
@@ -42,6 +42,8 @@ public final class IronsProxySlotWriter {
         boolean added = mutable.addSpellAtIndex(proxy, Math.max(1, level), newIndex, false);
         if (added) {
             ISpellContainer.set(book, mutable.toImmutable());
+            String key = com.otectus.arsnspells.spell.CrossCastNbt.TAG_NATIVE_BASE_CAPACITY;
+            if (!book.getOrCreateTag().contains(key)) book.getOrCreateTag().putInt(key, newIndex);
         }
         return added;
     }
@@ -67,5 +69,21 @@ public final class IronsProxySlotWriter {
             ISpellContainer.set(book, mutable.toImmutable());
         }
         return removed;
+    }
+
+    public static void restoreBaseCapacity(ItemStack book) {
+        String key = com.otectus.arsnspells.spell.CrossCastNbt.TAG_NATIVE_BASE_CAPACITY;
+        if (!book.hasTag() || !book.getTag().contains(key) || !ISpellContainer.isSpellContainer(book)) return;
+        int baseline = book.getTag().getInt(key);
+        if (baseline < 0) return;
+        ISpellContainer container = ISpellContainer.get(book);
+        if (container == null) return;
+        int count = container.getMaxSpellCount();
+        while (count > baseline && io.redspace.ironsspellbooks.api.spells.SpellData.EMPTY.equals(container.getSpellAtIndex(count - 1))) count--;
+        if (count != container.getMaxSpellCount()) {
+            ISpellContainerMutable mutable = container.mutableCopy();
+            mutable.setMaxSpellCount(count);
+            ISpellContainer.set(book, mutable.toImmutable());
+        }
     }
 }

@@ -33,6 +33,8 @@ public final class SpellAnalysis {
         private final List<AbstractSpellPart> allEffects;
         private final String dominantSchool;
         private final CooldownCategory category;
+        private final List<String> schoolKeys;
+        private final String mappingDigest;
 
         Result(@Nullable AbstractSpellPart firstEffect,
                @Nullable AbstractSpellPart castMethod,
@@ -44,6 +46,8 @@ public final class SpellAnalysis {
             this.allEffects = Collections.unmodifiableList(allEffects);
             this.dominantSchool = dominantSchool;
             this.category = category;
+            this.schoolKeys = SchoolResolver.resolveKeys(firstEffect);
+            this.mappingDigest = SchoolMappings.get().digest();
         }
 
         /** The first AbstractEffect glyph in the recipe, or null if none found. */
@@ -62,6 +66,13 @@ public final class SpellAnalysis {
 
         /** Enum-typed companion to {@link #dominantSchool()}; prefer this at new call sites. */
         public SpellSchoolId school() { return SpellSchoolId.fromId(dominantSchool); }
+
+        /** Ordered namespaced memberships of the actual payload, including custom schools. */
+        public List<String> schoolKeys() { return schoolKeys; }
+
+        public String schoolKey() { return schoolKeys().get(0); }
+
+        public String mappingDigest() { return mappingDigest; }
 
         /** The cooldown category for this spell. */
         public CooldownCategory category() { return category; }

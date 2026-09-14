@@ -27,11 +27,14 @@ public class CooldownHandler {
                 // cooldown enforcement will fall back to the per-spell-class gating in
                 // SpellResolver. Verify cancellability in dev when upgrading Ars.
                 event.setCanceled(true);
-            } else {
-                long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);
-                // High-fidelity sync ensures the client HUD mirrors the global-per-category lockout.
-                PacketHandler.sendToClient(new CooldownSyncPacket(category, cooldownEnd), player);
             }
         }
+    }
+    public static void commit(ServerPlayer player, com.hollingsworth.arsnouveau.api.spell.SpellContext context) {
+        if (!UnifiedCooldownManager.isEnabled()) return;
+        CooldownCategory category = SpellAnalysis.analyze(context.getSpell()).category();
+        long end = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category,
+            com.otectus.arsnspells.casting.ArsCastPayments.isCrossCast(context));
+        PacketHandler.sendToClient(new CooldownSyncPacket(category, end), player);
     }
 }

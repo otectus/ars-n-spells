@@ -5,7 +5,9 @@ import com.otectus.arsnspells.block.SpellLoomBlockEntity;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.contract.InscriptionPlan;
 import com.otectus.arsnspells.contract.InscriptionPlanner;
+import com.otectus.arsnspells.registry.ModItemsRegistry;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
+import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.ItemStackHandler;
 
@@ -51,6 +53,7 @@ public final class LoomInscription {
     public static final String REASON_NO_ARS_SPELL = "no ars spell";
     /** Building the carrier scroll failed; nothing was moved. */
     public static final String REASON_CARRIER_FAILED = "carrier failed";
+    public static final String REASON_INVALID_TARGET = "invalid target";
 
     private LoomInscription() {
     }
@@ -60,10 +63,7 @@ public final class LoomInscription {
      * mutates nothing.
      */
     public static InscriptionPlan plan(SpellLoomBlockEntity loom) {
-        ItemStackHandler items = loom.getItems();
-        return InscriptionPlanner.plan(new StackInscriptionView(
-            items.getStackInSlot(SpellLoomBlockEntity.SLOT_SOURCE),
-            items.getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL)));
+        return plan(loom, false);
     }
 
     /**
@@ -77,11 +77,51 @@ public final class LoomInscription {
      * destroyed by {@link #apply} with {@code convert} set, which no default path passes.
      */
     public static InscriptionPlan planConversion(SpellLoomBlockEntity loom) {
+        return plan(loom, true);
+    }
+
+    private static InscriptionPlan plan(SpellLoomBlockEntity loom, boolean convert) {
         ItemStackHandler items = loom.getItems();
+        ItemStack source = items.getStackInSlot(SpellLoomBlockEntity.SLOT_SOURCE);
         ItemStack target = items.getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL);
-        return InscriptionPlanner.plan(new StackInscriptionView(
-            items.getStackInSlot(SpellLoomBlockEntity.SLOT_SOURCE),
-            InscriptionClassifier.blankedSingleCopy(target)));
+        String failure = null;
+        if (!items.getStackInSlot(SpellLoomBlockEntity.SLOT_OUTPUT).isEmpty()) {
+            failure = REASON_OUTPUT_OCCUPIED;
+        } else if (!IronsCompat.isLoaded()) {
+            failure = REASON_IRONS_MISSING;
+        } else if (!isTarget(target)) {
+            failure = REASON_INVALID_TARGET;
+        } else if (!isSource(source)) {
+            failure = REASON_NO_ARS_SPELL;
+        }
+        if (failure != null) {
+            return new InscriptionPlan(InscriptionClassifier.classify(source),
+                InscriptionClassifier.classify(target), 0, 0, failure);
+        }
+        ItemStack planned = convert ? InscriptionClassifier.blankedSingleCopy(target) : target;
+        return InscriptionPlanner.plan(new StackInscriptionView(source, planned));
+    }
+
+    /** Shared menu/automation/server predicates. Filled targets require explicit conversion. */
+    public static boolean isSource(ItemStack stack) {
+        return ArsSpellExportUtil.extractArsSpell(stack).isPresent();
+    }
+
+    /**
+     * Whether {@code stack} may sit in the loom's target slot: an Iron's scroll, or our own
+     * blank scroll. The ANS blank exists because stock Iron's ships no recipe for a bare
+     * {@code irons_spellbooks:scroll}, so without it the only obtainable targets were scrolls
+     * that already held a spell. Either way the output is a real Iron's scroll carrier -- the
+     * blank is consumed as the target, not reshaped -- so accepting it costs the planner
+     * nothing: it carries no payload and no native container, and classifies as an honest
+     * blank.
+     */
+    public static boolean isTarget(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        return IronsBookBindingUtil.isIronsScroll(stack)
+            || stack.is(ModItemsRegistry.blankScroll().get());
     }
 
     /** {@link #apply(SpellLoomBlockEntity, boolean, String, String, String)} with no cosmetics. */
@@ -113,8 +153,7 @@ public final class LoomInscription {
         // The stack the plan is made against: the real target, or a blanked copy of it when the
         // player asked for a conversion. Either way this is a read -- the commit below rebuilds
         // the output from scratch.
-        ItemStack planned = convert ? InscriptionClassifier.blankedSingleCopy(target) : target;
-        InscriptionPlan plan = InscriptionPlanner.plan(new StackInscriptionView(source, planned));
+        InscriptionPlan plan = plan(loom, convert);
         if (!plan.isPermitted()) {
             return plan.reasonCode();
         }

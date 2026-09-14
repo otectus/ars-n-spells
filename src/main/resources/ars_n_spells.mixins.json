@@ -6,6 +6,7 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "ars_n_spells.refmap.json",
   "mixins": [
+    "ars.MixinManaCapAttacher",
     "ars.MixinManaCapability",
     "ars.MixinManaRegenTick",
     "ars.MixinSpellResolverMana",

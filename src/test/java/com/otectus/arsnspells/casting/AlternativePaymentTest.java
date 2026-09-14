@@ -42,6 +42,7 @@ class AlternativePaymentTest {
         private double debitCeiling = Double.MAX_VALUE;
         /** How much of a credit actually lands; a lossy adapter returns less than asked. */
         private double creditFraction = 1.0d;
+        private double debitMultiplier = 1.0d;
         int debits;
         int credits;
 
@@ -66,7 +67,7 @@ class AlternativePaymentTest {
                 return 0.0d;
             }
             debits++;
-            double moved = Math.min(Math.min(amount, balance), debitCeiling);
+            double moved = Math.min(Math.min(amount * debitMultiplier, balance), debitCeiling);
             balance -= moved;
             return moved;
         }
@@ -93,6 +94,32 @@ class AlternativePaymentTest {
     @BeforeEach
     void clearOpenLegs() {
         AlternativePayment.clearForTest();
+    }
+
+    @Test
+    void upstreamDrainSurchargeIsReleasedRatherThanSilentlyOverchargingTheQuote() {
+        FakePool lp = new FakePool(ResourceUnit.LP, 500);
+        lp.debitMultiplier = 1.5;
+        var result = AlternativePayment.reserve(UUID.randomUUID(), PLAYER, ResourceUnit.LP, 100,
+            lp, VERIFIED_LP, PaymentOpenFailurePolicy.REFUSE);
+        assertFalse(result.allowsCast());
+        assertEquals(500, lp.balance);
+        assertEquals(1, lp.credits);
+        assertEquals(0, AlternativePayment.openCount());
+    }
+
+    @Test
+    void invalidRequestedOrReportedResourceAmountsNeverAuthorizeACast() {
+        FakePool lp = new FakePool(ResourceUnit.LP, 500);
+        var invalidQuote = AlternativePayment.reserve(UUID.randomUUID(), PLAYER, ResourceUnit.LP, Double.NaN,
+            lp, VERIFIED_LP, PaymentOpenFailurePolicy.LEGACY_OPEN);
+        assertFalse(invalidQuote.allowsCast());
+        assertEquals(0, lp.debits);
+        lp.debitMultiplier = Double.NaN;
+        var invalidReceipt = AlternativePayment.reserve(UUID.randomUUID(), PLAYER, ResourceUnit.LP, 100,
+            lp, VERIFIED_LP, PaymentOpenFailurePolicy.LEGACY_OPEN);
+        assertFalse(invalidReceipt.allowsCast());
+        assertEquals(0, AlternativePayment.openCount());
     }
 
     @Test

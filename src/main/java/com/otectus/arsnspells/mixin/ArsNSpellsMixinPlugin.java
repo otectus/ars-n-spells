@@ -52,6 +52,13 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("MixinSanctifiedAbstractSpell")) {
             return ironsPresent && sanctifiedPresent;
         }
+        // Covenant's native ISSSpellEvents handlers are optional, but when they
+        // are present they would independently zero Iron's mana and debit LP or
+        // aura.  The 3.3.0 transaction path owns those decisions, so apply the
+        // compatibility seam only when both optional mods are actually present.
+        if (mixinClassName.endsWith("MixinCovenantSpellEvents")) {
+            return ironsPresent && sanctifiedPresent;
+        }
         // MixinResourceBarOverlay targets Covenant's ResourceBarOverlay (the actual
         // player-HUD overlay class — the prior MixinAuraContainerOverlay attempt
         // targeted the wrong class and silently no-op'd). The target won't exist
@@ -73,12 +80,15 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // Iron's-less server the mixin loader was crashing with NoClassDefFoundError.
         if (mixinClassName.endsWith("MixinIronsSpellDamage")
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
+            || mixinClassName.endsWith("MixinIronsManaBarVisibility")
             || mixinClassName.endsWith("MixinIronsCastValidation")
+            || mixinClassName.endsWith("MixinIronsCastPayment")
             || mixinClassName.endsWith("MagicDataAccessor")
             || mixinClassName.endsWith("MixinScrollItem")
             || mixinClassName.endsWith("MixinInscriptionTableMenu")
             || mixinClassName.endsWith("MixinInscriptionTableScreen")
-            || mixinClassName.endsWith("MixinAbstractSpellArsIcon")) {
+            || mixinClassName.endsWith("MixinAbstractSpellArsIcon")
+            || mixinClassName.endsWith("MixinItemStackIconContext")) {
             return ironsPresent;
         }
         return true;

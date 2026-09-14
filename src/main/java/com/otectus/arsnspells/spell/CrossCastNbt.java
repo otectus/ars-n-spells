@@ -38,7 +38,7 @@ public final class CrossCastNbt {
     public static final String TAG_PROXY_POOL_ID = "proxy_pool_id";
     /** Player-authored display name shown in Iron's wheel for this entry. */
     public static final String TAG_CUSTOM_NAME = "custom_name";
-    /** Chosen nature (string key); cosmetic tint plus optional affinity tie-in. */
+    /** Cosmetic background only. It never changes the spell's mechanical school. */
     public static final String TAG_NATURE = "nature";
     /** Rudimentary icon: a shipped symbol key; must be one of {@link #ICON_SYMBOLS}. */
     public static final String TAG_ICON_SYMBOL = "icon_symbol";
@@ -61,8 +61,8 @@ public final class CrossCastNbt {
      * these; the export packet rejects anything else so hand-crafted packets
      * cannot stamp NBT that resolves to a missing texture.
      */
-    public static final java.util.List<String> NATURE_KEYS = java.util.List.of(
-        "arcane", "fire", "ice", "lightning", "nature", "holy", "blood", "ender");
+    public static final java.util.List<String> NATURE_KEYS =
+        com.otectus.arsnspells.icons.IconCatalog.BACKGROUNDS;
 
     /** Sentinel meaning "no proxy pool slot allocated for this entry". */
     public static final int NO_PROXY_POOL_ID = -1;
@@ -82,6 +82,7 @@ public final class CrossCastNbt {
 
     /** Current schema version written by this build. */
     public static final int SCHEMA_VERSION = 1;
+    public static final String TAG_NATIVE_BASE_CAPACITY = "arsnspells:native_base_capacity";
 
     /** Schema version of {@code stackTag}; 0 for items written before stamping existed. */
     public static int schemaVersion(CompoundTag stackTag) {
@@ -93,7 +94,7 @@ public final class CrossCastNbt {
 
     /** Stamp the current schema version onto {@code stackTag}. */
     public static void stampSchemaVersion(CompoundTag stackTag) {
-        if (stackTag != null) {
+        if (stackTag != null && schemaVersion(stackTag) <= SCHEMA_VERSION) {
             stackTag.putInt(TAG_SCHEMA_VERSION, SCHEMA_VERSION);
         }
     }
@@ -139,6 +140,7 @@ public final class CrossCastNbt {
                                              int spellLevel,
                                              CrossSpellType type,
                                              CompoundTag arsSpellTag) {
+        if (schemaVersion(stackTag) > SCHEMA_VERSION) return;
         ListTag spellList;
         if (stackTag.contains(TAG_CROSS_MOD_SPELLS, Tag.TAG_LIST)) {
             spellList = stackTag.getList(TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
@@ -155,11 +157,12 @@ public final class CrossCastNbt {
             spellData.putString(TAG_SPELL_TYPE, type.name());
         }
         if (arsSpellTag != null) {
-            spellData.put(TAG_ARS_SPELL, arsSpellTag);
+            spellData.put(TAG_ARS_SPELL, arsSpellTag.copy());
         }
 
         spellList.add(spellData);
         stackTag.put(TAG_CROSS_MOD_SPELLS, spellList);
+        stampSchemaVersion(stackTag);
     }
 
     /**
@@ -178,6 +181,7 @@ public final class CrossCastNbt {
                                                String customName,
                                                String nature,
                                                String iconSymbol) {
+        if (schemaVersion(stackTag) > SCHEMA_VERSION) return -1;
         ListTag spellList;
         if (stackTag.contains(TAG_CROSS_MOD_SPELLS, Tag.TAG_LIST)) {
             spellList = stackTag.getList(TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
@@ -192,7 +196,7 @@ public final class CrossCastNbt {
         spellData.putInt(TAG_SPELL_LEVEL, spellLevel);
         spellData.putString(TAG_SPELL_TYPE, CrossSpellType.ARS_NOUVEAU.name());
         if (arsSpellTag != null) {
-            spellData.put(TAG_ARS_SPELL, arsSpellTag);
+            spellData.put(TAG_ARS_SPELL, arsSpellTag.copy());
         }
         if (proxyPoolId != NO_PROXY_POOL_ID) {
             spellData.putInt(TAG_PROXY_POOL_ID, proxyPoolId);

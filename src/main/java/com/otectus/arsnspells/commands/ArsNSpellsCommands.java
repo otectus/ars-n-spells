@@ -314,34 +314,14 @@ public class ArsNSpellsCommands {
             return 0;
         }
 
-        // Read the WHOLE entry, not just the ars_spell sub-tag: the Spell Loom's chosen
-        // name/nature/icon live as siblings of it and must ride onto the book, or the
-        // bound wheel entry loses the identity the player gave it at the loom.
-        java.util.Optional<net.minecraft.nbt.CompoundTag> entryOpt =
-            com.otectus.arsnspells.spell.IronsBookBindingUtil.extractSingleEntry(scroll);
-        if (entryOpt.isEmpty()) {
-            context.getSource().sendFailure(Component.translatable("commands.ans.bind.scroll_not_carrier"));
-            return 0;
-        }
-        net.minecraft.nbt.CompoundTag entry = entryOpt.get();
-        net.minecraft.nbt.CompoundTag arsTag =
-            entry.getCompound(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ARS_SPELL);
-
-        // Reject an unreadable payload before the scroll is consumed, rather than binding
-        // a wheel entry that silently does nothing when selected.
-        if (!com.otectus.arsnspells.spell.IronsBookBindingUtil.isCastableArsPayload(arsTag)) {
-            context.getSource().sendFailure(Component.translatable("commands.ans.bind.uncastable"));
-            return 0;
-        }
-
+        // Validation and mutation both live in the shared binder, so this command, the
+        // Spellbook Binding ritual and Iron's Inscription Table cannot drift apart on what a
+        // bind is allowed to do. The command keeps its own wording, its own permission check
+        // and the consumption.
         int maxCap = AnsConfig.MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK.get();
-        com.otectus.arsnspells.spell.IronsBookBindingUtil.AppendResult result =
-            com.otectus.arsnspells.spell.IronsBookBindingUtil.appendArsSpellToBook(
-                book, arsTag,
-                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_CUSTOM_NAME),
-                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_NATURE),
-                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ICON_SYMBOL),
-                maxCap);
+        com.otectus.arsnspells.spell.IronsSpellbookBinder.BindResult result =
+            com.otectus.arsnspells.spell.IronsSpellbookBinder.bind(player, scroll, book,
+                com.otectus.arsnspells.spell.IronsSpellbookBinder.Caller.COMMAND);
         switch (result) {
             case ADDED:
                 break;
@@ -352,6 +332,24 @@ public class ArsNSpellsCommands {
                 context.getSource().sendFailure(Component.translatable("commands.ans.bind.book_full",
                     com.otectus.arsnspells.spell.IronsBookBindingUtil.effectiveProxyCeiling(maxCap)));
                 return 0;
+            case DISABLED:
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.disabled"));
+                return 0;
+            case NO_BOOK:
+                context.getSource().sendFailure(
+                    Component.translatable("commands.ans.bind.need_scroll_and_book"));
+                return 0;
+            case UNCASTABLE:
+                // Refused before the scroll is consumed, rather than binding a wheel entry
+                // that silently does nothing when selected.
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.uncastable"));
+                return 0;
+            case NOT_A_CARRIER:
+            case INVALID_CARRIER:
+                context.getSource().sendFailure(
+                    Component.translatable("commands.ans.bind.scroll_not_carrier"));
+                return 0;
+            case FAILED:
             default:
                 context.getSource().sendFailure(Component.translatable("commands.ans.bind.failed"));
                 return 0;

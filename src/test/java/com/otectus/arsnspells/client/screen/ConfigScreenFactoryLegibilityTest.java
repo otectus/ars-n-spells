@@ -16,9 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <ul>
  *   <li>The screen paints its own opaque background instead of the vanilla
  *       translucent dim ({@code renderBackground}), which client blur mods hook.</li>
- *   <li>Row clicks are gated on {@code canMutate} (boolean rows used to toggle
+ *   <li>Native button actions are gated on {@code canMutate} (boolean rows used to toggle
  *       ungated in multiplayer, silently mutating the client's SERVER-config mirror).</li>
- *   <li>Render and click share the same control geometry ({@code buttonRect}),
+ *   <li>Native widgets own rendering, hit testing and keyboard activation,
  *       so hitboxes always match the drawn buttons.</li>
  * </ul>
  */
@@ -39,29 +39,22 @@ class ConfigScreenFactoryLegibilityTest {
     }
 
     @Test
-    void mouseClicked_gatesAllRowsOnCanMutate() throws IOException {
+    void nativeControls_gatePointerAndKeyboardMutations() throws IOException {
         String src = source();
-        int clickIdx = src.indexOf("public boolean mouseClicked");
-        assertTrue(clickIdx > 0, "mouseClicked must exist");
-        int gateIdx = src.indexOf("canMutate", clickIdx);
-        int toggleIdx = src.indexOf("option.toggle()", clickIdx);
-        assertTrue(gateIdx > 0 && toggleIdx > gateIdx,
-            "mouseClicked must check canMutate before any row toggles "
-                + "(boolean rows used to mutate ungated in multiplayer)");
+        int gate = src.indexOf("if (!canMutate) return;");
+        assertTrue(gate > 0 && gate < src.indexOf("option.toggle()"),
+            "the native button action must refuse changes in read-only mode");
+        assertTrue(src.contains("control.active = canMutate;"),
+            "disabled controls must also reject keyboard activation");
     }
 
     @Test
-    void hitboxes_shareGeometryWithRender() throws IOException {
+    void controls_useNativeWidgetHitboxesAndNarration() throws IOException {
         String src = source();
-        int renderIdx = src.indexOf("public void render");
-        int clickIdx = src.indexOf("public boolean mouseClicked");
-        // renderRow is invoked from render and uses buttonRect internally;
-        // mouseClicked must hit-test the same rect.
-        assertTrue(src.indexOf("buttonRect(", src.indexOf("private void renderRow")) > 0,
-            "renderRow must draw controls at buttonRect");
-        assertTrue(src.indexOf("buttonRect(", clickIdx) > 0,
-            "mouseClicked must hit-test against buttonRect");
-        assertTrue(renderIdx > 0 && clickIdx > 0);
+        assertTrue(src.contains("Button.builder(optionLabel(option)"));
+        assertTrue(src.contains("optionButtons.add(addRenderableWidget(control))"));
+        assertTrue(src.contains(".createNarration("));
+        assertFalse(src.contains("drawButtonChrome("), "native buttons own drawing and hit testing");
     }
 
     @Test

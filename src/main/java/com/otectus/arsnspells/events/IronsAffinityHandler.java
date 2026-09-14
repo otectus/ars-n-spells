@@ -48,16 +48,7 @@ public class IronsAffinityHandler {
         if (schoolId == null) {
             return;
         }
-        String schoolName = schoolId.getPath().toUpperCase(Locale.ROOT);
-        if (schoolName.isEmpty()) {
-            return;
-        }
-        AffinityType type;
-        try {
-            type = AffinityType.valueOf(schoolName);
-        } catch (IllegalArgumentException ignored) {
-            return;
-        }
+        String type = schoolId.toString();
         player.getCapability(AffinityData.AFFINITY_DATA).ifPresent(data -> {
             data.addLevel(type, 1);
             PacketHandler.sendToClient(new AffinitySyncPacket(type, data.getLevel(type)), player);

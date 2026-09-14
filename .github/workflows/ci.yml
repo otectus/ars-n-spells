@@ -2,284 +2,137 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, "release/**", "port/neoforge-1.21.1", "codex/3.3.0-neoforge-audit"]
   push:
-    branches: [main]
+    branches: [main, "release/**", "port/neoforge-1.21.1", "codex/3.3.0-neoforge-audit"]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build-and-test:
-    name: Build and test
+    name: Forge build and unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Cache Gradle caches
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Cache ForgeGradle caches
-        uses: actions/cache@v4
+          key: forge-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: forge-${{ runner.os }}-
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches/forge_gradle
             build/forge
           key: forgegradle-${{ runner.os }}-${{ hashFiles('gradle.properties', 'build.gradle') }}
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Compile
-        run: ./gradlew compileJava --no-daemon --stacktrace
-
-      - name: Test
-        run: ./gradlew test --no-daemon --stacktrace
-
-      - name: Upload test reports
+      - run: chmod +x ./gradlew
+      - name: Verify tooling and icon assets
+        run: |
+          python3 -m unittest discover -s tools -p "test_*.py"
+          python3 tools/generate_icons.py --check
+          python3 tools/verify_icons.py
+      - name: Verify shared domain and golden fixture manifest
+        run: python3 tools/contract_parity.py
+      - run: ./gradlew compileJava test --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: forge-unit-results
           path: |
             build/reports/tests/test
             build/test-results/test
 
-  # GameTests run as separate jobs because they are slower and require the full
-  # ForgeGradle environment. Two BLOCKING profiles (audit E7/V26): the Iron's-LESS
-  # one, which proves the fallback path boots and every required test passes with
-  # Iron's absent, and the Iron's-LOADED one, which is the only place the cross-mod
-  # integration scenarios actually execute. Each runs in its own -PgametestRunDir,
-  # because a world saved by one profile cannot be decoded by the other and
-  # runGameTestServer exits 0 over the top of that failure.
-  #
-  # Success is asserted in three independently failing steps per profile:
-  #   a. the Gradle exit code (weak alone: a boot crash still exits 0),
-  #   b. the "required tests passed" line AND the pinned ANS-GAMETEST scenario
-  #      counts, because a pass count cannot tell a real run from a mass self-skip,
-  #   c. the absence of the failure lines that otherwise hide inside a green run.
-  # The pinned counts come from observed runs. When a profile legitimately gains or
-  # loses a scenario, update the number here in the same commit.
+  # The expected counts are pinned to the final 3.3.3 Forge run. The verifier
+  # rejects a green ForgeGradle exit that did not complete the requested suite.
   gametest:
-    name: GameTest server (Iron's-less)
+    name: Forge GameTests (${{ matrix.profile }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     needs: build-and-test
-    env:
-      RUN_DIR: run-absent
-      EXPECTED_SCENARIOS: "ANS-GAMETEST executed=1 skipped=62"
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: absent
+            flags: ""
+            executed: 1
+            skipped: 84
+            identity: "--absent irons_spellbooks --absent ars_elemental --absent ars_zero --absent toomanyglyphs"
+          - profile: loaded
+            flags: "-PwithIronsRuntimeGameTests -PwithArsElemental"
+            executed: 75
+            skipped: 10
+            identity: "--present irons_spellbooks --present ars_elemental --absent ars_zero --absent toomanyglyphs"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Cache Gradle caches
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      # (a) Gradle exit code.
-      - name: Run GameTest server
-        run: ./gradlew runGameTestServer -PgametestRunDir=$RUN_DIR --no-daemon --stacktrace
-
-      # (b) The run reported success AND actually ran the scenarios it claims.
-      - name: Verify GameTest results
-        run: |
-          LOG="$RUN_DIR/logs/latest.log"
-          if ! grep -q "required tests passed" "$LOG"; then
-            echo "::error::GameTest server did not report success (boot crash or test failure)"
-            tail -n 80 "$LOG" || true
-            exit 1
-          fi
-          if ! grep -qF "$EXPECTED_SCENARIOS" "$LOG"; then
-            echo "::error::scenario counts changed; expected '$EXPECTED_SCENARIOS'"
-            grep -F "ANS-GAMETEST executed=" "$LOG" || echo "::error::no ANS-GAMETEST line at all"
-            exit 1
-          fi
-          grep "required tests passed" "$LOG"
-          grep -F "ANS-GAMETEST executed=" "$LOG"
-
-      # (c) Failures a green-looking run can hide.
-      - name: Verify no hidden failures
-        run: |
-          LOG="$RUN_DIR/logs/latest.log"
-          for pattern in "No test functions were given" "Mixin apply failed" "Failed to decode"; do
-            if grep -qF "$pattern" "$LOG"; then
-              echo "::error::log contains '$pattern'"
-              grep -F -m 5 "$pattern" "$LOG"
-              exit 1
-            fi
-          done
-
-      - name: Upload GameTest logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gametest-logs
-          path: run-absent/logs
-
-  gametest-loaded:
-    name: GameTest server (Iron's-loaded + Ars Elemental)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    needs: build-and-test
-    env:
-      RUN_DIR: run-loaded
-      EXPECTED_SCENARIOS: "ANS-GAMETEST executed=53 skipped=10"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Cache Gradle caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      # (a) Gradle exit code.
-      - name: Run GameTest server
+            ~/.gradle/caches/forge_gradle
+            build/forge
+          key: forge-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+      - run: chmod +x ./gradlew
+      - name: Run isolated profile
+        run: ./gradlew runGameTestServer -PgametestRunDir=run-${{ matrix.profile }} ${{ matrix.flags }} --no-daemon --stacktrace
+      - name: Verify completed tests and actual runtime profile
         run: >
-          ./gradlew runGameTestServer
-          -PwithIronsRuntimeGameTests -PwithArsElemental
-          -PgametestRunDir=$RUN_DIR --no-daemon --stacktrace
-
-      # (b) The run reported success AND actually ran the scenarios it claims.
-      - name: Verify GameTest results
-        run: |
-          LOG="$RUN_DIR/logs/latest.log"
-          if ! grep -q "required tests passed" "$LOG"; then
-            echo "::error::GameTest server did not report success (boot crash or test failure)"
-            tail -n 80 "$LOG" || true
-            exit 1
-          fi
-          if ! grep -qF "$EXPECTED_SCENARIOS" "$LOG"; then
-            echo "::error::scenario counts changed; expected '$EXPECTED_SCENARIOS'"
-            grep -F "ANS-GAMETEST executed=" "$LOG" || echo "::error::no ANS-GAMETEST line at all"
-            exit 1
-          fi
-          grep "required tests passed" "$LOG"
-          grep -F "ANS-GAMETEST executed=" "$LOG"
-
-      # (c) Failures a green-looking run can hide.
-      - name: Verify no hidden failures
-        run: |
-          LOG="$RUN_DIR/logs/latest.log"
-          for pattern in "No test functions were given" "Mixin apply failed" "Failed to decode"; do
-            if grep -qF "$pattern" "$LOG"; then
-              echo "::error::log contains '$pattern'"
-              grep -F -m 5 "$pattern" "$LOG"
-              exit 1
-            fi
-          done
-
-      - name: Upload GameTest logs
+          python3 tools/verify_gametest_log.py run-${{ matrix.profile }}/logs/latest.log
+          --required 115 --executed ${{ matrix.executed }} --skipped ${{ matrix.skipped }} ${{ matrix.identity }}
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: gametest-logs-loaded
-          path: run-loaded/logs
+          name: forge-gametest-${{ matrix.profile }}
+          path: run-${{ matrix.profile }}/logs
 
-  # Saved-world mod REMOVAL, deliberately separate from absence-at-startup: save a
-  # world with Iron's + Ars Elemental installed, then boot that same directory
-  # without them. What this documents is an UPSTREAM constraint — Iron's registers
-  # its own dimension type (irons_spellbooks:pocket_dimension_type) and a world that
-  # references it cannot be decoded once the mod is gone. ANS cannot fix that, so the
-  # job is non-blocking; it exists so the behaviour is observed and reported here
-  # rather than rediscovered by a player.
+  # Saved-world removal remains informational because Iron's own pocket-dimension
+  # registry prevents a world that references it from decoding without Iron's.
   gametest-removal:
-    name: GameTest server (saved-world mod removal, informational)
+    name: Forge saved-world removal (informational)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     needs: build-and-test
     continue-on-error: true
-    env:
-      RUN_DIR: run-removal
+    timeout-minutes: 60
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Cache Gradle caches
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Save a world with the optional mods loaded
+            ~/.gradle/caches/forge_gradle
+            build/forge
+          key: forge-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+      - run: chmod +x ./gradlew
+      - name: Save a loaded world
+        run: ./gradlew runGameTestServer -PwithIronsRuntimeGameTests -PwithArsElemental -PgametestRunDir=run-removal --no-daemon --stacktrace
+      - name: Verify loaded preparation
         run: >
-          ./gradlew runGameTestServer
-          -PwithIronsRuntimeGameTests -PwithArsElemental
-          -PgametestRunDir=$RUN_DIR --no-daemon --stacktrace
-
-      - name: Boot that saved world with the optional mods removed
-        run: |
-          set +e
-          ./gradlew runGameTestServer -PgametestRunDir=$RUN_DIR --no-daemon --stacktrace
-          echo "REMOVAL_EXIT=$?" >> "$GITHUB_ENV"
-
-      - name: Report the removal outcome
-        run: |
-          LOG="$RUN_DIR/logs/latest.log"
-          if ! grep -qF "Failed to decode" "$LOG"; then
-            echo "::error::expected the saved world to fail decoding without the optional mods"
-            exit 1
-          fi
-          if [ "$REMOVAL_EXIT" = "0" ]; then
-            echo "::error::the removal run reported success; the decode failure was swallowed"
-            exit 1
-          fi
-          grep -F -m 5 "Failed to decode" "$LOG"
-
-      - name: Upload removal logs
+          python3 tools/verify_gametest_log.py run-removal/logs/latest.log
+          --required 115 --executed 75 --skipped 10
+          --present irons_spellbooks --present ars_elemental
+          --absent ars_zero --absent toomanyglyphs
+      - name: Upload removal preparation log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gametest-logs-removal
+          name: forge-removal-preparation
           path: run-removal/logs

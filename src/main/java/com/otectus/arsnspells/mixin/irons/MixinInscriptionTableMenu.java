@@ -1,48 +1,70 @@
 package com.otectus.arsnspells.mixin.irons;
 
+import com.otectus.arsnspells.spell.irons.ArsCrossProxySpell;
 import com.otectus.arsnspells.spell.irons.IronsInscriptionPolicy;
+import com.otectus.arsnspells.spell.irons.IronsTableBindHandler;
+import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
+import io.redspace.ironsspellbooks.api.spells.SpellData;
+import io.redspace.ironsspellbooks.gui.inscription_table.InscriptionTableMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ResultContainer;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Server-side half of the Inscription Table guard, and the one that matters.
+ * Server-side router for the Inscription Table, and the one that matters.
  *
- * <p>The reported crash was a client NPE, but the same malformed scroll hits two more
- * unguarded {@code ISpellContainer.get(...)} dereferences on the <b>server thread</b>:
- * <pre>
- *   clickMenuButton: SpellData spellData = ISpellContainer.get(scrollStack).getSpellAtIndex(0);
- *   doInscription:   ISpellContainer scrollContainer = ISpellContainer.get(scrollItemStack);
- *                    SpellData scrollSlot = scrollContainer.getSpellAtIndex(0);
- * </pre>
- * On a dedicated server that is a crash any player can trigger with a legacy ANS scroll, so
- * the client guard alone is not sufficient — an old or modified client still sends the packet.
+ * <p>Three jobs, all at the head of Iron's own methods so ANS decides before Iron's reads
+ * anything:
+ * <ol>
+ *   <li><b>Crash guard.</b> A malformed scroll hits unguarded {@code ISpellContainer.get(...)}
+ *       dereferences on the <b>server thread</b> in both {@code clickMenuButton} and
+ *       {@code doInscription} — a crash any player can trigger on a dedicated server, so a
+ *       client-side guard alone is not sufficient.</li>
+ *   <li><b>Carrier bind.</b> A well-formed ANS carrier has a valid but intentionally empty
+ *       container, so Iron's would inscribe {@code SpellRegistry.none()} into the book and
+ *       {@code shrink(1)} the scroll. Instead the click is routed to
+ *       {@link IronsTableBindHandler}, which binds the Ars payload properly. This is what
+ *       makes the table a first-class bind route alongside the ritual and the command.</li>
+ *   <li><b>Extraction guard.</b> {@code setupResultSlot} offers the selected book spell for
+ *       extraction onto a fresh scroll. Doing that to an ANS proxy entry would hand the
+ *       player a scroll holding a proxy with no sidecar payload — a spell that resolves to
+ *       nothing — and strand the real entry on the book.</li>
+ * </ol>
  *
- * <p>{@code clickMenuButton} is guarded rather than only {@code doInscription} because the
- * first NPE happens before {@code doInscription} is ever called.
- *
- * <p>The guard also stops a <em>non</em>-crashing corruption: a well-formed ANS carrier has a
- * valid empty container, so {@code getSpellAtIndex(0)} yields {@code SpellData.EMPTY}, whose
- * {@code getSpell()} is a real {@code SpellRegistry.none()}. {@code doInscription} would
- * happily write that into the book and {@code shrink(1)} the scroll — silently eating the
- * carrier and adding a dud entry.
- *
- * <p><b>Iron's-gated</b> via {@code ArsNSpellsMixinPlugin}.
+ * <p><b>Iron's-gated</b> via {@code ArsNSpellsMixinPlugin}. No new mixin class: this is the
+ * same target the 3.2.x crash guard already used.
  */
-@Mixin(value = io.redspace.ironsspellbooks.gui.inscription_table.InscriptionTableMenu.class,
-       remap = false)
+@Mixin(value = InscriptionTableMenu.class, remap = false)
 public abstract class MixinInscriptionTableMenu {
 
-    /** Iron's own accessor for the scroll slot; stable across 3.15.0 and 3.16.2. */
-    @org.spongepowered.asm.mixin.Shadow
+    /** Iron's own accessors; stable across 3.15.0 and 3.16.2. */
+    @Shadow
     public abstract Slot getScrollSlot();
+
+    /** Iron's selected wheel index. Only read, never written. */
+    @Shadow
+    private int selectedSpellIndex;
+
+    /** The book being edited. Shadowed for the extraction guard's container read. */
+    @Shadow
+    @Final
+    private Slot spellBookSlot;
+
+    /** Backs the result slot at index 0; clearing it is how the offered scroll is withdrawn. */
+    @Shadow
+    @Final
+    protected ResultContainer resultContainer;
 
     /**
      * {@code clickMenuButton} is inherited from vanilla {@code AbstractContainerMenu}, so it
@@ -50,31 +72,82 @@ public abstract class MixinInscriptionTableMenu {
      */
     @Inject(method = "clickMenuButton", at = @At("HEAD"), cancellable = true,
             remap = true, require = 0)
-    private void arsnspells$guardMenuButton(Player player, int id,
+    private void arsnspells$routeMenuButton(Player player, int id,
                                             CallbackInfoReturnable<Boolean> cir) {
         // id >= 0 selects a spell slot and touches no scroll container; only the
-        // inscribe action (id < 0) reaches the unguarded dereference.
+        // inscribe action (id < 0) reaches the bind decision.
         if (id >= 0) {
             return;
         }
         IronsInscriptionPolicy.Verdict verdict = arsnspells$verdict();
-        if (!verdict.isRejection()) {
+        if (verdict == IronsInscriptionPolicy.Verdict.ALLOW) {
             return;
         }
-        // Returning false leaves the menu untouched and the scroll unconsumed.
-        cir.setReturnValue(false);
-        arsnspells$notify(player, verdict);
+        if (verdict.isRejection()) {
+            // Returning false leaves the menu untouched and the scroll unconsumed.
+            cir.setReturnValue(false);
+            arsnspells$notify(player, verdict.messageKey());
+            return;
+        }
+        // BIND_CARRIER: ANS owns this click. Iron's own path is skipped entirely, including
+        // its selectedSpellIndex precondition, which is meaningless for a carrier.
+        if (player instanceof ServerPlayer serverPlayer
+            && (Object) this instanceof InscriptionTableMenu menu) {
+            IronsTableBindHandler.handle(serverPlayer, menu);
+        }
+        cir.setReturnValue(true);
     }
 
     /**
      * Belt-and-braces: {@code doInscription} is public, so another mod could reach it without
-     * going through {@code clickMenuButton}. Cheap to guard, and it keeps the invariant local
-     * to the method that actually mutates the book.
+     * going through {@code clickMenuButton}, and Iron's own inscription must never run for a
+     * carrier or a malformed scroll.
      */
     @Inject(method = "doInscription", at = @At("HEAD"), cancellable = true, require = 0)
     private void arsnspells$guardDoInscription(int selectedIndex, CallbackInfo ci) {
-        if (IronsInscriptionPolicy.evaluate(arsnspells$scrollSlotItem()).isRejection()) {
+        if (IronsInscriptionPolicy.evaluate(arsnspells$scrollSlotItem())
+            != IronsInscriptionPolicy.Verdict.ALLOW) {
             ci.cancel();
+        }
+    }
+
+    /**
+     * Withdraw the extraction offer for ANS proxy entries.
+     *
+     * <p>Iron's method is its own, so {@code remap = false}. Both sides run the menu, so
+     * client and server agree on the empty result slot without any packet of ours.
+     */
+    @Inject(method = "setupResultSlot", at = @At("HEAD"), cancellable = true,
+            remap = false, require = 0)
+    private void arsnspells$guardResultSlot(CallbackInfo ci) {
+        if (!arsnspells$selectedIsProxy()) {
+            return;
+        }
+        if (resultContainer != null) {
+            resultContainer.setItem(0, ItemStack.EMPTY);
+        }
+        ci.cancel();
+    }
+
+    private boolean arsnspells$selectedIsProxy() {
+        if (selectedSpellIndex < 0 || spellBookSlot == null) {
+            return false;
+        }
+        try {
+            ItemStack book = spellBookSlot.getItem();
+            if (book.isEmpty()) {
+                return false;
+            }
+            ISpellContainer container = ISpellContainer.get(book);
+            if (container == null) {
+                return false;
+            }
+            SpellData data = container.getSpellAtIndex(selectedSpellIndex);
+            return data != null && data.getSpell() instanceof ArsCrossProxySpell;
+        } catch (Throwable ignored) {
+            // An unreadable container is Iron's problem to report, not a reason to throw out
+            // of a slot refresh; leave the offer to Iron's own code.
+            return false;
         }
     }
 
@@ -92,10 +165,11 @@ public abstract class MixinInscriptionTableMenu {
         }
     }
 
-    private void arsnspells$notify(Player player, IronsInscriptionPolicy.Verdict verdict) {
-        if (player != null && !player.level().isClientSide()) {
-            player.displayClientMessage(
-                Component.translatable(verdict.messageKey()).withStyle(ChatFormatting.RED), false);
+    /** Chat only ever goes to the server player; the client menu must stay silent. */
+    private void arsnspells$notify(Player player, String messageKey) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            serverPlayer.displayClientMessage(
+                Component.translatable(messageKey).withStyle(ChatFormatting.RED), false);
         }
     }
 }

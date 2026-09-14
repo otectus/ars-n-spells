@@ -2,67 +2,167 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.3.0] - 2026-09-04
+## [3.3.3] - 2026-09-12
 
-### Casting and payment correctness
+### Added
 
-- **Cost quotes are now repeatable.** A first cost query used to return one price and a second query a different one; cross-cast could debit mana during cost calculation itself. A cast now takes one immutable quote and pays it once at the native payment boundary. Ten cost reads change no balances.
-- **Spell damage scaling now identifies the spell from Ars Nouveau's own damage event.** Previous versions computed the multiplier at cast time, staged it for 60 ticks, and tried to recognise the resulting hit by substring-matching the damage-source message id for `"magic"` or `"ars_nouveau"`. A delayed projectile fired by player A that landed after player B opened their own window was scaled by whichever entry the map held, and any incidental magic damage the caster dealt was scaled as if it were their spell. The fix reads the immutable `SpellDamageEvent.Pre` directly, carrying the caster, target, spell context, and damage — the spell that is being scaled is the spell that is being resolved. No staging map, no tick window, and no message-string test. See [Spell scaling](#spell-scaling).
-- **Checks and charges now agree on units and rounding.** A single conversion policy prices both. Existing worlds keep their current pricing by default (`conversion_policy = flat_legacy`); equal-percentage conversion is a separate opt-in.
-- **Disabling mana unification now restores native pool routing properly.** The Iron's adapter is no longer dropped when unification is disabled.
-- **Mana granted by other mods is no longer silently swallowed.** Regeneration suppression is now scoped to the regeneration tick itself instead of blanketing every mana mutation.
+- New item `ars_n_spells:blank_scroll` ("Blank Scroll"), a Spell Loom substrate for servers
+  that don't want to hunt down a bare `irons_spellbooks:scroll` (`registry/ModItemsRegistry.java`).
+  Crafted shapeless from an Ars Nouveau blank parchment and a source gem
+  (`data/ars_n_spells/recipes/blank_scroll.json`), unlocked by a matching recipe advancement,
+  and listed in the ANS creative tab and JEI alongside the mod's other items.
+- Iron's chest loot can now drop the Blank Scroll when Iron's Spellbooks is installed:
+  `loot/BlankScrollLootModifier.java`, registered via `registry/ModLootModifiersRegistry.java`
+  and wired into `data/forge/loot_modifiers/global_loot_modifiers.json`. Four tiers under
+  `data/ars_n_spells/loot_modifiers/` cover stronghold libraries (15%), ancient city and
+  woodland mansion chests (10%), common dungeon/mineshaft/stronghold chests (5%), and a wide
+  set of Iron's own structure chests (6%). The Java gate — not a datapack condition — is what
+  keeps the modifier inert without Iron's, so it's always registered but never rolls. Weights
+  are datapack-overridable; there is no config key.
+- Iron's native Inscription Table now binds ANS carrier scrolls into Iron's spellbooks
+  directly, as a third bind route alongside the Spellbook Binding ritual and
+  `/ans bind_scroll_to_irons_book`. Previously the table only refused carriers with a
+  "can't read this scroll" message. The server-side router lives in
+  `mixin/irons/MixinInscriptionTableMenu.java` (`clickMenuButton` injection), which classifies
+  the scroll via `spell/irons/IronsInscriptionPolicy.java` and, for a well-formed carrier,
+  hands off to `spell/irons/IronsTableBindHandler.java`. The handler fires Iron's own
+  `InscribeSpellEvent` (so other mods still see the inscription and can veto it), binds through
+  the shared `spell/IronsSpellbookBinder.java`, consumes exactly one scroll on success, and
+  grants the `bind_spell` advancement.
 
-### Progression, gear and combat
+### Changed
 
-- **NeoForge progression attribute modifier fix:** The 1.21.1 port used two different modifier identities for one bonus; there is now one canonical modifier, and both historical identities are cleaned up. Cast counts are preserved.
-- **Disabling a feature now removes its bonuses.** Cleanup is unconditional and no longer gated on the feature being enabled, so a mode or config change removes old modifiers first, then recomputes, then clamps mana under a documented rule, then syncs.
-- **Fixed a ratchet where a third-party attribute multiplier could make the shared mana ceiling climb on every recompute.** Values are now measured against an isolated native snapshot rather than by subtracting a raw amount from an already-multiplied total.
+- Redesigned the Spell Loom as an ornate arcane workstation with carved walnut legs,
+  brass fittings, crystal finials, a suspended Source bobbin, and individual spell-weaving
+  threads above an inlaid inscription motif. Six Minecraft-style 16x16 pixel-art materials, a shaped
+  outline/collision box, and an updated inventory presentation replace the old cube.
+- The Spell Loom's target slot now accepts the new Blank Scroll in addition to a blank Iron's
+  scroll (`inscription/LoomInscription.java`, `isTarget`). The output is unchanged: a real
+  `irons_spellbooks:scroll` carrier built by
+  `spell/ArsSpellExportUtil.createIronsScrollCarrier`. Converting an already-filled Iron's
+  scroll still works exactly as before.
+- The Spellbook Binding ritual, `/ans bind_scroll_to_irons_book`, and the Inscription Table now
+  all go through one shared binder, `spell/IronsSpellbookBinder.java` (`bind`, `BindResult`),
+  instead of two separate implementations of the same checks (the table route did not exist
+  before this release). Proxy pool allocation still
+  happens only at bind time, in `spell/IronsBookBindingUtil.appendArsSpellToBook`.
+- Scroll classification is centralized in the new `spell/ScrollKind.java` enum (`NATIVE`,
+  `ANS_CARRIER`, `ANS_BLANK`, `INVALID`, `OTHER`), used by the table policy, the binder, and the
+  tooltip handler so they agree at the edges. An invalid carrier is refused with
+  `message.ars_n_spells.bind.invalid_carrier` and is never deleted; a legacy container-less
+  carrier is repaired in place by `spell/irons/CarrierReconciler` on the table path as well as
+  the ritual and command paths.
+- Selecting an Ars proxy entry in the Inscription Table no longer offers anything in the
+  extraction slot (`setupResultSlot` injection in `MixinInscriptionTableMenu.java`); Spell
+  Uninscription remains the way to remove a bound Ars spell.
+- The carrier scroll tooltip now shows the Loom-assigned name and nature plus
+  "Use at an Iron's Inscription Table or with the Spellbook Binding ritual."
+  (`events/CrossSpellTooltipHandler.java`), and the ritual's own description
+  (`ars_n_spells.ritual_desc.spellbook_binding`) now says binding is "one of two routes" instead
+  of implying the ritual is the only way. The Spell Loom's scroll-slot hints now name the ANS
+  Blank Scroll alongside a blank Iron's scroll, where they previously named only the latter.
 
-### Forge Covenant integration
+### Known limitations
 
-- **Fixed a crash:** the late Life Point cancellation path called `setCanceled` on an Iron's event that is not cancelable, raising an exception inside Iron's cast pipeline every time a late LP debit failed. See `src/main/java/com/otectus/arsnspells/events/IronsLPHandler.java` lines 250–256.
-- **LP and aura are now payment legs of the same cast transaction**, reserved before the cast commits rather than charged from an uncorrelated queue. Partial or unresolvable aura drain follows an explicit policy (`payment_open_failure_policy`) instead of reporting a success that did not happen. Existing worlds keep the previous permissive behavior; new installs get the safe one.
+- Ars Nouveau's own structure loot tables are not targeted by the new loot modifiers — no
+  confirmed table ids for them were identified for this release.
 
-### Spell Loom and inscription
+## [3.3.2] - 2026-09-07
 
-- **Item loss fixed:** the Loom consumed reusable spell sources. Books and foci are now read and returned, never eaten.
-- **A scroll that already holds a spell is no longer treated as blank.** It is identified as filled, with a stated reason, and converting it is a separate deliberate action with a preview.
-- **Previewing an inscription no longer changes your inventory.**
-- **Transcription now produces one output and returns the remainder,** instead of transforming a whole stack for a single source.
+### Fixed
 
-### Tests and infrastructure
+- Iron's contextual mana bar now hides when the displayed mana is full even if
+  equipment or shared-pool modifiers give the maximum a fractional value. The
+  visibility check uses the same integer precision as Iron's mana packet and HUD,
+  preserving held casting items and the Always/Never settings.
+- Fixed the shared visibility predicate on both Forge 1.20.1 and NeoForge 1.21.1,
+  so the XP bar returns when the contextual mana bar hides at the XP anchor.
+- Both loaders use identical mana-visibility rules and regression cases. No
+  config, network protocol, or save-format changes from 3.3.1.
+- The mana-bar overlay handler now returns before any config read for every overlay that
+  is not the Ars Nouveau or Iron's Spellbooks mana bar, and the debug-config read on its
+  error path is itself guarded, so a not-yet-loaded server config can no longer make Forge
+  skip an unrelated overlay's render.
 
-- **Both loaders now run a loaded-dependency GameTest profile in CI** alongside the existing dependency-absent one, in separate world directories. GameTest success is now three independent checks — process exit code, expected executed-scenario count, and negative log assertions for failure signatures — because a run can print BUILD SUCCESSFUL while the world failed to decode.
-- **Tests that skip because an optional mod is absent are now counted and reported separately** from tests that actually exercised the integration.
+### Added
 
-### Optional compatibility
+- Overlay diagnostics (debug mode) now listen at lowest priority and receive cancelled
+  events, logging once per overlay when its Pre arrives already cancelled and once when
+  its Post fires — so the log shows whether a third-party HUD (for example one drawing
+  from the vanilla hotbar) was suppressed, and by what.
 
-- **Ars Elemental 0.6.8.0+** — Ars Elemental glyphs now resolve their schools from their declared Ars metadata. Necromancy glyphs like `glyph_phantom_grasp` and `glyph_charm` resolve as `eldritch`; `glyph_life_link` declares Necromancy too but is explicitly mapped to `blood`. Filters like `glyph_aquatic_filter` resolve as `generic` and do not decide the spell's school. Most Ars Elemental content classifies correctly with no configuration at all; override any glyph from a datapack if needed.
-- **Ars Zero 2.0.2+** — Ars Zero's named effects (like `effect_conjure_blight`, `conjure_arcane_shield_effect`) resolve their schools from their declared Ars metadata or from the glyph's Ars school. Control-flow glyphs (`select_effect`, `anchor_effect`, etc.) resolve as `generic` and do not decide the spell's school. The mod requires Forge `[47.4.10,)` and Curios `5.14.1+1.20.1`.
-- **Covenant of the Seven 2.2.6+** — Covenant aura is sampled server-side through Nature's Aura's chunk aura to block casts when the aura threshold is too low, avoiding method probes for routines Covenant 2.2.6 removed. Dedicated servers behave correctly. The integration has no dedicated runtime test profile; surface compatibility is verified by bytecode inspection instead.
-- **Ars Nouveau's own glyph metadata** now drives all school resolution — `AbstractSpellPart.spellSchools` for vanilla and addon glyphs, with per-glyph overrides from datapacks. `AbstractAugment`, `AbstractCastMethod` and `AbstractFilter` instances always resolve as `generic` — they are not payload glyphs and do not carry a school (prior versions leaked the school decision to the glyph's registry name heuristic).
+### Testing
 
-### Test suite and build
+- A unit test pins that the mana-bar matchers never match vanilla or third-party overlay
+  ids (`minecraft:hotbar`, `minecraft:potion_icons`, `minecraft:effects`,
+  `durabilityviewer:*`).
 
-- New JUnit tests (`SchoolResolverAddonTest`, `CovenantJarSurfaceTest` which reads the Covenant jar bytecode and skips when absent, `VersionRangeTest`).
-- New gametests in `AddonCompatGameTests`: `arsZero_glyphsRoundTrip`, `arsZero_everyGlyphResolvesWithoutThrowing`, `arsZero_schoolsResolveFromDeclaredMetadata`, `arsZero_controlFlowGlyphsAreGeneric`, `arsZero_augmentsAndFormsDoNotDecideTheSchool`, `arsZero_namedEffectsAreUsable`, `arsElemental_necromancyGlyphsResolve`, `arsElemental_filtersResolveGeneric`, `mixedArsElementalArsZero_recipe_survivesSerialization`. With `-PwithArsElemental -PwithArsZero`: all pass (JUnit: 272 tests).
-- The `-PwithArsZero` profile is local-only (jar in `libs/`, git-ignored) and requires Forge `47.4.10`. Ars Elemental and Covenant profiles continue as before.
+Validation: full builds, unit suites, and ISS-absent/loaded GameTests passed on
+both loaders. See [the 3.3.2 verification record](docs/3.3.2-validation.md).
 
-### Changed: `cursed_rings.json` item tag
+## [3.3.1] - 2026-09-06
 
-- The non-existent `covenant_of_the_seven:cursed_ring` entry was removed; `enigmaticlegacy:cursed_ring` remains.
+### Removed: transaction receipt HUD and its client delivery chain
 
-### Known limitations (deliberately deferred)
+- The transaction receipt panel — the overlay that rendered every frame for the eight seconds a
+  receipt stayed live after a cast, showing what it quoted, paid, or refunded — is deleted
+  outright, not just switched off. It was already suppressed while the player was null, the HUD
+  was hidden with F1, or a screen was open, but there is no renderer left in the tree to revive:
+  `TransactionHud`, `ClientTransactionState`, `TransactionSyncPacket`, `TransactionSnapshotCodec`,
+  and `TransactionSync` are all removed, along with the `transaction.ars_n_spells.*` lang keys
+  that fed them. There is no config option for the panel.
+- `ArsCastPayments` and `IronsCastPayments` no longer report transactions; the server publishes
+  no receipt snapshot to clients at all. `TransactionSnapshot` itself still exists — its `Reason`
+  enum remains a record component of `NativePayment.Result` for server-side payment bookkeeping —
+  but nothing builds or sends a full snapshot off the server anymore.
+- **Breaking:** removing `TransactionSyncPacket` shifts `JournalSnapshotPacket` down one packet id,
+  so `PacketHandler.PROTOCOL_VERSION` moves from `5` to `6`. A client still on the old jar hard-fails
+  at connect instead of misdecoding packets; update client and server together.
 
-The following are known and scheduled for future work:
-- Curios equipment lifecycle and the full attribute contribution ledger.
-- Configuration keys that currently have no effect.
-- Source Jar cache invalidation and source-synergy rate decoupling.
-- School-analysis corpus, custom school identity and datapack overlay sync.
-- The icon registry and legacy icon-key fallback.
-- Loom automation policy.
+## [3.3.0] - Unreleased
 
-No config, packet, or save-format changes.
+3.3.0 updates both Forge 1.20.1 and NeoForge 1.21.1. The complete requirement and validation record is in [the audit closure ledger](docs/3.3.0-audit-status.md). Implementation and runtime verification are tracked separately; this entry does not certify unexecuted release gates.
+
+### Custom spell icons and backgrounds
+
+- Added 274 semantic icon IDs, original 16px and separately authored 32px art, normal/selected/disabled/high-contrast/monochrome variants, and 11 selectable icon frames/backgrounds.
+- Added the icon library and Loom icon/frame picker with search, labels and keyboard focus. Stored logical icon IDs retain legacy aliases. Resource reload publishes a replacement registry and checks whether textures exist before choosing a fallback.
+- Native Iron's proxy icons resolve from the selected physical carrier; ambiguous carrier selection refuses instead of silently choosing another book. The eight existing proxy registry IDs remain stable.
+
+### Vanilla GUI overhaul
+
+- Replaced purple panels across the Spell Loom, details, icon picker, school journal, compatibility screen and settings with light-grey container bevels, dark labels without shadows, recessed slots and native Minecraft buttons. HUD receipts now use a neutral translucent black background and white text.
+- The Loom fits the minimum 320x240 scaled viewport with a 176x224 panel, a vanilla-style recipe arrow and separate output/icon slots. Concise localized status hints link to complete tooltips and details.
+- Loom details wrap and scroll using the mouse wheel, scrollbar or keyboard. Settings use native focusable controls with narration and read-only gating; descriptions have full tooltips. Icon selection uses white borders and an inset state, with native hover/focus feedback.
+- Forge 1.20.1 and NeoForge 1.21.1 share the presentation with explicit background-rendering adapters so NeoForge's blur stays behind the panels. See [GUI design and validation](docs/3.3.0/gui-overhaul.md).
+
+### Casting and resource accounting
+
+- Native cast contexts own immutable quotes. Repeated price checks do not debit resources; a successful payment occurs at the native expenditure boundary before effects. Canceled casts release uncommitted reservations.
+- Quotes contain final paying units. Native spells in separate mode pay only their own pool; reusable cross-casts use normalized dual-cost shares. Directional flat rates apply across a resource boundary. Equal-percentage conversion is a separate policy using captured native maxima.
+- Restored public Ars mana set/add/remove behavior while limiting native regeneration suppression to the native regeneration tick. Native pool adapters remain available when sharing is disabled.
+- Native Iron's long casts and full-cost scrolls retain their initiation price and pay before effects; accepting scroll use is only initiation. Generic reusable carriers use trusted native book semantics and native effective spell levels.
+- Forge LP/aura payment is associated with the initiating cast instead of an unrelated per-player queue. Missing or insufficient alternate resources follow the configured refusal, native-fallback or legacy-open policy. Full Covenant-stack runtime acceptance remains recorded separately.
+- Cross-cast packets validate the current hand, carrier fingerprint, player/menu state and server-selected descriptor. Bounded rate and nonce admission refuse replay and stale swaps.
+
+### Schools, progression, equipment and Source
+
+- School classification uses payload roles and declared metadata, with namespaced custom-school identity. Deterministic mapping overlays expose provenance and synchronize replacement snapshots to clients.
+- Unified Neo progression modifier identity and cleanup of historical IDs preserve accumulated cast counts. Live cleanup removes owned contributions before recomputing and synchronizing affected state.
+- Shared mana ceilings use native attribute contributions without repeatedly amplifying owned modifiers. Curios and enchanted-equipment integration use actual attribute operations and bounded regeneration conversion.
+- Resonance uses its configured threshold, linger duration and strength. Source Jar proximity caches expire when stationary and invalidate on dimension/tag/config changes; discovery cadence no longer determines mana income.
+
+### Inscription and diagnostics
+
+- Loom planning reads reusable sources without consuming them, refuses already-filled targets, and preserves inventory when output is occupied. Transcription converts one target unit and returns the remainder.
+- Both loaders apply the same source/target insertion and output extraction policy. Unbinding removes owned proxies/metadata while retaining native spells and upgrades. Future schemas are refused without rewriting the saved item.
+- Added read-only school, progression, compatibility/diagnostic and removal-report tools. See the player and pack-author guides for command syntax and limits.
+
+### Migration and validation
+
+- Network protocol is now 5; update clients and server together. Config schema 2 migrates prior Source income with a backup and preserves explicit payment policy. Item/component schema stamps and schema-v2 school mappings retain legacy reads and unknown identities.
+- Both loader branches have blocking dependency-absent and loaded GameTest CI, isolated run directories, explicit runtime identities, and exact completion/executed/skipped log validation. Shared domain code and golden fixtures have a checked SHA-256 manifest.
+- Validation includes native resolver/resource/effect tests, non-unit conversion rates, replay admission, inventory conservation, and negative completion-log fixtures. Fresh run results and remaining client, multiplayer, performance and optional-version gates are listed in the ledger.
 
 ## [3.2.4] - 2026-09-02
 

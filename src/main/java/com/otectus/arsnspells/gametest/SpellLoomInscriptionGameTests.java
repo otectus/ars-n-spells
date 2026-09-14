@@ -9,6 +9,10 @@ import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.contract.InscriptionPlan;
 import com.otectus.arsnspells.inscription.LoomInscription;
 import com.otectus.arsnspells.registry.ModBlocksRegistry;
+import com.otectus.arsnspells.registry.ModItemsRegistry;
+import com.otectus.arsnspells.spell.CrossCastNbt;
+import com.otectus.arsnspells.spell.ScrollKind;
+import com.otectus.arsnspells.spell.irons.IronsScrollFactory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -192,6 +196,168 @@ public final class SpellLoomInscriptionGameTests {
         }
         if (!before.equals(snapshot(loom))) {
             helper.fail("previewing an inscription mutated the loom's slots");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "platform", batch = "ans_loom")
+    public static void Loom_invalidTargetsAndRepeatedRequestsPreserveStacks(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        SpellLoomBlockEntity loom = placeLoom(helper);
+        seed(loom, filledArsSpellBook(helper), new ItemStack(net.minecraft.world.item.Items.DIRT, 64));
+        String before = snapshot(loom);
+        helper.assertTrue(LoomInscription.REASON_INVALID_TARGET.equals(LoomInscription.apply(loom, false)),
+            "an arbitrary disposable target must not create an Iron's scroll");
+        helper.assertTrue(before.equals(snapshot(loom)), "invalid target consumed inventory");
+        ItemStack blank = IronsLoomFixtures.blankScroll();
+        blank.setCount(2);
+        seed(loom, filledArsSpellBook(helper), blank);
+        ItemStack sourceBefore = loom.getItems().getStackInSlot(0).copy();
+        helper.assertTrue(InscriptionPlan.REASON_OK.equals(LoomInscription.apply(loom, false)), "first export failed");
+        before = snapshot(loom);
+        helper.assertTrue(LoomInscription.REASON_OUTPUT_OCCUPIED.equals(LoomInscription.plan(loom).reasonCode()),
+            "preview must report occupied output");
+        helper.assertTrue(LoomInscription.REASON_OUTPUT_OCCUPIED.equals(LoomInscription.apply(loom, false)),
+            "a repeated request must refuse while output is occupied");
+        helper.assertTrue(before.equals(snapshot(loom)), "repeated request consumed inventory");
+        helper.assertTrue(ItemStack.matches(sourceBefore, loom.getItems().getStackInSlot(0)),
+            "reusable source spells/upgrades/NBT changed");
+        helper.succeed();
+    }
+
+    @GameTest(template = "platform", batch = "ans_loom")
+    public static void Loom_automationCannotBypassInputOrOutputPolicy(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        SpellLoomBlockEntity loom = placeLoom(helper);
+        var top = loom.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER,
+            net.minecraft.core.Direction.UP).orElseThrow(() -> new AssertionError("missing top capability"));
+        var side = loom.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER,
+            net.minecraft.core.Direction.NORTH).orElseThrow(() -> new AssertionError("missing side capability"));
+        var bottom = loom.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER,
+            net.minecraft.core.Direction.DOWN).orElseThrow(() -> new AssertionError("missing output capability"));
+        ItemStack source = filledArsSpellBook(helper);
+        ItemStack target = IronsLoomFixtures.blankScroll();
+        helper.assertTrue(!top.insertItem(2, source, false).isEmpty(), "top inserted into output");
+        helper.assertTrue(!side.insertItem(0, source, false).isEmpty(), "side inserted into source");
+        helper.assertTrue(!bottom.insertItem(1, target, false).isEmpty(), "bottom inserted a target");
+        helper.assertTrue(top.insertItem(0, source, false).isEmpty(), "top refused valid source");
+        helper.assertTrue(side.insertItem(1, target, false).isEmpty(), "side refused valid target");
+        helper.assertTrue(top.extractItem(0, 1, false).isEmpty(), "automation removed reusable source");
+        helper.assertTrue(InscriptionPlan.REASON_OK.equals(LoomInscription.apply(loom, false)), "automated inputs failed");
+        helper.assertTrue(top.extractItem(2, 1, false).isEmpty(), "top extracted output");
+        helper.assertTrue(!bottom.extractItem(2, 1, false).isEmpty(), "bottom did not extract output");
+        helper.succeed();
+    }
+
+    @GameTest(template = "platform", batch = "ans_loom")
+    public static void Loom_sourceDiscoveryIsReadOnlyAndFilledIronScrollIsUsableSource(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        ItemStack blank = new ItemStack(net.minecraft.world.item.Items.PAPER);
+        com.otectus.arsnspells.rituals.InscriptionInputs.readSource(blank);
+        helper.assertTrue(blank.getTag() == null, "source discovery stamped NBT onto blank paper");
+        ItemStack filled = IronsLoomFixtures.nativelyFilledScroll();
+        var plan = com.otectus.arsnspells.contract.InscriptionPlanner.plan(
+            new com.otectus.arsnspells.inscription.StackInscriptionView(filled, blank));
+        helper.assertTrue(plan.isPermitted() && plan.consumedUnits() == 1,
+            "native Iron's scroll must remain usable as a disposable transcription source");
+        helper.succeed();
+    }
+
+    // ------------------------------------------------------------------
+    // 3.3.3: the ANS blank scroll. Stock Iron's ships no recipe for a bare
+    // irons_spellbooks:scroll, so before this item the only obtainable loom target was a
+    // scroll that already held a spell -- which the loom correctly refuses. The blank is a
+    // target, not the output: what comes out is still a real Iron's scroll carrier, because
+    // Iron's doInscription requires `scroll instanceof Scroll`.
+    // ------------------------------------------------------------------
+
+    /** ANS blank + Ars source produces a real, readable Iron's carrier and eats the blank. */
+    @GameTest(template = "platform", batch = "ans_loom")
+    public static void Loom_blankScrollProducesAnIronsCarrier(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
+            return;
+        }
+        SpellLoomBlockEntity loom = placeLoom(helper);
+        seed(loom, filledArsSpellBook(helper),
+            new ItemStack(ModItemsRegistry.blankScroll().get()));
+
+        String applied = LoomInscription.apply(loom, false);
+        if (!InscriptionPlan.REASON_OK.equals(applied)) {
+            helper.fail("the ANS blank scroll must be a legal loom target, got '" + applied + "'");
+        }
+        ItemStackHandler items = loom.getItems();
+        ItemStack output = items.getStackInSlot(SpellLoomBlockEntity.SLOT_OUTPUT);
+        if (!ForgeRegistries.ITEMS.getKey(output.getItem())
+                .equals(new ResourceLocation("irons_spellbooks", "scroll"))) {
+            helper.fail("the output must be a real irons_spellbooks:scroll, not the ANS blank; "
+                + "got " + ForgeRegistries.ITEMS.getKey(output.getItem()));
+        }
+        if (ScrollKind.classify(output) != ScrollKind.ANS_CARRIER) {
+            helper.fail("the output must classify as an ANS carrier, got "
+                + ScrollKind.classify(output));
+        }
+        if (!IronsScrollFactory.hasReadableContainer(output)) {
+            helper.fail("the carrier needs a readable native container or Iron's own code "
+                + "dereferences null on it");
+        }
+        if (CrossCastNbt.countArsEntries(output.getOrCreateTag()) != 1) {
+            helper.fail("the carrier must hold exactly one Ars entry, found "
+                + CrossCastNbt.countArsEntries(output.getOrCreateTag()));
+        }
+        if (!items.getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL).isEmpty()) {
+            helper.fail("the one blank scroll paid for the inscription and should be gone");
+        }
+        helper.succeed();
+    }
+
+    /** A blank scroll with nothing to weave onto it is refused, and stays in the slot. */
+    @GameTest(template = "platform", batch = "ans_loom")
+    public static void Loom_blankScrollWithoutASourceIsRefused(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
+            return;
+        }
+        SpellLoomBlockEntity loom = placeLoom(helper);
+        seed(loom, ItemStack.EMPTY, new ItemStack(ModItemsRegistry.blankScroll().get()));
+        String before = snapshot(loom);
+
+        String applied = LoomInscription.apply(loom, false);
+        if (!LoomInscription.REASON_NO_ARS_SPELL.equals(applied)) {
+            helper.fail("a blank scroll with no Ars source must be refused for lack of a spell, "
+                + "got '" + applied + "'");
+        }
+        if (!before.equals(snapshot(loom))) {
+            helper.fail("a refused inscription consumed the blank scroll");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The conversion action is the escape hatch for the filled scroll that plain inscribe
+     * refuses (see {@link #Loom_filledScrollIsNotAcceptedAsBlank}): it blanks the target as
+     * part of the same operation and produces a carrier.
+     */
+    @GameTest(template = "platform", batch = "ans_loom")
+    public static void Loom_filledScrollIsAcceptedByConversion(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
+            return;
+        }
+        SpellLoomBlockEntity loom = placeLoom(helper);
+        ItemStack filled = IronsLoomFixtures.nativelyFilledScroll();
+        if (filled.isEmpty() || IronsLoomFixtures.nativeContainerIsEmpty(filled)) {
+            helper.fail("the fixture scroll must be natively filled, or this test proves nothing");
+        }
+        seed(loom, filledArsSpellBook(helper), filled);
+
+        String applied = LoomInscription.apply(loom, true);
+        if (!InscriptionPlan.REASON_OK.equals(applied)) {
+            helper.fail("Convert must accept a filled Iron's scroll, got '" + applied + "'");
+        }
+        ItemStack output = loom.getItems().getStackInSlot(SpellLoomBlockEntity.SLOT_OUTPUT);
+        if (ScrollKind.classify(output) != ScrollKind.ANS_CARRIER) {
+            helper.fail("conversion must produce an ANS carrier, got " + ScrollKind.classify(output));
+        }
+        if (!loom.getItems().getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL).isEmpty()) {
+            helper.fail("the converted scroll should have been consumed as the target");
         }
         helper.succeed();
     }

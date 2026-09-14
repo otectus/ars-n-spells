@@ -4,6 +4,10 @@ import com.otectus.arsnspells.data.AffinityData;
 import net.minecraft.world.entity.player.Player;
 
 public class AffinityBonuses {
+    public static float getAttributeMultiplier(Player player, String school) {
+        return player.getCapability(AffinityData.AFFINITY_DATA).map(data ->
+            1.0f + AffinityCalculator.getDamageBonus(null, data.getLevel(school))).orElse(1.0f);
+    }
     /**
      * Multiplier applied to spell power for the school the player is casting.
      * Built from {@link AffinityCalculator#getDamageBonus} so the per-level

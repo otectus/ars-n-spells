@@ -146,7 +146,7 @@ public final class InscriptionClassifier {
             return false;
         }
         try {
-            Spell spell = new SpellCaster(tag).getSpell();
+            Spell spell = new SpellCaster(tag.copy()).getSpell();
             if (spell != null && spell.recipe != null && !spell.recipe.isEmpty()) {
                 return true;
             }
@@ -154,7 +154,7 @@ public final class InscriptionClassifier {
             // Narrow to Exception so LinkageError still propagates, as elsewhere in this repo.
         }
         try {
-            Spell rooted = Spell.fromTag(tag);
+            Spell rooted = Spell.fromTag(tag.copy());
             return rooted != null && rooted.recipe != null && !rooted.recipe.isEmpty();
         } catch (Exception ignored) {
             return false;

@@ -14,6 +14,7 @@ import com.otectus.arsnspells.registry.ModBlockEntities;
 import com.otectus.arsnspells.registry.ModBlocksRegistry;
 import com.otectus.arsnspells.registry.ModCreativeTabs;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
+import com.otectus.arsnspells.registry.ModLootModifiersRegistry;
 import com.otectus.arsnspells.registry.ModMenus;
 import com.otectus.arsnspells.rituals.RitualRegistryHandler;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
@@ -72,6 +73,11 @@ public class ArsNSpells {
         }
         ModItemsRegistry.register(modEventBus);
 
+        // 3.3.3: blank-scroll chest loot. The serializer registers everywhere; the
+        // modifier itself returns loot untouched without Iron's (see
+        // BlankScrollLootModifier).
+        ModLootModifiersRegistry.register(modEventBus);
+
         // 3.0.0: Spell Loom workstation — block, block entity, and menu. Not
         // Iron's-gated: the block registers everywhere; its export action no-ops
         // with a clear message when Iron's is absent (no Iron's scroll item).
@@ -129,7 +135,7 @@ public class ArsNSpells {
             MinecraftForge.EVENT_BUS.register(new ArsSpellScalingHandler());
             MinecraftForge.EVENT_BUS.register(new ResonanceEvents());
             MinecraftForge.EVENT_BUS.register(new RegenSynergyHandler());
-            MinecraftForge.EVENT_BUS.register(new CrossCastIronsHandler());
+            MinecraftForge.EVENT_BUS.register(new com.otectus.arsnspells.casting.IronsCastPayments());
             MinecraftForge.EVENT_BUS.register(new IronsLPHandler());
             // IronsAuraHandler deleted: Covenant of the Seven's own Iron's integration
             // deducts aura natively for Iron's spells. We were double-paying.

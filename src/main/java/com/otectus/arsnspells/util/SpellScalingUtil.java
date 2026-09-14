@@ -60,7 +60,7 @@ public class SpellScalingUtil {
         float multiplier = (float) player.getAttributeValue(AttributeRegistry.SPELL_POWER.get());
 
         SpellAnalysis.Result analysis = SpellAnalysis.analyze(spell);
-        SpellSchoolId school = analysis.school();
+        String school = analysis.schoolKey();
 
         // Additive scaling: base power + (elemental bonus - 1.0) prevents exponential stacking.
         //
@@ -69,27 +69,21 @@ public class SpellScalingUtil {
         // substring test over a HashMap — so Firework counted as generic for affinity but
         // matched "fire" for scaling, and a path containing two element names resolved by hash
         // iteration order.
-        RegistryObject<Attribute> elemental = elementMap().get(school);
-        if (elemental != null) {
-            float elementalPower = (float) player.getAttributeValue(elemental.get());
+        Attribute elemental = com.otectus.arsnspells.compat.IronsSchoolAttributes.power(school);
+        if (elemental != null && player.getAttribute(elemental) != null) {
+            float elementalPower = (float) player.getAttributeValue(elemental);
             multiplier = multiplier + (elementalPower - 1.0f);
         }
 
         // Apply affinity bonus: 0.5% per affinity level for matching school
-        if (AnsConfig.ENABLE_AFFINITY_SYSTEM.get() && !school.isGeneric()) {
-            try {
-                AffinityType affinityType = AffinityType.valueOf(school.name());
-                float affinityMultiplier = AffinityBonuses.getAttributeMultiplier(player, affinityType);
-                multiplier *= affinityMultiplier;
-            } catch (IllegalArgumentException ignored) {
-                // Unreachable for the canonical vocabulary (every non-generic school has an
-                // AffinityType constant); kept so adding a school cannot crash a cast.
-            }
+        if (AnsConfig.ENABLE_AFFINITY_SYSTEM.get() && !SchoolKeys.GENERIC.equals(school)
+            && elemental != null) {
+            multiplier *= AffinityBonuses.getAttributeMultiplier(player, school);
         }
 
         // Apply resonance multiplier from cross-mod mana synergy
         if (AnsConfig.ENABLE_RESONANCE_SYSTEM.get()) {
-            multiplier *= (float) ResonanceManager.getResonance(player);
+            multiplier *= (float) ResonanceManager.getArsResonance(player);
         }
 
         return Math.min(multiplier, AnsConfig.SPELL_POWER_CAP.get().floatValue());

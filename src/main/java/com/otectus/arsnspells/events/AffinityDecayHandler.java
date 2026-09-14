@@ -61,7 +61,7 @@ public class AffinityDecayHandler {
         }
 
         player.getCapability(AffinityData.AFFINITY_DATA).ifPresent(data -> {
-            for (AffinityType type : AffinityType.values()) {
+            for (String type : data.getAllLevels().keySet()) {
                 int level = data.getLevel(type);
                 if (level <= 0) {
                     continue;

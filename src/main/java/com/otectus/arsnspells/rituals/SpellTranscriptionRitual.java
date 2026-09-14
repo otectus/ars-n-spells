@@ -147,8 +147,13 @@ public class SpellTranscriptionRitual extends AnsRitual {
         }
         // Split the untouched remainder back into the world instead of transforming it.
         if (outcome.targetRemainder() > 0) {
+            // EntityJoinLevelEvent may refuse a new entity. Never remove the paid target or
+            // source until its output has actually entered the world.
+            if (!dropBeside(level, targetEntity, inscribed)) {
+                error(LANG_PREFIX + "error.refused.unknown");
+                return;
+            }
             targetEntity.setItem(targetStack.copyWithCount(outcome.targetRemainder()));
-            dropBeside(level, targetEntity, inscribed);
         } else {
             targetEntity.setItem(inscribed);
         }
@@ -171,11 +176,11 @@ public class SpellTranscriptionRitual extends AnsRitual {
      * Put the single inscribed item into the world next to the stack it was split off, so the
      * player can see that one item changed and the rest did not.
      */
-    private void dropBeside(Level level, ItemEntity origin, ItemStack inscribed) {
+    private boolean dropBeside(Level level, ItemEntity origin, ItemStack inscribed) {
         ItemEntity dropped = new ItemEntity(level, origin.getX(), origin.getY() + 0.25,
             origin.getZ(), inscribed, 0.0, 0.0, 0.0);
         dropped.setPickUpDelay(10);
-        level.addFreshEntity(dropped);
+        return level.addFreshEntity(dropped);
     }
 
     /**

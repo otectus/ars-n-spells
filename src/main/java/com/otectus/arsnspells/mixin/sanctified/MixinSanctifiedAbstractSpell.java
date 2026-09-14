@@ -3,12 +3,15 @@ package com.otectus.arsnspells.mixin.sanctified;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
+import io.redspace.ironsspellbooks.api.magic.MagicData;
+import io.redspace.ironsspellbooks.api.spells.CastSource;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,5 +68,32 @@ public abstract class MixinSanctifiedAbstractSpell {
         // This prevents the "instant death" bug when scrolls or spells trigger
         // Sanctified Legacy's handler before our system processes the cost.
         cir.setReturnValue(true);
+    }
+
+    /**
+     * Covenant 2.2.6-hotfix modifies the first boolean local in Iron's
+     * {@code canBeCastedBy} method, turning the native mana check into a bypass
+     * whenever either ring is worn.  Keep that bypass only for a resource path
+     * that is actually enabled: ANS settles Cursed Ring LP, while active Virtue
+     * aura remains Covenant-native.  With either toggle off the original Iron's
+     * mana result must survive, otherwise the ring would make casts free.
+     *
+     * <p>{@code require = 0} keeps this compatible with Iron's builds whose
+     * method name or local layout differs; the pinned 3.3.0 Covenant profile has
+     * the exact {@code canBeCastedBy(...)}/ordinal-zero surface.
+     */
+    @ModifyVariable(method = "canBeCastedBy", at = @At("STORE"), ordinal = 0, require = 0)
+    private boolean arsnspells$gateNativeManaBypass(
+        boolean value, int spellLevel, CastSource castSource, MagicData playerMagicData, Player player) {
+        if (!(player instanceof ServerPlayer) || !SanctifiedLegacyCompat.isAvailable()) {
+            return value;
+        }
+        if (SanctifiedLegacyCompat.isWearingCursedRing(player)) {
+            return AnsConfig.ENABLE_LP_SYSTEM.get();
+        }
+        if (SanctifiedLegacyCompat.isWearingVirtueRing(player)) {
+            return AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get();
+        }
+        return value;
     }
 }

@@ -51,11 +51,16 @@ public class IronsCooldownHandler {
         // Ars OFFENSIVE cast and vice versa. This is the documented behavior in 1.9.0+.
         if (UnifiedCooldownManager.isOnCooldown(player, category)) {
             event.setCanceled(true);
-        } else {
-            long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);
-            if (!player.level().isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-                PacketHandler.sendToClient(new CooldownSyncPacket(category, cooldownEnd), serverPlayer);
-            }
         }
+    }
+
+    public static void commit(Player player, io.redspace.ironsspellbooks.api.spells.AbstractSpell spell,
+                              io.redspace.ironsspellbooks.api.spells.CastSource source, boolean cross) {
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)
+                || !source.respectsCooldown() || CrossCastNbt.isArsCrossProxyId(spell.getSpellId())
+                || !UnifiedCooldownManager.isEnabled() || !AnsConfig.ENABLE_CROSS_MOD_COOLDOWNS.get()) return;
+        CooldownCategory category = SpellCategorizer.categorizeIronsSpell(spell.getSchoolType().getId());
+        long end = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, cross);
+        PacketHandler.sendToClient(new CooldownSyncPacket(category, end), serverPlayer);
     }
 }

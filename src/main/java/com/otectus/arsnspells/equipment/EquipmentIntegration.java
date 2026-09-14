@@ -19,10 +19,10 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ArmorItem;
+
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
+
+
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
@@ -59,12 +59,6 @@ public class EquipmentIntegration {
     private static final UUID ARS_TO_IRON_REGEN_ID =
         AnsModifierIdentities.uuid(AnsModifierIds.ARS_GEAR_MANA_REGEN);
 
-    /**
-     * V13: a throwaway identity used only to measure how much a third-party multiplier
-     * amplifies an additive point on MAX_MANA. It is never left on the player, so it is
-     * deliberately not an AnsModifierIds key.
-     */
-    private static final UUID CEILING_PROBE_ID = UUID.fromString("a45b0e17-0000-4000-8000-000000000013");
 
     private static final EquipmentSlot[] EQUIPPED_SLOTS = new EquipmentSlot[] {
         EquipmentSlot.HEAD,
@@ -166,68 +160,17 @@ public class EquipmentIntegration {
             return;
         }
         AttributeModifier existing = instance.getModifier(ARS_TO_IRON_MAX_MANA_ID);
-        // Skip the remove/add churn when the ceiling is unchanged; MAX_MANA is syncable and each dirty broadcasts an attribute packet.
-        if (existing != null) {
-            double ownMax = instance.getBaseValue();
-            boolean additiveOnly = true;
-            for (AttributeModifier m : instance.getModifiers()) {
-                if (m.getOperation() != AttributeModifier.Operation.ADDITION) { additiveOnly = false; break; }
-                if (!m.getId().equals(ARS_TO_IRON_MAX_MANA_ID)) ownMax += m.getAmount();
-            }
-            if (additiveOnly
-                    && SharedPoolCeiling.modifierAmount(instance.getAttribute().sanitizeValue(ownMax), arsMax)
-                       == existing.getAmount()) {
-                return; // ceiling already correct; do not dirty the attribute
-            }
-        }
-        // Drop our own modifier first so getValue() reports Iron's own max, whatever
-        // operations other mods' modifiers use. Nothing writes mana in between, so the
-        // momentarily lower ceiling cannot clamp anything.
-        if (existing != null) {
-            instance.removeModifier(ARS_TO_IRON_MAX_MANA_ID);
-        }
-        // V13: the isolated native snapshot, i.e. this attribute with every ANS-owned modifier
-        // taken out. The shortfall is measured against that, and then divided by what one
-        // additive point is actually worth here - never subtracted straight out of a total a
-        // third-party multiplier has already inflated.
-        double ironsOwnMax = instance.getValue();
-        double amplification = additiveAmplification(instance, ironsOwnMax);
+        java.util.List<AttributeModifier> nativeModifiers = instance.getModifiers().stream()
+            .filter(modifier -> !modifier.getId().equals(ARS_TO_IRON_MAX_MANA_ID)).toList();
+        double ironsOwnMax = instance.getAttribute().sanitizeValue(
+            AttributeContribution.evaluate(instance.getBaseValue(), nativeModifiers));
+        double amplification = AttributeContribution.additiveAmplification(nativeModifiers);
         double needed = SharedPoolCeiling.modifierAmount(ironsOwnMax, arsMax, amplification);
-        if (needed != 0.0) {
-            instance.addTransientModifier(new AttributeModifier(
-                ARS_TO_IRON_MAX_MANA_ID, "Ars Max Mana Sync", needed,
-                AttributeModifier.Operation.ADDITION));
-        }
+        if (existing != null && existing.getAmount() == needed) return;
+        if (existing != null) instance.removeModifier(ARS_TO_IRON_MAX_MANA_ID);
+        if (needed != 0) instance.addTransientModifier(new AttributeModifier(
+            ARS_TO_IRON_MAX_MANA_ID, "Ars Max Mana Sync", needed, AttributeModifier.Operation.ADDITION));
     }
-
-    /**
-     * What one additive point on {@code instance} is worth in final attribute value (audit V13).
-     *
-     * <p>Measured, not assumed: a probe modifier of exactly one point is added, the value read,
-     * and the probe removed. Any {@code MULTIPLY_BASE} / {@code MULTIPLY_TOTAL} another mod has
-     * put on this attribute shows up in the difference, which is the only way to know it
-     * without enumerating operations we do not own. The probe is transient and is removed on
-     * every path; nothing reads or writes mana in between.
-     *
-     * @param isolated the attribute's value with the ANS modifier already removed
-     * @return the amplification, or 1.0 when it could not be measured
-     */
-    private static double additiveAmplification(AttributeInstance instance, double isolated) {
-        try {
-            instance.addTransientModifier(new AttributeModifier(
-                CEILING_PROBE_ID, "Ars Ceiling Probe", 1.0, AttributeModifier.Operation.ADDITION));
-            double probed = instance.getValue();
-            return probed - isolated;
-        } catch (Exception e) {
-            LOGGER.debug("Could not measure max-mana amplification; assuming 1.0", e);
-            return 1.0;
-        } finally {
-            if (instance.getModifier(CEILING_PROBE_ID) != null) {
-                instance.removeModifier(CEILING_PROBE_ID);
-            }
-        }
-    }
-
     /**
      * Ars's own computed max mana: config base + glyph bonus + book tier + Ars perk
      * attributes, less any reserve.
@@ -308,297 +251,84 @@ public class EquipmentIntegration {
     }
     
     private static CachedEquipmentData calculateBonuses(Player player) {
-        if (!BridgeManager.isUnificationEnabled()) {
-            return CachedEquipmentData.EMPTY;
-        }
-
+        if (player == null || !BridgeManager.isUnificationEnabled()) return CachedEquipmentData.EMPTY;
         CachedEquipmentData cached = equipmentCache.get(player.getUUID());
-        long currentTime = System.currentTimeMillis();
-        if (cached != null && (currentTime - cached.timestamp) < CACHE_DURATION_MS) {
-            return cached;
-        }
+        long now = System.currentTimeMillis();
+        if (cached != null && now >= cached.timestamp && now - cached.timestamp < CACHE_DURATION_MS) return cached;
 
-        double arsMaxBonus = 0.0;
-        double arsRegenBonus = 0.0;
-        double ironMaxBonus = 0.0;
-        double ironRegenBonus = 0.0;
-
-        boolean ironsLoaded = IronsCompat.isLoaded();
-
+        // UUID deduplication matches the native attribute map, including accessories whose
+        // modifiers reuse an armor identity. Forge ItemStack emits Ars perks and enchantments
+        // through ItemAttributeModifierEvent, so adding manual enchant estimates doubles them.
+        Map<Attribute, Map<UUID, AttributeModifier>> contributions = new java.util.HashMap<>();
+        double fallbackMax = 0;
+        double fallbackRegen = 0;
         for (EquipmentSlot slot : EQUIPPED_SLOTS) {
             ItemStack item = player.getItemBySlot(slot);
-            if (item.isEmpty()) {
-                continue;
+            if (item.isEmpty()) continue;
+            Multimap<Attribute, AttributeModifier> modifiers = item.getAttributeModifiers(slot);
+            collectModifiers(contributions, modifiers);
+            if (slot.getType() == EquipmentSlot.Type.ARMOR && item.getItem() instanceof IManaEquipment equipment) {
+                if (!modifiers.containsKey(PerkAttributes.MAX_MANA.get())) fallbackMax += equipment.getMaxManaBoost(item);
+                if (!modifiers.containsKey(PerkAttributes.MANA_REGEN_BONUS.get())) fallbackRegen += equipment.getManaRegenBonus(item);
             }
-
-            ItemBonuses itemBonuses = calculateItemBonuses(item, slot, ironsLoaded);
-            arsMaxBonus += itemBonuses.arsBonus.maxMana;
-            arsRegenBonus += itemBonuses.arsBonus.manaRegen;
-            ironMaxBonus += itemBonuses.ironBonus.maxMana;
-            ironRegenBonus += itemBonuses.ironBonus.manaRegen;
         }
-
-        // Curios (if present): read IManaEquipment + Ars enchantments, and — when enabled —
-        // attribute modifiers off each curio slot. The attribute pass is what lets
-        // Apotheosis/Apothic-Curios affixes & sockets (and any other curio mana gear) reach the
-        // cross-mod bridge, mirroring the armor/weapon path in calculateItemBonuses.
         try {
-            boolean readCurioAttributes = AnsConfig.READ_CURIO_ATTRIBUTE_MODIFIERS.get();
-            List<SlotResult> wornCurios = CuriosApi.getCuriosInventory(player)
-                .map(handler -> handler.findCurios(stack -> !stack.isEmpty()))
-                .orElse(Collections.emptyList());
-            for (SlotResult result : wornCurios) {
-                ItemBonuses itemBonuses = calculateCurioBonuses(result, ironsLoaded, readCurioAttributes);
-                arsMaxBonus += itemBonuses.arsBonus.maxMana;
-                arsRegenBonus += itemBonuses.arsBonus.manaRegen;
-                ironMaxBonus += itemBonuses.ironBonus.maxMana;
-                ironRegenBonus += itemBonuses.ironBonus.manaRegen;
+            List<SlotResult> worn = CuriosApi.getCuriosInventory(player)
+                .map(handler -> handler.findCurios(stack -> !stack.isEmpty())).orElse(Collections.emptyList());
+            for (SlotResult result : worn) {
+                ItemStack item = result.stack();
+                SlotContext context = result.slotContext();
+                Multimap<Attribute, AttributeModifier> modifiers = CuriosApi.getAttributeModifiers(
+                    context, CuriosApi.getSlotUuid(context), item);
+                if (AnsConfig.READ_CURIO_ATTRIBUTE_MODIFIERS.get()) collectModifiers(contributions, modifiers);
+                if (item.getItem() instanceof IManaEquipment equipment) {
+                    if (!modifiers.containsKey(PerkAttributes.MAX_MANA.get())) fallbackMax += equipment.getMaxManaBoost(item);
+                    if (!modifiers.containsKey(PerkAttributes.MANA_REGEN_BONUS.get())) fallbackRegen += equipment.getManaRegenBonus(item);
+                }
             }
         } catch (Exception e) {
-            LOGGER.debug("Curios integration unavailable: {}", e.getMessage());
+            LOGGER.debug("Curios equipment extraction unavailable", e);
         }
-
-        // Calculate curio discounts
-        CurioDiscountData curioDiscounts = calculateCurioDiscountsInternal(player);
-
-        CachedEquipmentData computed = new CachedEquipmentData(
-            new ManaBonus(arsMaxBonus, arsRegenBonus),
-            new ManaBonus(ironMaxBonus, ironRegenBonus),
-            curioDiscounts,
-            currentTime
-        );
+        java.util.Set<UUID> excluded = new java.util.HashSet<>();
+        for (String key : AnsModifierIds.allKeys()) {
+            for (String identity : AnsModifierIds.currentAndLegacyKeysFor(key)) {
+                UUID id = AnsModifierIdentities.MAPPER.map(identity);
+                if (id != null) excluded.add(id);
+            }
+        }
+        if (!AnsConfig.respectEnchantments.get()) {
+            for (EquipmentSlot slot : EQUIPPED_SLOTS) {
+                UUID id = com.hollingsworth.arsnouveau.common.event.ArsEvents.getEnchantBoostBySlot(slot);
+                excluded.add(id);
+                for (Map<UUID, AttributeModifier> values : contributions.values()) values.remove(id);
+            }
+        }
+        ManaBonus ars = new ManaBonus(fallbackMax + contribution(player, PerkAttributes.MAX_MANA.get(), contributions, excluded),
+            fallbackRegen + contribution(player, PerkAttributes.MANA_REGEN_BONUS.get(), contributions, excluded));
+        ManaBonus irons = IronsCompat.isLoaded() ? new ManaBonus(
+            contribution(player, AttributeRegistry.MAX_MANA.get(), contributions, excluded),
+            contribution(player, AttributeRegistry.MANA_REGEN.get(), contributions, excluded)) : ManaBonus.ZERO;
+        CachedEquipmentData computed = new CachedEquipmentData(ars, irons, calculateCurioDiscountsInternal(player), now);
         equipmentCache.put(player.getUUID(), computed);
-
-        logDebug("Calculated Ars bonuses for {}: max={}, regen={}",
-            player.getName().getString(), arsMaxBonus, arsRegenBonus);
-        logDebug("Calculated Iron bonuses for {}: max={}, regen={}",
-            player.getName().getString(), ironMaxBonus, ironRegenBonus);
-        logDebug("Calculated curio discounts for {}: virtue={}, blasphemy={}, total={}%",
-            player.getName().getString(), curioDiscounts.hasVirtueRing,
-            curioDiscounts.hasBlasphemy, String.format("%.1f", curioDiscounts.totalDiscount * 100));
-
         return computed;
     }
 
-    private static ItemBonuses calculateItemBonuses(ItemStack item, EquipmentSlot slot, boolean ironsLoaded) {
-        double arsMax = 0.0;
-        double arsRegen = 0.0;
-        double ironMax = 0.0;
-        double ironRegen = 0.0;
-
-        try {
-            Multimap<Attribute, AttributeModifier> modifiers = item.getAttributeModifiers(slot);
-            arsMax += sumModifiers(modifiers, PerkAttributes.MAX_MANA.get());
-            arsRegen += sumModifiers(modifiers, PerkAttributes.MANA_REGEN_BONUS.get());
-            if (ironsLoaded) {
-                ironMax += sumModifiers(modifiers, AttributeRegistry.MAX_MANA.get());
-                ironRegen += sumModifiers(modifiers, AttributeRegistry.MANA_REGEN.get());
-            }
-        } catch (Exception e) {
-            LOGGER.debug("Failed reading attribute modifiers for {}", item, e);
-        }
-
-        // Ars equipment API fallbacks (some items only implement IManaEquipment)
-        if (item.getItem() instanceof IManaEquipment manaEquipment) {
-            arsMax += manaEquipment.getMaxManaBoost(item);
-            arsRegen += manaEquipment.getManaRegenBonus(item);
-        }
-
-        // Ars enchantment heuristics (applied to Ars side)
-        ManaBonus enchantBonus = getEnchantmentManaBonus(item);
-        arsMax += enchantBonus.maxMana;
-        arsRegen += enchantBonus.manaRegen;
-
-        // Generic name-based fallback for mage gear (applied to both sides)
-        if (item.getItem() instanceof ArmorItem && arsMax == 0.0 && ironMax == 0.0) {
-            double fallback = getGenericArmorBonus(item);
-            if (fallback != 0.0) {
-                arsMax += fallback;
-                ironMax += fallback;
+    private static void collectModifiers(Map<Attribute, Map<UUID, AttributeModifier>> contributions,
+                                         Multimap<Attribute, AttributeModifier> modifiers) {
+        for (Map.Entry<Attribute, AttributeModifier> entry : modifiers.entries()) {
+            if (Double.isFinite(entry.getValue().getAmount())) {
+                contributions.computeIfAbsent(entry.getKey(), ignored -> new java.util.LinkedHashMap<>())
+                    .put(entry.getValue().getId(), entry.getValue());
             }
         }
-
-        return new ItemBonuses(new ManaBonus(arsMax, arsRegen), new ManaBonus(ironMax, ironRegen));
     }
 
-    private static ItemBonuses calculateCurioBonuses(SlotResult result, boolean ironsLoaded, boolean readAttributes) {
-        ItemStack item = result.stack();
-        double arsMax = 0.0;
-        double arsRegen = 0.0;
-        double ironMax = 0.0;
-        double ironRegen = 0.0;
-
-        // Attribute modifiers on the curio slot (Apotheosis/Apothic-Curios affixes & sockets,
-        // and any other mod's curio mana attributes). CuriosApi aggregates the item's own
-        // declared curio modifiers with anything injected for the slot. ADDITION-only via
-        // sumModifiers, matching calculateItemBonuses so Ars-vs-Iron's attribution is identical.
-        if (readAttributes) {
-            try {
-                SlotContext ctx = result.slotContext();
-                UUID slotUuid = CuriosApi.getSlotUuid(ctx);
-                Multimap<Attribute, AttributeModifier> modifiers =
-                    CuriosApi.getAttributeModifiers(ctx, slotUuid, item);
-                arsMax += sumModifiers(modifiers, PerkAttributes.MAX_MANA.get());
-                arsRegen += sumModifiers(modifiers, PerkAttributes.MANA_REGEN_BONUS.get());
-                if (ironsLoaded) {
-                    ironMax += sumModifiers(modifiers, AttributeRegistry.MAX_MANA.get());
-                    ironRegen += sumModifiers(modifiers, AttributeRegistry.MANA_REGEN.get());
-                }
-            } catch (Exception e) {
-                LOGGER.debug("Failed reading curio attribute modifiers for {}", item, e);
-            }
-        }
-
-        if (item.getItem() instanceof IManaEquipment manaEquipment) {
-            arsMax += manaEquipment.getMaxManaBoost(item);
-            arsRegen += manaEquipment.getManaRegenBonus(item);
-        }
-
-        ManaBonus enchantBonus = getEnchantmentManaBonus(item);
-        arsMax += enchantBonus.maxMana;
-        arsRegen += enchantBonus.manaRegen;
-
-        return new ItemBonuses(new ManaBonus(arsMax, arsRegen), new ManaBonus(ironMax, ironRegen));
+    private static double contribution(Player player, Attribute attribute,
+                                       Map<Attribute, Map<UUID, AttributeModifier>> contributions,
+                                       java.util.Set<UUID> excluded) {
+        Map<UUID, AttributeModifier> modifiers = contributions.getOrDefault(attribute, Collections.emptyMap());
+        return AttributeContribution.equipmentDelta(player.getAttribute(attribute), modifiers.values(), excluded);
     }
-
-    private static double sumModifiers(Multimap<Attribute, AttributeModifier> modifiers, Attribute attribute) {
-        if (modifiers == null || attribute == null) {
-            return 0.0;
-        }
-        double total = 0.0;
-        for (AttributeModifier modifier : modifiers.get(attribute)) {
-            if (modifier.getOperation() == AttributeModifier.Operation.ADDITION) {
-                total += modifier.getAmount();
-            }
-        }
-        return total;
-    }
-
-    /**
-     * Get generic armor bonus (for any mage armor).
-     */
-    private static double getGenericArmorBonus(ItemStack armor) {
-        try {
-            String itemName = armor.getItem().toString().toLowerCase();
-            if (itemName.contains("mage") || itemName.contains("wizard") ||
-                itemName.contains("sorcerer") || itemName.contains("archmage")) {
-                return 25.0;
-            }
-        } catch (Exception e) {
-            LOGGER.error("Failed to get generic armor bonus", e);
-        }
-        return 0.0;
-    }
-    
-    private static final ResourceLocation ARS_MANA_REGEN_ENCHANT_ID =
-        new ResourceLocation("ars_nouveau", "mana_regen");
-    private static final ResourceLocation ARS_MANA_BOOST_ENCHANT_ID =
-        new ResourceLocation("ars_nouveau", "mana_boost");
-
-    /**
-     * Get mana bonus from Ars Nouveau enchantments equipped on an item.
-     *
-     * <p>Returns Ars-side units: {@code maxMana} in absolute mana, {@code manaRegen}
-     * in absolute mana/sec. The cross-system bridge converts these to Iron's
-     * percentage-of-pool units when applied via {@link #applyArsBonusesToIrons}.
-     *
-     * <p>This path is load-bearing in {@code ISS_PRIMARY} / {@code HYBRID} mode where
-     * {@code MixinManaRegenTick} suppresses Ars's native regen tick at its one caller,
-     * {@code ManaCapEvents.playerOnTick} (audit V06 moved it there from the blanket
-     * {@code MixinManaCapability.addMana} no-op) — the enchantment's intended effect would
-     * otherwise be lost on the Iron's pool.
-     * In {@code ARS_PRIMARY} mode Ars handles its own enchantments natively, so the
-     * value populated here is unused (the Ars-primary regen handler reads only the
-     * Iron's-side bonus container).
-     *
-     * <p>Detection is anchored to specific Ars enchantment IDs to avoid false
-     * positives from the previous broad string match (which granted +50 max per
-     * level to any enchantment whose description contained "mana" or "source",
-     * including unrelated ones like {@code mana_steal} or {@code source_friendly}).
-     */
-    private static ManaBonus getEnchantmentManaBonus(ItemStack armor) {
-        if (!AnsConfig.respectEnchantments.get()) {
-            return ManaBonus.ZERO;
-        }
-
-        double maxBonus = 0.0;
-        double regenBonus = 0.0;
-
-        try {
-            Map<Enchantment, Integer> enchantments = EnchantmentHelper.getEnchantments(armor);
-
-            for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
-                Enchantment enchantment = entry.getKey();
-                int level = entry.getValue();
-                ResourceLocation id = ForgeRegistries.ENCHANTMENTS.getKey(enchantment);
-                if (id == null) {
-                    continue;
-                }
-
-                if (ARS_MANA_REGEN_ENCHANT_ID.equals(id)) {
-                    regenBonus += level;
-                } else if (ARS_MANA_BOOST_ENCHANT_ID.equals(id)) {
-                    maxBonus += level * 50;
-                }
-            }
-        } catch (Exception e) {
-            LOGGER.error("Failed to get enchantment mana bonus", e);
-        }
-
-        return new ManaBonus(maxBonus, regenBonus);
-    }
-    
-    /**
-     * Calculate total spell power bonus from equipment
-     */
-    public static double calculateTotalSpellPowerBonus(Player player) {
-        double totalBonus = 0.0;
-        
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            if (slot.getType() != EquipmentSlot.Type.ARMOR) {
-                continue;
-            }
-            
-            ItemStack armorPiece = player.getItemBySlot(slot);
-            
-            if (armorPiece.isEmpty()) {
-                continue;
-            }
-            
-            // Simplified spell power calculation (fallback for Ars mage armor)
-            String itemName = armorPiece.getItem().toString().toLowerCase();
-            if (itemName.contains("arcanist") || itemName.contains("mage")) {
-                totalBonus += 0.05; // 5% per piece
-            }
-        }
-        
-        return totalBonus;
-    }
-    
-    /**
-     * Check if a player has any mage armor equipped
-     */
-    public static boolean hasMageArmorEquipped(Player player) {
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            if (slot.getType() != EquipmentSlot.Type.ARMOR) {
-                continue;
-            }
-            
-            ItemStack armorPiece = player.getItemBySlot(slot);
-            
-            if (armorPiece.isEmpty()) {
-                continue;
-            }
-            
-            String itemName = armorPiece.getItem().toString().toLowerCase();
-            if (itemName.contains("mage") || itemName.contains("wizard")) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
     /**
      * Clear equipment cache for a player
      */

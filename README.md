@@ -1,6 +1,8 @@
-# Ars 'n' Spells (v3.3.0)
+# Ars 'n' Spells
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.20.1 (Forge). It rests on three pillars: **mana unification** (five configurable modes for how the two pools interact), **cross-mod scaling and progression** (Iron's spell-power attributes scale Ars spells; both mods feed shared school progression and affinity), and **cross-casting** (inscribe spells from either mod onto arbitrary items, or export Ars spells onto real Iron's scrolls and spellbooks and cast them from Iron's native spell wheel). Optional integration with **Covenant of the Seven** (Sanctified Legacy) adds LP and aura-based casting through the Ring of Seven Curses and Ring of Seven Virtues.
+
+The 3.3.0 release review covers Forge 1.20.1 and the separate NeoForge 1.21.1 build. See [the audit closure ledger](docs/3.3.0-audit-status.md) for implemented changes, verification evidence, intentional loader differences, and remaining release gates. A passing build is not a certification of every supported mod combination.
 
 ## Requirements
 
@@ -26,9 +28,9 @@ If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars b
 
 **Always keep backups** when removing Iron's from an established world. ANS does not automatically delete dimensions or cross-cast payloads that refer to the mod.
 
-¹ The Covenant aura-bar HUD mixin is verified against Covenant 2.2.6; other versions still work, but the client logs a warning if the overlay bytecode has drifted.
+¹ Covenant 2.2.6 has a bytecode-surface check; its complete dependency graph and graphical HUD have not been runtime-certified by this release review. Other admitted versions are unverified.
 ² No hard dependency — mana stats on curios are read generically through the Curios API (see [Gear perks and enchantments](#gear-perks-and-enchantments)).
-³ The advertised range is verified rather than assumed: every Iron's API type Ars 'n' Spells uses is byte-identical between 3.15.0 and 3.16.2 (the only difference across the whole API package is five *added* spell-registry constants), and the automated GameTest suite runs against both.
+³ The pinned Forge runtime is Iron's `1.20.1-3.15.0` (CurseForge file 7402504). The broader admitted 3.x range is not a runtime verification claim; test another version with the loaded profile before deployment.
 
 ## Features
 
@@ -120,20 +122,32 @@ Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank pa
 
 New in 3.0.0: design an Ars Nouveau spell at the **Spell Loom**, export it onto a real **Iron's scroll**, bind it into a real **Iron's spellbook**, and then **select and cast it from Iron's own native spell wheel** — while it still runs through Ars 'n' Spells' cross-cast pipeline (mana, multiplier, scaling, cooldown). The Ars spell's data rides as an Ars 'n' Spells sidecar (`arsnspells:cross_spells`) on the real Iron item — Iron's per-slot format has no room for it — and a registered proxy spell slot is added to the book's native container so the entry shows in the wheel. The book's own Iron's spells are never overwritten. This leg requires Iron's Spellbooks to be installed.
 
-**1. Export an Ars spell to an Iron's scroll — at the Spell Loom or by command.**
-Build the spell with Ars Nouveau's normal tools (Scribe's Table / spellbook), then craft a **Spell Loom** (`G` gold / `L` lapis / `B` book / `O` obsidian on a crafting table). Right-click it, drop the Ars source (spell parchment, focus, or Ars spellbook) into the source slot and a **blank Iron's scroll** into the scroll slot, type a **name**, pick a **nature**, choose a rudimentary **icon**, and press **Inscribe** — the inscribed scroll appears in the output slot. (The op-only `/ans export_to_irons_scroll` still works for a quick, metadata-free export.)
+**1. Design an Ars Nouveau spell.**
+Build it with Ars Nouveau's normal tools (Scribe's Table / spellbook).
 
-**2. Bind the scroll into an Iron's spellbook.**
-Hold the exported scroll and an Iron's spellbook and run `/ans bind_scroll_to_irons_book`, or run the **Spellbook Binding** ritual (its tablet is crafted on the Enchanting Apparatus for 2500 source and only registers when Iron's is loaded; recipe at [data/ars_n_spells/recipes/apparatus/spellbook_binding.json](src/main/resources/data/ars_n_spells/recipes/apparatus/spellbook_binding.json)).
+**2. Craft or find a Blank Scroll.**
+As of 3.3.3, `ars_n_spells:blank_scroll` is a shapeless recipe of an Ars Nouveau blank parchment and a source gem ([recipe](src/main/resources/data/ars_n_spells/recipes/blank_scroll.json)); it exists because stock Iron's ships no recipe for a bare `irons_spellbooks:scroll`. It can also drop from chest loot when Iron's is installed — stronghold libraries, ancient city and woodland mansion chests, common dungeon/mineshaft/stronghold chests, and a range of Iron's own structure chests, at rates set in `data/ars_n_spells/loot_modifiers/`. A blank Iron's scroll works too, if you already have one.
 
-The ritual reads **dropped item entities, not inventories**. Place the tablet on a Ritual Brazier, throw (`Q`) the carrier scroll and the spellbook on the ground within **three blocks** of the brazier, then light it by right-clicking the brazier with an **empty main hand** — right-clicking while holding something tries to feed that item to the brazier instead of starting the ritual. It burns for about three seconds. Anything else lying inside that three-block radius aborts the run with `unexpected item(s) in range` rather than risk binding the wrong stack, mirroring the uninscribe ritual's philosophy. On success one scroll is consumed (carriers stack to 16, so a stacked scroll survives minus one) and the Ars entry is appended to the book — including any name/nature/icon chosen at the Spell Loom. Binding deduplicates by the serialized spell payload, so re-binding the same spell is rejected. Set `allow_ars_spells_in_irons_spellbooks=false` to disable binding — the ritual and the command both refuse — or `max_ars_cross_spells_per_irons_spellbook` to cap how many Ars spells a book may hold (`-1` = no cap, bounded by the native-wheel pool size of 8).
+**3. Weave the spell onto the scroll at the Spell Loom.**
+Craft a **Spell Loom** (`G` gold / `L` lapis / `B` book / `O` obsidian on a crafting table). Right-click it, drop the Ars source (spell parchment, focus, or Ars spellbook) into the source slot and the Blank Scroll (or blank Iron's scroll) into the scroll slot, type a **name**, pick a **nature**, choose a rudimentary **icon**, and press **Inscribe** — the inscribed carrier scroll appears in the output slot. (The op-only `/ans export_to_irons_scroll` still works for a quick, metadata-free export.)
+
+**4. Take the scroll to an Iron's Inscription Table, or bind it another way.**
+As of 3.3.3, dropping the carrier scroll into an Iron's Inscription Table and pressing Inscribe binds the Ars spell directly into the spellbook in the table — no ritual needed. This is now one of three equivalent bind routes:
+
+- **Inscription Table** — drop the carrier scroll and the target spellbook into the table and press Inscribe.
+- **Spellbook Binding ritual** — hold both and run the ritual described below.
+- **Command** — `/ans bind_scroll_to_irons_book`, holding the scroll and the spellbook.
+
+All three go through the same checks and the same append logic, so the result — and the config toggles that gate it — is identical no matter which one you use.
+
+**Spellbook Binding ritual, in detail.** Its tablet is crafted on the Enchanting Apparatus for 2500 source and only registers when Iron's is loaded; recipe at [data/ars_n_spells/recipes/apparatus/spellbook_binding.json](src/main/resources/data/ars_n_spells/recipes/apparatus/spellbook_binding.json). The ritual reads **dropped item entities, not inventories**. Place the tablet on a Ritual Brazier, throw (`Q`) the carrier scroll and the spellbook on the ground within **three blocks** of the brazier, then light it by right-clicking the brazier with an **empty main hand** — right-clicking while holding something tries to feed that item to the brazier instead of starting the ritual. It burns for about three seconds. Anything else lying inside that three-block radius aborts the run with `unexpected item(s) in range` rather than risk binding the wrong stack, mirroring the uninscribe ritual's philosophy.
+
+Whichever route you use, on success one scroll is consumed and the Ars entry is appended to the book — including any name/nature/icon chosen at the Spell Loom. Binding deduplicates by the serialized spell payload, so re-binding the same spell is rejected. Set `allow_ars_spells_in_irons_spellbooks=false` to disable binding — all three routes refuse — or `max_ars_cross_spells_per_irons_spellbook` to cap how many Ars spells a book may hold (`-1` = no cap, bounded by the native-wheel pool size of 8).
 
 > **This is not Ars Nouveau's "Binding" ritual.** Ars ships `ars_nouveau:ritual_binding`, whose display name is exactly **Binding**; it converts nearby mobs into Bound Scripts for familiars and ignores dropped scrolls entirely. The tablet you want is **Spellbook Binding** (`ars_n_spells:spellbook_binding`, shown as *Ritual of Spellbook Binding* on the brazier). Lighting the wrong one looks identical to the feature being broken, because neither ritual says anything about the other.
 
-**3. Cast from the spellbook — through Iron's native spell wheel.**
-Each bound Ars spell appears as its **own entry in Iron's native spell-selection wheel**, with the name and icon you chose. Select it like any Iron's spell and right-click the spellbook to cast — it runs the real Ars spell through Ars 'n' Spells' server-authoritative cross-cast pipeline (mana, the `cross_cast_cost_multiplier`, scaling, cooldown). Your book's native Iron's spells are untouched and cast exactly as before. Under the hood, each entry occupies one of a small pool of registered proxy spells (`ars_cross_1..8`); the real Ars data lives in the book's `arsnspells:cross_spells` sidecar, since Iron's own per-slot data has no room for it. Up to **8** Ars spells per book show in the wheel. (Generic inscribed items that aren't Iron's spellbooks still cast via right-click / sneak-cycle as before.)
-
-**Iron's Inscription Table and ANS carriers.** An exported carrier is a real Iron's scroll, but its payload is an Ars spell that Iron's own Inscription Table cannot read. Putting one in the table and pressing Inscribe is refused with a message pointing you back at the binding workflow above — it does not consume the scroll. Carriers exported by 3.0.3 and earlier lacked a native spell container entirely and **crashed** the table (and, on a dedicated server, the server); 3.1.0 both fixes new exports and repairs old carriers in place the first time something touches them.
+**5. Cast from the spellbook — through Iron's native spell wheel.**
+Each bound Ars spell appears as its **own entry in Iron's native spell-selection wheel**, with the name and icon you chose. Select it like any Iron's spell and right-click the spellbook to cast — it runs the real Ars spell through Ars 'n' Spells' server-authoritative cross-cast pipeline (mana, the `cross_cast_cost_multiplier`, scaling, cooldown). Your book's native Iron's spells are untouched and cast exactly as before. Under the hood, each entry occupies one of a small pool of registered proxy spells (`ars_cross_1..8`); the real Ars data lives in the book's `arsnspells:cross_spells` sidecar, since Iron's own per-slot data has no room for it. Up to **8** Ars spells per book show in the wheel. Selecting a bound Ars entry in the Inscription Table's own spell list does not offer it in the extraction slot; use the Spell Uninscription ritual to remove one. (Generic inscribed items that aren't Iron's spellbooks still cast via right-click / sneak-cycle as before.)
 
 ---
 
@@ -206,7 +220,7 @@ Root command: `/ans`. Mutating subcommands require permission level 2; read-only
 
 Config file (per-world, server-authoritative, auto-synced to clients): `<world>/serverconfig/ars_n_spells-server.toml` — singleplayer: `.minecraft/saves/<World>/serverconfig/`; dedicated server: `<server>/world/serverconfig/`. (Changed from `config/ars_n_spells-common.toml` in 2.0.0 when the config became `ModConfig.Type.SERVER`; the old global file is ignored.) On multiplayer clients the in-game config screen is read-only ("Read-only: server-managed config").
 
-> **Migration note:** the 3.0.1 audit removed a number of config keys that no code ever read (hybrid sync rate, mana overflow, per-glyph/per-school bonus tables, several resonance/cooldown caps, progression/affinity multipliers, discount stacking, per-cast reagent, mana sync/caching). If your TOML still contains them they are silently ignored. Every key below is live.
+> **Migration note:** the 3.0.1 audit removed a number of config keys that no code ever read (hybrid sync rate, mana overflow, per-glyph/per-school bonus tables, several resonance/cooldown caps, progression/affinity multipliers, discount stacking, per-cast reagent, mana sync/caching). If your TOML still contains them they are silently ignored. The tables describe the supported settings; the audit ledger records behavior tests and any outstanding validation.
 
 **Defaults at a glance** — enabled out of the box: mana unification (`iss_primary`), resonance, progression, affinity, LP system (Cursed Ring), virtue aura (Virtue Ring), curio discounts, Source Jar synergy, cross-cast inscription. Disabled out of the box: unified cooldowns, affinity decay, `death_on_insufficient_lp`, debug mode.
 
@@ -437,7 +451,7 @@ Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 - **Ritual tablets are a purple-and-black checkerboard**: Fixed in 3.2.0. The tablets shipped with no item model or texture from 3.0.0 through 3.1.0. Update the mod; no world or config change is needed.
 - **Mana Infusion / Mana Well cannot be crafted or placed on a brazier**: They had no tablet item at all before 3.2.0, so there was genuinely no way to reach them. Both are now craftable on the Enchanting Apparatus.
 - **My game crashes when I hover a Spell Loom scroll**: Hardened in 3.2.0 — the tooltip now drops a line and logs the item and payload instead of taking the client down. If it still crashes, the crash report is what's needed to pin it; the mod's own tooltip failures show up as `cross-spell tooltip failed for` in `latest.log`.
-- **Loot chests contain "Ars Spell" scrolls whose tooltip is a raw key like `spell.ars_n_spells.ars_cross_1.guide`**: Fixed in 3.2.2. Those are ANS's internal `ars_cross_*` proxy spells, which do nothing outside a spellbook carrying the matching Ars entry. ANS modifies no loot table; the proxies simply never declared `allowLooting=false`, so Iron's own random-spell rolls could pick them — at `COMMON`, the heaviest weight in that table. Update the mod and no new one can generate. A scroll already in your world becomes a blank Iron's scroll the first time you right-click it. Unopened chests were never affected, since loot is rolled when a chest is first opened.
+- **Loot chests contain "Ars Spell" scrolls whose tooltip is a raw key like `spell.ars_n_spells.ars_cross_1.guide`**: Fixed in 3.2.2. Those are ANS's internal `ars_cross_*` proxy spells, which do nothing outside a spellbook carrying the matching Ars entry. ANS never removes or replaces loot entries; since 3.3.3 it appends a Blank Scroll to some chest tables via global loot modifiers, only when Iron's is loaded ([data/forge/loot_modifiers/global_loot_modifiers.json](src/main/resources/data/forge/loot_modifiers/global_loot_modifiers.json)) — but the raw-key `ars_cross_1` scroll itself was never ANS's loot table entry: the proxies simply never declared `allowLooting=false`, so Iron's own random-spell rolls could pick them — at `COMMON`, the heaviest weight in that table. Update the mod and no new one can generate. A scroll already in your world becomes a blank Iron's scroll the first time you right-click it. Unopened chests were never affected, since loot is rolled when a chest is first opened.
 - **An addon glyph gets the wrong school**: Override it from a datapack; see [Spell schools](#spell-schools). No mod update needed.
 - **Aura bar looks wrong with a newer Covenant version**: The aura-bar HUD mixin is verified against Covenant 2.2.6; the client logs a warning when the overlay has drifted. Gameplay is unaffected.
 
@@ -452,7 +466,7 @@ Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 
 Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven; no manual jar placement required.
 
-Output jar: `build/libs/ars_n_spells-3.3.0.jar` (version tracks `mod_version` in `gradle.properties`).
+Output jar: `build/libs/ars_n_spells-<mod_version>.jar`, where `<mod_version>` comes from `gradle.properties`.
 
 ### Test profiles
 

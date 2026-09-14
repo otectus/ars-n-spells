@@ -47,6 +47,8 @@ class CovenantJarSurfaceTest {
         "net/llenzzz/covenant_of_the_seven/gui/ResourceBarOverlay";
     private static final String RESOURCE_SYNC_EVENTS =
         "net/llenzzz/covenant_of_the_seven/events/ResourceSyncEvents";
+    private static final String ISS_SPELL_EVENTS =
+        "net/llenzzz/covenant_of_the_seven/events/ISSSpellEvents";
 
     /** The sampling radius SanctifiedLegacyCompat mirrors in COVENANT_AURA_RADIUS. */
     private static final int EXPECTED_AURA_RADIUS = 35;
@@ -186,5 +188,18 @@ class CovenantJarSurfaceTest {
             + "IAuraChunk.triangulateAuraInArea with a constant radius");
         assertEquals(EXPECTED_AURA_RADIUS, radius.intValue(),
             "SanctifiedLegacyCompat.COVENANT_AURA_RADIUS must match Covenant's sampling radius");
+    }
+
+    @Test
+    void issSpellEvents_exposesNativeCostHandlers() throws IOException {
+        ClassNode node = read(ISS_SPELL_EVENTS);
+        String preCast = "(Lio/redspace/ironsspellbooks/api/events/SpellPreCastEvent;)V";
+        String onCast = "(Lio/redspace/ironsspellbooks/api/events/SpellOnCastEvent;)V";
+        assertNotNull(method(node, "cursedRingCastingEvent", preCast),
+            "Covenant's Cursed Ring pre-cast handler is the surface guarded by MixinCovenantSpellEvents");
+        assertNotNull(method(node, "virtueRingCastingEvent", preCast),
+            "Covenant's Virtue Ring pre-cast handler is the surface guarded by MixinCovenantSpellEvents");
+        assertNotNull(method(node, "manaCostModifier", onCast),
+            "Covenant's native Iron's cost modifier is the surface guarded by MixinCovenantSpellEvents");
     }
 }

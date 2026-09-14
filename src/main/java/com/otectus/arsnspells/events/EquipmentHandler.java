@@ -28,12 +28,10 @@ public class EquipmentHandler {
             return;
         }
         
-        if (!BridgeManager.isUnificationEnabled()) {
-            return;
-        }
         
         Player player = (Player) event.getEntity();
         
+        DIRTY.add(player.getUUID());
         // Clear equipment cache to force recalculation
         EquipmentIntegration.clearCache(player);
         
@@ -48,9 +46,6 @@ public class EquipmentHandler {
      */
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!BridgeManager.isUnificationEnabled()) {
-            return;
-        }
         
         Player player = event.getEntity();
         
@@ -65,9 +60,6 @@ public class EquipmentHandler {
      */
     @SubscribeEvent
     public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
-        if (!BridgeManager.isUnificationEnabled()) {
-            return;
-        }
         
         Player player = event.getEntity();
         
@@ -91,9 +83,6 @@ public class EquipmentHandler {
      */
     @SubscribeEvent
     public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
-        if (!BridgeManager.isUnificationEnabled()) {
-            return;
-        }
 
         Player player = event.getEntity();
         EquipmentIntegration.clearCache(player);
@@ -109,16 +98,37 @@ public class EquipmentHandler {
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         EquipmentIntegration.clearCache(event.getEntity());
+        DIRTY.remove(event.getEntity().getUUID());
     }
 
-    // Note: a CurioChangeEvent listener would invalidate the 20-tick curio cache instantly
-    // and clear pending aura/LP costs on ring swap. It's been deferred because the event
-    // class lives in `top.theillusivec4.curios.api.event`, which isn't on the transitive
-    // compile classpath without an explicit Curios dependency in build.gradle. The
-    // existing 20-tick cache TTL plus the Pre/Post ring-state re-verify already gate the
-    // correctness case (no double-charge after unequip); the only remaining UX gap is
-    // up to ~1 s of "ring just equipped but not active yet" latency on the cast hot-path.
-    
+    private static final java.util.Set<java.util.UUID> DIRTY = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    @SubscribeEvent
+    public static void onCurioChange(top.theillusivec4.curios.api.event.CurioChangeEvent event) {
+        if (event.getEntity() instanceof Player player && !player.level().isClientSide()) {
+            EquipmentIntegration.clearCache(player);
+            com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearCacheFor(player.getUUID());
+            DIRTY.add(player.getUUID());
+        }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerTick(net.minecraftforge.event.TickEvent.PlayerTickEvent event) {
+        if (event.phase != net.minecraftforge.event.TickEvent.Phase.END || event.player.level().isClientSide()) return;
+        Player player = event.player;
+        // Curios changes settle before END; the one-second reconciliation also observes
+        // effect, perk, learned-glyph, book-tier and dynamic attribute changes.
+        if (DIRTY.remove(player.getUUID()) || player.tickCount % 20 == 0) {
+            EquipmentIntegration.clearCache(player);
+            updatePlayerMaxMana(player);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onServerStopping(net.minecraftforge.event.server.ServerStoppingEvent event) {
+        DIRTY.clear();
+        EquipmentIntegration.clearAllCaches();
+    }
     /**
      * Re-apply whatever mana contributions the current mode and config actually enable.
      *

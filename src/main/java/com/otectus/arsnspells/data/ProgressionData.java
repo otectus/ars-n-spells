@@ -18,11 +18,12 @@ public class ProgressionData {
     private final Map<String, Integer> schoolCastCounts = new HashMap<>();
 
     public int getCastCount(String school) {
-        return schoolCastCounts.getOrDefault(school, 0);
+        return schoolCastCounts.getOrDefault(com.otectus.arsnspells.util.SchoolKeys.normalize(school), 0);
     }
 
     public void incrementCastCount(String school) {
-        schoolCastCounts.put(school, getCastCount(school) + 1);
+        schoolCastCounts.put(com.otectus.arsnspells.util.SchoolKeys.normalize(school),
+            (int) Math.min(Integer.MAX_VALUE, (long) getCastCount(school) + 1));
     }
 
     /**
@@ -59,7 +60,10 @@ public class ProgressionData {
         if (nbt.contains("ProgressionCounts")) {
             CompoundTag tag = nbt.getCompound("ProgressionCounts");
             for (String key : tag.getAllKeys()) {
-                schoolCastCounts.put(key, tag.getInt(key));
+                // If an item already has both spellings, preserve the larger count rather
+                // than crediting the same historical casts twice. Unknown short keys survive.
+                schoolCastCounts.merge(com.otectus.arsnspells.util.SchoolKeys.normalize(key),
+                    Math.max(0, tag.getInt(key)), Math::max);
             }
         }
     }

@@ -24,31 +24,38 @@ import net.minecraftforge.items.SlotItemHandler;
 public class SpellLoomMenu extends AbstractContainerMenu {
     // ---- Layout constants (single source of truth for slot geometry; the
     // screen derives every dependent coordinate from these). The GUI is
-    // 176x208: taller than a vanilla chest so the name field, recipe row, and
+    // 176x224: taller than a vanilla chest so the name field, recipe row, and
     // two button rows fit above the player inventory without overlap.
     public static final int GUI_WIDTH = 176;
-    public static final int GUI_HEIGHT = 208;
+    public static final int GUI_HEIGHT = 224;
     public static final int SLOT_SIZE = 18;
     /** Working-slot columns (16px inner boxes at these x positions). */
-    public static final int SLOT_SOURCE_X = 44;
-    public static final int SLOT_SCROLL_X = 80;
-    public static final int SLOT_OUTPUT_X = 134;
+    public static final int SLOT_SOURCE_X = 26;
+    public static final int SLOT_SCROLL_X = 62;
+    public static final int SLOT_OUTPUT_X = 120;
     /** Working-slot row. */
     public static final int RECIPE_ROW_Y = 40;
-    /** Player inventory: vanilla formulas for a 208-tall container. */
+    /** Player inventory: vanilla 18px slots and a 4px gap before the hotbar. */
     public static final int INV_LEFT = 8;
-    public static final int INV_TOP = GUI_HEIGHT - 82;   // 126
-    public static final int HOTBAR_Y = GUI_HEIGHT - 24;  // 184
+    public static final int INV_TOP = GUI_HEIGHT - 82;
+    public static final int HOTBAR_Y = GUI_HEIGHT - 24;
 
+    private final java.util.UUID sessionId;
+    public java.util.UUID sessionId() { return sessionId; }
     private final SpellLoomBlockEntity blockEntity;
     private final ContainerLevelAccess access;
 
     public SpellLoomMenu(int id, Inventory inv, FriendlyByteBuf buf) {
-        this(id, inv, resolve(inv, buf.readBlockPos()));
+        this(id, inv, resolve(inv, buf.readBlockPos()), buf.readUUID());
     }
 
     public SpellLoomMenu(int id, Inventory inv, SpellLoomBlockEntity be) {
+        this(id, inv, be, java.util.UUID.randomUUID());
+    }
+
+    public SpellLoomMenu(int id, Inventory inv, SpellLoomBlockEntity be, java.util.UUID sessionId) {
         super(ModMenus.SPELL_LOOM.get(), id);
+        this.sessionId = sessionId;
         this.blockEntity = be;
         this.access = be == null
             ? ContainerLevelAccess.NULL
@@ -62,8 +69,7 @@ public class SpellLoomMenu extends AbstractContainerMenu {
                 SLOT_SOURCE_X, RECIPE_ROW_Y) {
                 @Override
                 public boolean mayPlace(ItemStack stack) {
-                    return InscriptionClassifier.classify(stack)
-                        != InscriptionSourceKind.BLANK_PARCHMENT;
+                    return com.otectus.arsnspells.inscription.LoomInscription.isSource(stack);
                 }
             });
             addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SCROLL,
@@ -72,7 +78,7 @@ public class SpellLoomMenu extends AbstractContainerMenu {
                 public boolean mayPlace(ItemStack stack) {
                     // A filled scroll is allowed in, so the explicit Convert route can reach
                     // it; what it is never allowed to be is silently treated as blank.
-                    return !InscriptionClassifier.classify(stack).isReusable();
+                    return com.otectus.arsnspells.inscription.LoomInscription.isTarget(stack);
                 }
             });
             addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_OUTPUT,
@@ -113,8 +119,11 @@ public class SpellLoomMenu extends AbstractContainerMenu {
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
         ItemStack result = ItemStack.EMPTY;
+        if (index < 0 || index >= this.slots.size()) {
+            return result;
+        }
         // Audit E5 (defensive): if the client-side BE lookup failed, no working
-        // slots were added and this.slots holds only the 36 player slots — the
+        // slots were added and this.slots holds only the 36 player slots â€” the
         // index math below would then misclassify player slots 0-2 as loom slots.
         // Unreachable on the authoritative server (createMenu always passes a BE).
         if (this.slots.size() < SpellLoomBlockEntity.SLOT_COUNT + 36) {

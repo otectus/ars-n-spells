@@ -18,6 +18,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class CrossCastRequestPacketTest {
 
     @Test
+    void carrierRevisionIsPreservedAcrossWire() {
+        String fingerprint = "0123456789abcdef".repeat(4);
+        CrossCastRequestPacket round = writeAndRead(new CrossCastRequestPacket(
+            InteractionHand.MAIN_HAND, CrossCastRequestPacket.Action.CAST, 1, UUID.randomUUID(), fingerprint));
+        assertEquals(fingerprint, round.carrierFingerprint());
+    }
+
+    @Test
     void mainHandCastAction_roundTripsBitIdentically() {
         UUID id = UUID.randomUUID();
         CrossCastRequestPacket original =

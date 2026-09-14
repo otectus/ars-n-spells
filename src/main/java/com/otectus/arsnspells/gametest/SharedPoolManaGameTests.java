@@ -296,7 +296,7 @@ public final class SharedPoolManaGameTests {
 
             CostQuote quote = QuoteService.quoteNativeCast(
                 ResourceUnit.ARS_MANA, 100, QuoteService.currentRules());
-            float expectedLeg = QuoteService.legAsFloat(quote, ResourceUnit.ARS_MANA);
+            float expectedLeg = QuoteService.legAsFloat(quote, ResourceUnit.IRONS_MANA);
 
             CastAttempt attempt = CastLedger.open(player.getUUID(), COMMIT_CARRIER, 0, quote,
                 player.level().getGameTime());

@@ -45,6 +45,19 @@ class ArsNSpellsMixinPluginSanctifiedGatingTest {
     }
 
     @Test
+    void covenantSpellEventsMixin_appliesOnlyWhenBothPresent() throws Exception {
+        String fqn = "com.otectus.arsnspells.mixin.sanctified.MixinCovenantSpellEvents";
+        assertTrue(plugin(true, true).shouldApplyMixin("any.target", fqn),
+            "Covenant spell-event bridge must apply when both optional mods are present");
+        assertFalse(plugin(true, false).shouldApplyMixin("any.target", fqn),
+            "Covenant spell-event bridge must skip without Covenant");
+        assertFalse(plugin(false, true).shouldApplyMixin("any.target", fqn),
+            "Covenant spell-event bridge must skip without Iron's");
+        assertFalse(plugin(false, false).shouldApplyMixin("any.target", fqn),
+            "Covenant spell-event bridge must skip when both optional mods are absent");
+    }
+
+    @Test
     void sanctifiedPresentField_exists() throws NoSuchFieldException {
         Field f = ArsNSpellsMixinPlugin.class.getDeclaredField("sanctifiedPresent");
         f.setAccessible(true);

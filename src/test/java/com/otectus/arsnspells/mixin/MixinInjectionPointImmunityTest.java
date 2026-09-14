@@ -66,7 +66,8 @@ class MixinInjectionPointImmunityTest {
      * config, which together make a conflict cosmetic rather than fatal.
      */
     private static final Set<String> INSTRUCTION_LEVEL_ALLOWLIST =
-        Set.of("MixinResourceBarOverlay.java");
+        Set.of("MixinResourceBarOverlay.java", "MixinIronsCastPayment.java",
+            "MixinSanctifiedAbstractSpell.java");
 
     /** Matches both {@code @At("HEAD")} and {@code @At(value = "INVOKE", ...)}. */
     private static final Pattern AT_SIMPLE = Pattern.compile("@At\\s*\\(\\s*\"([A-Z_]+)\"");

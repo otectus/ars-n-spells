@@ -57,6 +57,17 @@ public final class CrossSpellTooltipGameTests {
 
     private CrossSpellTooltipGameTests() {}
 
+    /** The translation key of every translatable line, in order; literals contribute nothing. */
+    private static List<String> translationKeys(List<Component> lines) {
+        List<String> keys = new ArrayList<>();
+        for (Component line : lines) {
+            if (line.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc) {
+                keys.add(tc.getKey());
+            }
+        }
+        return keys;
+    }
+
     private static List<Component> renderTooltip(GameTestHelper helper, ItemStack stack) {
         ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), FAKE_PROFILE);
         List<Component> lines = new ArrayList<>();
@@ -168,8 +179,21 @@ public final class CrossSpellTooltipGameTests {
             helper.fail("hovering a Spell Loom carrier must not throw: " + t);
             return;
         }
-        if (lines.size() != 3) {
-            helper.fail("a loom carrier must render header + entry + cast hint, got " + lines);
+        // A loom carrier carries display metadata and the two-route hint on top of the three
+        // lines every inscribed stack gets, so this asserts the lines that must be there rather
+        // than a total -- a count would break again the next time a line is added.
+        List<String> keys = translationKeys(lines);
+        for (String required : List.of("tooltip.ars_n_spells.cross_spell.header",
+                                       "tooltip.ars_n_spells.cross_spell.entry",
+                                       "tooltip.ars_n_spells.cross_spell.cast_hint",
+                                       "tooltip.ars_n_spells.carrier.routes")) {
+            if (!keys.contains(required)) {
+                helper.fail("a loom carrier tooltip is missing '" + required + "', got " + lines);
+            }
+        }
+        if (lines.stream().noneMatch(line -> line.getString().contains("Test Weave"))) {
+            helper.fail("the name the player gave the weave must appear on its tooltip, got "
+                + lines);
         }
         helper.succeed();
     }

@@ -122,14 +122,14 @@ public final class SchoolResolver {
             return SpellSchoolId.GENERIC;
         }
 
-        SpellSchoolId mapped = SchoolMappings.get().glyphSchool(registryId);
-        if (mapped != null) {
-            return mapped;
-        }
-
         int nameStart = registryId.indexOf(':');
         if (isNonPayloadPath(nameStart >= 0 ? registryId.substring(nameStart + 1) : registryId)) {
             return SpellSchoolId.GENERIC;
+        }
+
+        SpellSchoolId mapped = SchoolMappings.get().glyphSchool(registryId);
+        if (mapped != null) {
+            return mapped;
         }
 
         SpellSchoolId fromMetadata = fromArsSchools(arsSchoolIds);
@@ -140,6 +140,39 @@ public final class SchoolResolver {
         int colon = registryId.indexOf(':');
         String path = colon >= 0 ? registryId.substring(colon + 1) : registryId;
         return heuristic(path);
+    }
+
+    /** Namespaced ordered memberships; cosmetic metadata is never consulted. */
+    public static List<String> resolveKeys(@Nullable AbstractSpellPart part) {
+        if (part == null || part.getRegistryName() == null || isNonPayloadPart(part))
+            return List.of(SchoolKeys.GENERIC);
+        List<String> declared = new ArrayList<>();
+        if (part.spellSchools != null) for (SpellSchool school : part.spellSchools) {
+            if (school != null && school.getId() != null) declared.add(school.getId());
+        }
+        return resolveKeys(part.getRegistryName().toString(), declared);
+    }
+
+    public static List<String> resolveKeys(@Nullable String registryId, @Nullable List<String> declared) {
+        if (registryId == null || registryId.isEmpty()) return List.of(SchoolKeys.GENERIC);
+        int colon = registryId.indexOf(':');
+        String path = colon < 0 ? registryId : registryId.substring(colon + 1);
+        if (isNonPayloadPath(path)) return List.of(SchoolKeys.GENERIC);
+        SchoolMappings snapshot = SchoolMappings.get();
+        List<String> mapped = snapshot.glyphSchoolKeys(registryId);
+        if (mapped != null) return mapped;
+        java.util.LinkedHashSet<String> result = new java.util.LinkedHashSet<>();
+        if (declared != null) for (String raw : declared) {
+            if (raw == null) continue;
+            List<String> overlay = snapshot.arsSchoolKeys(raw);
+            if (overlay != null) result.addAll(overlay);
+            else {
+                SpellSchoolId builtin = ARS_SCHOOL_TO_CANONICAL.get(raw.toLowerCase(Locale.ROOT));
+                if (builtin != null) result.add(SchoolKeys.normalize(builtin.id()));
+                // Untranslated Ars schools are a different vocabulary, not Iron's school IDs.
+            }
+        }
+        return result.isEmpty() ? List.of(SchoolKeys.normalize(heuristic(path).id())) : List.copyOf(result);
     }
 
     /**

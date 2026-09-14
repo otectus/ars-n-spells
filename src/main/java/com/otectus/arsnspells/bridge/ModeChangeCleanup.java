@@ -104,9 +104,14 @@ public final class ModeChangeCleanup {
         //    the fresh routing snapshot, and both are no-ops for a feature that is off.
         com.otectus.arsnspells.events.EquipmentHandler.recomputeContributions(player);
         com.otectus.arsnspells.events.ProgressionHandler.reapplyAllBonuses(player);
+        if (BridgeManager.getNativeIronsBridge() != null) {
+            com.otectus.arsnspells.equipment.PotionContributions.reconcile(player);
+        }
 
         // 3 + 4. Clamp under the migration rule, then write it back through the owning mod.
         clampAndSynchronize(player, removed);
+        NativeManaSync.send(player);
+        com.otectus.arsnspells.events.CapabilityResyncHandler.syncAll(player);
     }
 
     /**

@@ -87,13 +87,13 @@ public final class ModCreativeTabs {
     /**
      * Everything the mod registers, block items first so the Spell Loom workstation leads.
      *
-     * <p>Iterating the {@link DeferredRegister}s rather than naming the six items makes the
-     * Iron's gate structural instead of defensive. Without Iron's,
+     * <p>Iterating the {@link DeferredRegister}s rather than naming the seven items (the Spell
+     * Loom block item, the four Iron's-gated tablets, the uninscribe tablet, and the blank
+     * scroll) makes the Iron's gate structural instead of defensive. Without Iron's,
      * {@code ModItemsRegistry.registerIronsDependentItems()} is never called, so those four
      * entries do not exist to iterate — there is nothing to null-check. Naming them instead
      * would mean calling accessors like {@code ModItemsRegistry.spellTranscriptionTablet()},
-     * which return a <em>null</em> {@link RegistryObject} on an Iron's-less install. A seventh
-     * ANS item is also picked up here for free.
+     * which return a <em>null</em> {@link RegistryObject} on an Iron's-less install.
      *
      * <p>{@code DeferredRegister} backs its entries with a {@code LinkedHashMap}, so the tab
      * order is registration order, fixed by the {@code ArsNSpells} constructor.

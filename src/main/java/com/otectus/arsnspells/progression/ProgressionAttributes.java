@@ -39,8 +39,8 @@ public final class ProgressionAttributes {
         if (player == null || school == null || school.isEmpty()) {
             return;
         }
-        Attribute attribute = ForgeRegistries.ATTRIBUTES.getValue(
-            new ResourceLocation(IRONS_NAMESPACE, school + "_spell_power"));
+        if (!com.otectus.arsnspells.compat.IronsCompat.isLoaded()) return;
+        Attribute attribute = com.otectus.arsnspells.compat.IronsSchoolAttributes.power(school);
         if (attribute == null) {
             return;
         }
@@ -49,7 +49,7 @@ public final class ProgressionAttributes {
             return;
         }
         instance.removeModifier(ELEMENT_XP_ID);
-        if (bonus > 0) {
+        if (Double.isFinite(bonus) && bonus > 0) {
             instance.addTransientModifier(new AttributeModifier(
                 ELEMENT_XP_ID, MODIFIER_NAME, bonus, AttributeModifier.Operation.ADDITION));
         }

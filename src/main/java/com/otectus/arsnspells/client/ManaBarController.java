@@ -10,7 +10,6 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
-import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -20,6 +19,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Controls mana bar visibility using Forge's overlay event system.
  * This is a more reliable approach than mixins for hiding overlays.
+ *
+ * <p>Scope: this handler only ever cancels the Ars Nouveau and Iron's Spellbooks mana
+ * bars (namespace equals one of those two, path contains {@code mana}). Every other
+ * overlay - vanilla, or any third-party HUD - returns before a single config read, so
+ * this class cannot hide, delay, or throw on anything it does not own.
  */
 @Mod.EventBusSubscriber(modid = ArsNSpells.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class ManaBarController {
@@ -40,11 +44,18 @@ public class ManaBarController {
             String overlayNamespace = overlayId.getNamespace();
             String overlayPath = overlayId.getPath();
 
+            // Anything that is not one of the two mana bars is none of this handler's
+            // business: return before touching any config. Every read below is on the
+            // SERVER spec, which throws IllegalStateException while it is not loaded, and
+            // this runs once per overlay per frame - a vanilla overlay must never reach one.
+            if (!isManaOverlay(overlayNamespace, overlayPath)) {
+                return;
+            }
+
             // Hide mana bars when the Cursed/Virtue Ring is equipped — spells consume
             // LP or Aura in that state, so showing a mana bar is misleading. This runs
             // independently of mana unification so it still applies when unification is off.
-            if (isManaOverlay(overlayNamespace, overlayPath)
-                && AnsConfig.HIDE_MANA_BAR_WITH_RING.get()
+            if (AnsConfig.HIDE_MANA_BAR_WITH_RING.get()
                 && SanctifiedLegacyCompat.isAvailable()) {
                 LocalPlayer localPlayer = Minecraft.getInstance().player;
                 if (localPlayer != null) {
@@ -99,9 +110,17 @@ public class ManaBarController {
                 }
             }
         } catch (Exception e) {
-            // Fail silently to prevent crashes
-            if (AnsConfig.DEBUG_MODE.get()) {
-                LOGGER.error("[ManaBarController] Error in overlay handler", e);
+            // Never let a HUD listener take the render loop down: when Pre throws, ForgeGui
+            // skips that overlay entirely (render and Post), which hides it and every mod
+            // drawing from its Post. Logged only under debug so a config-not-loaded window
+            // cannot spam the log - and that config read is the most likely thing to have
+            // thrown in the first place, so it is guarded too.
+            try {
+                if (AnsConfig.DEBUG_MODE.get()) {
+                    LOGGER.error("[ManaBarController] Error in overlay handler", e);
+                }
+            } catch (Exception ignored) {
+                // Config not loaded; nothing useful to report.
             }
         }
     }

@@ -60,8 +60,8 @@ public class BridgeManager {
                 IManaBridge nativeArs, IManaBridge nativeIrons) {
             this.snapshot = snapshot;
             this.mode = mode;
-            this.nativeArs = nativeArs;
-            this.nativeIrons = nativeIrons;
+            this.nativeArs = NativeManaAccess.wrap(nativeArs, ResourceUnit.ARS_MANA);
+            this.nativeIrons = NativeManaAccess.wrap(nativeIrons, ResourceUnit.IRONS_MANA);
         }
 
         /**
@@ -84,6 +84,7 @@ public class BridgeManager {
      * reference load, so a refresh can never be observed half-applied.
      */
     private static volatile Routing routing = null;
+    private static volatile Routing fallbackRouting;
 
     private static boolean isIronsLoaded = false;
 
@@ -136,6 +137,13 @@ public class BridgeManager {
      * via the integrated server executor).
      */
     public static synchronized void refreshMode() {
+        var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        if (server != null && !server.isSameThread()) {
+            // Forge's config file watcher is a background thread. Publishing there could
+            // change the public mana route halfway through a synchronous native spell.
+            server.execute(BridgeManager::refreshMode);
+            return;
+        }
         publish(buildRouting(AnsConfig.getManaMode(), isIronsLoaded));
         logInitialization();
     }
@@ -227,7 +235,10 @@ public class BridgeManager {
         }
         // ANS-MED-018: before init runs (e.g. early client render frames during world load)
         // there is still a well-formed answer - no Iron's, no unification, Ars native.
-        return buildRouting(ManaUnificationMode.DISABLED, false, FALLBACK_BRIDGE, null);
+        synchronized (BridgeManager.class) {
+            if (fallbackRouting == null) fallbackRouting = buildRouting(ManaUnificationMode.DISABLED, false, FALLBACK_BRIDGE, null);
+            return fallbackRouting;
+        }
     }
 
     /** The immutable routing decision every mode question is answered from. */
@@ -287,6 +298,9 @@ public class BridgeManager {
         return routing().nativeIrons;
     }
 
+    public static IManaBridge getNativeBridge(ResourceUnit unit) {
+        return routing().adapterFor(unit);
+    }
     /** The Ars adapter. Always present. */
     public static IManaBridge getNativeArsBridge() {
         return routing().nativeArs;
@@ -420,7 +434,7 @@ public class BridgeManager {
             if (leg.isZero()) {
                 continue;
             }
-            IManaBridge bridge = current.adapterFor(payingUnit(current.snapshot, leg.unit()));
+            IManaBridge bridge = current.adapterFor(leg.unit());
             if (bridge.getMana(player) < (float) leg.amount()) {
                 return false;
             }
@@ -451,10 +465,10 @@ public class BridgeManager {
             if (leg.isZero()) {
                 continue;
             }
-            IManaBridge bridge = current.adapterFor(payingUnit(current.snapshot, leg.unit()));
+            IManaBridge bridge = current.adapterFor(leg.unit());
             if (!bridge.consumeMana(player, (float) leg.amount())) {
                 for (com.otectus.arsnspells.contract.ResourceAmount done : paid) {
-                    current.adapterFor(payingUnit(current.snapshot, done.unit()))
+                    current.adapterFor(done.unit())
                         .addMana(player, (float) done.amount());
                 }
                 return false;

@@ -551,12 +551,13 @@ public final class CrossCastGameTests {
 
     /**
      * A well-formed post-fix carrier no longer crashes, but Iron's still cannot read its Ars
-     * payload — and would consume the scroll while inscribing an empty {@code none} spell.
-     * It must be refused, and refused with the carrier-specific message that points at the
-     * supported binding workflow.
+     * payload — and would consume the scroll while inscribing an empty {@code none} spell. So
+     * Iron's own inscription must never run for it: as of 3.3.3 the verdict is
+     * {@code BIND_CARRIER} and the click is rerouted to the ANS binder. The property under
+     * test is unchanged: Iron's own inscription does not get it.
      */
     @GameTest(template = "platform")
-    public static void ironsLoaded_validCarrier_isRejectedFromNativeTable(GameTestHelper helper) {
+    public static void ironsLoaded_validCarrier_isRoutedToBindAtNativeTable(GameTestHelper helper) {
         if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
@@ -566,9 +567,9 @@ public final class CrossCastGameTests {
             helper.fail("export must yield a carrier when Iron's is loaded");
         }
         IronsInscriptionPolicy.Verdict verdict = IronsInscriptionPolicy.evaluate(carrier);
-        if (verdict != IronsInscriptionPolicy.Verdict.ANS_CARRIER) {
-            helper.fail("a valid ANS carrier must be refused as ANS_CARRIER (so the player is sent "
-                + "to the binding workflow), got " + verdict);
+        if (verdict != IronsInscriptionPolicy.Verdict.BIND_CARRIER) {
+            helper.fail("a valid ANS carrier must be routed to the ANS binder as BIND_CARRIER "
+                + "(Iron's own inscription would eat it and write a dud), got " + verdict);
         }
         helper.succeed();
     }

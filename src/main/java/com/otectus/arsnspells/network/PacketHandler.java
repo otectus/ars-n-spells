@@ -17,7 +17,10 @@ public class PacketHandler {
     // (preview / inscribe / convert) and SpellLoomResultPacket (S2C) was added to carry
     // the inscription reason code back. Both the payload shape and the id set changed, so
     // a mismatched client must be rejected at connect rather than silently misdecoding.
-    private static final String PROTOCOL_VERSION = "4";
+    // 3.3.0: school snapshots, complete namespaced affinity replacement, and carrier fingerprints.
+    // Bumped 5 -> 6: TransactionSyncPacket was removed with the transaction receipt HUD,
+    // which shifts JournalSnapshotPacket down one id slot — an old client would misdecode.
+    private static final String PROTOCOL_VERSION = "6";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ArsNSpells.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -58,6 +61,15 @@ public class PacketHandler {
             java.util.Optional.of(NetworkDirection.PLAY_TO_SERVER));
         INSTANCE.registerMessage(id++, SpellLoomResultPacket.class,
             SpellLoomResultPacket::toBytes, SpellLoomResultPacket::new, SpellLoomResultPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        INSTANCE.registerMessage(id++, SchoolMappingsSyncPacket.class,
+            SchoolMappingsSyncPacket::toBytes, SchoolMappingsSyncPacket::new, SchoolMappingsSyncPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        // TransactionSyncPacket removed with the transaction receipt HUD: nothing on the
+        // client consumed the snapshot any more. JournalSnapshotPacket shifted down one
+        // slot, so PROTOCOL_VERSION was bumped to hard-fail old clients at connect.
+        INSTANCE.registerMessage(id++, JournalSnapshotPacket.class,
+            JournalSnapshotPacket::toBytes, JournalSnapshotPacket::new, JournalSnapshotPacket::handle,
             java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 

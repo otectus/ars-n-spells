@@ -88,11 +88,7 @@ public final class AnsFeatureCleanup implements FeatureCleanup {
         }
         int removed = 0;
         for (String key : keys) {
-            for (String target : AnsModifierIdentities.targetAttributesFor(key)) {
-                Attribute attribute = attribute(target);
-                if (attribute == null) {
-                    continue;
-                }
+            for (Attribute attribute : ForgeRegistries.ATTRIBUTES.getValues()) {
                 AttributeInstance instance = player.getAttribute(attribute);
                 if (instance == null) {
                     continue;
@@ -124,11 +120,7 @@ public final class AnsFeatureCleanup implements FeatureCleanup {
         }
         int found = 0;
         for (String key : AnsModifierIds.allKeys()) {
-            for (String target : AnsModifierIdentities.targetAttributesFor(key)) {
-                Attribute attribute = attribute(target);
-                if (attribute == null) {
-                    continue;
-                }
+            for (Attribute attribute : ForgeRegistries.ATTRIBUTES.getValues()) {
                 AttributeInstance instance = player.getAttribute(attribute);
                 if (instance == null) {
                     continue;

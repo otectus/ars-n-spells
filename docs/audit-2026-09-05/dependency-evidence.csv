@@ -1,0 +1,8 @@
+label,filename,version,sha256,declared_license
+forge_ars,ars-nouveau-401955-6688854.jar,4.12.7,1f1debc282a0c379c1141f2840ea294eede6f6b544c589663f40bbe17b59a1af,GNU GENERAL PUBLIC LICENSE
+neo_ars,ars_nouveau-1.21.1-5.13.1.1400.jar,5.13.1,bd4a827859154e864ca648bd9d907d9da55cb0045facaeb60d68a5847574306b,GNU GENERAL PUBLIC LICENSE
+forge_irons,irons-spells-n-spellbooks-855414-7402504.jar,1.20.1-3.15.0,92c046383b4960c655f840d8846732a481edcf7c5ed89028b3d7b2cc2910b224,All Rights Reserved
+neo_irons,irons_spellbooks-1.21.1-3.16.3.jar,1.21.1-3.16.3,70cc7e37c48d45260eb101a4c536cd391b8e258ca95199bde4f06707b2d5623b,All Rights Reserved
+forge_elemental,ars-elemental-561470-8399870.jar,0.6.8.0,2172db18ab7a4f43da49a2bb245b3d90f1c6cd8f7ce7905870dbc60e3f5ad40b,GNU Lesser General Public License v3.0
+neo_elemental,ars-elemental-561470-8399862.jar,0.7.10.1,7a3aea48d7210ce0f150cace1c1c30fca78c7ede50f80ae70e7a692328dfa548,GNU Lesser General Public License v3.0
+neo_elemancy,ars-elemancy-1153666-8349780.jar,1.18.3,502366f85dfde7bf13ceef571cc3c2ba9c7960d35fa54d5e2cdf6e8f407fc9cf,GNU Lesser General Public License v3.0

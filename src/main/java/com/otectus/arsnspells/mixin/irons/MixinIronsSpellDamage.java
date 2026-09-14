@@ -40,7 +40,7 @@ public abstract class MixinIronsSpellDamage {
     private void arsnspells$applyResonanceMultiplier(int spellLevel, Entity sourceEntity, CallbackInfoReturnable<Float> cir) {
         if (sourceEntity instanceof Player player) {
             float spellPower = cir.getReturnValue();
-            double resonanceMultiplier = ResonanceManager.getResonance(player);
+            double resonanceMultiplier = ResonanceManager.getIronsResonance(player);
             cir.setReturnValue((float) (spellPower * resonanceMultiplier));
         }
     }

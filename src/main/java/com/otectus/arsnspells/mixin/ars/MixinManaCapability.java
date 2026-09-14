@@ -2,6 +2,7 @@ package com.otectus.arsnspells.mixin.ars;
 
 import com.otectus.arsnspells.bridge.ArsRegenTickScope;
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.bridge.ManaAccessDirection;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.hollingsworth.arsnouveau.common.capability.ManaCap;
 import net.minecraft.world.entity.LivingEntity;
@@ -16,11 +17,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = ManaCap.class, remap = false)
-public abstract class MixinManaCapability {
+public abstract class MixinManaCapability implements com.otectus.arsnspells.bridge.ManaOwnerBinding {
 
     @Shadow @Final private LivingEntity livingEntity;
     @Shadow private double mana;
     @Shadow private int maxMana;
+
+    @Unique private LivingEntity arsnspells$attachedOwner;
+    @Override public void arsnspells$bindOwner(LivingEntity owner) { arsnspells$attachedOwner = owner; }
+    @Unique private LivingEntity arsnspells$owner() { return livingEntity != null ? livingEntity : arsnspells$attachedOwner; }
 
     /**
      * Tracks the Ars Nouveau native max mana value in HYBRID mode.
@@ -43,7 +48,7 @@ public abstract class MixinManaCapability {
      * bypassing the bridge.
      */
     @Unique
-    private static final ThreadLocal<java.util.Map<java.util.UUID, java.util.EnumSet<Direction>>>
+    private static final ThreadLocal<java.util.Map<java.util.UUID, java.util.EnumSet<ManaAccessDirection>>>
         arsnspells$inBridgeCall = ThreadLocal.withInitial(java.util.HashMap::new);
 
     /**
@@ -55,30 +60,22 @@ public abstract class MixinManaCapability {
      * pool. Reads and writes now guard independently and only against themselves.
      */
     @Unique
-    private enum Direction {
-        /** Reading a balance or ceiling out of the authoritative pool. */
-        READ,
-        /** Moving the authoritative pool. */
-        WRITE
-    }
-
-    @Unique
-    private boolean arsnspells$enterGuard(Player player, Direction direction) {
+    private boolean arsnspells$enterGuard(Player player, ManaAccessDirection direction) {
         return arsnspells$inBridgeCall.get()
-            .computeIfAbsent(player.getUUID(), k -> java.util.EnumSet.noneOf(Direction.class))
+            .computeIfAbsent(player.getUUID(), k -> java.util.EnumSet.noneOf(ManaAccessDirection.class))
             .add(direction);
     }
 
     @Unique
-    private boolean arsnspells$isGuarded(Player player, Direction direction) {
-        java.util.EnumSet<Direction> held = arsnspells$inBridgeCall.get().get(player.getUUID());
+    private boolean arsnspells$isGuarded(Player player, ManaAccessDirection direction) {
+        java.util.EnumSet<ManaAccessDirection> held = arsnspells$inBridgeCall.get().get(player.getUUID());
         return held != null && held.contains(direction);
     }
 
     @Unique
-    private void arsnspells$exitGuard(Player player, Direction direction) {
-        java.util.Map<java.util.UUID, java.util.EnumSet<Direction>> held = arsnspells$inBridgeCall.get();
-        java.util.EnumSet<Direction> directions = held.get(player.getUUID());
+    private void arsnspells$exitGuard(Player player, ManaAccessDirection direction) {
+        java.util.Map<java.util.UUID, java.util.EnumSet<ManaAccessDirection>> held = arsnspells$inBridgeCall.get();
+        java.util.EnumSet<ManaAccessDirection> directions = held.get(player.getUUID());
         if (directions != null) {
             directions.remove(direction);
             if (directions.isEmpty()) {
@@ -93,13 +90,13 @@ public abstract class MixinManaCapability {
 
     @Inject(method = "getCurrentMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$getCurrentMana(CallbackInfoReturnable<Double> cir) {
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(arsnspells$owner() instanceof Player player)) {
             return;
         }
-        if (arsnspells$isGuarded(player, Direction.READ)) {
+        if (com.otectus.arsnspells.bridge.NativeManaAccess.active(player, com.otectus.arsnspells.contract.ResourceUnit.ARS_MANA) || arsnspells$hydrating || arsnspells$isGuarded(player, ManaAccessDirection.READ)) {
             return; // Recursion guard for THIS player and direction — let native method run
         }
-        if (!BridgeManager.isUnificationEnabled()) {
+        if (arsnspells$hydrating || !BridgeManager.isUnificationEnabled()) {
             return;
         }
         if (player.level().isClientSide()) {
@@ -112,7 +109,7 @@ public abstract class MixinManaCapability {
         if (mode != null && mode.isArsPrimary()) {
             return;
         }
-        arsnspells$enterGuard(player, Direction.READ);
+        arsnspells$enterGuard(player, ManaAccessDirection.READ);
         try {
             double current = (double) BridgeManager.getBridge().getMana(player);
             if (mode != null && mode.isHybrid()) {
@@ -121,19 +118,19 @@ public abstract class MixinManaCapability {
             }
             cir.setReturnValue(current);
         } finally {
-            arsnspells$exitGuard(player, Direction.READ);
+            arsnspells$exitGuard(player, ManaAccessDirection.READ);
         }
     }
 
     @Inject(method = "getMaxMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$getMaxMana(CallbackInfoReturnable<Integer> cir) {
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(arsnspells$owner() instanceof Player player)) {
             return;
         }
-        if (arsnspells$isGuarded(player, Direction.READ)) {
+        if (com.otectus.arsnspells.bridge.NativeManaAccess.active(player, com.otectus.arsnspells.contract.ResourceUnit.ARS_MANA) || arsnspells$hydrating || arsnspells$isGuarded(player, ManaAccessDirection.READ)) {
             return; // Recursion guard for THIS player and direction — let native method run
         }
-        if (!BridgeManager.isUnificationEnabled()) {
+        if (arsnspells$hydrating || !BridgeManager.isUnificationEnabled()) {
             return;
         }
         if (player.level().isClientSide()) {
@@ -150,56 +147,54 @@ public abstract class MixinManaCapability {
             }
             return;
         }
-        arsnspells$enterGuard(player, Direction.READ);
+        arsnspells$enterGuard(player, ManaAccessDirection.READ);
         try {
             cir.setReturnValue((int) BridgeManager.getBridge().getMaxMana(player));
         } finally {
-            arsnspells$exitGuard(player, Direction.READ);
+            arsnspells$exitGuard(player, ManaAccessDirection.READ);
         }
     }
 
-    /**
-     * {@code setMana} stays a read-only sync, deliberately.
-     *
-     * <p>V06 routed the two <em>delta</em> mutators ({@code addMana}, {@code removeMana}) to
-     * the authoritative pool, because a delta is unambiguous: {@code +50} means fifty more
-     * mana whoever asked. An absolute {@code setMana} is not. In the pinned Ars 4.12.7 the
-     * calls that reach this site are Ars-internal - capability attach, {@code playerClone},
-     * {@code deserializeNBT}, the max-mana clamp - and they carry a value computed against
-     * Ars's own stale pool, typically zero. Forwarding those would overwrite the shared pool
-     * with a number nobody asked for, which is a strictly worse bug than the one V06 names,
-     * and there is no information at this site that separates them from a third-party set.
-     *
-     * <p>So the shadow field is synced from the authoritative pool (read-only) and the
-     * original is cancelled, which keeps Ars's direct field reads consistent and stops it
-     * clamping against its own stale {@code maxMana}. Third-party code that wants to set an
-     * absolute value can express it as a delta through {@code addMana}/{@code removeMana},
-     * which now work.
-     */
+    /** Native NBT hydration restores the dormant Ars shadow, not the active shared pool. */
+    @Unique private boolean arsnspells$hydrating;
+
+    @Inject(method = "serializeNBT()Lnet/minecraft/nbt/CompoundTag;", at = @At("RETURN"))
+    private void arsnspells$persistNativeBalance(CallbackInfoReturnable<net.minecraft.nbt.CompoundTag> cir) {
+        // Persistence owns the dormant native state. Ars's PacketUpdateMana reads the
+        // public getters separately, so preserving disk state does not hide the shared HUD.
+        if (arsnspells$owner() instanceof Player player && !player.level().isClientSide()) {
+            cir.getReturnValue().putDouble("current", mana);
+            cir.getReturnValue().putInt("max", maxMana);
+        }
+    }
+
+    @Inject(method = "deserializeNBT(Lnet/minecraft/nbt/CompoundTag;)V", at = @At("HEAD"))
+    private void arsnspells$beginHydration(net.minecraft.nbt.CompoundTag tag, CallbackInfo ci) {
+        arsnspells$hydrating = true;
+    }
+
+    @Inject(method = "deserializeNBT(Lnet/minecraft/nbt/CompoundTag;)V", at = @At("RETURN"))
+    private void arsnspells$endHydration(net.minecraft.nbt.CompoundTag tag, CallbackInfo ci) {
+        arsnspells$hydrating = false;
+    }
+
+    /** Public absolute writes honor their value; only the identified native hydration is scoped out. */
     @Inject(method = "setMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$setMana(double amount, CallbackInfoReturnable<Double> cir) {
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(arsnspells$owner() instanceof Player player) || player.level().isClientSide()
+                || !arsnspells$shouldIntercept() || arsnspells$hydrating) return;
+        if (!Double.isFinite(amount)) {
+            cir.setReturnValue((double) BridgeManager.getBridge().getMana(player));
             return;
         }
-        if (!arsnspells$shouldIntercept()) {
-            return;
-        }
-        if (player.level().isClientSide()) {
-            return;
-        }
-        // Read-only sync: update shadow field from Iron's actual value.
-        // Do NOT write 'amount' to Iron's — that would overwrite Iron's real mana
-        // with stale Ars-internal values (typically 0).
-        arsnspells$enterGuard(player, Direction.READ);
+        if (!arsnspells$enterGuard(player, ManaAccessDirection.WRITE)) return;
         try {
-            double ironsCurrentMana = (double) BridgeManager.getBridge().getMana(player);
-            this.mana = ironsCurrentMana;  // Sync shadow field from Iron's for consistency
-            cir.setReturnValue(amount);     // Return requested value to satisfy API contract
+            BridgeManager.getBridge().setMana(player, (float) Math.max(0, Math.min(Float.MAX_VALUE, amount)));
+            cir.setReturnValue((double) BridgeManager.getBridge().getMana(player));
         } finally {
-            arsnspells$exitGuard(player, Direction.READ);
+            arsnspells$exitGuard(player, ManaAccessDirection.WRITE);
         }
     }
-
     /**
      * Route an {@code addMana} to the shared authoritative pool (audit V06).
      *
@@ -217,7 +212,7 @@ public abstract class MixinManaCapability {
      */
     @Inject(method = "addMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$addMana(double amount, CallbackInfoReturnable<Double> cir) {
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(arsnspells$owner() instanceof Player player)) {
             return;
         }
         if (!arsnspells$shouldIntercept()) {
@@ -233,25 +228,23 @@ public abstract class MixinManaCapability {
             // MixinManaRegenTick is what names the scope. Report the unchanged balance,
             // which is exactly what a zero-sized regen tick would have returned.
             double unchanged = (double) BridgeManager.getBridge().getMana(player);
-            this.mana = unchanged;
             cir.setReturnValue(unchanged);
             return;
         }
         // Injection two: every other caller is a legitimate mutation and is routed.
-        if (!arsnspells$enterGuard(player, Direction.WRITE)) {
+        if (!arsnspells$enterGuard(player, ManaAccessDirection.WRITE)) {
             // A bridge write is already in flight for this player and re-entered us. Let
             // native ManaCap run so the shadow field still moves; routing again doubles it.
             return;
         }
         try {
-            if (amount != 0.0d) {
-                BridgeManager.getBridge().addMana(player, (float) amount);
+            if (Double.isFinite(amount) && amount != 0.0d) {
+                BridgeManager.getBridge().addMana(player, (float) Math.max(-Float.MAX_VALUE, Math.min(Float.MAX_VALUE, amount)));
             }
             double current = (double) BridgeManager.getBridge().getMana(player);
-            this.mana = current;
             cir.setReturnValue(current);
         } finally {
-            arsnspells$exitGuard(player, Direction.WRITE);
+            arsnspells$exitGuard(player, ManaAccessDirection.WRITE);
         }
     }
 
@@ -265,7 +258,7 @@ public abstract class MixinManaCapability {
      */
     @Inject(method = "removeMana", at = @At("HEAD"), cancellable = true)
     private void arsnspells$removeMana(double amount, CallbackInfoReturnable<Double> cir) {
-        if (!(this.livingEntity instanceof Player player)) {
+        if (!(arsnspells$owner() instanceof Player player)) {
             return;
         }
         if (!arsnspells$shouldIntercept()) {
@@ -274,58 +267,35 @@ public abstract class MixinManaCapability {
         if (player.level().isClientSide()) {
             return;
         }
-        if (!arsnspells$enterGuard(player, Direction.WRITE)) {
+        if (!arsnspells$enterGuard(player, ManaAccessDirection.WRITE)) {
             return;
         }
         try {
-            if (amount > 0.0d) {
-                BridgeManager.getBridge().addMana(player, (float) -amount);
+            if (Double.isFinite(amount) && amount > 0.0d) {
+                BridgeManager.getBridge().addMana(player, (float) -Math.min(Float.MAX_VALUE, amount));
             }
             double current = (double) BridgeManager.getBridge().getMana(player);
-            this.mana = current;
             cir.setReturnValue(current);
         } finally {
-            arsnspells$exitGuard(player, Direction.WRITE);
+            arsnspells$exitGuard(player, ManaAccessDirection.WRITE);
         }
     }
 
-    @Inject(method = "setMaxMana", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "setMaxMana", at = @At("HEAD"))
     private void arsnspells$setMaxMana(int amount, CallbackInfo ci) {
-        if (!(this.livingEntity instanceof Player player)) {
-            return;
-        }
-        if (!BridgeManager.isUnificationEnabled()) {
-            return;
-        }
-        if (player.level().isClientSide()) {
-            return;
-        }
-        ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        // In HYBRID mode, capture the Ars native max value but let Ars set it normally.
-        if (mode != null && mode.isHybrid()) {
-            arsnspells$arsNativeMaxMana = amount;
-            return; // Let Ars set its own maxMana natively
-        }
-        // Only redirect in ISS_PRIMARY mode where Iron's is the sole source of truth.
-        if (mode == null || !mode.isIssPrimary()) {
-            return;
-        }
-        arsnspells$enterGuard(player, Direction.READ);
-        try {
-            this.maxMana = (int) BridgeManager.getBridge().getMaxMana(player);
-        } finally {
-            arsnspells$exitGuard(player, Direction.READ);
-        }
-        ci.cancel();
+        // Keep the real Ars ceiling in its own field. Shared display reads are routed
+        // independently; a raw native snapshot must not contain Iron's ceiling.
+        arsnspells$arsNativeMaxMana = amount;
     }
-
     /**
      * Check if this ManaCap operation should be intercepted (ISS_PRIMARY or HYBRID).
      * Unlike the old shouldRedirectToIrons(), this does NOT imply writing to Iron's.
      */
     @Unique
     private boolean arsnspells$shouldIntercept() {
-        if (!BridgeManager.isUnificationEnabled()) {
+        if (arsnspells$owner() instanceof Player p && com.otectus.arsnspells.bridge.NativeManaAccess.active(p,
+                com.otectus.arsnspells.contract.ResourceUnit.ARS_MANA)) return false;
+        if (arsnspells$hydrating || !BridgeManager.isUnificationEnabled()) {
             return false;
         }
         ManaUnificationMode mode = BridgeManager.getCurrentMode();

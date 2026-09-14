@@ -44,9 +44,16 @@ public final class OptionalModGate {
 
     /** The first frame outside this class, i.e. the {@code @GameTest} method that gated itself. */
     private static String callerTestName() {
-        return StackWalker.getInstance()
+        return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
             .walk(frames -> frames
-                .filter(frame -> !OptionalModGate.class.getName().equals(frame.getClassName()))
+                .filter(frame -> {
+                    try {
+                        return frame.getDeclaringClass().getDeclaredMethod(frame.getMethodName(), GameTestHelper.class)
+                            .isAnnotationPresent(net.minecraft.gametest.framework.GameTest.class);
+                    } catch (ReflectiveOperationException ignored) {
+                        return false;
+                    }
+                })
                 .findFirst()
                 .map(frame -> {
                     String type = frame.getClassName();

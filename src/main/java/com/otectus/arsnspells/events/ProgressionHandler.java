@@ -24,8 +24,8 @@ public class ProgressionHandler {
             return;
         }
         if (event.getEntity() instanceof ServerPlayer player) {
-            String school = SpellAnalysis.analyze(event.spell).dominantSchool();
-            if (!"generic".equals(school)) {
+            String school = SpellAnalysis.analyze(event.spell).schoolKey();
+            if (!com.otectus.arsnspells.util.SchoolKeys.GENERIC.equals(school)) {
                 player.getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(data -> {
                     data.incrementCastCount(school);
                     ProgressionAttributes.applyTransientBonus(player, school, data.getBonusForSchool(school));

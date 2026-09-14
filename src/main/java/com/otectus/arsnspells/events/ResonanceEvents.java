@@ -20,14 +20,11 @@ public class ResonanceEvents {
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !IronsCompat.isLoaded()) {
-            return;
-        }
         if (event.phase == TickEvent.Phase.END
             && !event.player.level().isClientSide()
-            && event.player.tickCount % 40 == 0
+
             && event.player instanceof ServerPlayer player) {
-            double before = ResonanceManager.getResonance(player);
+            double before = ResonanceManager.cachedResonance(player);
             ResonanceManager.computeResonance(player);
             double after = ResonanceManager.getResonance(player);
             if (after != before) {
@@ -57,9 +54,6 @@ public class ResonanceEvents {
 
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !IronsCompat.isLoaded()) {
-            return;
-        }
         if (event.getEntity() instanceof ServerPlayer player) {
             // Logic: Immediate sync on login ensures no 'Zero-State' HUD artifacts
             ResonanceManager.computeResonance(player);

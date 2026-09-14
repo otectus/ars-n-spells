@@ -131,7 +131,7 @@ public final class ModeChangeCleanupGameTests {
             player.getCapability(ProgressionData.PROGRESSION_DATA)
                 .ifPresent(data -> data.incrementCastCount("fire"));
             int before = player.getCapability(ProgressionData.PROGRESSION_DATA)
-                .map(data -> data.getAllCastCounts().getOrDefault("fire", 0))
+                .map(data -> data.getAllCastCounts().getOrDefault("irons_spellbooks:fire", 0))
                 .orElse(0);
             if (before <= 0) {
                 helper.fail("could not record a cast count to preserve");
@@ -142,7 +142,7 @@ public final class ModeChangeCleanupGameTests {
             AnsFeatureCleanup.removeAll(player);
 
             int after = player.getCapability(ProgressionData.PROGRESSION_DATA)
-                .map(data -> data.getAllCastCounts().getOrDefault("fire", 0))
+                .map(data -> data.getAllCastCounts().getOrDefault("irons_spellbooks:fire", 0))
                 .orElse(0);
             if (after != before) {
                 helper.fail("cleanup destroyed progression data: " + before + " -> " + after);

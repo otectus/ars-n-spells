@@ -4,11 +4,13 @@ import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+import com.otectus.arsnspells.spell.IronsSpellbookBinder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -17,7 +19,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Binds an exported Ars spell carried by a real Iron's scroll onto a real Iron's
@@ -104,36 +105,24 @@ public class SpellbookBindingRitual extends AnsRitual {
         ItemStack scrollStack = scrollEntity.getItem();
         ItemStack bookStack = bookEntity.getItem();
 
-        Optional<CompoundTag> entryOpt = IronsBookBindingUtil.extractSingleEntry(scrollStack);
-        if (entryOpt.isEmpty()) {
-            // Classification said this was a valid carrier but a second read
-            // failed -- a transient parse problem, not a validation error.
-            error(LANG_PREFIX + "error.scroll_parse_failed",
-                scrollStack.getHoverName().getString());
-            return;
-        }
-        CompoundTag entry = entryOpt.get();
-        CompoundTag arsTag = entry.getCompound(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ARS_SPELL);
+        // Whoever the feedback goes to is also whoever the bind is credited to: the ritual has
+        // no owning player of its own, so resolving it once here keeps the message, the
+        // diagnostics and the advancement from ever disagreeing (audit H4).
+        ServerPlayer credited =
+            recipient() instanceof ServerPlayer player ? player : null;
 
-        // Reject an unreadable payload before anything is consumed. Binding it would
-        // produce a wheel entry that selects and does nothing, and the scroll would
-        // already be gone.
-        if (!IronsBookBindingUtil.isCastableArsPayload(arsTag)) {
-            error(LANG_PREFIX + "error.uncastable",
-                scrollStack.getHoverName().getString());
-            return;
-        }
+        // Read the entry for the success label only. The binder is the authority on whether
+        // this scroll may be bound; a label we cannot build degrades to a generic one.
+        CompoundTag arsTag = IronsBookBindingUtil.extractSingleEntry(scrollStack)
+            .map(entry -> entry.getCompound(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ARS_SPELL))
+            .orElseGet(CompoundTag::new);
 
-        // Validation complete -- mutation begins here. The util allocates a
-        // native-wheel proxy slot and mirrors the entry (with the scroll's chosen
-        // display name/nature/icon) into Iron's container.
+        // Validation and mutation both live in the shared binder, so the ritual, the command
+        // and Iron's Inscription Table cannot drift apart on what a bind is allowed to do.
+        // Consumption, feedback wording and the advancement stay here.
         int maxCap = AnsConfig.MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK.get();
-        IronsBookBindingUtil.AppendResult result =
-            IronsBookBindingUtil.appendArsSpellToBook(bookStack, arsTag,
-                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_CUSTOM_NAME),
-                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_NATURE),
-                entry.getString(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ICON_SYMBOL),
-                maxCap);
+        IronsSpellbookBinder.BindResult result = IronsSpellbookBinder.bind(
+            credited, scrollStack, bookStack, IronsSpellbookBinder.Caller.RITUAL);
         switch (result) {
             case ADDED:
                 break;
@@ -146,12 +135,31 @@ public class SpellbookBindingRitual extends AnsRitual {
                     bookStack.getHoverName().getString(),
                     IronsBookBindingUtil.effectiveProxyCeiling(maxCap));
                 return;
+            case DISABLED:
+                error(LANG_PREFIX + "error.disabled");
+                return;
+            case NO_BOOK:
+                error(LANG_PREFIX + "error.no_book");
+                return;
+            case UNCASTABLE:
+                // An unreadable payload is refused before anything is consumed: binding it
+                // would produce a wheel entry that selects and does nothing.
+                error(LANG_PREFIX + "error.uncastable",
+                    scrollStack.getHoverName().getString());
+                return;
+            case NOT_A_CARRIER:
+            case INVALID_CARRIER:
+                // Classification said this was a valid carrier but the binder's own read
+                // failed -- a transient parse problem, not a validation error.
+                error(LANG_PREFIX + "error.scroll_parse_failed",
+                    scrollStack.getHoverName().getString());
+                return;
             case FAILED:
             default:
-                // The book refused the entry (native container write failed) and the
-                // binding util has already rolled the sidecar back. Report it against
-                // the BOOK — the scroll parsed fine, so "scroll parse failed" sent
-                // players to re-export a scroll that was never the problem.
+                // The book refused the entry (native container write failed) and the binder
+                // has already rolled the sidecar back. Reported against the BOOK -- the
+                // scroll parsed fine, so "scroll parse failed" sent players to re-export a
+                // scroll that was never the problem.
                 error(LANG_PREFIX + "error.bind_failed",
                     bookStack.getHoverName().getString());
                 return;
@@ -169,12 +177,7 @@ public class SpellbookBindingRitual extends AnsRitual {
         playBindEffects(level, pos);
         success(LANG_PREFIX + "success", spellLabel(arsTag));
 
-        // Audit H4: the ritual has no owning player of its own, so credit whoever the success
-        // message just went to -- the player who lit the brazier, or the nearest one if they have
-        // since logged off. Resolving it the same way keeps the message and the advancement from
-        // ever disagreeing about who ran the ritual, which they did back when this kept its own
-        // 16-block radius while feedback searched only 8.
-        if (recipient() instanceof net.minecraft.server.level.ServerPlayer credited) {
+        if (credited != null) {
             com.otectus.arsnspells.util.AdvancementUtil.grant(credited, "bind_spell");
         }
     }

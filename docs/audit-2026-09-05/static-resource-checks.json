@@ -1,0 +1,16 @@
+{
+  "forge": {
+    "valid_json_files": 28,
+    "invalid_json": [],
+    "english_keys": 165,
+    "missing_direct_literal_translation_keys": [],
+    "limitations": "Syntax and direct literal keys only; not proof of valid registry references, dynamic keys, recipe behavior, or full localization"
+  },
+  "neo": {
+    "valid_json_files": 28,
+    "invalid_json": [],
+    "english_keys": 184,
+    "missing_direct_literal_translation_keys": [],
+    "limitations": "Syntax and direct literal keys only; not proof of valid registry references, dynamic keys, recipe behavior, or full localization"
+  }
+}

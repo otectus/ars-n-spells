@@ -18,7 +18,7 @@ public class AnsConfig {
     public static final ForgeConfigSpec.ConfigValue<String> PAYMENT_OPEN_FAILURE_POLICY;
 
     /** The schema this build writes. A file that reads back lower than this predates 3.3.0. */
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
 
     /**
      * The {@code payment_open_failure_policy} value that means "let the migration decide".
@@ -192,6 +192,8 @@ public class AnsConfig {
     // CROSS-CAST INSCRIPTION
     // ========================================
     public static final ForgeConfigSpec.DoubleValue CROSS_CAST_COST_MULTIPLIER;
+    public static final ForgeConfigSpec.IntValue NETWORK_REQUEST_RATE_PER_SECOND;
+    public static final ForgeConfigSpec.IntValue NETWORK_REQUEST_BURST;
     public static final ForgeConfigSpec.BooleanValue ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS;
     public static final ForgeConfigSpec.IntValue MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK;
     // ANS-HIGH-027: ENABLE_PER_CAST_REAGENT removed — was a reserved hook with zero
@@ -825,7 +827,7 @@ public class AnsConfig {
                      "Higher values = stronger regen when standing near Source Jars.",
                      "Final bonus = CONVERSION_RATE_ARS_TO_IRON * this value per second.",
                      "To disable the feature use enable_source_jar_synergy = false, not a zero multiplier.")
-            .defineInRange("source_jar_synergy_multiplier", 5.0, 0.1, 100.0);
+            .defineInRange("source_jar_synergy_multiplier", 5.0, 0.01, 2000.0);
 
         BUILDER.pop();
 
@@ -870,6 +872,14 @@ public class AnsConfig {
                 "active mana unification mode and SEPARATE-mode dual-cost splitting."
             )
             .defineInRange("cross_cast_cost_multiplier", 1.25, 0.5, 5.0);
+
+        NETWORK_REQUEST_RATE_PER_SECOND = BUILDER
+            .comment("Maximum sustained cross-cast/cycle requests per player per second. Server-owned; live reload.",
+                "Repeated request IDs are ignored independently for 60 seconds. Does not limit native casts.")
+            .defineInRange("network_request_rate_per_second", 10, 1, 20);
+        NETWORK_REQUEST_BURST = BUILDER
+            .comment("Immediate cross-cast/cycle request burst per player. Allows ordinary double clicks and latency bursts.")
+            .defineInRange("network_request_burst", 4, 1, 20);
 
         ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS = BUILDER
             .comment(
@@ -1020,7 +1030,7 @@ public class AnsConfig {
                 "Unknown payment_open_failure_policy '{}', resolving it as 'auto'. "
                     + "Valid values: legacy_open, refuse, native_fallback, auto.", raw);
         }
-        boolean writtenByThisSchema = freshlyGenerated || schemaRead >= CURRENT_SCHEMA_VERSION;
+        boolean writtenByThisSchema = freshlyGenerated || schemaRead >= 1;
         return writtenByThisSchema
             ? com.otectus.arsnspells.contract.PaymentOpenFailurePolicy.REFUSE
             : com.otectus.arsnspells.contract.PaymentOpenFailurePolicy.LEGACY_OPEN;
@@ -1090,12 +1100,30 @@ public class AnsConfig {
                     ? " (freshly generated config: the safe policy)"
                     : " (config written before 3.3.0: existing behaviour preserved)"));
         }
-        if (fresh) {
+        if (schemaRead < CURRENT_SCHEMA_VERSION) {
+            if (!fresh && configFile != null && java.nio.file.Files.exists(configFile)) {
+                java.nio.file.Path backup = configFile.resolveSibling(configFile.getFileName() + ".pre-3.3.0.bak");
+                try {
+                    if (!java.nio.file.Files.exists(backup)) java.nio.file.Files.copy(configFile, backup);
+                } catch (java.io.IOException error) {
+                    MIGRATION_LOG.error("Config backup failed; preserving the existing source rate and schema for retry: {}", backup, error);
+                    return;
+                }
+                double oldMultiplier = SOURCE_JAR_SYNERGY_MULTIPLIER.get();
+                double migratedMultiplier = com.otectus.arsnspells.util.SourceSynergyPolicy.migratePerScanMultiplier(
+                    oldMultiplier, SOURCE_JAR_SCAN_INTERVAL_TICKS.get());
+                SOURCE_JAR_SYNERGY_MULTIPLIER.set(migratedMultiplier);
+                migrated.add("  source_jar_synergy_multiplier: " + oldMultiplier + " per scan -> "
+                    + migratedMultiplier + " per second (average income preserved; backup " + backup + ")");
+            }
+            if (PAYMENT_POLICY_AUTO.equalsIgnoreCase(rawPayment)) {
+                PAYMENT_OPEN_FAILURE_POLICY.set(EFFECTIVE_PAYMENT_POLICY.name().toLowerCase(java.util.Locale.ROOT));
+            }
             // Stamp the schema so the next load reads it from the file instead of probing the
             // filesystem again. Without this the same world would resolve differently on its
             // second start, when the file is no longer new.
             migrated.add("  config_schema_version: " + schemaRead + " -> " + CURRENT_SCHEMA_VERSION
-                + " (freshly generated config stamped with the current schema)");
+                + " (migration completed; subsequent loads do not repeat it)");
             AnsConfig.CONFIG_SCHEMA_VERSION.set(CURRENT_SCHEMA_VERSION);
             safeSave();
         }

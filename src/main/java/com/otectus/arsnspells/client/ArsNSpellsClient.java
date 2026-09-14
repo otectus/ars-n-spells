@@ -19,6 +19,11 @@ import org.slf4j.LoggerFactory;
 @Mod.EventBusSubscriber(modid = ArsNSpells.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class ArsNSpellsClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(ArsNSpellsClient.class);
+
+    @SubscribeEvent
+    public static void registerIconReload(net.minecraftforge.client.event.RegisterClientReloadListenersEvent event) {
+        event.registerReloadListener(com.otectus.arsnspells.client.icons.SpellIconRegistry.INSTANCE);
+    }
     
     /**
      * Client setup event
@@ -35,16 +40,37 @@ public class ArsNSpellsClient {
             com.otectus.arsnspells.registry.ModMenus.SPELL_LOOM.get(),
             com.otectus.arsnspells.client.screen.SpellLoomScreen::new));
 
-        // Enable overlay diagnostics if debug mode is on
-        if (AnsConfig.DEBUG_MODE.get()) {
-            LOGGER.info("Debug mode enabled - activating overlay diagnostics");
-            OverlayDiagnostics.enable();
-        }
+        // DEBUG_MODE is SERVER-owned and is not available at client setup.
+        // Loading/reloading handlers below run after world configuration arrives.
 
         // N-4: surface silent aura-bar HUD-mixin breakage on Covenant version drift.
         probeCovenantHudCompat();
         
         LOGGER.info("Client-side initialization complete");
+    }
+
+    @SubscribeEvent
+    public static void onClientConfigLoaded(net.minecraftforge.fml.event.config.ModConfigEvent.Loading event) {
+        syncDiagnostics(event.getConfig().getModId());
+    }
+
+    @SubscribeEvent
+    public static void onClientConfigReloaded(net.minecraftforge.fml.event.config.ModConfigEvent.Reloading event) {
+        syncDiagnostics(event.getConfig().getModId());
+    }
+
+    @SubscribeEvent
+    public static void onClientConfigUnloaded(net.minecraftforge.fml.event.config.ModConfigEvent.Unloading event) {
+        if (ArsNSpells.MODID.equals(event.getConfig().getModId()))
+            net.minecraft.client.Minecraft.getInstance().execute(OverlayDiagnostics::disable);
+    }
+
+    private static void syncDiagnostics(String modId) {
+        if (!ArsNSpells.MODID.equals(modId)) return;
+        net.minecraft.client.Minecraft.getInstance().execute(() -> {
+            if (AnsConfig.DEBUG_MODE.get()) OverlayDiagnostics.enable();
+            else OverlayDiagnostics.disable();
+        });
     }
     
     /**

@@ -1,27 +1,27 @@
 package com.otectus.arsnspells.augmentation;
 
 import com.otectus.arsnspells.config.AnsConfig;
-import io.redspace.ironsspellbooks.api.magic.MagicData;
-import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
+import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.bridge.IManaBridge;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.fml.ModList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
-import java.util.Set;
+
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
+
 
 public class ResonanceManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(ResonanceManager.class);
     /** Audit D4: log the first compute failure per session so a broken Iron's API surface isn't invisible. */
     private static final AtomicBoolean loggedComputeFailure = new AtomicBoolean(false);
     // Fixed: Use UUID instead of Player to prevent garbage collection issues
-    private static final Map<UUID, Double> resonanceCache = new ConcurrentHashMap<>();
+    private static final Map<UUID, ResonanceState> resonanceCache = new ConcurrentHashMap<>();
     /** ANS-HIGH-007 / E-MED-06: volatile so the network-thread write is visible to the render thread. */
     private static volatile double clientResonance = 1.0;
 
@@ -32,7 +32,7 @@ public class ResonanceManager {
         if (player.level().isClientSide()) {
             return clientResonance;
         }
-        return resonanceCache.getOrDefault(player.getUUID(), 1.0);
+        return resonanceCache.getOrDefault(player.getUUID(), ResonanceState.INACTIVE).multiplier();
     }
 
     public static void setClientResonance(float value) {
@@ -45,43 +45,44 @@ public class ResonanceManager {
         clientResonance = Math.max(0.0, Math.min(100.0, (double) value));
     }
 
-    public static void computeResonance(Player player) {
-        try {
-            if (player == null || !AnsConfig.ENABLE_RESONANCE_SYSTEM.get()) {
-                return;
-            }
-            if (!ModList.get().isLoaded("irons_spellbooks")) {
-                return;
-            }
-            MagicData data = MagicData.getPlayerMagicData(player);
-            if (data == null) {
-                return;
-            }
-            double maxMana = player.getAttributeValue(AttributeRegistry.MAX_MANA.get());
-            // ANS-HIGH-007: clamp manaPercent to [0,1]. Iron's MagicData.getMana() can
-            // briefly exceed maxMana from external buff scripts or attribute injection;
-            // without the clamp, resonance scales unboundedly into spell damage.
-            double rawPercent = data.getMana() / Math.max(1.0, maxMana);
-            double manaPercent = Math.max(0.0, Math.min(1.0, rawPercent));
-            double strength = AnsConfig.RESONANCE_STRENGTH.get();
-            double cap = AnsConfig.MAX_DAMAGE_MULTIPLIER.get();
+    public static double getArsResonance(Player player) {
+        return AnsConfig.ENABLE_ARS_RESONANCE.get() ? getResonance(player) : 1.0;
+    }
 
-            // Cap the final resonance to the documented MAX_DAMAGE_MULTIPLIER ceiling.
-            double resonance = Math.min(cap, 1.0 + (manaPercent * strength * 0.2));
-            if (!Double.isFinite(resonance)) resonance = 1.0;
-            resonanceCache.put(player.getUUID(), resonance);
+    public static double getIronsResonance(Player player) {
+        return AnsConfig.ENABLE_IRONS_RESONANCE.get() ? getResonance(player) : 1.0;
+    }
+
+    public static double cachedResonance(Player player) {
+        return resonanceCache.getOrDefault(player.getUUID(), ResonanceState.INACTIVE).multiplier();
+    }
+
+    public static void computeResonance(Player player) {
+        if (player == null) return;
+        if (!AnsConfig.ENABLE_RESONANCE_SYSTEM.get() || !BridgeManager.isUnificationEnabled()
+                || !BridgeManager.isIronsSpellbooksLoaded()) {
+            clear(player);
+            return;
+        }
+        try {
+            // Shared modes use their authoritative pool. Separate mode deliberately uses
+            // native Ars mana for this global synergy, never a mirrored Iron's shadow.
+            IManaBridge bridge = BridgeManager.getCurrentMode() == com.otectus.arsnspells.config.ManaUnificationMode.SEPARATE
+                ? BridgeManager.getNativeArsBridge() : BridgeManager.getBridge();
+            ResonanceState next = ResonanceState.update(resonanceCache.get(player.getUUID()),
+                player.level().getGameTime(), bridge.getMana(player), bridge.getMaxMana(player),
+                AnsConfig.RESONANCE_THRESHOLD.get(), AnsConfig.RESONANCE_DURATION.get(),
+                AnsConfig.RESONANCE_STRENGTH.get(), AnsConfig.MAX_DAMAGE_MULTIPLIER.get());
+            resonanceCache.put(player.getUUID(), next);
         } catch (Exception e) {
-            // Degrade to no resonance if Iron's API is unavailable, but say so once:
-            // a silent catch here masked "resonance does nothing" regressions (audit D4).
+            clear(player);
             if (loggedComputeFailure.compareAndSet(false, true)) {
-                LOGGER.warn("[ANS] Resonance computation failed; resonance will stay at 1.0 "
-                    + "until the cause is fixed (further failures logged at debug)", e);
+                LOGGER.warn("[ANS] Resonance computation failed; using neutral resonance", e);
             } else {
                 LOGGER.debug("[ANS] Resonance computation failed", e);
             }
         }
     }
-
     public static void clear(Player player) {
         if (player != null) {
             resonanceCache.remove(player.getUUID());

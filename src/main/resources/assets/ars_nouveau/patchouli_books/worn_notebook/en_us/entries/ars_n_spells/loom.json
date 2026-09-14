@@ -1,0 +1,21 @@
+{
+  "category": "ars_nouveau:ars_n_spells",
+  "icon": "ars_n_spells:spell_loom",
+  "name": "ars_n_spells.book.loom.name",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.loom.1"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.loom.2"
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "ars_n_spells:spell_loom"
+    }
+  ],
+  "flag": "mod:irons_spellbooks"
+}

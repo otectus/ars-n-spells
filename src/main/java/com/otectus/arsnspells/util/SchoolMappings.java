@@ -25,11 +25,102 @@ public final class SchoolMappings {
 
     private final Map<String, SpellSchoolId> glyphSchools;
     private final Map<String, SpellSchoolId> arsSchools;
+    private final Map<String, java.util.List<String>> glyphKeys;
+    private final Map<String, java.util.List<String>> arsKeys;
+    private final Map<String, String> provenance;
+    private final String digest;
 
     private SchoolMappings(Map<String, SpellSchoolId> glyphSchools,
                            Map<String, SpellSchoolId> arsSchools) {
-        this.glyphSchools = Collections.unmodifiableMap(glyphSchools);
-        this.arsSchools = Collections.unmodifiableMap(arsSchools);
+        this(toKeys(glyphSchools), toKeys(arsSchools), Map.of());
+    }
+
+    private SchoolMappings(Map<String, java.util.List<String>> glyphKeys,
+                           Map<String, java.util.List<String>> arsKeys,
+                           Map<String, String> provenance) {
+        this.glyphKeys = immutable(glyphKeys);
+        this.arsKeys = immutable(arsKeys);
+        this.glyphSchools = project(this.glyphKeys);
+        this.arsSchools = project(this.arsKeys);
+        this.provenance = Collections.unmodifiableMap(new java.util.TreeMap<>(provenance));
+        try {
+            String canonical = this.glyphKeys + "\n" + this.arsKeys + "\n" + this.provenance;
+            this.digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest
+                .getInstance("SHA-256").digest(canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private static Map<String, java.util.List<String>> immutable(Map<String, java.util.List<String>> input) {
+        Map<String, java.util.List<String>> result = new java.util.TreeMap<>();
+        input.forEach((key, values) -> result.put(key.toLowerCase(Locale.ROOT),
+            values.isEmpty() ? java.util.List.of(SchoolKeys.GENERIC) : values.stream().map(SchoolKeys::normalize).distinct().toList()));
+        return Collections.unmodifiableMap(result);
+    }
+
+    private static Map<String, java.util.List<String>> toKeys(Map<String, SpellSchoolId> input) {
+        Map<String, java.util.List<String>> result = new HashMap<>();
+        input.forEach((key, value) -> result.put(key, java.util.List.of(SchoolKeys.normalize(value.id()))));
+        return result;
+    }
+
+    private static Map<String, SpellSchoolId> project(Map<String, java.util.List<String>> input) {
+        Map<String, SpellSchoolId> result = new HashMap<>();
+        input.forEach((key, values) -> result.put(key,
+            values.isEmpty() ? SpellSchoolId.GENERIC : SchoolKeys.builtin(values.get(0))));
+        return Collections.unmodifiableMap(result);
+    }
+
+    /** Publish a validated server overlay in one atomic swap. */
+    public static void applyKeyOverlay(Map<String, java.util.List<String>> glyphs,
+                                       Map<String, java.util.List<String>> ars,
+                                       Map<String, String> sources) {
+        Map<String, java.util.List<String>> merged = toKeys(builtinGlyphSchools());
+        merged.putAll(glyphs);
+        current = new SchoolMappings(merged, ars, sources);
+    }
+
+    /** Server semantic snapshot, already includes built-ins. Used by client synchronization. */
+    public static void acceptSnapshot(Map<String, java.util.List<String>> glyphs,
+                                      Map<String, java.util.List<String>> ars,
+                                      Map<String, String> sources, String expectedDigest) {
+        SchoolMappings snapshot = new SchoolMappings(glyphs, ars, sources);
+        if (!snapshot.digest.equals(expectedDigest)) throw new IllegalArgumentException("School snapshot digest mismatch");
+        current = snapshot;
+    }
+
+    public Map<String, java.util.List<String>> glyphKeys() { return glyphKeys; }
+    public Map<String, java.util.List<String>> arsKeys() { return arsKeys; }
+    public Map<String, String> provenance() { return provenance; }
+    public String digest() { return digest; }
+    public static void applyMultiOverlay(Map<String, java.util.List<SpellSchoolId>> glyphs,
+                                         Map<String, java.util.List<SpellSchoolId>> ars) {
+        Map<String, java.util.List<String>> g = new HashMap<>();
+        Map<String, java.util.List<String>> a = new HashMap<>();
+        if (glyphs != null) glyphs.forEach((key, values) -> {
+            if (key != null && values != null) g.put(key, values.stream().filter(java.util.Objects::nonNull)
+                .map(value -> SchoolKeys.normalize(value.id())).distinct().toList());
+        });
+        if (ars != null) ars.forEach((key, values) -> {
+            if (key != null && values != null) a.put(key, values.stream().filter(java.util.Objects::nonNull)
+                .map(value -> SchoolKeys.normalize(value.id())).distinct().toList());
+        });
+        applyKeyOverlay(g, a, Map.of());
+    }
+    public java.util.List<SpellSchoolId> glyphSchoolsAll(String id) {
+        java.util.List<String> values = glyphSchoolKeys(id);
+        return values == null ? null : values.stream().map(SchoolKeys::builtin).distinct().toList();
+    }
+    public java.util.List<SpellSchoolId> arsSchoolsAll(String id) {
+        java.util.List<String> values = arsSchoolKeys(id);
+        return values == null ? null : values.stream().map(SchoolKeys::builtin).distinct().toList();
+    }
+    public java.util.List<String> glyphSchoolKeys(String id) {
+        return id == null ? null : glyphKeys.get(id.toLowerCase(Locale.ROOT));
+    }
+    public java.util.List<String> arsSchoolKeys(String id) {
+        return id == null ? null : arsKeys.get(id.toLowerCase(Locale.ROOT));
     }
 
     /** The active snapshot. */

@@ -43,98 +43,77 @@ public class RegenSynergyHandler {
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.player.level().isClientSide()) {
+        if (event.phase != TickEvent.Phase.END || event.player.level().isClientSide()) return;
+        Player player = event.player;
+        UUID playerId = player.getUUID();
+        if (!IronsCompat.isLoaded() || !BridgeManager.isUnificationEnabled()
+                || !AnsConfig.ENABLE_SOURCE_JAR_SYNERGY.get()) {
+            sourceJarCacheMap.remove(playerId);
             return;
         }
-        if (!IronsCompat.isLoaded()) {
-            return;
-        }
-        if (!BridgeManager.isUnificationEnabled()) {
-            return;
-        }
-        // ANS-CRIT-005 follow-up: server-owner kill switch for this feature only.
-        if (!AnsConfig.ENABLE_SOURCE_JAR_SYNERGY.get()) {
-            return;
-        }
-
+        Level level = player.level();
+        BlockPos pos = player.blockPosition();
+        long now = level.getGameTime();
         int scanInterval = Math.max(1, AnsConfig.SOURCE_JAR_SCAN_INTERVAL_TICKS.get());
-        if (event.player.tickCount % scanInterval == 0) {
-            Player player = event.player;
-            Level level = player.level();
-            BlockPos pos = player.blockPosition();
-
-            // Check cache: only re-scan if player moved beyond threshold
-            UUID playerId = player.getUUID();
-            SourceJarCache cached = sourceJarCacheMap.get(playerId);
-            double threshold = AnsConfig.SOURCE_JAR_CACHE_MOVE_THRESHOLD.get();
-            double thresholdSq = threshold * threshold;
-
-            boolean needsScan = cached == null
-                || !cached.dimension.equals(level.dimension())
-                || pos.distSqr(cached.scanPosition) > thresholdSq;
-
-            // Defensive clamp even though the config spec already enforces 1..8.
-            int radius = Math.min(8, Math.max(1, AnsConfig.SOURCE_JAR_SCAN_RADIUS.get()));
-
-            boolean nearSource;
-            if (needsScan) {
-                // ANS-CRIT-005: never scan while the covered chunks are still loading.
-                // getBlockState on an unloaded chunk forces a synchronous chunk load on
-                // the server thread (ServerChunkCache.getChunkBlocking), which deadlocked
-                // 2.6.1 during login/teleport chunk streaming. Skip the cycle and leave
-                // the cache untouched so the scan retries next second once chunks arrive;
-                // caching a result now would pin a false negative for the whole move
-                // threshold. The guard stays all-or-nothing rather than scanning loaded
-                // chunks individually: a partial scan result cannot be cached safely
-                // (it would pin false negatives for jars in the unloaded portion), and
-                // an uncached partial scan is behaviourally identical to skip-and-retry.
-                if (areScanChunksLoaded(level, pos, radius)) {
-                    long startNanos = System.nanoTime();
-                    nearSource = scanForSourceJar(level, pos, radius);
-                    long elapsed = System.nanoTime() - startNanos;
-                    scansRun.incrementAndGet();
-                    if (nearSource) {
-                        jarsFound.incrementAndGet();
-                    }
-                    if (elapsed > SLOW_SCAN_WARN_NANOS && isDebugMode()) {
-                        LOGGER.warn("[ANS] SourceJar scan took {} ms (radius {})",
-                            elapsed / 1_000_000L, radius);
-                    }
-                    sourceJarCacheMap.put(playerId, new SourceJarCache(pos, nearSource, level.dimension()));
-                } else {
-                    scansSkippedUnloaded.incrementAndGet();
-                    nearSource = false;
+        int radius = Math.min(8, Math.max(1, AnsConfig.SOURCE_JAR_SCAN_RADIUS.get()));
+        double threshold = AnsConfig.SOURCE_JAR_CACHE_MOVE_THRESHOLD.get();
+        SourceJarCache cached = sourceJarCacheMap.get(playerId);
+        boolean needsScan = cached == null || !cached.dimension.equals(level.dimension())
+            || cached.radius != radius || cached.generation != tagGeneration
+            || pos.distSqr(cached.scanPosition) > threshold * threshold
+            || com.otectus.arsnspells.util.SourceSynergyPolicy.expired(cached.scannedAt, now, scanInterval);
+        boolean nearSource = cached != null && cached.nearSource;
+        if (needsScan) {
+            // Guard every covered chunk before any block read. An unavailable chunk is
+            // not cached as a negative result, and no stale positive earns mana meanwhile.
+            if (areScanChunksLoaded(level, pos, radius)) {
+                long startNanos = System.nanoTime();
+                nearSource = scanForSourceJar(level, pos, radius);
+                long elapsed = System.nanoTime() - startNanos;
+                scansRun.incrementAndGet();
+                if (nearSource) jarsFound.incrementAndGet();
+                if (elapsed > SLOW_SCAN_WARN_NANOS && isDebugMode()) {
+                    LOGGER.warn("[ANS] SourceJar scan took {} ms (radius {})", elapsed / 1_000_000L, radius);
                 }
+                sourceJarCacheMap.put(playerId,
+                    new SourceJarCache(pos.immutable(), nearSource, level.dimension(), now, radius, tagGeneration));
             } else {
-                nearSource = cached.nearSource;
+                scansSkippedUnloaded.incrementAndGet();
+                sourceJarCacheMap.remove(playerId);
+                nearSource = false;
             }
-
-            maybeLogDebugSummary(level.getGameTime());
-
-            if (nearSource) {
-                try {
-                    float boost = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get().floatValue()
-                        * AnsConfig.SOURCE_JAR_SYNERGY_MULTIPLIER.get().floatValue();
-                    com.otectus.arsnspells.bridge.IManaBridge bridge =
-                        com.otectus.arsnspells.bridge.BridgeManager.getBridge();
-                    float current = bridge.getMana(player);
-                    float max = bridge.getMaxMana(player);
-                    bridge.setMana(player, Math.min(current + boost, max));
-                } catch (Exception e) {
-                    // Degrade to no synergy boost if the bridge is unavailable, but say so
-                    // once: a silent catch here masked "synergy does nothing" regressions
-                    // (audit D4).
-                    if (loggedBoostFailure.compareAndSet(false, true)) {
-                        LOGGER.warn("[ANS] Source Jar synergy mana boost failed; synergy is "
-                            + "inactive until the cause is fixed (further failures logged at debug)", e);
-                    } else {
-                        LOGGER.debug("[ANS] Source Jar synergy mana boost failed", e);
-                    }
-                }
+        }
+        maybeLogDebugSummary(now);
+        if (!nearSource) return;
+        try {
+            double rate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get()
+                * AnsConfig.SOURCE_JAR_SYNERGY_MULTIPLIER.get();
+            float boost = (float) com.otectus.arsnspells.util.SourceSynergyPolicy.income(rate, 1);
+            com.otectus.arsnspells.bridge.IManaBridge bridge = BridgeManager.getBridge();
+            float current = bridge.getMana(player);
+            float max = bridge.getMaxMana(player);
+            bridge.setMana(player, Math.min(current + boost, max));
+        } catch (Exception e) {
+            if (loggedBoostFailure.compareAndSet(false, true)) {
+                LOGGER.warn("[ANS] Source Jar synergy mana boost failed; further failures logged at debug", e);
+            } else {
+                LOGGER.debug("[ANS] Source Jar synergy mana boost failed", e);
             }
         }
     }
 
+    private static volatile long tagGeneration;
+
+    @SubscribeEvent
+    public void onTagsUpdated(net.minecraftforge.event.TagsUpdatedEvent event) {
+        tagGeneration++;
+        sourceJarCacheMap.clear();
+    }
+
+    @SubscribeEvent
+    public void onServerStopping(net.minecraftforge.event.server.ServerStoppingEvent event) {
+        sourceJarCacheMap.clear();
+    }
     @SubscribeEvent
     public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         sourceJarCacheMap.remove(event.getEntity().getUUID());
@@ -202,11 +181,18 @@ public class RegenSynergyHandler {
         final BlockPos scanPosition;
         final boolean nearSource;
         final ResourceKey<Level> dimension;
+        final long scannedAt;
+        final int radius;
+        final long generation;
 
-        SourceJarCache(BlockPos scanPosition, boolean nearSource, ResourceKey<Level> dimension) {
+        SourceJarCache(BlockPos scanPosition, boolean nearSource, ResourceKey<Level> dimension,
+                       long scannedAt, int radius, long generation) {
             this.scanPosition = scanPosition;
             this.nearSource = nearSource;
             this.dimension = dimension;
+            this.scannedAt = scannedAt;
+            this.radius = radius;
+            this.generation = generation;
         }
     }
 }

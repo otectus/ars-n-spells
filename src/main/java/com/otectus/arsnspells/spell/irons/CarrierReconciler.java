@@ -68,6 +68,7 @@ public final class CarrierReconciler {
             return Outcome.UNCHANGED;
         }
 
+        if (CrossCastNbt.schemaVersion(stack.getTag()) > CrossCastNbt.SCHEMA_VERSION) return Outcome.UNCHANGED;
         boolean containerRepaired = repairCarrierContainer(stack);
         boolean orphansRemoved = removeOrphanProxySlots(stack);
 

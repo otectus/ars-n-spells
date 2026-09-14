@@ -210,13 +210,24 @@ public final class IronsBookBindingUtil {
     public static AppendResult appendArsSpellToBook(ItemStack book, CompoundTag arsTag,
                                                     String customName, String nature,
                                                     String iconSymbol, int maxCap) {
-        if (book == null || book.isEmpty() || arsTag == null || arsTag.isEmpty()) {
+        if (book == null || book.isEmpty()) return AppendResult.FAILED;
+        ItemStack working = book.copy();
+        AppendResult result = appendToWorkingCopy(working, arsTag, customName, nature, iconSymbol, maxCap);
+        if (result.wasAdded()) book.setTag(working.getTag() == null ? null : working.getTag().copy());
+        return result;
+    }
+
+    private static AppendResult appendToWorkingCopy(ItemStack book, CompoundTag arsTag,
+                                                    String customName, String nature,
+                                                    String iconSymbol, int maxCap) {
+        if (book == null || book.isEmpty() || arsTag == null || arsTag.isEmpty()
+            || CrossCastNbt.schemaVersion(book.getTag()) > CrossCastNbt.SCHEMA_VERSION) {
             return AppendResult.FAILED;
         }
         // Binding is a natural repair point: the book is in hand and about to be rewritten
         // anyway, so clear out any orphan wheel slots a pre-fix uninscribe left behind before
         // allocating a new pool id — otherwise a stale slot can hold an id this bind wants.
-        if (IronsCompat.isLoaded()) {
+        if (IronsCompat.isLoaded() && isIronsSpellBook(book)) {
             com.otectus.arsnspells.spell.irons.CarrierReconciler.reconcile(book);
         }
         if (containsEquivalentArsSpell(book, arsTag)) {
@@ -238,7 +249,7 @@ public final class IronsBookBindingUtil {
         // slot). Ignoring its result used to leave a sidecar entry with no wheel
         // slot: invisible, uncastable, and reported to the player as success. Roll
         // the sidecar back so the book is byte-identical to before the attempt.
-        if (IronsCompat.isLoaded()
+        if (IronsCompat.isLoaded() && isIronsSpellBook(book)
             && !com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.addProxySlot(book, poolId, 1)) {
             CrossCastNbt.removeEntryByProxyPoolId(bookTag, poolId);
             return AppendResult.FAILED;
@@ -311,11 +322,15 @@ public final class IronsBookBindingUtil {
                 }
             }
         }
+        if (IronsCompat.isLoaded()) {
+            com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.restoreBaseCapacity(stack);
+        }
         CrossCastNbt.clearCrossModSpells(stack);
         // clearCrossModSpells may have dropped the root tag entirely; re-read before
         // touching the marker so this cannot resurrect an empty compound.
         if (stack.hasTag() && stack.getTag() != null) {
             stack.getTag().remove(ArsSpellExportUtil.TAG_EXPORT_MODE);
+            stack.getTag().remove(CrossCastNbt.TAG_NATIVE_BASE_CAPACITY);
             if (stack.getTag().isEmpty()) {
                 stack.setTag(null);
             }

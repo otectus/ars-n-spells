@@ -3,6 +3,7 @@
 .gradle/
 .vscode/
 .idea/
+.worktrees/
 *.iml
 
 # Build output
@@ -17,6 +18,7 @@ run-*/
 # Dependencies & local copies
 dependencies/
 mods/
+libs/
 covenant_extract/
 io/
 /com/
@@ -32,3 +34,12 @@ gradle-8.4-bin.zip
 nul
 $null
 *.log
+
+# Python tooling bytecode
+__pycache__/
+
+# Local Claude Code session data and worktrees
+.claude/
+
+# Local texture/model backups (superseded assets remain in git history)
+backups/

@@ -53,6 +53,10 @@ public final class CrossCastValidator {
             return ValidationResult.failure("arsnspells.crosscast.invalid.empty_payload");
         }
 
+        if (!com.otectus.arsnspells.util.PayloadBudget.tag(spellEntry)
+            || !com.otectus.arsnspells.util.PayloadBudget.name(spellEntry.getString(CrossCastNbt.TAG_CUSTOM_NAME))) {
+            return ValidationResult.failure("arsnspells.crosscast.invalid.payload_budget");
+        }
         CrossSpellType type = resolveType(spellEntry);
         if (type == null) {
             return ValidationResult.failure("arsnspells.crosscast.invalid.spell_type");
@@ -66,6 +70,9 @@ public final class CrossCastValidator {
                 CompoundTag arsTag = spellEntry.getCompound(CrossCastNbt.TAG_ARS_SPELL);
                 if (arsTag.isEmpty()) {
                     return ValidationResult.failure("arsnspells.crosscast.invalid.ars_spell_empty");
+                }
+                if (!com.otectus.arsnspells.util.PayloadBudget.arsSpell(arsTag)) {
+                    return ValidationResult.failure("arsnspells.crosscast.invalid.payload_budget");
                 }
                 ResourceLocation arsId = ResourceLocation.tryParse(spellEntry.getString(CrossCastNbt.TAG_SPELL_ID));
                 return ValidationResult.success(CrossSpellType.ARS_NOUVEAU, arsId);

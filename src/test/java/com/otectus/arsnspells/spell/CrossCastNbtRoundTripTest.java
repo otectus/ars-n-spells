@@ -115,4 +115,18 @@ class CrossCastNbtRoundTripTest {
         assertEquals(new CompoundTag(), stack,
             "after clearing all inscriptions, the tag is empty");
     }
+    @Test void futureSchemaIsNotRestampedOrAppendedAndUnknownDataStaysRecoverable() {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt(CrossCastNbt.TAG_SCHEMA_VERSION, CrossCastNbt.SCHEMA_VERSION + 5);
+        CompoundTag future = new CompoundTag();
+        future.putString("unknown:addon", "recoverable");
+        tag.put("future_payload", future);
+        CompoundTag original = tag.copy();
+        CrossCastNbt.stampSchemaVersion(tag);
+        int result = CrossCastNbt.addArsEntryWithMetaToTag(tag,
+            new ResourceLocation("ars_nouveau", "spell"), 1, new CompoundTag(), 1, "name", "fire", "flame");
+        assertEquals(-1, result);
+        assertEquals(original, tag);
+    }
+
 }

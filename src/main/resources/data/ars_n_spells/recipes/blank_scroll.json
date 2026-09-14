@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "ars_nouveau:blank_parchment" },
+    { "item": "ars_nouveau:source_gem" }
+  ],
+  "result": {
+    "item": "ars_n_spells:blank_scroll"
+  }
+}

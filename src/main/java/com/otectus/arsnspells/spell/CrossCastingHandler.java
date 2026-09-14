@@ -108,7 +108,8 @@ public class CrossCastingHandler {
                 ? CrossCastRequestPacket.Action.CYCLE
                 : CrossCastRequestPacket.Action.CAST;
             int clientIndex = peekSelectedIndex(stack);
-            PacketHandler.sendToServer(new CrossCastRequestPacket(hand, action, clientIndex, clientAttempt));
+            PacketHandler.sendToServer(new CrossCastRequestPacket(hand, action, clientIndex, clientAttempt,
+                com.otectus.arsnspells.network.CarrierFingerprint.of(stack)));
             CrossCastTrace.log(clientAttempt, player, CrossCastTrace.Side.C,
                 CrossCastTrace.Stage.REQUEST_SENT,
                 "hand", hand, "action", action, "index", clientIndex);
@@ -139,10 +140,19 @@ public class CrossCastingHandler {
         if (player == null || item == null || item.isEmpty()) {
             return false;
         }
+        if (hand != InteractionHand.MAIN_HAND || action == null || !player.isAlive()
+            || player.isSpectator() || player.isSleeping() || player.containerMenu != player.inventoryMenu
+            || item != player.getItemInHand(hand) || IronsBookBindingUtil.isIronsSpellBook(item)) {
+            return false;
+        }
         if (!item.hasTag() || !item.getTag().contains(TAG_CROSS_MOD_SPELLS)) {
             return false;
         }
 
+        if (CrossCastNbt.schemaVersion(item.getTag()) > CrossCastNbt.SCHEMA_VERSION) {
+            player.displayClientMessage(Component.translatable("arsnspells.crosscast.invalid.future_schema"), true);
+            return false;
+        }
         CompoundTag tag = item.getTag();
         ListTag spellList = tag.getList(TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
         if (spellList.isEmpty()) {
@@ -216,6 +226,16 @@ public class CrossCastingHandler {
      */
     public static boolean castArsSpell(Player player, ItemStack item, InteractionHand hand,
         CompoundTag spellData, UUID attemptId) {
+        if (item == null || CrossCastNbt.schemaVersion(item.getTag()) > CrossCastNbt.SCHEMA_VERSION) {
+            player.displayClientMessage(Component.translatable("arsnspells.crosscast.invalid.future_schema"), true);
+            return false;
+        }
+        if (!com.otectus.arsnspells.util.PayloadBudget.tag(spellData)
+            || !com.otectus.arsnspells.util.PayloadBudget.name(spellData.getString(CrossCastNbt.TAG_CUSTOM_NAME))
+            || !com.otectus.arsnspells.util.PayloadBudget.arsSpell(spellData.getCompound(TAG_ARS_SPELL))) {
+            player.displayClientMessage(Component.translatable("arsnspells.crosscast.invalid.payload_budget"), true);
+            return false;
+        }
         CompoundTag arsSpellTag = spellData.getCompound(TAG_ARS_SPELL);
         if (arsSpellTag.isEmpty()) {
             LOGGER.warn("Cross-mod Ars spell missing ars_spell tag: {}", spellData);
@@ -269,16 +289,7 @@ public class CrossCastingHandler {
         } finally {
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
                 CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "ARS", "success", success);
-            if (!success) {
-                // V01: nothing is pre-paid during cost calculation any more, so there is
-                // no compensating refund to make here. A reservation that was taken at the
-                // pre-cast gate and never committed is released by the ledger - exactly
-                // once, whether this path or the TTL sweep gets there first.
-                CrossCastContext.take(player);
-                CastLedger.findOpen(player.getUUID(),
-                        CastLedger.carrierIdentity(item))
-                    .ifPresent(attempt -> CastLedger.cancel(attempt, CastLedger.forPlayer(player)));
-            }
+            CrossCastContext.clear(player);
         }
     }
 
@@ -302,95 +313,22 @@ public class CrossCastingHandler {
             return false;
         }
 
-        int spellLevel = Math.max(1, spellData.getInt(TAG_SPELL_LEVEL));
-        int castLevel = spell.getLevelFor(spellLevel, player);
-        io.redspace.ironsspellbooks.api.spells.CastSource source =
-            parseCastSource(spellData, io.redspace.ironsspellbooks.api.spells.CastSource.SPELLBOOK);
-
-        float multiplier = (float) Math.max(0.0, AnsConfig.CROSS_CAST_COST_MULTIPLIER.get());
-        ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        boolean unified = BridgeManager.isUnificationEnabled();
-        if (unified && mode == ManaUnificationMode.SEPARATE) {
-            float baseCost = spell.getManaCost(castLevel);
-            // Apply the cross-cast multiplier once, on the base cost, before the
-            // SEPARATE-mode dual-cost split. The handler in CrossCastIronsHandler
-            // reads entry.issCost as-is to avoid a second application at event time.
-            float totalCost = baseCost * multiplier;
-            float arsPercent = AnsConfig.DUAL_COST_ARS_PERCENTAGE.get().floatValue();
-            float issPercent = AnsConfig.DUAL_COST_ISS_PERCENTAGE.get().floatValue();
-            float arsCost = (float) (totalCost * arsPercent * AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
-            float issCost = totalCost * issPercent;
-
-            if (!player.isCreative() && arsCost > 0.0f) {
-                float arsMana = BridgeManager.getBridge().getMana(player);
-                if (arsMana < arsCost) {
-                    logDebug("Insufficient Ars mana for cross-cast: need {}, have {}", arsCost, arsMana);
-                    return false;
-                }
-            }
-
-            logDebug("Iron's cross-cast (SEPARATE) {}: base={} multiplier={} total={} ars={} iss={}",
-                spellId, baseCost, multiplier, totalCost, arsCost, issCost);
-
-            CrossCastContext.begin(player, CrossSpellType.IRONS_SPELLBOOKS,
-                player.level().getGameTime(), arsCost, issCost, spell.getSpellId(), attemptId);
-
-            // ANS-MED-002: try/finally for context cleanup on exception.
-            boolean success = false;
-            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                CrossCastTrace.Stage.UPSTREAM_CAST_ENTER,
-                "runtime", "IRON", "spell", spellId, "mode", mode, "unified", unified);
-            try {
-                success = CrossCastContext.withManaCheckOverride(player, issPercent,
-                    () -> spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT));
-                return success;
-            } finally {
-                CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                    CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "IRON", "success", success);
-                if (!success) {
-                    CrossCastContext.clear(player);
-                }
-            }
-        }
-
-        // Non-SEPARATE (including unified=false): Iron's owns the cost
-        // calculation. The CrossCastIronsHandler applies the multiplier when
-        // SpellOnCastEvent fires; ARS_PRIMARY currency conversion only runs
-        // when unification is enabled.
-        // ANS-MED-002: try/finally for context cleanup on exception.
+        int storedLevel = spellData.getInt(TAG_SPELL_LEVEL);
+        if (storedLevel < 1 || storedLevel > spell.getMaxLevel()) return false;
+        int castLevel = spell.getLevelFor(storedLevel, player);
+        // Generic ANS carriers are reusable. Serialized COMMAND/SCROLL/MOB never bypass
+        // native restrictions or payment; real native scrolls keep their own item pathway.
+        var source = io.redspace.ironsspellbooks.api.spells.CastSource.SPELLBOOK;
         CrossCastContext.begin(player, CrossSpellType.IRONS_SPELLBOOKS,
-            player.level().getGameTime(), 0.0f, 0.0f, spell.getSpellId(), attemptId);
-        boolean success = false;
-        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-            CrossCastTrace.Stage.UPSTREAM_CAST_ENTER,
-            "runtime", "IRON", "spell", spellId, "mode", mode, "unified", unified);
+            player.level().getGameTime(), 0, 0, spell.getSpellId(), attemptId);
+        boolean accepted = false;
         try {
-            success = spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT);
-            return success;
+            accepted = spell.attemptInitiateCast(item, castLevel, player.level(), player, source, true, CROSS_CAST_SLOT);
+            return accepted;
         } finally {
-            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "IRON", "success", success);
-            if (!success) {
-                CrossCastContext.clear(player);
-            }
+            CrossCastContext.clear(player);
         }
     }
-
-    private static io.redspace.ironsspellbooks.api.spells.CastSource parseCastSource(
-        CompoundTag spellData,
-        io.redspace.ironsspellbooks.api.spells.CastSource fallback) {
-
-        String sourceName = spellData.getString(TAG_CAST_SOURCE);
-        if (sourceName.isEmpty()) {
-            return fallback;
-        }
-        try {
-            return io.redspace.ironsspellbooks.api.spells.CastSource.valueOf(sourceName);
-        } catch (IllegalArgumentException ignored) {
-            return fallback;
-        }
-    }
-
     /**
      * Cost events already answered, so one event instance gets one stamp.
      *
@@ -456,46 +394,10 @@ public class CrossCastingHandler {
      * lives on the attempt's quote and is applied when the reservation is taken, and
      * rewriting the event as well would convert it twice.
      */
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onArsSpellCost(SpellCostCalcEvent event) {
-        LivingEntity caster = event.context != null ? event.context.getUnwrappedCaster() : null;
-        if (!(caster instanceof Player player)) {
-            return;
-        }
-        if (player.level().isClientSide()) {
-            return;
-        }
-
-        CrossCastContext.Entry entry = CrossCastContext.peek(player);
-        boolean crossCast = entry != null && entry.type == CrossSpellType.ARS_NOUVEAU;
-        if (!crossCast && !BridgeManager.isUnificationEnabled()) {
-            // Ars prices and charges its own cast; ANS has no opinion and opens no attempt.
-            return;
-        }
-
-        CarrierPolicy carrier = crossCast
-            ? CarrierPolicy.REUSABLE_BOOK_SEMANTICS
-            : CarrierPolicy.NATIVE_ONLY;
-        String carrierIdentity = CastLedger.carrierIdentity(event.context.getCasterTool());
-        int baseEventCost = Math.max(0, event.currentCost);
-
-        int quoted = quoteArsCostForEvent(event, player.getUUID(), carrierIdentity, carrier,
-            baseEventCost, QuoteService.currentRules(), player.level().getGameTime());
-
-        if (!crossCast) {
-            // Native cast: the attempt now holds the quote, but the event keeps reporting
-            // Ars's own number. See the method note above.
-            return;
-        }
-
-        event.currentCost = quoted;
-        CrossCastTrace.log(entry.attemptId, player, CrossCastTrace.Side.S,
-            CrossCastTrace.Stage.ARS_COST_APPLIED,
-            "mode", BridgeManager.getCurrentMode(), "unified", BridgeManager.isUnificationEnabled(),
-            "base", baseEventCost, "final", quoted);
-        logDebug("Ars cross-cast: base={} quoted={}", baseEventCost, quoted);
+        com.otectus.arsnspells.casting.ArsCastPayments.quoteEvent(event);
     }
-
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {

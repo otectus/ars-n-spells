@@ -172,13 +172,13 @@ public final class CastLedger {
         @Override
         public double current(UUID player, ResourceUnit unit) {
             Player p = resolver.apply(player);
-            return p == null ? 0.0d : BridgeManager.getManaForMode(p, unit);
+            return p == null ? 0.0d : BridgeManager.getNativeBridge(unit).getMana(p);
         }
 
         @Override
         public double max(UUID player, ResourceUnit unit) {
             Player p = resolver.apply(player);
-            return p == null ? 0.0d : BridgeManager.getMaxManaForMode(p, unit);
+            return p == null ? 0.0d : BridgeManager.getNativeBridge(unit).getMaxMana(p);
         }
 
         @Override
@@ -187,11 +187,11 @@ public final class CastLedger {
             if (p == null || amount <= 0.0d) {
                 return 0.0d;
             }
-            double before = BridgeManager.getManaForMode(p, unit);
-            if (!BridgeManager.consumeManaForMode(p, (float) amount, unit)) {
+            double before = BridgeManager.getNativeBridge(unit).getMana(p);
+            if (!BridgeManager.getNativeBridge(unit).consumeMana(p, (float) amount)) {
                 return 0.0d;
             }
-            double after = BridgeManager.getManaForMode(p, unit);
+            double after = BridgeManager.getNativeBridge(unit).getMana(p);
             return Math.max(0.0d, before - after);
         }
 
@@ -201,9 +201,9 @@ public final class CastLedger {
             if (p == null || amount <= 0.0d) {
                 return 0.0d;
             }
-            double before = BridgeManager.getManaForMode(p, unit);
-            BridgeManager.addManaForMode(p, (float) amount, unit);
-            double after = BridgeManager.getManaForMode(p, unit);
+            double before = BridgeManager.getNativeBridge(unit).getMana(p);
+            BridgeManager.getNativeBridge(unit).addMana(p, (float) amount);
+            double after = BridgeManager.getNativeBridge(unit).getMana(p);
             return Math.max(0.0d, after - before);
         }
     }

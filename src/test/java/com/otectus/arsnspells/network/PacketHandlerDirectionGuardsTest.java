@@ -5,32 +5,48 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * ANS-HIGH-013 — verifies that all four S2C packets register with an explicit
+ * ANS-HIGH-013 — verifies that every S2C packet registers with an explicit
  * {@code NetworkDirection.PLAY_TO_CLIENT} direction guard so the bus rejects
  * mis-directed payloads from a hostile or buggy client.
  */
 class PacketHandlerDirectionGuardsTest {
 
     @Test
-    void allS2cPackets_haveDirectionGuards() throws IOException {
+    void allPacketsHaveOneExplicitDirectionAndOnlyApprovedCommandsAcceptClientInput() throws IOException {
         String src = Files.readString(Paths.get(
             "src/main/java/com/otectus/arsnspells/network/PacketHandler.java"));
-        // Count the number of S2C packet registrations that include the direction guard.
-        // 3 S2C packets remain (Resonance, Affinity, Cooldown) after AuraSyncPacket was
-        // deleted in the aura-subsystem refactor; CrossCastRequestPacket is the single C2S.
-        // The direction marker is Optional.of(NetworkDirection.PLAY_TO_CLIENT).
-        long s2cGuards = countOccurrences(src, "Optional.of(NetworkDirection.PLAY_TO_CLIENT)");
-        assertTrue(s2cGuards >= 3,
-            "All three remaining S2C packets must register with NetworkDirection.PLAY_TO_CLIENT "
-                + "(ANS-HIGH-013); found " + s2cGuards + " occurrences");
-
-        // The single C2S packet keeps its PLAY_TO_SERVER guard.
-        assertTrue(src.contains("Optional.of(NetworkDirection.PLAY_TO_SERVER)"),
-            "CrossCastRequestPacket must still register with PLAY_TO_SERVER");
+        Set<String> clientCommands = Set.of("CrossCastRequestPacket", "SpellLoomExportPacket");
+        Set<String> requiredSnapshots = Set.of("AffinitySyncPacket", "CooldownSyncPacket",
+            "ResonanceSyncPacket", "SchoolMappingsSyncPacket", "SpellLoomResultPacket",
+            "JournalSnapshotPacket");
+        Matcher registrations = Pattern.compile(
+            "INSTANCE\\.registerMessage\\(id\\+\\+,\\s*(\\w+)\\.class,(.*?)\\);", Pattern.DOTALL).matcher(src);
+        Map<String, String> directions = new HashMap<>();
+        while (registrations.find()) {
+            String packet = registrations.group(1);
+            Matcher guard = Pattern.compile("Optional\\.of\\(NetworkDirection\\.(PLAY_TO_CLIENT|PLAY_TO_SERVER)\\)")
+                .matcher(registrations.group(2));
+            assertTrue(guard.find(), packet + " requires an explicit direction guard");
+            String direction = guard.group(1);
+            assertNull(directions.put(packet, direction), packet + " registered more than once");
+            assertEquals(clientCommands.contains(packet) ? "PLAY_TO_SERVER" : "PLAY_TO_CLIENT", direction,
+                packet + " accepts an unauthorized direction");
+        }
+        assertEquals(countOccurrences(src, "INSTANCE.registerMessage("), (long) directions.size(),
+            "Every registration must be covered, including a newly added registration shape");
+        assertTrue(directions.keySet().containsAll(clientCommands));
+        assertTrue(directions.keySet().containsAll(requiredSnapshots));
     }
 
     @Test

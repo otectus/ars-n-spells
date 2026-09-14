@@ -22,6 +22,10 @@ public final class ClientAffinityPacketHandler {
     private ClientAffinityPacketHandler() {}
 
     public static void apply(String typeName, int level) {
+        apply(java.util.Map.of(typeName, level), false);
+    }
+
+    public static void apply(java.util.Map<String, Integer> levels, boolean replacement) {
         // ANS-LOW-001: Minecraft.getInstance() never returns null in any documented version;
         // the previous mc == null check was dead. Only the player can be null (between worlds).
         Minecraft mc = Minecraft.getInstance();
@@ -29,14 +33,8 @@ public final class ClientAffinityPacketHandler {
             return;
         }
         mc.player.getCapability(AffinityData.AFFINITY_DATA).ifPresent(data -> {
-            try {
-                AffinityType type = AffinityType.valueOf(typeName);
-                data.setLevel(type, level);
-            } catch (IllegalArgumentException e) {
-                // ANS-LOW-004: log mod-version skew so the user can diagnose desync,
-                // instead of silently dropping the packet.
-                LOGGER.warn("Unknown AffinityType from server: {}", typeName);
-            }
+            if (replacement) data.replaceLevels(levels);
+            else levels.forEach(data::setLevel);
         });
     }
 }
