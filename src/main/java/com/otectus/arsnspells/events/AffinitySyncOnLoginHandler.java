@@ -25,9 +25,6 @@ public class AffinitySyncOnLoginHandler {
 
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!AnsConfig.ENABLE_AFFINITY_SYSTEM.get()) {
-            return;
-        }
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
@@ -37,12 +34,10 @@ public class AffinitySyncOnLoginHandler {
         // on login, on respawn and on every dimension change.
         Map<String, Integer> tracked = new java.util.LinkedHashMap<>();
         data.getAllLevels().forEach((key, level) -> {
-            if (level != null && level > 0) {
+            if (AnsConfig.ENABLE_AFFINITY_SYSTEM.get() && level != null && level > 0) {
                 tracked.put(key, level);
             }
         });
-        if (!tracked.isEmpty()) {
-            PacketHandler.sendToClient(new AffinityBulkSyncPayload(tracked), player);
-        }
+        PacketHandler.sendToClient(new AffinityBulkSyncPayload(tracked), player);
     }
 }

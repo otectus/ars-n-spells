@@ -1,9 +1,12 @@
 package com.otectus.arsnspells.gametest;
 
-import com.otectus.arsnspells.compat.CompatIds;
+import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.hollingsworth.arsnouveau.common.spell.effect.EffectHeal;
+import com.hollingsworth.arsnouveau.common.spell.method.MethodSelf;
+import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.events.CrossSpellTooltipHandler;
+import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
-import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -37,6 +40,17 @@ import java.util.List;
 public final class CrossSpellTooltipGameTests {
 
     private CrossSpellTooltipGameTests() {}
+
+    /** The translation key of every translatable line, in order; literals contribute nothing. */
+    private static List<String> translationKeys(List<Component> lines) {
+        List<String> keys = new ArrayList<>();
+        for (Component line : lines) {
+            if (line.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc) {
+                keys.add(tc.getKey());
+            }
+        }
+        return keys;
+    }
 
     /** Drive the real tooltip handler and return only the lines it added. */
     private static List<Component> renderTooltip(GameTestHelper helper, ItemStack stack) {
@@ -132,21 +146,39 @@ public final class CrossSpellTooltipGameTests {
 
     @GameTest(template = "platform")
     public static void ironsLoaded_tooltip_onRealLoomCarrier_survives(GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
-        ItemStack carrier = new ItemStack(Items.BOOK);
-        IronsBookBindingUtil.appendArsSpellToBook(carrier, arsPayload("glyph_heal"));
+        // A real loom carrier, not a book with a payload stapled on: the route lines are
+        // driven by ScrollKind, which only calls a genuine Iron's scroll a carrier.
+        ItemStack carrier = ArsSpellExportUtil.createIronsScrollCarrier(
+            new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE), "Test Weave", "arcane", "spark");
+        if (carrier.isEmpty()) {
+            helper.fail("the loaded profile must produce an actual exported Iron's scroll");
+            return;
+        }
+        List<Component> lines;
         try {
-            List<Component> lines = renderTooltip(helper, carrier);
-            if (lines.size() < 3) {
-                helper.fail("a loom carrier must render a header, an entry and a cast hint, got "
-                    + lines.size() + ": " + lines);
-                return;
-            }
+            lines = renderTooltip(helper, carrier);
         } catch (Throwable t) {
             helper.fail("hovering a Spell Loom carrier must not throw: " + t);
             return;
+        }
+        // A loom carrier carries display metadata and the two-route hint on top of the three
+        // lines every inscribed stack gets, so this asserts the lines that must be there rather
+        // than a total -- a count would break again the next time a line is added.
+        List<String> keys = translationKeys(lines);
+        for (String required : List.of("tooltip.ars_n_spells.cross_spell.header",
+                                       "tooltip.ars_n_spells.cross_spell.entry",
+                                       "tooltip.ars_n_spells.cross_spell.cast_hint",
+                                       "tooltip.ars_n_spells.carrier.routes")) {
+            if (!keys.contains(required)) {
+                helper.fail("a loom carrier tooltip is missing '" + required + "', got " + lines);
+            }
+        }
+        if (lines.stream().noneMatch(line -> line.getString().contains("Test Weave"))) {
+            helper.fail("the name the player gave the weave must appear on its tooltip, got "
+                + lines);
         }
         helper.succeed();
     }

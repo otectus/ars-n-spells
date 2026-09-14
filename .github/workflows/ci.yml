@@ -2,327 +2,88 @@ name: CI
 
 on:
   pull_request:
-    branches: [main, port/neoforge-1.21.1, port/1.21.1-neoforge]
+    branches: [main, "release/**", "port/neoforge-1.21.1", "codex/3.3.0-neoforge-audit"]
   push:
-    branches: [main, port/neoforge-1.21.1, port/1.21.1-neoforge]
+    branches: [main, "release/**", "port/neoforge-1.21.1", "codex/3.3.0-neoforge-audit"]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build-and-test:
-    name: Build and test
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # Minecraft 1.20.5+ requires Java 21. Gradle itself also runs on it here; the
-      # foojay resolver in settings.gradle would provision a toolchain if it did not.
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-
-      - name: Cache Gradle caches
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
+          key: neoforge-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+      - run: chmod +x ./gradlew
+      - name: Verify tooling and icon assets
+        run: |
+          python3 -m unittest discover -s tools -p "test_*.py"
+          python3 tools/generate_icons.py --check
+          python3 tools/verify_icons.py
+      - name: Verify shared domain and golden fixture manifest
+        run: python3 tools/contract_parity.py
 
-      # ModDevGradle decompiles and patches Minecraft into ~/.gradle/caches/neoformruntime.
-      # It is slow (minutes) and keyed only on the NeoForge version, so cache it separately
-      # from the dependency cache above. Replaces the 1.20.1 ForgeGradle cache step.
-      - name: Cache NeoForm runtime
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches/neoformruntime
-          key: neoformruntime-${{ runner.os }}-${{ hashFiles('gradle.properties') }}
-          restore-keys: |
-            neoformruntime-${{ runner.os }}-
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Compile
-        run: ./gradlew compileJava --no-daemon --stacktrace
-
-      - name: Test
-        run: ./gradlew test --no-daemon --stacktrace
-
-      - name: Upload test reports
+      - run: ./gradlew compileJava test --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: neo-unit-results
           path: |
             build/reports/tests/test
             build/test-results/test
 
-  # GameTests run as separate jobs because they are slower and need the full ModDevGradle
-  # environment. There are three, and they answer three different questions:
-  #
-  #   gametest          - does ANS work with Iron's ABSENT? (blocking, audit E7)
-  #   gametest-loaded   - does ANS work with Iron's and the Ars addons PRESENT? (blocking)
-  #   gametest-removal  - what happens to a world saved WITH Iron's when Iron's goes away?
-  #                       (non-blocking: it documents upstream behaviour, see below)
-  #
-  # Each gets its own -PgametestRunDir. Sharing one would let the loaded profile's saved world
-  # be re-opened without Iron's, which fails to decode while Gradle still prints BUILD
-  # SUCCESSFUL - that is the removal job's subject, and it must not leak into the other two.
-  #
-  # Success in every gametest job is split into three independently failing steps: the gradle
-  # exit code, the positive log assertions, and the negative log assertions. runGameTestServer
-  # exits 0 even when the server crashes at boot or collects zero tests, so the exit code alone
-  # proves nothing - but a step that checks several unrelated things at once cannot say which
-  # one broke, so they stay apart.
   gametest:
-    name: GameTest server (Iron's-less)
+    name: NeoForge GameTests (${{ matrix.profile }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     needs: build-and-test
-    env:
-      RUN_DIR: run-gametest-absent
-      # Pinned from a real run of this profile, not guessed. ANS-GAMETEST counts gate-visible
-      # OPTIONAL-MOD scenarios only (see ScenarioReport), which is why "executed" is small here
-      # while 82 tests pass: with Iron's and the addons absent, almost every integration test
-      # self-skips. That gap is the whole point of the line - the pass count cannot show it.
-      EXPECTED_REPORT: 'ANS-GAMETEST executed=3 skipped=50'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Cache Gradle caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-
-      - name: Cache NeoForm runtime
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches/neoformruntime
-          key: neoformruntime-${{ runner.os }}-${{ hashFiles('gradle.properties') }}
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      # (a) The gradle exit code. Necessary, nowhere near sufficient.
-      - name: Run GameTest server
-        run: ./gradlew runGameTestServer -PgametestRunDir=$RUN_DIR --no-daemon --stacktrace
-
-      # (b) The positive log assertions: the harness reported success AND the scenario report
-      # matches what this profile is supposed to exercise.
-      - name: Verify GameTest results
-        run: |
-          if ! grep -q "required tests passed" "$RUN_DIR/logs/latest.log"; then
-            echo "::error::GameTest server did not report success (boot crash or test failure)"
-            tail -n 80 "$RUN_DIR/logs/latest.log" || true
-            exit 1
-          fi
-          if ! grep -qF "$EXPECTED_REPORT" "$RUN_DIR/logs/latest.log"; then
-            echo "::error::scenario report is not $EXPECTED_REPORT - a test stopped exercising, or started self-skipping, its integration"
-            grep -F "ANS-GAMETEST executed=" "$RUN_DIR/logs/latest.log" || echo "(no ANS-GAMETEST line at all)"
-            exit 1
-          fi
-          grep "required tests passed" "$RUN_DIR/logs/latest.log"
-          grep -F "ANS-GAMETEST executed=" "$RUN_DIR/logs/latest.log"
-
-      # (c) The negative log assertions. An empty namespace makes vanilla throw "No test
-      # functions were given!" while the build still reports success; a mixin that fails to
-      # apply does not fail the run at all, it just silently disables the feature - and the
-      # Iron's-less profile is exactly where ArsNSpellsMixinPlugin's conditional gating is
-      # load-bearing (ANS-CRIT-001). A decode failure means the run dir was not clean.
-      - name: Verify the log is clean
-        run: |
-          if grep -qE "No test functions were given|Mixin apply failed|MixinTargetAlreadyLoadedException|NoClassDefFoundError|Failed to decode" "$RUN_DIR/logs/latest.log"; then
-            echo "::error::the Iron's-less run log reports zero tests, a mixin failure or a decode failure"
-            grep -nE "No test functions were given|Mixin apply failed|MixinTargetAlreadyLoadedException|NoClassDefFoundError|Failed to decode" "$RUN_DIR/logs/latest.log" | head -n 20
-            exit 1
-          fi
-          echo "log is clean"
-
-      - name: Upload GameTest logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gametest-logs
-          path: run-gametest-absent/logs
-
-  # The Iron's-loaded profile, BLOCKING. Until 3.3.0 this was a manual local run, which meant
-  # every Iron's-facing test in the suite was unverified in CI: the Iron's-less job passes them
-  # by self-skipping. This is the job that actually exercises the cross-mod code.
-  gametest-loaded:
-    name: GameTest server (Iron's + Ars addons)
-    runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: build-and-test
-    env:
-      RUN_DIR: run-gametest-loaded
-      # Pinned from a real run of this profile. The mirror image of the absent job's numbers:
-      # nearly every optional-mod scenario executes, and the two skips are the tests that only
-      # make sense with Iron's ABSENT (ironAbsent_predicatesAreSafe,
-      # withoutIrons_ironsOnlyTabletsAreAbsent), which go through OptionalModGate.skipIfPresent.
-      EXPECTED_REPORT: 'ANS-GAMETEST executed=51 skipped=2'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: absent
+            flags: ""
+            executed: 1
+            skipped: 66
+            identity: "--absent irons_spellbooks --absent ars_elemental --absent ars_zero --absent ars_elemancy"
+          - profile: loaded
+            flags: "-PwithIronsRuntimeGameTests -PwithArsElemental -PwithArsZero -PwithArsElemancy"
+            executed: 67
+            skipped: 0
+            identity: "--present irons_spellbooks --present ars_elemental --present ars_zero --present ars_elemancy"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-
-      - name: Cache Gradle caches
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-
-      - name: Cache NeoForm runtime
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches/neoformruntime
-          key: neoformruntime-${{ runner.os }}-${{ hashFiles('gradle.properties') }}
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      # (a) The gradle exit code.
-      - name: Run GameTest server (loaded)
+          key: neoforge-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+      - run: chmod +x ./gradlew
+      - name: Run isolated profile
+        run: ./gradlew runGameTestServer -PgametestRunDir=run-${{ matrix.profile }} ${{ matrix.flags }} --no-daemon --stacktrace
+      - name: Verify completed tests and actual runtime profile
         run: >
-          ./gradlew runGameTestServer -PgametestRunDir=$RUN_DIR
-          -PwithIronsRuntimeGameTests -PwithArsElemental -PwithArsElemancy -PwithArsZero
-          --no-daemon --stacktrace
-
-      # (b) The positive log assertions.
-      - name: Verify GameTest results
-        run: |
-          if ! grep -q "required tests passed" "$RUN_DIR/logs/latest.log"; then
-            echo "::error::the loaded GameTest server did not report success"
-            tail -n 80 "$RUN_DIR/logs/latest.log" || true
-            exit 1
-          fi
-          if ! grep -qF "$EXPECTED_REPORT" "$RUN_DIR/logs/latest.log"; then
-            echo "::error::scenario report is not $EXPECTED_REPORT - an integration test started self-skipping despite its mod being present"
-            grep -F "ANS-GAMETEST executed=" "$RUN_DIR/logs/latest.log" || echo "(no ANS-GAMETEST line at all)"
-            exit 1
-          fi
-          grep "required tests passed" "$RUN_DIR/logs/latest.log"
-          grep -F "ANS-GAMETEST executed=" "$RUN_DIR/logs/latest.log"
-
-      # (c) The negative log assertions.
-      - name: Verify the log is clean
-        run: |
-          if grep -qE "No test functions were given|Mixin apply failed|MixinTargetAlreadyLoadedException|NoClassDefFoundError|Failed to decode" "$RUN_DIR/logs/latest.log"; then
-            echo "::error::the loaded run log reports zero tests, a mixin failure or a decode failure"
-            grep -nE "No test functions were given|Mixin apply failed|MixinTargetAlreadyLoadedException|NoClassDefFoundError|Failed to decode" "$RUN_DIR/logs/latest.log" | head -n 20
-            exit 1
-          fi
-          echo "log is clean"
-
-      - name: Upload GameTest logs
+          python3 tools/verify_gametest_log.py run-${{ matrix.profile }}/logs/latest.log
+          --required 104 --executed ${{ matrix.executed }} --skipped ${{ matrix.skipped }} ${{ matrix.identity }}
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: gametest-logs-loaded
-          path: run-gametest-loaded/logs
-
-  # NON-BLOCKING, and deliberately so. Saved-world removal is a different question from
-  # absence-at-startup: the Iron's-less job above proves ANS boots fine on a FRESH world with no
-  # Iron's, and this one asks what happens to a world that WAS created with Iron's when Iron's
-  # is then uninstalled. The answer is that it fails to decode - on
-  # irons_spellbooks:pocket_dimension_type, a registry entry Iron's itself writes into level
-  # data. That is an upstream resource ANS neither owns nor can repair, so this job documents
-  # the behaviour rather than gating merges on it. It goes red only if the behaviour CHANGES.
-  gametest-removal:
-    name: GameTest server (Iron's removed from a saved world)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    needs: gametest-loaded
-    continue-on-error: true
-    env:
-      RUN_DIR: run-gametest-removal
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Cache Gradle caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
-
-      - name: Cache NeoForm runtime
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/caches/neoformruntime
-          key: neoformruntime-${{ runner.os }}-${{ hashFiles('gradle.properties') }}
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      # Step 1: create the world WITH Iron's, and keep it.
-      - name: Run loaded and keep the world
-        run: >
-          ./gradlew runGameTestServer -PgametestRunDir=$RUN_DIR
-          -PwithIronsRuntimeGameTests -PwithArsElemental -PwithArsElemancy -PwithArsZero
-          --no-daemon --stacktrace
-
-      # Step 2: reopen that same world WITHOUT Iron's. Expected to fail, so the gradle exit code
-      # is captured rather than allowed to fail the step - and then asserted to be NONZERO. A
-      # zero exit would mean either the world was silently reset or the failure is being
-      # swallowed; both are worth knowing about.
-      - name: Reopen the saved world without Iron's
-        run: |
-          set +e
-          ./gradlew runGameTestServer -PgametestRunDir=$RUN_DIR --no-daemon --stacktrace
-          echo "exit=$?" > removal-exit.txt
-          set -e
-          cat removal-exit.txt
-
-      - name: Report the removal behaviour
-        run: |
-          status=$(sed 's/exit=//' removal-exit.txt)
-          decoded=no
-          if grep -qE "Failed to decode|pocket_dimension_type" "$RUN_DIR/logs/latest.log"; then
-            decoded=yes
-          fi
-          echo "nonzero exit: $status / decode failure reported: $decoded"
-          if [ "$status" = "0" ] || [ "$decoded" = "no" ]; then
-            echo "::warning::removing Iron's from a saved world no longer fails the way it did at the 3.3.0 audit (exit=$status, decode failure=$decoded) - re-check whether this is now recoverable"
-            exit 1
-          fi
-          grep -nE "Failed to decode|pocket_dimension_type" "$RUN_DIR/logs/latest.log" | head -n 10
-
-      - name: Upload removal logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gametest-logs-removal
-          path: run-gametest-removal/logs
+          name: neo-gametest-${{ matrix.profile }}
+          path: run-${{ matrix.profile }}/logs

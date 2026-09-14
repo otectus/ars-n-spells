@@ -41,6 +41,9 @@ public final class SpellAnalysis {
         private final String dominantSchool;
         private final Set<String> schools;
         private final CooldownCategory category;
+        private final List<String> schoolKeys;
+        private final String mappingDigest;
+        private final List<String> allSchoolKeys;
 
         Result(@Nullable AbstractSpellPart firstEffect,
                @Nullable AbstractSpellPart castMethod,
@@ -54,6 +57,10 @@ public final class SpellAnalysis {
             this.dominantSchool = dominantSchool;
             this.schools = Collections.unmodifiableSet(schools);
             this.category = category;
+            this.schoolKeys = SchoolResolver.resolveKeys(firstEffect);
+            this.mappingDigest = SchoolMappings.get().digest();
+            this.allSchoolKeys = allEffects.stream().flatMap(effect -> SchoolResolver.resolveKeys(effect).stream())
+                .filter(key -> !SchoolKeys.GENERIC.equals(key)).distinct().toList();
         }
 
         /** The first AbstractEffect glyph in the recipe, or null if none found. */
@@ -75,6 +82,10 @@ public final class SpellAnalysis {
          * one primary school and always has had.
          */
         public String dominantSchool() { return dominantSchool; }
+        public List<String> schoolKeys() { return schoolKeys; }
+        public String schoolKey() { return schoolKeys.get(0); }
+        public String mappingDigest() { return mappingDigest; }
+        public List<String> allSchoolKeys() { return allSchoolKeys; }
 
         /**
          * Every canonical school resolved across the recipe's effect glyphs, in the order they
@@ -139,7 +150,6 @@ public final class SpellAnalysis {
                 // category, and the wrong elemental scaling. Filters select targets; they are
                 // not what the spell *does*, so they are remembered only as a fallback for a
                 // recipe that has no real effect at all.
-                allEffects.add(part);
                 if (firstFilter == null) {
                     firstFilter = part;
                 }

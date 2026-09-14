@@ -8,8 +8,6 @@ import com.otectus.arsnspells.bridge.SharedPoolCeiling;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
-import com.otectus.arsnspells.modifier.AnsModifierIdMapper;
-import com.otectus.arsnspells.modifier.NativeAttributeSnapshot;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
@@ -102,33 +100,36 @@ public final class EquipmentIntegration {
      * the 1.20.1 line read a per-item gear scan here instead.
      */
     public static double ironsGearMaxManaBonus(Player player) {
-        return foreignModifierTotal(player, AttributeRegistry.MAX_MANA);
+        return foreignModifierTotal(player, AttributeRegistry.MAX_MANA, ARS_TO_IRON_MAX_MANA_ID);
     }
 
     /** The gear-derived Iron's MANA_REGEN bonus. See {@link #ironsGearMaxManaBonus}. */
     public static double ironsGearRegenBonus(Player player) {
-        return foreignModifierTotal(player, AttributeRegistry.MANA_REGEN);
+        return foreignModifierTotal(player, AttributeRegistry.MANA_REGEN, ARS_TO_IRON_REGEN_ID);
     }
 
     /**
-     * Everything other than ANS contributes above the base value, measured through an isolated
-     * native snapshot (audit V13).
+     * {@code getValue() - getBaseValue()}, less the amount contributed by {@code ownId}.
      *
-     * <p>This used to be {@code getValue() - getBaseValue() - ownModifier.amount()}: a raw
-     * {@code ADD_VALUE} amount subtracted out of a total that every {@code ADD_MULTIPLIED_*}
-     * modifier had already scaled. A third-party multiplier on Iron's {@code max_mana}
-     * therefore left part of ANS's own contribution in the result, ARS_PRIMARY folded that
-     * residue back into Ars's max, {@link #syncIronsMaxToArs} wrote the larger ceiling back
-     * onto the same attribute, and the pool grew on every recompute.
-     * {@link NativeAttributeSnapshot} takes the ANS modifiers off and lets the attribute
-     * recompute instead, so no amount is ever subtracted from a multiplied result.
+     * <p>Exact under the ADD_VALUE model every modifier in this class uses; a third-party
+     * multiply modifier would skew it, which is the same approximation
+     * {@link #syncIronsMaxToArs} already reasons in. Never negative.
      */
-    private static double foreignModifierTotal(Player player, Holder<Attribute> attribute) {
+    private static double foreignModifierTotal(Player player, Holder<Attribute> attribute,
+                                               ResourceLocation ownId) {
         if (player == null || !IronsCompat.isLoaded()) {
             return 0.0;
         }
-        return NativeAttributeSnapshot.foreignAdditiveDelta(
-            player.getAttribute(attribute), AnsModifierIdMapper.INSTANCE.allIds());
+        AttributeInstance instance = player.getAttribute(attribute);
+        if (instance == null) {
+            return 0.0;
+        }
+        EquipmentSnapshot snapshot = equipment(player);
+        ResourceLocation key = net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.getKey(attribute.value());
+        java.util.Set<ResourceLocation> excluded = new java.util.HashSet<>(ownedModifierIds());
+        if (!AnsConfig.respectEnchantments.get()) excluded.addAll(snapshot.enchantmentIds);
+        return AttributeContribution.equipmentDelta(instance,
+            snapshot.modifiers.getOrDefault(key, java.util.Map.of()).values(), excluded);
     }
 
     /** Remove any Ars-derived modifiers from Iron's attributes. */
@@ -138,6 +139,55 @@ public final class EquipmentIntegration {
         }
         removeAttributeModifier(player, AttributeRegistry.MAX_MANA, ARS_TO_IRON_MAX_MANA_ID);
         removeAttributeModifier(player, AttributeRegistry.MANA_REGEN, ARS_TO_IRON_REGEN_ID);
+    }
+
+    public static java.util.Set<ResourceLocation> ownedModifierIds() {
+        var ids = new java.util.HashSet<ResourceLocation>();
+        for (String key : com.otectus.arsnspells.contract.AnsModifierIds.allKeys()) {
+            for (String candidate : com.otectus.arsnspells.contract.AnsModifierIds.currentAndLegacyKeysFor(key)) {
+                ResourceLocation id = ResourceLocation.tryParse(candidate);
+                if (id != null) ids.add(id);
+            }
+        }
+        return java.util.Set.copyOf(ids);
+    }
+
+    private static final class EquipmentSnapshot {
+        final java.util.Map<ResourceLocation, java.util.Map<ResourceLocation, AttributeModifier>> modifiers = new java.util.HashMap<>();
+        final java.util.Set<ResourceLocation> enchantmentIds = new java.util.HashSet<>();
+        void add(Holder<Attribute> attribute, AttributeModifier modifier) {
+            if (ownedModifierIds().contains(modifier.id())) return;
+            ResourceLocation key = net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.getKey(attribute.value());
+            modifiers.computeIfAbsent(key, ignored -> new java.util.LinkedHashMap<>()).putIfAbsent(modifier.id(), modifier);
+        }
+    }
+
+    /** Read actual item/Curios attribute APIs. Enchantment attributes have a distinct native iterator. */
+    private static EquipmentSnapshot equipment(Player player) {
+        EquipmentSnapshot result = new EquipmentSnapshot();
+        for (net.minecraft.world.entity.EquipmentSlot slot : net.minecraft.world.entity.EquipmentSlot.values()) {
+            var stack = player.getItemBySlot(slot);
+            if (stack.isEmpty()) continue;
+            stack.getAttributeModifiers().forEach(slot, result::add);
+            net.minecraft.world.item.enchantment.EnchantmentHelper.forEachModifier(stack, slot, (attribute, modifier) -> {
+                result.enchantmentIds.add(modifier.id());
+                if (AnsConfig.respectEnchantments.get()) result.add(attribute, modifier);
+            });
+        }
+        if (net.neoforged.fml.ModList.get().isLoaded("curios")) {
+            top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(player).ifPresent(inventory ->
+                inventory.getCurios().forEach((name, handler) -> {
+                    var stacks = handler.getStacks();
+                    for (int index = 0; index < stacks.getSlots(); index++) {
+                        var stack = stacks.getStackInSlot(index);
+                        if (stack.isEmpty()) continue;
+                        var context = new top.theillusivec4.curios.api.SlotContext(name, player, index, false, true);
+                        top.theillusivec4.curios.api.CuriosApi.getAttributeModifiers(context,
+                            top.theillusivec4.curios.api.CuriosApi.getSlotId(context), stack).forEach(result::add);
+                    }
+                }));
+        }
+        return result;
     }
 
     private static void applyArsBonusesToIrons(Player player, double conversionRate) {
@@ -172,7 +222,12 @@ public final class EquipmentIntegration {
             return 0.0f;
         }
         try {
-            return com.hollingsworth.arsnouveau.api.util.ManaUtil.calcMaxMana(player).getRealMax();
+            double maximum = com.hollingsworth.arsnouveau.api.util.ManaUtil.calcMaxMana(player).getRealMax();
+            if (!AnsConfig.respectEnchantments.get()) {
+                var instance = player.getAttribute(PerkAttributes.MAX_MANA);
+                if (instance != null) maximum -= instance.getValue() - arsAttribute(player, PerkAttributes.MAX_MANA);
+            }
+            return (float) Math.max(0, maximum);
         } catch (Throwable t) {
             LOGGER.debug("Could not read Ars max mana for {}", player.getName().getString(), t);
             return 0.0f;
@@ -199,41 +254,14 @@ public final class EquipmentIntegration {
         if (instance == null) {
             return;
         }
-        // OPT-008: decide whether anything needs to change BEFORE touching the modifier map.
-        // This runs once per second per player from EquipmentHandler's tick, and removing a
-        // modifier marks the attribute dirty whether or not the value changed - which the
-        // server drains into a ClientboundUpdateAttributesPacket at the end of the tick. The
-        // steady state is by far the common case, and it should cost one read.
-        //
-        // The check is exact by construction: applying modifierAmount() leaves the attribute
-        // at max(ironsOwnMax, arsMax), so with our modifier present the ceiling is correct
-        // iff getValue() == arsMax, and with it absent iff getValue() >= arsMax. Any drift in
-        // either input moves getValue() off that equality and falls through to the recompute.
-        AttributeModifier existing = instance.getModifier(ARS_TO_IRON_MAX_MANA_ID);
-        double current = instance.getValue();
-        if (existing == null) {
-            if (current >= arsMax) {
-                return;
-            }
-        } else if (Math.abs(current - arsMax) < CEILING_EPSILON) {
-            return;
-        }
-
-        // Read Iron's own max through the isolated native snapshot: every ANS modifier off,
-        // recompute, read, put back (audit V13). Nothing writes mana in between, so the
-        // momentarily lower ceiling cannot clamp anything.
-        double ironsOwnMax = NativeAttributeSnapshot.nativeValue(
-            instance, AnsModifierIdMapper.INSTANCE.allIds());
-        if (existing != null) {
-            instance.removeModifier(ARS_TO_IRON_MAX_MANA_ID);
-        }
-        double needed = SharedPoolCeiling.modifierAmount(ironsOwnMax, arsMax);
-        if (needed != 0.0) {
-            instance.addTransientModifier(new AttributeModifier(
-                ARS_TO_IRON_MAX_MANA_ID, needed, AttributeModifier.Operation.ADD_VALUE));
-        }
+        var nativeModifiers = instance.getModifiers().stream()
+            .filter(modifier -> !ownedModifierIds().contains(modifier.id())).toList();
+        double nativeMaximum = instance.getAttribute().value().sanitizeValue(
+            AttributeContribution.evaluate(instance.getBaseValue(), nativeModifiers));
+        double amplification = AttributeContribution.additiveAmplification(nativeModifiers);
+        double needed = amplification > 0 ? Math.max(0, arsMax - nativeMaximum) / amplification : 0;
+        applyAttributeModifier(player, AttributeRegistry.MAX_MANA, ARS_TO_IRON_MAX_MANA_ID, needed);
     }
-
     /**
      * Tolerance for the ceiling-is-already-correct check. The modifier amount is a double
      * difference, so {@code ironsOwnMax + (arsMax - ironsOwnMax)} need not reproduce
@@ -277,7 +305,12 @@ public final class EquipmentIntegration {
     /** Read an aggregate Ars perk-attribute value (gear/perk/curio bonus), 0 on any failure. */
     private static double arsAttribute(Player player, Holder<Attribute> attribute) {
         try {
-            return player.getAttributeValue(attribute);
+            AttributeInstance instance = player.getAttribute(attribute);
+            if (instance == null) return 0;
+            var excluded = new java.util.HashSet<>(ownedModifierIds());
+            if (!AnsConfig.respectEnchantments.get()) excluded.addAll(equipment(player).enchantmentIds);
+            var modifiers = instance.getModifiers().stream().filter(modifier -> !excluded.contains(modifier.id())).toList();
+            return attribute.value().sanitizeValue(AttributeContribution.evaluate(instance.getBaseValue(), modifiers));
         } catch (Throwable t) {
             return 0.0;
         }

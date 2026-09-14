@@ -63,7 +63,9 @@ public class AffinityData {
         // handed to every player that lacks the field, and DecayAccumulator is mutable.
         DecayAccumulator.CODEC.orElseGet(DecayAccumulator::new)
             .optionalFieldOf("decay_remainders")
-            .forGetter(d -> Optional.of(d.getDecayAccumulator()))
+            .forGetter(d -> Optional.of(d.getDecayAccumulator())),
+        Codec.unboundedMap(Codec.STRING, Codec.INT).optionalFieldOf("unresolved_legacy", Map.of())
+            .forGetter(d -> d.unresolvedLegacy)
     ).apply(inst, AffinityData::fromCurrent));
 
     /** Legacy shape: a bare {@code Map<enumName->level>} written by 2.0.x and earlier. */
@@ -81,6 +83,8 @@ public class AffinityData {
     );
 
     private final Map<String, Integer> levels = new HashMap<>();
+    private final Map<String, Integer> unresolvedLegacy = new HashMap<>();
+    public Map<String, Integer> unresolvedLegacy() { return Map.copyOf(unresolvedLegacy); }
 
     /**
      * Sub-point decay carried between intervals. Without it the decay handler's
@@ -97,7 +101,7 @@ public class AffinityData {
     }
 
     private static AffinityData fromCurrent(int version, Map<String, Integer> levels,
-                                            Optional<DecayAccumulator> decay) {
+                                            Optional<DecayAccumulator> decay, Map<String, Integer> unresolved) {
         // version is read for forward-compat; v1 levels are already canonical ids.
         AffinityData d = new AffinityData();
         levels.forEach((k, v) -> {
@@ -105,6 +109,7 @@ public class AffinityData {
                 d.levels.merge(k, clamp(v), Math::max);
             }
         });
+        d.unresolvedLegacy.putAll(unresolved);
         decay.ifPresent(acc -> acc.snapshot().forEach((k, r) -> d.decay.accrue(k, r)));
         return d;
     }
@@ -119,7 +124,7 @@ public class AffinityData {
             if (canonical != null) {
                 d.levels.merge(canonical, clamp(v), Math::max);
             }
-            // else: legacy category bucket or unknown enum name -> dropped
+            else d.unresolvedLegacy.put(k, clamp(v)); // archival, never an attribute identity
         });
         return d;
     }
@@ -138,7 +143,12 @@ public class AffinityData {
 
     /** A copy of every tracked school's level. Safe to iterate while mutating the original. */
     public Map<String, Integer> getAllLevels() {
-        return new HashMap<>(levels);
+        return Map.copyOf(levels);
+    }
+
+    /** A replacement snapshot includes deletions; an empty disabled snapshot clears the mirror. */
+    public void replaceLevels(Map<String, Integer> replacement) {
+        levels.clear(); replacement.forEach(this::setLevel);
     }
 
     /**

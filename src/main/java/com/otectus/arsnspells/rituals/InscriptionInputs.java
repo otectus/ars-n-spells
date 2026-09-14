@@ -111,7 +111,7 @@ public final class InscriptionInputs {
             if (!SpellCasterRegistry.hasCaster(stack)) {
                 return null;
             }
-            AbstractCaster<?> caster = SpellCasterRegistry.from(stack);
+            AbstractCaster<?> caster = SpellCasterRegistry.from(stack.copy());
             if (caster == null) {
                 return null;
             }

@@ -89,7 +89,7 @@ public record AffinityBulkSyncPayload(Map<String, Integer> levels) implements Cu
                 return;
             }
             AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
-            p.levels().forEach(data::setLevel);
+            data.replaceLevels(p.levels());
         }
     }
 }

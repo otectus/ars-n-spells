@@ -41,8 +41,34 @@ public record CrossModSpell(
     int proxyPoolId,
     Optional<String> customName,
     Optional<String> nature,
-    Optional<String> iconSymbol
+    Optional<String> iconSymbol,
+    CompoundTag unknownFields
 ) {
+    public CrossModSpell {
+        unknownFields = unknownFields == null ? new CompoundTag() : unknownFields.copy();
+        arsSpellTag = arsSpellTag == null ? Optional.empty() : arsSpellTag.map(CompoundTag::copy);
+    }
+
+    /** Mutable NBT cannot leak through an otherwise immutable component record. */
+    public Optional<CompoundTag> arsSpellTag() { return arsSpellTag.map(CompoundTag::copy); }
+
+    /** Inspect private payload fields before any defensive-copy allocation. */
+    public boolean payloadWithinBudget() {
+        return com.otectus.arsnspells.util.PayloadBudget.name(customName.orElse(""))
+            && com.otectus.arsnspells.util.PayloadBudget.tag(unknownFields)
+            && (arsSpellTag.isEmpty() || com.otectus.arsnspells.util.PayloadBudget.arsSpell(arsSpellTag.get()));
+    }
+
+    public CompoundTag unknownFields() { return unknownFields.copy(); }
+
+    public CrossModSpell(ResourceLocation spellId, int level, String typeName,
+                         Optional<CompoundTag> arsSpellTag, Optional<String> castSource,
+                         int proxyPoolId, Optional<String> customName, Optional<String> nature,
+                         Optional<String> iconSymbol) {
+        this(spellId, level, typeName, arsSpellTag, castSource, proxyPoolId,
+            customName, nature, iconSymbol, new CompoundTag());
+    }
+
     /** Legacy shape (pre-3.0.x): no proxy metadata. Kept so existing callers compile untouched. */
     public CrossModSpell(ResourceLocation spellId,
                          int level,
@@ -54,7 +80,7 @@ public record CrossModSpell(
             Optional.empty(), Optional.empty(), Optional.empty());
     }
 
-    public static final Codec<CrossModSpell> CODEC = RecordCodecBuilder.create(i -> i.group(
+    private static final Codec<CrossModSpell> KNOWN_CODEC = RecordCodecBuilder.create(i -> i.group(
         ResourceLocation.CODEC.fieldOf("spell_id").forGetter(CrossModSpell::spellId),
         Codec.INT.fieldOf("spell_level").forGetter(CrossModSpell::level),
         Codec.STRING.fieldOf("spell_type").forGetter(CrossModSpell::typeName),
@@ -66,6 +92,13 @@ public record CrossModSpell(
         Codec.STRING.optionalFieldOf("nature").forGetter(CrossModSpell::nature),
         Codec.STRING.optionalFieldOf("icon_symbol").forGetter(CrossModSpell::iconSymbol)
     ).apply(i, CrossModSpell::new));
+
+    public static final Codec<CrossModSpell> CODEC = PreservingRecordCodec.wrap(KNOWN_CODEC,
+        java.util.Set.of("spell_id", "spell_level", "spell_type", "ars_spell", "cast_source",
+            "proxy_pool_id", "custom_name", "nature", "icon_symbol"), CrossModSpell::unknownFields,
+        (value, extras) -> new CrossModSpell(value.spellId(), value.level(), value.typeName(),
+            value.arsSpellTag(), value.castSource(), value.proxyPoolId(), value.customName(),
+            value.nature(), value.iconSymbol(), extras));
 
     // Hand-written: StreamCodec.composite maxes out at 6 fields on 1.21.1.
     public static final StreamCodec<RegistryFriendlyByteBuf, CrossModSpell> STREAM_CODEC =
@@ -80,6 +113,7 @@ public record CrossModSpell(
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).encode(buf, value.customName());
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).encode(buf, value.nature());
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).encode(buf, value.iconSymbol());
+                ByteBufCodecs.COMPOUND_TAG.encode(buf, value.unknownFields());
             },
             buf -> new CrossModSpell(
                 ResourceLocation.STREAM_CODEC.decode(buf),
@@ -90,7 +124,8 @@ public record CrossModSpell(
                 ByteBufCodecs.VAR_INT.decode(buf),
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buf),
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buf),
-                ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buf)
+                ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buf),
+                ByteBufCodecs.COMPOUND_TAG.decode(buf)
             )
         );
 

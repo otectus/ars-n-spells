@@ -43,12 +43,14 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // any of the runtime gates could help.
         if (mixinClassName.endsWith("MixinIronsSpellPowerResonance")
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
+            || mixinClassName.endsWith("MixinIronsManaBarVisibility")
             || mixinClassName.endsWith("MixinIronsCastValidation")
             || mixinClassName.endsWith("MagicDataAccessor")
             || mixinClassName.endsWith("MixinScrollItem")
             || mixinClassName.endsWith("MixinInscriptionTableMenu")
             || mixinClassName.endsWith("MixinInscriptionTableScreen")
-            || mixinClassName.endsWith("MixinAbstractSpellArsIcon")) {
+            || mixinClassName.endsWith("MixinAbstractSpellArsIcon")
+            || mixinClassName.endsWith("MixinItemStackIconContext")) {
             return ironsPresent;
         }
         if (mixinClassName.endsWith("MixinManaCapability")) {

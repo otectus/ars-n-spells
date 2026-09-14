@@ -17,7 +17,6 @@ import com.otectus.arsnspells.events.CooldownHandler;
 import com.otectus.arsnspells.events.IronsAffinityHandler;
 import com.otectus.arsnspells.events.IronsCooldownHandler;
 import com.otectus.arsnspells.events.IronsProgressionHandler;
-import com.otectus.arsnspells.events.ModeChangeMigration;
 import com.otectus.arsnspells.events.ProgressionHandler;
 import com.otectus.arsnspells.events.ResonanceEvents;
 import com.otectus.arsnspells.network.PacketHandler;
@@ -25,6 +24,7 @@ import com.otectus.arsnspells.registry.ModBlockEntities;
 import com.otectus.arsnspells.registry.ModBlocksRegistry;
 import com.otectus.arsnspells.registry.ModCreativeTabs;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
+import com.otectus.arsnspells.registry.ModLootModifiersRegistry;
 import com.otectus.arsnspells.registry.ModMenus;
 import com.otectus.arsnspells.rituals.RitualRegistryHandler;
 import com.otectus.arsnspells.spell.CrossCastIronsHandler;
@@ -72,6 +72,7 @@ public class ArsNSpells {
             com.otectus.arsnspells.spell.irons.ArsCrossProxyRegistry.register(modBus);
         }
         ModItemsRegistry.register(modBus);
+        ModLootModifiersRegistry.register(modBus);
         AttachmentTypes.register(modBus);
         ModDataComponents.register(modBus);
         // Spell Loom workstation (block + block item + block entity + menu).
@@ -95,8 +96,8 @@ public class ArsNSpells {
         modBus.addListener(ArsNSpells::onRegisterCapabilities);
 
         // ---- Config registration via ModContainer ----
-        // SERVER (was COMMON): gameplay tunables — mana mode, conversion rates, dual-cost
-        // splits, resonance — must be server-authoritative on dedicated servers and
+        // SERVER (was COMMON): gameplay tunables â€” mana mode, conversion rates, dual-cost
+        // splits, resonance â€” must be server-authoritative on dedicated servers and
         // auto-synced to clients on login. A COMMON config does not sync, so the in-game
         // config screen and HUD on a connected client would read stale local values.
         // The live file moves to <world>/serverconfig/ars_n_spells-server.toml; the old
@@ -114,8 +115,6 @@ public class ArsNSpells {
         NeoForge.EVENT_BUS.register(new AffinityDecayHandler());
         NeoForge.EVENT_BUS.register(new AffinitySyncOnLoginHandler());
         NeoForge.EVENT_BUS.register(ArsNSpellsCommands.class);
-        // Self-gates on the GameTest namespace property, so this is a no-op on a real install.
-        com.otectus.arsnspells.gametest.ScenarioReport.register();
 
         if (ModList.get().isLoaded("irons_spellbooks")) {
             NeoForge.EVENT_BUS.register(new IronsCooldownHandler());
@@ -125,14 +124,14 @@ public class ArsNSpells {
             NeoForge.EVENT_BUS.register(new ArsDamageBridge());
             NeoForge.EVENT_BUS.register(new IronsDamageBridge());
             NeoForge.EVENT_BUS.register(new ResonanceEvents());
-            NeoForge.EVENT_BUS.register(new CrossCastIronsHandler());
+            NeoForge.EVENT_BUS.register(new com.otectus.arsnspells.casting.IronsCastPayments());
             NeoForge.EVENT_BUS.register(new IronsCurioDiscountHandler());
             // RegenSynergyHandler (Source-Jar proximity regen) auto-registers via its
             // @EventBusSubscriber annotation and self-gates on IronsCompat.isLoaded().
         }
 
         // ArsNSpells's own lifecycle methods (commonSetup, onConfigLoading) are
-        // mod-bus listeners via modBus.addListener above — the class has no
+        // mod-bus listeners via modBus.addListener above â€” the class has no
         // game-bus @SubscribeEvent methods, so we do NOT call
         // NeoForge.EVENT_BUS.register(this) here.
     }
@@ -141,7 +140,7 @@ public class ArsNSpells {
         // Expose the Spell Loom's slots to hoppers/pipes (parity with the 1.20.1
         // ForgeCapabilities.ITEM_HANDLER exposure).
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK,
-            ModBlockEntities.SPELL_LOOM.get(), (be, side) -> be.getItems());
+            ModBlockEntities.SPELL_LOOM.get(), (be, side) -> be.automation(side));
     }
 
     /**
@@ -185,19 +184,8 @@ public class ArsNSpells {
         if (!event.getConfig().getModId().equals(MODID)) {
             return;
         }
-        // 3.3.0 (T1.2): resolve the schema-migrated keys and log the migration report once,
-        // before anything downstream reads a policy that migration may have decided.
-        // ModConfig.getFullPath() throws for a non-file config, so the path is optional here;
-        // an unknown path resolves as "not freshly generated", preserving existing behaviour.
-        java.nio.file.Path configFile = null;
-        try {
-            configFile = event.getConfig().getFullPath();
-        } catch (IllegalStateException notAFileConfig) {
-            // no path to probe
-        }
-        com.otectus.arsnspells.config.AnsConfig.onConfigLoaded(configFile);
-
-        // The SERVER config is now readable — (re)build the mana bridges for the active
+        AnsConfig.onConfigLoaded(event.getConfig().getFullPath());
+        // The SERVER config is now readable â€” (re)build the mana bridges for the active
         // mode. This is the real bridge-init point on a server (common setup runs before
         // the SERVER config loads). Idempotent with BridgeManager.init().
         BridgeManager.refreshMode();
@@ -215,11 +203,6 @@ public class ArsNSpells {
         // Pick up runtime config edits (e.g. mana_unification_mode changed on disk or via
         // the config screen) without a restart.
         BridgeManager.refreshMode();
-        // Then bring every online player onto the new snapshot: cleanup, recompute, clamp,
-        // sync (audit V14). Called from inside this listener rather than registered as a
-        // second ModConfigEvent.Reloading listener so the ordering against refreshMode() is
-        // fixed rather than left to listener registration order.
-        ModeChangeMigration.onRoutingChanged();
         syncClientDiagnostics();
     }
 

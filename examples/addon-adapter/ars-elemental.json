@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "mod_id": "ars_elemental",
+  "profiles": {
+    "forge": {
+      "minecraft": "1.20.1",
+      "ars_nouveau": "4.12.7",
+      "irons_spellbooks": "1.20.1-3.15.0",
+      "ars_elemental": "0.6.8.0"
+    },
+    "neoforge": {
+      "minecraft": "1.21.1",
+      "ars_nouveau": "5.13.1",
+      "irons_spellbooks": "1.21.1-3.16.3",
+      "ars_elemental": "0.7.10.1"
+    }
+  },
+  "glyphs": {
+    "ars_elemental:glyph_life_link": {
+      "roles": ["payload"],
+      "schools": ["irons_spellbooks:blood"]
+    },
+    "ars_elemental:glyph_aquatic_filter": {
+      "roles": ["filter"],
+      "schools": ["ars_n_spells:generic"]
+    }
+  }
+}

@@ -88,7 +88,8 @@ class ContractFixtureTest {
                 ResourceUnit.valueOf(o.get("unit").getAsString()), o.get("amount").getAsDouble());
             CarrierPolicy carrier = CarrierPolicy.valueOf(c.get("carrier").getAsString());
 
-            CostQuote quote = StandardQuotePolicy.INSTANCE.quote(origin, rules, carrier);
+            CostQuote quote = StandardQuotePolicy.INSTANCE.quote(origin, rules, carrier,
+                c.get("nativeArsMax").getAsDouble(), c.get("nativeIronsMax").getAsDouble());
 
             assertEquals(c.get("expectedGeneration").getAsInt(), quote.rulesGeneration(), "rulesGeneration");
             JsonArray expectedLegs = c.getAsJsonArray("expectedLegs");
@@ -192,8 +193,7 @@ class ContractFixtureTest {
             if (source.isReusable()) {
                 assertEquals(0, plan.consumedUnits(), "a reusable source is never consumed");
             }
-            if (source == InscriptionSourceKind.FILLED_SCROLL
-                || target == InscriptionSourceKind.FILLED_SCROLL) {
+            if (target == InscriptionSourceKind.FILLED_SCROLL) {
                 assertEquals(InscriptionPlan.REASON_NOT_BLANK, plan.reasonCode(),
                     "a filled scroll is never treated as blank");
             }

@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Pure-helper façade over the {@link ModDataComponents#CROSS_SPELLS}
+ * Pure-helper faÃ§ade over the {@link ModDataComponents#CROSS_SPELLS}
  * data component. Replaces the 1.20.1-era {@code CrossCastNbt} class that
  * worked directly on {@link CompoundTag}. Same operational shape (mutate
  * the cross-cast payload in place), now via component reads/writes.
@@ -66,7 +66,7 @@ public final class CrossModSpellComponents {
 
     /** Record that this item has been looked over by the current build. */
     public static void stampSchemaVersion(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
+        if (stack == null || stack.isEmpty() || schemaVersion(stack) > SCHEMA_VERSION) {
             return;
         }
         stack.set(ModDataComponents.SCHEMA_VERSION.get(), SCHEMA_VERSION);
@@ -91,8 +91,7 @@ public final class CrossModSpellComponents {
      * these; the export payload rejects anything else so hand-crafted packets
      * cannot stamp data that resolves to a missing texture.
      */
-    public static final List<String> NATURE_KEYS = List.of(
-        "arcane", "fire", "ice", "lightning", "nature", "holy", "blood", "ender");
+    public static final List<String> NATURE_KEYS = com.otectus.arsnspells.icons.IconCatalog.BACKGROUNDS;
 
     /**
      * Placeholder spell id shared by every Ars-typed entry (the real payload
@@ -113,17 +112,19 @@ public final class CrossModSpellComponents {
         return list != null ? list : CrossModSpellList.EMPTY;
     }
 
-    /**
-     * Drop the cross-spell payload component - and only that (audit V20).
-     *
-     * <p>Named for what it does. It leaves the export marker, the schema stamp and any native
-     * wheel proxy slots in place, so it is correct only for an internal rewrite that is about
-     * to put something back. Anything a player triggers must go through
-     * {@link IronsBookBindingUtil#removeAllArsEntries}, which reconciles all of that; calling
-     * this instead is how a book ends up with wheel entries that cast nothing.
-     */
+    /** Drop every inscription artifact from the stack. */
+    public static void clear(ItemStack stack) {
+        removeInscription(stack);
+    }
+
+    /** Low-level sidecar operation for reconciliation that already removed native slots. */
     public static void clearPayloadOnly(ItemStack stack) {
         stack.remove(ModDataComponents.CROSS_SPELLS.get());
+    }
+
+    /** Public player operation: native proxies, schema, selection and export metadata together. */
+    public static void removeInscription(ItemStack stack) {
+        IronsBookBindingUtil.removeAllArsEntries(stack);
     }
 
     /**
@@ -136,6 +137,7 @@ public final class CrossModSpellComponents {
                                         int spellLevel,
                                         @Nullable CrossSpellType type,
                                         @Nullable CompoundTag arsSpellTag) {
+        if (schemaVersion(stack) > SCHEMA_VERSION) return;
         CrossModSpellList existing = get(stack);
         ResourceLocation safeId = spellId != null ? spellId : ARS_PLACEHOLDER_ID;
         String typeName = type != null ? type.name() : CrossSpellType.ARS_NOUVEAU.name();
@@ -149,16 +151,18 @@ public final class CrossModSpellComponents {
         List<CrossModSpell> next = new ArrayList<>(existing.spells());
         next.add(entry);
         stack.set(ModDataComponents.CROSS_SPELLS.get(),
-            new CrossModSpellList(List.copyOf(next), existing.selectedIndex()));
+            new CrossModSpellList(List.copyOf(next), existing.selectedIndex(), existing.unknownFields()));
+        stampSchemaVersion(stack);
     }
 
     /** Replace just the selected index, preserving the spell list. */
     public static void setSelectedIndex(ItemStack stack, int index) {
+        if (schemaVersion(stack) > SCHEMA_VERSION) return;
         CrossModSpellList existing = get(stack);
         if (existing.isEmpty()) return;
         int clamped = Math.max(0, Math.min(index, existing.size() - 1));
         stack.set(ModDataComponents.CROSS_SPELLS.get(),
-            new CrossModSpellList(existing.spells(), clamped));
+            new CrossModSpellList(existing.spells(), clamped, existing.unknownFields()));
     }
 
     // ------------------------------------------------------------------
@@ -194,7 +198,7 @@ public final class CrossModSpellComponents {
         );
         List<CrossModSpell> next = new ArrayList<>(list.spells());
         next.add(entry);
-        return new CrossModSpellList(List.copyOf(next), list.selectedIndex());
+        return new CrossModSpellList(List.copyOf(next), list.selectedIndex(), list.unknownFields());
     }
 
     /**
@@ -209,9 +213,11 @@ public final class CrossModSpellComponents {
                                           @Nullable String customName,
                                           @Nullable String nature,
                                           @Nullable String iconSymbol) {
+        if (schemaVersion(stack) > SCHEMA_VERSION) return -1;
         CrossModSpellList next = withArsEntry(get(stack), spellId, spellLevel, arsSpellTag,
             proxyPoolId, customName, nature, iconSymbol);
         stack.set(ModDataComponents.CROSS_SPELLS.get(), next);
+        stampSchemaVersion(stack);
         return next.size() - 1;
     }
 
@@ -268,7 +274,7 @@ public final class CrossModSpellComponents {
      * <p>Used for two things (3.0.3 / 3.1.0): rolling the sidecar back when the
      * native container write fails midway through binding, and tearing an entry
      * down on unbind. Teardown must remove the native slot <em>before</em> calling
-     * this — clearing the sidecar first leaves an orphan slot in Iron's wheel with
+     * this â€” clearing the sidecar first leaves an orphan slot in Iron's wheel with
      * nothing to resolve.
      */
     public static CrossModSpellList withoutProxyPoolId(CrossModSpellList list, int poolId) {
@@ -292,7 +298,7 @@ public final class CrossModSpellComponents {
         }
         // Keep the cycle index in range after the shrink.
         int index = Math.max(0, Math.min(list.selectedIndex(), next.size() - 1));
-        return new CrossModSpellList(List.copyOf(next), index);
+        return new CrossModSpellList(List.copyOf(next), index, list.unknownFields());
     }
 
     /**
@@ -309,7 +315,7 @@ public final class CrossModSpellComponents {
             return false;
         }
         if (next.isEmpty()) {
-            clearPayloadOnly(stack);
+            clear(stack);
         } else {
             stack.set(ModDataComponents.CROSS_SPELLS.get(), next);
         }
@@ -329,8 +335,8 @@ public final class CrossModSpellComponents {
 
     /**
      * True when the list already carries an Ars entry with the same serialized
-     * spell payload. Dedup keys on the {@code arsSpellTag} blob — never on the
-     * shared {@link #ARS_PLACEHOLDER_ID} — so two different Ars spells on one
+     * spell payload. Dedup keys on the {@code arsSpellTag} blob â€” never on the
+     * shared {@link #ARS_PLACEHOLDER_ID} â€” so two different Ars spells on one
      * book are never treated as duplicates.
      */
     public static boolean containsEquivalentArsSpell(CrossModSpellList list, @Nullable CompoundTag arsSpellTag) {

@@ -1,70 +1,70 @@
 package com.otectus.arsnspells.events;
 
 import com.otectus.arsnspells.augmentation.ResonanceManager;
+import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.network.PacketHandler;
 import com.otectus.arsnspells.network.ResonanceSyncPayload;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 
-/**
- * Computes resonance per player at 1 Hz and pushes it to the client so the HUD
- * mirror stays current. {@link ResonanceManager#computeResonance} reads Iron's
- * {@code MagicData}; this handler is registered only when Iron's is loaded.
- *
- * <p>The server value is authoritative for spell scaling
- * ({@code MixinIronsSpellPowerResonance} reads it directly server-side); the
- * {@link ResonanceSyncPayload} sent here only keeps the <em>client</em> copy in
- * sync — on login and on every recompute. Respawn / dimension sync is owned by
- * {@link CapabilityResyncHandler}.
- */
 public class ResonanceEvents {
-
-    /** Recompute interval, in ticks. 40 = twice a second, matching the 1.20.1 line. */
-    private static final int RECOMPUTE_INTERVAL_TICKS = 40;
+    // ANS-MED-028: cleanup tracking moved to a server-wide ServerTickEvent handler
+    // below. The per-player tick counter previously incremented N times per
+    // (40-tick) window with N players, causing cleanup to fire much more often
+    // than the "60 seconds" the comment claimed.
+    private int serverCleanupTickCounter = 0;
 
     @SubscribeEvent
-    public void onPlayerTickPost(PlayerTickEvent.Post event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
+    public void onPlayerTick(PlayerTickEvent.Post event) {
+        if (!event.getEntity().level().isClientSide()
+            
+            && event.getEntity() instanceof ServerPlayer player) {
+            double before = ResonanceManager.cachedResonance(player);
+            ResonanceManager.computeResonance(player);
+            double after = ResonanceManager.getResonance(player);
+            if (after != before) {
+                PacketHandler.sendToClient(new ResonanceSyncPayload((float) after), player);
+            }
+        }
+    }
+
+    /**
+     * ANS-MED-028: server-global cleanup, fires once per 1200 server ticks
+     * (60 seconds) regardless of player count.
+     */
+    @SubscribeEvent
+    public void onServerTick(ServerTickEvent.Post event) {
+        if (!IronsCompat.isLoaded()) {
             return;
         }
-        if (player.tickCount % RECOMPUTE_INTERVAL_TICKS != 0) {
-            return;
-        }
-        // The feature gate belongs here as well as inside computeResonance: without it the
-        // handler pays the MagicData lookup and the attribute read for a system the server
-        // owner turned off.
-        if (!AnsConfig.flag(AnsConfig.ENABLE_RESONANCE_SYSTEM, false)) {
-            return;
-        }
-        // Only sync when the value actually moved. The client copy is a HUD/prediction
-        // mirror; resending an unchanged multiplier every interval is a packet per player
-        // per interval that changes nothing on the receiving end.
-        if (ResonanceManager.computeResonance(player)) {
-            sync(player);
+        serverCleanupTickCounter++;
+        if (serverCleanupTickCounter >= 1200) {
+            serverCleanupTickCounter = 0;
+            ResonanceManager.cleanupOfflinePlayers(event.getServer());
         }
     }
 
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            // Always sync on login, changed or not: the client starts at the neutral 1.0 and
-            // has nothing to mirror until the first packet arrives.
+            // Logic: Immediate sync on login ensures no 'Zero-State' HUD artifacts
             ResonanceManager.computeResonance(player);
-            sync(player);
+            PacketHandler.sendToClient(new ResonanceSyncPayload((float) ResonanceManager.getResonance(player)), player);
         }
+    }
+
+    @SubscribeEvent
+    public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        ResonanceManager.clear(event.getEntity());
     }
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         ResonanceManager.clearAll();
-    }
-
-    private static void sync(ServerPlayer player) {
-        PacketHandler.sendToClient(
-            new ResonanceSyncPayload((float) ResonanceManager.getResonance(player)), player);
     }
 }

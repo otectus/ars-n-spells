@@ -2,6 +2,7 @@ package com.otectus.arsnspells.events;
 
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.otectus.arsnspells.ArsNSpells;
+import com.otectus.arsnspells.registry.ModItemsRegistry;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossCastValidator;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
@@ -9,6 +10,8 @@ import com.otectus.arsnspells.spell.CrossModSpell;
 import com.otectus.arsnspells.spell.CrossModSpellComponents;
 import com.otectus.arsnspells.spell.CrossModSpellList;
 import com.otectus.arsnspells.spell.CrossSpellType;
+import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+import com.otectus.arsnspells.spell.ScrollKind;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -62,10 +65,29 @@ public final class CrossSpellTooltipHandler {
     public static void onItemTooltip(ItemTooltipEvent event) {
         ItemStack stack = event.getItemStack();
         try {
+            appendBlankScrollLine(event, stack);
             appendCrossSpellLines(event, stack);
+            appendCarrierRouteLines(event, stack);
         } catch (Throwable t) {
             logOnce(stack, t);
         }
+    }
+
+    /**
+     * The blank scroll's one affordance line. It carries no components of its own, so nothing
+     * below would ever reach it, and a player holding one otherwise has no way to learn what it
+     * is for -- stock Iron's has no blank scroll, so the Spell Loom is the only thing that wants
+     * this item.
+     */
+    private static void appendBlankScrollLine(ItemTooltipEvent event, ItemStack stack) {
+        if (stack.isEmpty()
+            || ModItemsRegistry.blankScroll() == null
+            || !ModItemsRegistry.blankScroll().isBound()
+            || !stack.is(ModItemsRegistry.blankScroll().get())) {
+            return;
+        }
+        event.getToolTip().add(Component.translatable("tooltip.ars_n_spells.blank_scroll")
+            .withStyle(ChatFormatting.DARK_GRAY));
     }
 
     private static void appendCrossSpellLines(ItemTooltipEvent event, ItemStack stack) {
@@ -90,6 +112,38 @@ public final class CrossSpellTooltipHandler {
                 .withStyle(ChatFormatting.DARK_GRAY));
         }
         tip.add(Component.translatable("tooltip.ars_n_spells.cross_spell.cast_hint")
+            .withStyle(ChatFormatting.DARK_GRAY));
+    }
+
+    /**
+     * The carrier scroll's extra lines: the name and cosmetic nature the player chose at the
+     * Spell Loom, and where the scroll can be used. The spell itself is already named by
+     * {@link #appendCrossSpellLines}, so this adds only what that cannot know — a carrier is
+     * the one inscribed item with two bind routes, and players who never found the ritual
+     * tablet had no way to learn about either.
+     *
+     * <p>The icon symbol is deliberately not echoed here: it is a wheel graphic with no
+     * player-facing name, and the tooltip has nothing to draw it with.
+     */
+    private static void appendCarrierRouteLines(ItemTooltipEvent event, ItemStack stack) {
+        if (ScrollKind.classify(stack) != ScrollKind.ANS_CARRIER) {
+            return;
+        }
+        List<Component> tip = event.getToolTip();
+        CrossModSpell entry = IronsBookBindingUtil.extractSingleEntry(stack).orElse(null);
+        if (entry != null) {
+            String customName = entry.customName().orElse("");
+            if (!customName.isEmpty()) {
+                tip.add(Component.literal(customName).withStyle(ChatFormatting.AQUA));
+            }
+            String nature = entry.nature().orElse("");
+            if (CrossModSpellComponents.NATURE_KEYS.contains(nature)) {
+                tip.add(Component.translatable("ars_n_spells.spell_loom.nature",
+                        Component.translatable("ars_n_spells.nature." + nature))
+                    .withStyle(ChatFormatting.GRAY));
+            }
+        }
+        tip.add(Component.translatable("tooltip.ars_n_spells.carrier.routes")
             .withStyle(ChatFormatting.DARK_GRAY));
     }
 

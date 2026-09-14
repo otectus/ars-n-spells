@@ -12,8 +12,8 @@
     },
     {
       "expectedConsumedUnits": 0,
-      "expectedOutputCount": 1,
-      "expectedReasonCode": "ok",
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
       "name": "REUSABLE_BOOK->REUSABLE_BOOK/empty=true/count=0",
       "sourceKind": "REUSABLE_BOOK",
       "sourceStackCount": 0,
@@ -52,8 +52,8 @@
     },
     {
       "expectedConsumedUnits": 0,
-      "expectedOutputCount": 1,
-      "expectedReasonCode": "ok",
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
       "name": "REUSABLE_BOOK->REUSABLE_FOCUS/empty=true/count=0",
       "sourceKind": "REUSABLE_BOOK",
       "sourceStackCount": 0,
@@ -92,8 +92,8 @@
     },
     {
       "expectedConsumedUnits": 0,
-      "expectedOutputCount": 1,
-      "expectedReasonCode": "ok",
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
       "name": "REUSABLE_BOOK->CONSUMABLE_SCROLL/empty=true/count=0",
       "sourceKind": "REUSABLE_BOOK",
       "sourceStackCount": 0,
@@ -132,8 +132,8 @@
     },
     {
       "expectedConsumedUnits": 0,
-      "expectedOutputCount": 1,
-      "expectedReasonCode": "ok",
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
       "name": "REUSABLE_BOOK->BLANK_PARCHMENT/empty=true/count=0",
       "sourceKind": "REUSABLE_BOOK",
       "sourceStackCount": 0,
@@ -212,8 +212,8 @@
     },
     {
       "expectedConsumedUnits": 0,
-      "expectedOutputCount": 1,
-      "expectedReasonCode": "ok",
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
       "name": "REUSABLE_FOCUS->REUSABLE_BOOK/empty=true/count=0",
       "sourceKind": "REUSABLE_FOCUS",
       "sourceStackCount": 0,
@@ -252,8 +252,8 @@
     },
     {
       "expectedConsumedUnits": 0,
-      "expectedOutputCount": 1,
-      "expectedReasonCode": "ok",
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
       "name": "REUSABLE_FOCUS->REUSABLE_FOCUS/empty=true/count=0",
       "sourceKind": "REUSABLE_FOCUS",
       "sourceStackCount": 0,
@@ -292,8 +292,8 @@
     },
     {
       "expectedConsumedUnits": 0,
-      "expectedOutputCount": 1,
-      "expectedReasonCode": "ok",
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
       "name": "REUSABLE_FOCUS->CONSUMABLE_SCROLL/empty=true/count=0",
       "sourceKind": "REUSABLE_FOCUS",
       "sourceStackCount": 0,
@@ -332,8 +332,8 @@
     },
     {
       "expectedConsumedUnits": 0,
-      "expectedOutputCount": 1,
-      "expectedReasonCode": "ok",
+      "expectedOutputCount": 0,
+      "expectedReasonCode": "insufficient stack",
       "name": "REUSABLE_FOCUS->BLANK_PARCHMENT/empty=true/count=0",
       "sourceKind": "REUSABLE_FOCUS",
       "sourceStackCount": 0,
@@ -801,9 +801,9 @@
       "targetKind": "FILLED_SCROLL"
     },
     {
-      "expectedConsumedUnits": 0,
-      "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
       "name": "FILLED_SCROLL->REUSABLE_BOOK/empty=true/count=1",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 1,
@@ -813,7 +813,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "insufficient stack",
       "name": "FILLED_SCROLL->REUSABLE_BOOK/empty=true/count=0",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 0,
@@ -823,7 +823,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "target not empty",
       "name": "FILLED_SCROLL->REUSABLE_BOOK/empty=false/count=1",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 1,
@@ -833,7 +833,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "target not empty",
       "name": "FILLED_SCROLL->REUSABLE_BOOK/empty=false/count=0",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 0,
@@ -841,9 +841,9 @@
       "targetKind": "REUSABLE_BOOK"
     },
     {
-      "expectedConsumedUnits": 0,
-      "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
       "name": "FILLED_SCROLL->REUSABLE_FOCUS/empty=true/count=1",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 1,
@@ -853,7 +853,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "insufficient stack",
       "name": "FILLED_SCROLL->REUSABLE_FOCUS/empty=true/count=0",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 0,
@@ -863,7 +863,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "target not empty",
       "name": "FILLED_SCROLL->REUSABLE_FOCUS/empty=false/count=1",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 1,
@@ -873,7 +873,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "target not empty",
       "name": "FILLED_SCROLL->REUSABLE_FOCUS/empty=false/count=0",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 0,
@@ -881,9 +881,9 @@
       "targetKind": "REUSABLE_FOCUS"
     },
     {
-      "expectedConsumedUnits": 0,
-      "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
       "name": "FILLED_SCROLL->CONSUMABLE_SCROLL/empty=true/count=1",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 1,
@@ -893,7 +893,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "insufficient stack",
       "name": "FILLED_SCROLL->CONSUMABLE_SCROLL/empty=true/count=0",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 0,
@@ -903,7 +903,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "target not empty",
       "name": "FILLED_SCROLL->CONSUMABLE_SCROLL/empty=false/count=1",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 1,
@@ -913,7 +913,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "target not empty",
       "name": "FILLED_SCROLL->CONSUMABLE_SCROLL/empty=false/count=0",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 0,
@@ -921,9 +921,9 @@
       "targetKind": "CONSUMABLE_SCROLL"
     },
     {
-      "expectedConsumedUnits": 0,
-      "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedConsumedUnits": 1,
+      "expectedOutputCount": 1,
+      "expectedReasonCode": "ok",
       "name": "FILLED_SCROLL->BLANK_PARCHMENT/empty=true/count=1",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 1,
@@ -933,7 +933,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "insufficient stack",
       "name": "FILLED_SCROLL->BLANK_PARCHMENT/empty=true/count=0",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 0,
@@ -943,7 +943,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "target not empty",
       "name": "FILLED_SCROLL->BLANK_PARCHMENT/empty=false/count=1",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 1,
@@ -953,7 +953,7 @@
     {
       "expectedConsumedUnits": 0,
       "expectedOutputCount": 0,
-      "expectedReasonCode": "not blank",
+      "expectedReasonCode": "target not empty",
       "name": "FILLED_SCROLL->BLANK_PARCHMENT/empty=false/count=0",
       "sourceKind": "FILLED_SCROLL",
       "sourceStackCount": 0,

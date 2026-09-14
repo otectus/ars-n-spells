@@ -30,10 +30,6 @@ public final class ManaUtil {
     }
 
     private static IManaBridge chooseArsBridge() {
-        IManaBridge active = BridgeManager.getBridge();
-        if (active instanceof ArsNativeBridge) return active;
-        IManaBridge secondary = BridgeManager.getSecondaryBridge();
-        if (secondary instanceof ArsNativeBridge) return secondary;
-        return new ArsNativeBridge();
+        return BridgeManager.getNativeArsBridge();
     }
 }

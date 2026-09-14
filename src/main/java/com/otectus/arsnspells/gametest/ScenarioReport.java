@@ -1,102 +1,85 @@
 package com.otectus.arsnspells.gametest;
 
 import com.otectus.arsnspells.ArsNSpells;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 
-import java.util.List;
 import java.util.Map;
-import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Counts the optional-mod scenarios {@link OptionalModGate} let through against the ones it
- * skipped, and emits a single machine-readable line when the GameTest server shuts down.
+ * Counts which GameTest scenarios actually <em>executed</em> and which merely reported success
+ * because an optional mod was absent, and prints that split once as the server stops.
  *
- * <p>The line is the CI success signal that "N required tests passed" cannot be, because the
- * harness counts a mod-absent self-skip as a pass:
+ * <p><b>Why this exists (audit V26).</b> GameTest has no notion of a skipped test: a scenario that
+ * returns {@code helper.succeed()} because {@code irons_spellbooks} is missing is indistinguishable
+ * in the log from one that drove the whole integration. An absent-profile run therefore reported
+ * "71 tests passed" while zero cross-mod scenarios had run, and CI read that as a pass. The pass
+ * count cannot tell the truth on its own, so CI reads this line instead.
  *
- * <pre>
- *   ANS-GAMETEST executed=35 skipped=2 byMod={irons_spellbooks=2}
- * </pre>
+ * <p>Recording happens from {@link OptionalModGate}, which is called from GameTest batches running
+ * on several threads, hence the concurrent map. A test name maps either to {@link #EXECUTED} or to
+ * the id of the mod whose absence skipped it; a skip always wins over an execute, so a scenario
+ * gated on two mods where only one is present counts as skipped.
  *
- * <p><b>What the numbers cover.</b> Only gate-visible scenarios - the tests that depend on an
- * optional mod. Unconditional tests are not counted here at all: they run in every profile and
- * the harness's own pass count already speaks for them. So {@code executed} answers "how many
- * integrations did this profile actually exercise", which is exactly the question the absent
- * profile was previously answering with a lie.
- *
- * <p>The {@code ANS-GAMETEST executed=} prefix is grepped by {@code .github/workflows/ci.yml};
- * do not reword it.
- *
- * <p>Registered on the game bus only when the GameTest namespace property is set, so a normal
- * client or server install never sees this line.
+ * <p>The FORGE bus carries {@link ServerStoppingEvent}. Nothing is printed when no scenario was
+ * recorded, so a production server never sees this line.
  */
+@EventBusSubscriber(modid = ArsNSpells.MODID)
 public final class ScenarioReport {
 
-    /** The literal CI greps for. Keep it stable. */
+    /** The literal CI greps for. Changing it breaks {@code .github/workflows/ci.yml}. */
     public static final String PREFIX = "ANS-GAMETEST executed=";
 
-    private static final AtomicInteger EXECUTED = new AtomicInteger();
-    private static final AtomicInteger SKIPPED = new AtomicInteger();
-    private static final Map<String, AtomicInteger> BY_MOD = new ConcurrentHashMap<>();
-    private static final List<String> SKIPPED_NAMES = new CopyOnWriteArrayList<>();
-    private static final List<String> EXECUTED_NAMES = new CopyOnWriteArrayList<>();
-    private static final AtomicBoolean EMITTED = new AtomicBoolean();
+    private static final String EXECUTED = "";
 
-    private ScenarioReport() {}
+    private static final Map<String, String> OUTCOMES = new ConcurrentHashMap<>();
+    private static final AtomicBoolean EMITTED = new AtomicBoolean(false);
 
-    /**
-     * Subscribe the report to the game bus when this process is a GameTest run.
-     *
-     * <p>Called from the mod constructor. {@code neoforge.enabledGameTestNamespaces} is the
-     * property {@code build.gradle}'s {@code gameTestServer} run sets, and it is the only
-     * thing that distinguishes a test server from a real one this early.
-     */
-    public static void register() {
-        String namespaces = System.getProperty("neoforge.enabledGameTestNamespaces");
-        if (namespaces == null || namespaces.isBlank()) {
-            return;
-        }
-        NeoForge.EVENT_BUS.register(ScenarioReport.class);
+    private ScenarioReport() {
     }
 
-    /** Record that {@code testName} really exercised its optional-mod integration. */
+    /** Record that {@code testName} genuinely ran its integration path. Never downgrades a skip. */
     static void executed(String testName) {
-        EXECUTED.incrementAndGet();
-        EXECUTED_NAMES.add(testName);
+        OUTCOMES.putIfAbsent(testName, EXECUTED);
     }
 
-    /** Record that {@code testName} was skipped over {@code modId}'s presence state. */
+    /** Record that {@code testName} was skipped because {@code modId} is not loaded. */
     static void skipped(String modId, String testName) {
-        SKIPPED.incrementAndGet();
-        BY_MOD.computeIfAbsent(modId, id -> new AtomicInteger()).incrementAndGet();
-        SKIPPED_NAMES.add(testName + " (" + modId + ")");
+        OUTCOMES.put(testName, modId);
+    }
+
+    /** The one honest line, e.g. {@code ANS-GAMETEST executed=12 skipped=39 byMod={ars_zero=6}}. */
+    static String render() {
+        int executed = 0;
+        int skipped = 0;
+        Map<String, Integer> byMod = new TreeMap<>();
+        for (String outcome : OUTCOMES.values()) {
+            if (EXECUTED.equals(outcome)) {
+                executed++;
+            } else {
+                skipped++;
+                byMod.merge(outcome, 1, Integer::sum);
+            }
+        }
+        StringBuilder mods = new StringBuilder();
+        byMod.forEach((mod, count) -> {
+            if (mods.length() > 0) {
+                mods.append(", ");
+            }
+            mods.append(mod).append('=').append(count);
+        });
+        return PREFIX + executed + " skipped=" + skipped + " byMod={" + mods + "}";
     }
 
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
-        emit();
-    }
-
-    /**
-     * Emit the report line, once. {@code ServerStoppingEvent} can be seen more than once
-     * across an integrated-server lifetime, and a second line would double the count CI reads.
-     */
-    private static void emit() {
-        if (!EMITTED.compareAndSet(false, true)) {
+        if (OUTCOMES.isEmpty() || !EMITTED.compareAndSet(false, true)) {
             return;
         }
-        StringJoiner byMod = new StringJoiner(", ", "{", "}");
-        new TreeMap<>(BY_MOD).forEach((modId, count) -> byMod.add(modId + "=" + count.get()));
-        ArsNSpells.LOGGER.info("{}{} skipped={} byMod={}",
-            PREFIX, EXECUTED.get(), SKIPPED.get(), byMod);
-        ArsNSpells.LOGGER.debug("ANS-GAMETEST executed scenarios: {}", EXECUTED_NAMES);
-        ArsNSpells.LOGGER.debug("ANS-GAMETEST skipped scenarios: {}", SKIPPED_NAMES);
+        ArsNSpells.LOGGER.info(render());
     }
 }

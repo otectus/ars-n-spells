@@ -46,7 +46,7 @@ public class IronsProgressionHandler {
         if (schoolId == null) {
             return;
         }
-        String school = schoolId.getPath().toLowerCase(Locale.ROOT);
+        String school = schoolId.toString();
         if (school.isEmpty()) {
             return;
         }

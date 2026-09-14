@@ -11,7 +11,6 @@ import com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile;
 import com.mojang.authlib.GameProfile;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.combat.CombatDebugState;
-import com.otectus.arsnspells.compat.CompatIds;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.util.SpellAnalysis;
@@ -272,7 +271,7 @@ public final class CombatBridgeGameTests {
     /** A caster with no spell power at all must deal exactly the damage Ars computed. */
     @GameTest(template = "platform")
     public static void ironsLoaded_arsSpellWithNoSpellPower_isUnchanged(GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -292,7 +291,7 @@ public final class CombatBridgeGameTests {
     /** Generic spell power with no matching school scales by the generic factor alone. */
     @GameTest(template = "platform")
     public static void ironsLoaded_genericSpellPower_scalesAnArsSpell(GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -320,7 +319,7 @@ public final class CombatBridgeGameTests {
     @GameTest(template = "platform")
     public static void ironsLoaded_matchingSchoolPower_addsToTheGenericFactor(
             GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -353,7 +352,7 @@ public final class CombatBridgeGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_nonMatchingSchoolPower_isNotApplied(GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -389,7 +388,7 @@ public final class CombatBridgeGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_realPyromancerSet_scalesAnArsFireSpell(GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -437,7 +436,7 @@ public final class CombatBridgeGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_scalingNeedsNoPrecedingCastEvent(GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -463,7 +462,7 @@ public final class CombatBridgeGameTests {
     @GameTest(template = "platform")
     public static void ironsLoaded_interleavedSchools_doNotContaminateEachOther(
             GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -510,7 +509,7 @@ public final class CombatBridgeGameTests {
     @GameTest(template = "platform")
     public static void ironsLoaded_repeatedArsCasts_scaleIdenticallyAndOnlyOnce(
             GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -554,7 +553,7 @@ public final class CombatBridgeGameTests {
     @GameTest(template = "platform")
     public static void ironsLoaded_arsDamageBonus_addsToAnIronsSpellExactlyOnce(
             GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -588,7 +587,7 @@ public final class CombatBridgeGameTests {
     /** A sword swing is not a spell. The perk must not touch it. */
     @GameTest(template = "platform")
     public static void ironsLoaded_meleeDamage_isNeverTouched(GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);
@@ -616,7 +615,7 @@ public final class CombatBridgeGameTests {
      */
     @GameTest(template = "platform")
     public static void ironsLoaded_environmentalDamage_isNeverTouched(GameTestHelper helper) {
-        if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
         ServerPlayer player = preparedPlayer(helper);

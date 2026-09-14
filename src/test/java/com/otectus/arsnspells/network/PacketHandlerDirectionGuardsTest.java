@@ -7,11 +7,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * ANS-HIGH-013 - every payload must be registered with an explicit direction, so the bus
@@ -34,7 +37,7 @@ class PacketHandlerDirectionGuardsTest {
     /** Payloads that must only ever travel server to client. */
     private static final List<String> S2C = List.of(
         "AffinitySyncPayload", "AffinityBulkSyncPayload", "CooldownSyncPayload",
-        "ResonanceSyncPayload");
+        "JournalSnapshotPayload", "ResonanceSyncPayload", "SchoolMappingsSyncPayload", "SpellLoomResultPayload");
 
     /** Payloads that must only ever travel client to server. */
     private static final List<String> C2S = List.of(
@@ -67,20 +70,19 @@ class PacketHandlerDirectionGuardsTest {
 
     @Test
     void everyRegisteredPayloadIsAccountedForByThisTest() throws IOException {
-        // Otherwise a new payload could be added with no direction assertion at all and this
-        // file would keep passing while covering less.
         String src = source();
-        List<String> registered = new ArrayList<>();
-        Matcher m = Pattern.compile("play(?:ToClient|ToServer)\\((\\w+)\\.TYPE").matcher(src);
+        Map<String, String> registered = new HashMap<>();
+        Matcher m = Pattern.compile("(playToClient|playToServer|playBidirectional)\\(\\s*(\\w+)\\.TYPE").matcher(src);
         while (m.find()) {
-            registered.add(m.group(1));
+            String payload = m.group(2);
+            assertNull(registered.put(payload, m.group(1)), payload + " registered more than once");
+            assertEquals(C2S.contains(payload) ? "playToServer" : "playToClient", m.group(1),
+                payload + " accepts client input without being an approved command");
         }
-        List<String> expected = new ArrayList<>(S2C);
-        expected.addAll(C2S);
-        assertEquals(expected.size(), registered.size(),
-            "a payload was registered that this test does not cover: " + registered);
-        assertTrue(registered.containsAll(expected),
-            "expected every known payload to be registered; saw " + registered);
+        assertTrue(registered.keySet().containsAll(S2C), "Every required snapshot must be registered");
+        assertTrue(registered.keySet().containsAll(C2S), "Every approved command must be registered");
+        assertEquals(src.split("reg\\.play", -1).length - 1, registered.size(),
+            "Every registration shape must be covered");
     }
 
     @Test

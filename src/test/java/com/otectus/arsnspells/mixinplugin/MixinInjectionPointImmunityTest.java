@@ -58,11 +58,14 @@ class MixinInjectionPointImmunityTest {
     /**
      * Files permitted to use an instruction-level injection point.
      *
-     * <p>Empty, and it should stay that way. The 1.20.1 line allowlisted exactly one file -
+     * <p>The native Iron payment boundary is after its final cost event and before effects;
+     * HEAD sees an unfinished price and RETURN is too late. Its exact instruction is
+     * verified against the pinned Iron runtime by NativeCastPaymentGameTests.
+     * The 1.20.1 line additionally allowlisted
      * Covenant of the Seven's HUD overlay, whose {@code void render} target had no HEAD/RETURN
      * formulation of "replace the fill-width divisor". That mixin is not part of this build.
      */
-    private static final Set<String> INSTRUCTION_LEVEL_ALLOWLIST = Set.of();
+    private static final Set<String> INSTRUCTION_LEVEL_ALLOWLIST = Set.of("MixinIronsCastPayment.java");
 
     /** Matches both {@code @At("HEAD")} and {@code @At(value = "INVOKE", ...)}. */
     private static final Pattern AT_SIMPLE = Pattern.compile("@At\\s*\\(\\s*\"([A-Z_]+)\"");

@@ -450,29 +450,14 @@ public class ArsNSpellsCommands {
             return 0;
         }
 
-        java.util.Optional<com.otectus.arsnspells.spell.CrossModSpell> entry =
-            com.otectus.arsnspells.spell.IronsBookBindingUtil.extractSingleEntry(scroll);
-        if (entry.isEmpty() || entry.get().arsSpellTag().isEmpty()) {
-            context.getSource().sendFailure(Component.translatable("commands.ans.bind.scroll_not_carrier"));
-            return 0;
-        }
-
-        // 3.0.3: refuse an unreadable payload before the scroll is consumed - same gate the
-        // binding ritual applies. See IronsBookBindingUtil.isCastableArsPayload.
-        if (!com.otectus.arsnspells.spell.IronsBookBindingUtil
-                .isCastableArsPayload(entry.get().arsSpellTag().get())) {
-            context.getSource().sendFailure(Component.translatable("commands.ans.bind.uncastable"));
-            return 0;
-        }
-
+        // Validation and mutation both live in the shared binder, so this command, the
+        // Spellbook Binding ritual and Iron's Inscription Table cannot drift apart on what a
+        // bind is allowed to do. The command keeps its own wording, its own permission check
+        // and the consumption.
         int maxCap = AnsConfig.MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK.get();
-        com.otectus.arsnspells.spell.IronsBookBindingUtil.AppendResult result =
-            com.otectus.arsnspells.spell.IronsBookBindingUtil.appendArsSpellToBook(
-                book, entry.get().arsSpellTag().get(),
-                entry.get().customName().orElse(null),
-                entry.get().nature().orElse(null),
-                entry.get().iconSymbol().orElse(null),
-                maxCap);
+        com.otectus.arsnspells.spell.IronsSpellbookBinder.BindResult result =
+            com.otectus.arsnspells.spell.IronsSpellbookBinder.bind(player, scroll, book,
+                com.otectus.arsnspells.spell.IronsSpellbookBinder.Caller.COMMAND);
         switch (result) {
             case ADDED:
                 break;
@@ -484,6 +469,23 @@ public class ArsNSpellsCommands {
                 // sends the player looking for a bug that is not there.
                 context.getSource().sendFailure(Component.translatable("commands.ans.bind.book_full",
                     com.otectus.arsnspells.spell.IronsBookBindingUtil.effectiveProxyCeiling(maxCap)));
+                return 0;
+            case DISABLED:
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.disabled"));
+                return 0;
+            case NO_BOOK:
+                context.getSource().sendFailure(
+                    Component.translatable("commands.ans.bind.need_scroll_and_book"));
+                return 0;
+            case UNCASTABLE:
+                // 3.0.3: refused before the scroll is consumed, rather than binding a wheel
+                // entry that silently does nothing when selected.
+                context.getSource().sendFailure(Component.translatable("commands.ans.bind.uncastable"));
+                return 0;
+            case NOT_A_CARRIER:
+            case INVALID_CARRIER:
+                context.getSource().sendFailure(
+                    Component.translatable("commands.ans.bind.scroll_not_carrier"));
                 return 0;
             case FAILED:
             default:
@@ -535,10 +537,6 @@ public class ArsNSpellsCommands {
         // needs Iron's and it is absent (e.g. ISS_PRIMARY -> ARS_PRIMARY), so we echo both
         // the requested and the now-active mode.
         BridgeManager.refreshMode();
-        // The mode-set path is the second entry point of the mode-change migration: remove
-        // every ANS modifier, recompute what the new mode enables, clamp the pool, re-sync
-        // (audit V14). Without it a live mode switch left the old mode's bonuses applied.
-        com.otectus.arsnspells.events.ModeChangeMigration.onRoutingChanged();
 
         final String requestedName = parsed.getConfigName();
         final String effectiveName = BridgeManager.getCurrentMode().getConfigName();

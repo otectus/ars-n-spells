@@ -8,7 +8,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 /**
- * NeoForge 1.21.1 payload handler — replaces the Forge SimpleChannel rig
+ * NeoForge 1.21.1 payload handler â€” replaces the Forge SimpleChannel rig
  * from 1.20.1. Registration runs on the mod bus
  * ({@link RegisterPayloadHandlersEvent}); broadcast helpers wrap
  * {@link PacketDistributor}.
@@ -22,24 +22,23 @@ public final class PacketHandler {
     /**
      * Bumped on protocol-breaking changes. Server and client must match exactly:
      * a mismatch fails channel negotiation and refuses the connection, which is the
-     * intended behaviour — a partial payload set would desync silently instead.
+     * intended behaviour â€” a partial payload set would desync silently instead.
      *
      * <p>History: "2" = 3.0.x line (loom payload added).
      * "4" = affinity_bulk_sync added, replacing the one-packet-per-school burst
      *       the full resyncs sent on login / respawn / dimension change.
-     * "3" = 3.2.0 parity pass — cross_cast_request added, restoring the
+     * "3" = 3.2.0 parity pass â€” cross_cast_request added, restoring the
      * server-authoritative cast path from the 1.20.1 build.
-     * "5" = spell_loom_export gained its reasonCode field (audit V18). A client that
-     *       still sends the three-string form would decode the next field off the end of
-     *       the buffer, so the mismatch has to be refused at negotiation.
+     * "6" = transaction_sync removed along with the transaction receipt HUD.
      */
-    public static final String PROTOCOL_VERSION = "5";
+    public static final String PROTOCOL_VERSION = "6";
 
     private PacketHandler() {}
 
     public static void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar reg = event.registrar(PROTOCOL_VERSION);
-
+        reg.playToClient(SchoolMappingsSyncPayload.TYPE, SchoolMappingsSyncPayload.STREAM_CODEC, SchoolMappingsSyncPayload::handleOnClient);
+        reg.playToClient(SpellLoomResultPayload.TYPE, SpellLoomResultPayload.STREAM_CODEC, SpellLoomResultPayload::handleOnClient);
         reg.playToClient(AffinitySyncPayload.TYPE, AffinitySyncPayload.STREAM_CODEC,
             AffinitySyncPayload::handleOnClient);
         reg.playToClient(AffinityBulkSyncPayload.TYPE, AffinityBulkSyncPayload.STREAM_CODEC,
@@ -52,6 +51,8 @@ public final class PacketHandler {
             SpellLoomExportPayload::handleOnServer);
         reg.playToServer(CrossCastRequestPayload.TYPE, CrossCastRequestPayload.STREAM_CODEC,
             CrossCastRequestPayload::handleOnServer);
+
+        reg.playToClient(JournalSnapshotPayload.TYPE, JournalSnapshotPayload.STREAM_CODEC, JournalSnapshotPayload::handleOnClient);
 
         ArsNSpells.LOGGER.info("Registered payload handlers (protocol={})", PROTOCOL_VERSION);
     }

@@ -84,8 +84,9 @@ public final class ModCreativeTabs {
     /**
      * Everything the mod registers, block items first so the Spell Loom workstation leads.
      *
-     * <p>Iterating the {@link DeferredRegister}s rather than naming the items makes the Iron's
-     * gate structural instead of defensive. Without Iron's,
+     * <p>Iterating the {@link DeferredRegister}s rather than naming the seven items (the Spell
+     * Loom block item, the four Iron's-gated tablets, the uninscribe tablet, and the blank
+     * scroll) makes the Iron's gate structural instead of defensive. Without Iron's,
      * {@code ModItemsRegistry.registerIronsDependentItems()} is never called, so those entries do
      * not exist to iterate — there is nothing to null-check. Naming them instead would mean
      * calling accessors that return a <em>null</em> holder on an Iron's-less install. Any future

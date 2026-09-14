@@ -1,0 +1,20 @@
+{
+  "loader": "NeoForge 1.21.1",
+  "version": "3.3.3",
+  "command": "/home/otectus/.gradle/wrapper/dists/gradle-8.12-bin/cetblhg4pflnnks72fxwobvgv/gradle-8.12/bin/gradle --offline compileJava processResources test --tests com.otectus.arsnspells.registry.ItemAssetCompletenessTest jar",
+  "wrapper_note": "The checkout gradlew uses CRLF and fails on Linux; used its cached Gradle 8.12 distribution directly.",
+  "build": "passed",
+  "item_asset_tests": 4,
+  "shared_files_matching_forge": 15,
+  "model_elements": 91,
+  "model_faces": 546,
+  "warp_weft_threads": 10,
+  "diamond_complete_and_symmetric": true,
+  "textures": "six opaque 16x16 RGB PNGs",
+  "collision_boxes": "26 identical to Forge",
+  "packaged_resources_verified": 9,
+  "jar": "build/libs/ars_n_spells-3.3.3.jar",
+  "jar_sha256": "3114e6c0fe48521ad344136540b66296c713d6eb78793ea970aedc489b423763",
+  "backup": "backups/spell-loom/spell-loom-before-art-port-20260912T233810Z.zip",
+  "live_client_visual_check": "not run"
+}

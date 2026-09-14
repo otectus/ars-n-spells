@@ -4,7 +4,6 @@ import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
 import com.otectus.arsnspells.combat.CombatDebugState;
 import com.otectus.arsnspells.compat.ScrollLPTracker;
-import com.otectus.arsnspells.modifier.AnsFeatureCleanup;
 import com.otectus.arsnspells.spell.CrossCastContext;
 import com.otectus.arsnspells.util.LogThrottle;
 import net.minecraft.server.MinecraftServer;
@@ -59,11 +58,6 @@ public final class StateEvictionHandler {
         ResonanceManager.clear(player);
         CrossCastContext.clear(player);
         CombatDebugState.clear(player.getUUID());
-        // Transient attribute modifiers too, unconditionally (audit V14). They do not survive
-        // a logout on their own, but a dedicated server can hand the same LivingEntity's
-        // attribute map back on a fast reconnect, and every other caller of this handler wants
-        // "nothing of ours is left on this player" to mean all of it.
-        AnsFeatureCleanup.removeAll(player);
     }
 
     @SubscribeEvent
@@ -83,7 +77,6 @@ public final class StateEvictionHandler {
         // Integrated server: the JVM survives world exit, so these statics carry into the next
         // world unless they are drained here.
         sweepCounter = 0;
-        ModeChangeMigration.reset();
         ScrollLPTracker.clearAll();
         com.otectus.arsnspells.spell.CastValidationScope.clearAll();
         ResonanceManager.clearAll();

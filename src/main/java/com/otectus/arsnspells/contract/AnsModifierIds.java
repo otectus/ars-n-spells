@@ -56,6 +56,7 @@ public final class AnsModifierIds {
             "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
             "Ars Potion Mana Regen"));
         legacy.put(CROSS_MOD_SCHOOL_PROGRESSION, List.of(
+            "ars_n_spells:progression_element_xp",
             "b0ba11ad-dead-beef-cafe-f00d20245678",
             "Cross-Mod School Progression"));
         LEGACY_KEYS = Collections.unmodifiableMap(legacy);

@@ -32,8 +32,8 @@ public class AffinityHandler {
             return;
         }
         if (event.getEntity() instanceof ServerPlayer player) {
-            String key = SchoolKeys.fromArsSchool(SpellAnalysis.analyze(event.spell).dominantSchool());
-            if (key != null) {
+            String key = SpellAnalysis.analyze(event.spell).schoolKey();
+            if (!com.otectus.arsnspells.util.SchoolKeys.GENERIC.equals(key)) {
                 AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
                 data.addLevel(key, 1);
                 PacketHandler.sendToClient(new AffinitySyncPayload(key, data.getLevel(key)), player);

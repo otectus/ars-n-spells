@@ -66,4 +66,26 @@ class ManaBarControllerOverlayMatchTest {
         assertFalse(ManaBarController.isArsManaOverlay("irons_spellbooks", "mana_overlay"),
             "the Ars matcher must not match the Iron's layer");
     }
+
+    @Test
+    void matchers_neverTouchVanillaOrThirdPartyOverlays() {
+        // Third-party HUDs (e.g. Durability Viewer) draw from the Post of the vanilla hotbar
+        // and potion/effects overlays; a cancelled Pre suppresses that Post. These ids must
+        // never match, in any matcher, regardless of mode.
+        String[][] foreign = {
+            {"minecraft", "hotbar"},
+            {"minecraft", "potion_icons"},
+            {"minecraft", "effects"},
+            {"minecraft", "experience_bar"},
+            {"durabilityviewer", "durability_viewer"},
+            {"ars_nouveau", "hotbar"},
+            {"irons_spellbooks", "cooldown_bar"},
+        };
+        for (String[] id : foreign) {
+            String label = id[0] + ":" + id[1] + " must never be matched";
+            assertFalse(ManaBarController.isManaOverlay(id[0], id[1]), label);
+            assertFalse(ManaBarController.isIronsManaOverlay(id[0], id[1]), label);
+            assertFalse(ManaBarController.isArsManaOverlay(id[0], id[1]), label);
+        }
+    }
 }

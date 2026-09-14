@@ -1,0 +1,21 @@
+{
+  "category": "ars_nouveau:ars_n_spells",
+  "icon": "ars_n_spells:spellbook_binding",
+  "name": "ars_n_spells.book.binding.name",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.binding.1"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.binding.2"
+    },
+    {
+      "type": "ars_nouveau:apparatus_recipe",
+      "recipe": "ars_n_spells:apparatus/spellbook_binding"
+    }
+  ],
+  "flag": "mod:irons_spellbooks"
+}

@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 @EventBusSubscriber(modid = ArsNSpells.MODID)
 public final class EquipmentHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(EquipmentHandler.class);
+    private static final java.util.Set<java.util.UUID> DIRTY = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private EquipmentHandler() {}
 
@@ -48,12 +49,13 @@ public final class EquipmentHandler {
                 event.getTo());
         }
         EquipmentIntegration.recomputeFor(player);
+        DIRTY.add(player.getUUID());
     }
 
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            EquipmentIntegration.recomputeFor(player);
+            com.otectus.arsnspells.bridge.ModeChangeCleanup.reconcile(player);
         }
     }
 
@@ -64,8 +66,17 @@ public final class EquipmentHandler {
         }
         // Once per second — picks up dynamic Ars perk/potion mana sources. The
         // recompute is cheap and only churns Iron's attributes when a value changed.
-        if (player.tickCount % 20 == 0) {
+        if (DIRTY.remove(player.getUUID()) || player.tickCount % 20 == 0) {
             EquipmentIntegration.recomputeFor(player);
         }
     }
+
+    @SubscribeEvent
+    public static void onCurioChange(top.theillusivec4.curios.api.event.CurioChangeEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) DIRTY.add(player.getUUID());
+    }
+    @SubscribeEvent
+    public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) { DIRTY.remove(event.getEntity().getUUID()); }
+    @SubscribeEvent
+    public static void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) { DIRTY.clear(); }
 }

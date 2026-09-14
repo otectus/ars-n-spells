@@ -120,6 +120,9 @@ public final class AttemptLedger {
     public void commit(CastAttempt attempt) {
         Objects.requireNonNull(attempt, "attempt");
         attempt.commit();
+        // Reservation ownership ends at commit. A late cancel/failure callback must
+        // never turn an already executed paid cast into a refund, including COMPLETED.
+        attempt.tryMarkReleased();
     }
 
     /** Settle a committed attempt and drop it from the registry. Nothing is refunded. */

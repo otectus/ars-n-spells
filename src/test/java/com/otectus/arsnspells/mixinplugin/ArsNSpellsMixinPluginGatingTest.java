@@ -108,6 +108,14 @@ class ArsNSpellsMixinPluginGatingTest {
         }
     }
 
+    @Test
+    void manaBarVisibilityAppliesOnlyWhenIronsIsPresent() throws Exception {
+        String target = "io.redspace.ironsspellbooks.gui.overlays.ManaBarOverlay";
+        String mixin = "com.otectus.arsnspells.mixin.irons.MixinIronsManaBarVisibility";
+        assertFalse(newPluginWithIronsPresent(false).shouldApplyMixin(target, mixin));
+        assertTrue(newPluginWithIronsPresent(true).shouldApplyMixin(target, mixin));
+    }
+
     private static final String[] ARS_MIXINS = {
         "com.otectus.arsnspells.mixin.ars.MixinManaCapability",
         "com.otectus.arsnspells.mixin.ars.MixinSpellResolverMana",

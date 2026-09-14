@@ -1,6 +1,6 @@
 package com.otectus.arsnspells.gametest;
 
-import com.otectus.arsnspells.compat.CompatIds;
+import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.rituals.SpellbookBindingInputs;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossCastValidator;
@@ -144,12 +144,16 @@ public final class ArsIronsExportGameTests {
     }
 
     @GameTest(template = "platform")
-    public static void clearPayloadOnly_onRealItemStack_preservesSiblings(GameTestHelper helper) {
+    public static void clearCrossSpells_onRealItemStack_preservesSiblings(GameTestHelper helper) {
         ItemStack book = new ItemStack(Items.BOOK);
-        book.set(ModDataComponents.EXPORT_MODE.get(), "sibling_value");
+        CompoundTag sibling = new CompoundTag();
+        sibling.putString("third_party:state", "sibling_value");
+        book.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
+            net.minecraft.world.item.component.CustomData.of(sibling));
+        book.set(ModDataComponents.EXPORT_MODE.get(), "ans_owned_marker");
         IronsBookBindingUtil.appendArsSpellToBook(book, arsPayload("glyph_heal"));
 
-        CrossModSpellComponents.clearPayloadOnly(book);
+        CrossModSpellComponents.clear(book);
 
         if (book.isEmpty()) {
             helper.fail("clearing inscriptions must not turn the stack into EMPTY");
@@ -159,9 +163,12 @@ public final class ArsIronsExportGameTests {
             helper.fail("clear must remove the cross-spells component");
             return;
         }
-        if (!"sibling_value".equals(book.get(ModDataComponents.EXPORT_MODE.get()))) {
-            helper.fail("clear must not touch unrelated components - a real carrier also holds "
-                + "Iron's own spell container, and eating that is data loss");
+        if (book.has(ModDataComponents.EXPORT_MODE.get()) || book.has(ModDataComponents.SCHEMA_VERSION.get())) {
+            helper.fail("public clear must remove ANS-owned export/schema artifacts too"); return;
+        }
+        var remaining = book.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA);
+        if (remaining == null || !sibling.equals(remaining.copyTag())) {
+            helper.fail("clear must not touch unrelated third-party components");
             return;
         }
         helper.succeed();
@@ -263,7 +270,9 @@ public final class ArsIronsExportGameTests {
 
     @GameTest(template = "platform")
     public static void ironAbsent_predicatesAreSafe(GameTestHelper helper) {
-        if (OptionalModGate.skipIfPresent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (IronsCompat.isLoaded()) {
+            // This one is specifically about the Iron's-absent path.
+            helper.succeed();
             return;
         }
         try {

@@ -34,10 +34,10 @@ class RegenSynergyHandlerChunkGuardTest {
     @Test
     void guardIsEvaluatedBeforeTheScan() throws IOException {
         String src = source();
-        int tickIdx = src.indexOf("public static void onPlayerTickPost");
+        int tickIdx = src.indexOf("public void onPlayerTick");
         assertTrue(tickIdx > 0, "the player tick handler must exist");
         int guardIdx = src.indexOf("areScanChunksLoaded(level, pos", tickIdx);
-        int scanCallIdx = src.indexOf("findSourceJar(level, pos", tickIdx);
+        int scanCallIdx = src.indexOf("scanForSourceJar(level, pos", tickIdx);
         assertTrue(guardIdx > 0 && scanCallIdx > guardIdx,
             "the tick must evaluate areScanChunksLoaded before invoking the scan");
     }
@@ -48,7 +48,7 @@ class RegenSynergyHandlerChunkGuardTest {
         // so the chunk-unloaded branch must leave the cache untouched and retry next interval.
         String src = source();
         // Anchor inside the tick method, not on the field declaration of the same name.
-        int tickIdx = src.indexOf("public static void onPlayerTickPost");
+        int tickIdx = src.indexOf("public void onPlayerTick");
         assertTrue(tickIdx > 0, "the player tick handler must exist");
         int elseIdx = src.indexOf("scansSkippedUnloaded.incrementAndGet()", tickIdx);
         assertTrue(elseIdx > 0, "the skipped-scan branch must be counted");

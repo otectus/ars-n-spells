@@ -59,19 +59,23 @@ class AffinityDataMigrationTest {
     }
 
     @Test
-    void legacyCategoryBucketsAndUnknownsAreDropped() {
+    void legacyCategoryBucketsAndUnknownsAreArchived() {
         CompoundTag legacy = new CompoundTag();
         legacy.putInt("FIRE", 5);       // migrates
-        legacy.putInt("OFFENSIVE", 9);  // category bucket -> dropped
-        legacy.putInt("HYBRID", 4);     // source bucket   -> dropped
-        legacy.putInt("BOGUS", 7);      // unknown          -> dropped
+        legacy.putInt("OFFENSIVE", 9);  // archived category bucket
+        legacy.putInt("HYBRID", 4);     // archived source bucket
+        legacy.putInt("BOGUS", 7);      // archived unknown key
 
         AffinityData decoded = AffinityData.CODEC.parse(NbtOps.INSTANCE, legacy).getOrThrow();
 
         assertEquals(5, decoded.getLevel("irons_spellbooks:fire"));
-        // Only the one real elemental survives; buckets/unknowns gone.
+        // Only real elemental data activates bonuses; unresolved keys remain archival.
         assertEquals(1, decoded.getAllLevels().size());
         assertFalse(decoded.getAllLevels().containsKey("OFFENSIVE"));
+        assertEquals(9, decoded.unresolvedLegacy().get("OFFENSIVE"));
+        AffinityData roundTrip = AffinityData.CODEC.parse(NbtOps.INSTANCE,
+            AffinityData.CODEC.encodeStart(NbtOps.INSTANCE, decoded).getOrThrow()).getOrThrow();
+        assertEquals(decoded.unresolvedLegacy(), roundTrip.unresolvedLegacy());
     }
 
     @Test

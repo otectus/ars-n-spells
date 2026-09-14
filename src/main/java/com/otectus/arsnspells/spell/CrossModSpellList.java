@@ -13,13 +13,25 @@ import java.util.List;
  * inscribed entries plus the currently-selected index for sneak-cycling.
  * Encoded as one DataComponent per item via {@link ModDataComponents#CROSS_SPELLS}.
  */
-public record CrossModSpellList(List<CrossModSpell> spells, int selectedIndex) {
+public record CrossModSpellList(List<CrossModSpell> spells, int selectedIndex, net.minecraft.nbt.CompoundTag unknownFields) {
+    public CrossModSpellList {
+        spells = List.copyOf(spells);
+        unknownFields = unknownFields == null ? new net.minecraft.nbt.CompoundTag() : unknownFields.copy();
+    }
+    public CrossModSpellList(List<CrossModSpell> spells, int selectedIndex) {
+        this(spells, selectedIndex, new net.minecraft.nbt.CompoundTag());
+    }
+    public net.minecraft.nbt.CompoundTag unknownFields() { return unknownFields.copy(); }
     public static final CrossModSpellList EMPTY = new CrossModSpellList(List.of(), 0);
 
-    public static final Codec<CrossModSpellList> CODEC = RecordCodecBuilder.create(i -> i.group(
+    private static final Codec<CrossModSpellList> KNOWN_CODEC = RecordCodecBuilder.create(i -> i.group(
         CrossModSpell.CODEC.listOf().fieldOf("spells").forGetter(CrossModSpellList::spells),
         Codec.INT.optionalFieldOf("index", 0).forGetter(CrossModSpellList::selectedIndex)
     ).apply(i, CrossModSpellList::new));
+
+    public static final Codec<CrossModSpellList> CODEC = PreservingRecordCodec.wrap(KNOWN_CODEC,
+        java.util.Set.of("spells", "index"), CrossModSpellList::unknownFields,
+        (value, extras) -> new CrossModSpellList(value.spells(), value.selectedIndex(), extras));
 
     /**
      * Wire ceiling on the entry list.
@@ -37,6 +49,7 @@ public record CrossModSpellList(List<CrossModSpell> spells, int selectedIndex) {
             CrossModSpell.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_WIRE_ENTRIES)),
                                                                     CrossModSpellList::spells,
             ByteBufCodecs.VAR_INT,                                  CrossModSpellList::selectedIndex,
+            ByteBufCodecs.COMPOUND_TAG,                              CrossModSpellList::unknownFields,
             CrossModSpellList::new
         );
 

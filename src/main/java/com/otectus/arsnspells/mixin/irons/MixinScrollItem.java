@@ -22,41 +22,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Intercepts Iron's Spellbooks scroll usage to enforce resource costs. Scrolls
- * normally bypass SpellPreCastEvent/SpellOnCastEvent, so without this mixin they
- * would cast for free.
- *
- * <p>Cost handling is transactional: HEAD validates and stages a pending cost via
- * {@link ScrollLPTracker}, RETURN commits or rolls back based on whether Iron's
- * actually accepted the use. This prevents the pre-1.9.0 bug where the cost was
- * consumed before the cast and could leave invariants broken if the cast failed
- * downstream.
- *
- * <p>State lives in {@link ScrollLPTracker} (a non-mixin package) because Sponge
- * Mixin forbids direct references to inner classes of a mixin — the mixin's bytecode
- * is merged into the target class, so {@code MixinX$Y} would have no resolvable home.
- *
- * <p>Behavior is controlled by the {@code scroll_cost_mode} config:
- * <ul>
- *   <li><b>full</b>: Scrolls cost the same as casting the spell normally.</li>
- *   <li><b>lp_only</b>: Scrolls are mana-free but LP is still consumed for Cursed Ring wearers.</li>
- *   <li><b>free</b>: No resource cost, but LP from Cursed Ring still applies.</li>
- * </ul>
- *
- * <p><b>Covenant of the Seven on 1.21.1.</b> The 1.20.1 build ran a Cursed-Ring LP
- * branch ahead of the mana check, so a ring wearer paid LP <em>instead of</em> mana,
- * never both. Covenant has no 1.21.1 release, so that branch has no consumer and is
- * not carried here; {@code lp_only} consequently behaves as {@code free}. The
- * {@link ScrollLPTracker} entry still carries {@code lpCost}/{@code deathMode} so
- * re-enabling the subsystem does not need a staging-format change. See
- * Covenant of the Seven, which has no 1.21.1 release.
- */
+/** Reject stale proxy scrolls before native initiation. Full scroll mana pricing is captured
+ * by IronsCastPayments and committed at the same before-effects boundary as native books. */
 @Mixin(value = io.redspace.ironsspellbooks.item.Scroll.class, remap = false)
 public class MixinScrollItem {
     private static final Logger LOGGER = LoggerFactory.getLogger(MixinScrollItem.class);
 
-    @Inject(method = "use", at = @At("HEAD"), cancellable = true, require = 0)
+    @Inject(method = "use", at = @At("HEAD"), cancellable = true, require = 1)
     private void arsnspells$validateScrollCast(Level level, Player player, InteractionHand hand,
             CallbackInfoReturnable<InteractionResultHolder<ItemStack>> cir) {
         if (level.isClientSide()) {
@@ -108,65 +80,5 @@ public class MixinScrollItem {
             return;
         }
 
-        String scrollMode = AnsConfig.SCROLL_COST_MODE.get().toLowerCase();
-        int manaCost = spell.getManaCost(spellLevel);
-
-        // Cursed-Ring LP path would run here, ahead of the mana check, and return early so
-        // LP replaces mana rather than adding to it. Inert on 1.21.1 — see the class javadoc.
-
-        // --- Mana cost validation (based on scroll_cost_mode) ---
-        if ("free".equals(scrollMode) || "lp_only".equals(scrollMode)) {
-            return;
-        }
-
-        // "full" mode: validate mana like a normal spell cast, and stage the consume for
-        // RETURN. ANS-MED-043: validation alone charged nothing — Iron's scrolls never
-        // deduct mana natively, so "full" mode was documented as costing mana but was
-        // actually free.
-        if (manaCost > 0) {
-            if (!CastingAuthority.canCastIronsSpell(player, manaCost)) {
-                cir.setReturnValue(InteractionResultHolder.fail(stack));
-                return;
-            }
-            ScrollLPTracker.stage(player.getUUID(), 0, false, manaCost, level.getGameTime());
-        }
-    }
-
-    /**
-     * Commit the staged cost based on whether Iron's actually accepted the use. Runs
-     * after the original {@code use} method completes.
-     */
-    @Inject(method = "use", at = @At("RETURN"), require = 0)
-    private void arsnspells$commitScrollCost(Level level, Player player, InteractionHand hand,
-            CallbackInfoReturnable<InteractionResultHolder<ItemStack>> cir) {
-        if (level.isClientSide()) {
-            return;
-        }
-
-        InteractionResultHolder<ItemStack> result = cir.getReturnValue();
-        boolean castSucceeded = result != null && result.getResult().consumesAction();
-
-        ScrollLPTracker.Entry pending = ScrollLPTracker.take(player.getUUID(), level.getGameTime());
-        if (pending == null) {
-            return;
-        }
-
-        if (!castSucceeded) {
-            // Scroll didn't actually cast (cooldown, target invalid, etc.). Don't pay anything.
-            LOGGER.debug("Scroll cast did not consume action; skipping cost commit for {}",
-                player.getName().getString());
-            return;
-        }
-
-        if (pending.manaCost > 0.0f) {
-            boolean consumed = CastingAuthority.consumeIronsSpellMana(player, Math.round(pending.manaCost));
-            if (!consumed) {
-                LOGGER.warn("Scroll mana commit failed for {} despite successful validation; spell already cast",
-                    player.getName().getString());
-            }
-        }
-
-        // The LP / death-mode commit branch would follow here, keyed on pending.lpCost and
-        // pending.deathMode. Inert on 1.21.1 — see the class javadoc.
     }
 }

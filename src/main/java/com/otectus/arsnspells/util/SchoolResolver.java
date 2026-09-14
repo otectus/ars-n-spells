@@ -53,6 +53,26 @@ import java.util.Set;
 public final class SchoolResolver {
 
     private SchoolResolver() {}
+    private static boolean isNonPayloadPart(AbstractSpellPart part) {
+        return part instanceof com.hollingsworth.arsnouveau.api.spell.AbstractAugment
+            || part instanceof com.hollingsworth.arsnouveau.api.spell.AbstractCastMethod
+            || part instanceof com.hollingsworth.arsnouveau.api.spell.AbstractFilter;
+    }
+
+    /**
+     * The name-shaped equivalent of {@link #isNonPayloadPart}, so the pure overload and the
+     * typed one give the same answer for the same glyph. Covers both id conventions in play:
+     * Ars Nouveau and Ars Elemental prefix with {@code glyph_}, Ars Zero does not.
+     */
+    private static boolean isNonPayloadPath(String rawPath) {
+        String path = rawPath.toLowerCase(Locale.ROOT);
+        if (path.startsWith("glyph_")) {
+            path = path.substring("glyph_".length());
+        }
+        return path.endsWith("_filter") || path.startsWith("augment_") || path.endsWith("_form");
+    }
+
+
 
     /**
      * Ars Nouveau school id → ANS canonical school.
@@ -79,6 +99,7 @@ public final class SchoolResolver {
         m.put("abjuration", SpellSchoolId.HOLY);
         m.put("conjuration", SpellSchoolId.EVOCATION);
         m.put("manipulation", SpellSchoolId.ENDER);
+        m.put("necromancy", SpellSchoolId.ELDRITCH);
         // "elemental" intentionally absent — see the javadoc above. It is NOT expanded to its
         // four child elements even now that resolveAll can return several schools: under the
         // MAX aggregation policy that would let any generic-elemental glyph claim whichever of
@@ -97,6 +118,7 @@ public final class SchoolResolver {
      * lets the whole resolution chain be unit-tested without an Ars runtime.
      */
     public static SpellSchoolId resolve(@Nullable AbstractSpellPart part) {
+        if (part != null && isNonPayloadPart(part)) return SpellSchoolId.GENERIC;
         return resolve(registryIdOf(part), declaredArsSchoolsOf(part));
     }
 
@@ -137,6 +159,7 @@ public final class SchoolResolver {
      * an empty set. Empty is therefore a normal, meaningful result.
      */
     public static Set<SpellSchoolId> resolveAll(@Nullable AbstractSpellPart part) {
+        if (part != null && isNonPayloadPart(part)) return Collections.emptySet();
         return resolveAll(registryIdOf(part), declaredArsSchoolsOf(part));
     }
 
@@ -149,6 +172,9 @@ public final class SchoolResolver {
         if (registryId == null || registryId.isEmpty()) {
             return Collections.emptySet();
         }
+
+        int nameStart = registryId.indexOf(':');
+        if (isNonPayloadPath(nameStart < 0 ? registryId : registryId.substring(nameStart + 1))) return Collections.emptySet();
 
         // An explicit mapping is the pack author's deliberate correction and is authoritative:
         // it stops resolution even when it names nothing but "generic", which is how a pack says
@@ -166,6 +192,39 @@ public final class SchoolResolver {
         int colon = registryId.indexOf(':');
         String path = colon >= 0 ? registryId.substring(colon + 1) : registryId;
         return toSchoolSet(List.of(heuristic(path)));
+    }
+
+    /** Namespaced ordered memberships; cosmetic metadata is never consulted. */
+    public static List<String> resolveKeys(@Nullable AbstractSpellPart part) {
+        if (part == null || part.getRegistryName() == null || isNonPayloadPart(part))
+            return List.of(SchoolKeys.GENERIC);
+        List<String> declared = new ArrayList<>();
+        if (part.spellSchools != null) for (SpellSchool school : part.spellSchools) {
+            if (school != null && school.getId() != null) declared.add(school.getId());
+        }
+        return resolveKeys(part.getRegistryName().toString(), declared);
+    }
+
+    public static List<String> resolveKeys(@Nullable String registryId, @Nullable List<String> declared) {
+        if (registryId == null || registryId.isEmpty()) return List.of(SchoolKeys.GENERIC);
+        int colon = registryId.indexOf(':');
+        String path = colon < 0 ? registryId : registryId.substring(colon + 1);
+        if (isNonPayloadPath(path)) return List.of(SchoolKeys.GENERIC);
+        SchoolMappings snapshot = SchoolMappings.get();
+        List<String> mapped = snapshot.glyphSchoolKeys(registryId);
+        if (mapped != null) return mapped;
+        java.util.LinkedHashSet<String> result = new java.util.LinkedHashSet<>();
+        if (declared != null) for (String raw : declared) {
+            if (raw == null) continue;
+            List<String> overlay = snapshot.arsSchoolKeys(raw);
+            if (overlay != null) result.addAll(overlay);
+            else {
+                SpellSchoolId builtin = ARS_SCHOOL_TO_CANONICAL.get(raw.toLowerCase(Locale.ROOT));
+                if (builtin != null) result.add(SchoolKeys.normalize(builtin.id()));
+                // Untranslated Ars schools are a different vocabulary, not Iron's school IDs.
+            }
+        }
+        return result.isEmpty() ? List.of(SchoolKeys.normalize(heuristic(path).id())) : List.copyOf(result);
     }
 
     /** Full registry id of a glyph, or null when it has none. */

@@ -7,13 +7,16 @@
   "mixins": [
     "irons.MagicDataAccessor",
     "irons.MixinIronsCastValidation",
+    "irons.MixinIronsCastPayment",
     "irons.MixinIronsSpellPowerResonance",
     "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem",
     "irons.MixinInscriptionTableMenu"
   ],
   "client": [
+    "irons.MixinIronsManaBarVisibility",
     "irons.MixinAbstractSpellArsIcon",
+    "irons.MixinItemStackIconContext",
     "irons.MixinInscriptionTableScreen"
   ],
   "injectors": {

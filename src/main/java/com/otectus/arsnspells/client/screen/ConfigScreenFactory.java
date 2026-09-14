@@ -7,9 +7,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,10 +17,6 @@ import java.util.List;
 /**
  * Simple in-game configuration screen for Ars 'n' Spells.
  * Provides access to key configuration options without requiring manual file editing.
- *
- * <p>Lives under {@code client.screen} (audit F3): a client-only {@link Screen}
- * in the common {@code config} package risked accidental server-side
- * classloading by future config code.
  */
 public class ConfigScreenFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(ConfigScreenFactory.class);
@@ -38,42 +32,20 @@ public class ConfigScreenFactory {
      * Main configuration screen
      */
     public static class ArsNSpellsConfigScreen extends Screen {
-        // ANS 3.0.1 legibility pass: the screen paints its own near-opaque
-        // background and a bounded panel instead of the vanilla translucent dim
-        // (which client blur mods hook and turn into unreadable frosted glass),
-        // and rows/controls get real chrome with shared render/click geometry.
-
-        // Layout
         private static final int ROW_STRIDE = 34;
         private static final int ROW_WIDTH = 340;
         private static final int PANEL_PAD = 8;
         private static final int BTN_H = 20;
         private static final int BTN_W_BOOL = 44;
         private static final int BTN_W_CYCLE = 110;
-        private static final int FOOTER_H = 40;
-
-        // Colors (full ARGB so blending over the panel fills stays consistent)
-        private static final int BG_OVERLAY = 0xF2101014;
-        private static final int PANEL_BG = 0xFF1A1A21;
-        private static final int PANEL_BORDER = 0xFF5A5A6E;
-        private static final int ROW_BG = 0x22FFFFFF;
-        private static final int ROW_BG_HOVER = 0x33FFFFFF;
-        private static final int TEXT_PRIMARY = 0xFFFFFFFF;
-        private static final int TEXT_SECONDARY = 0xFFB8B8C0;
-        private static final int TEXT_DISABLED = 0xFF707078;
-        private static final int TEXT_NOTE = 0xFFF0C060;
-        private static final int BTN_BG = 0xFF2E2E38;
-        private static final int BTN_BG_HOVER = 0xFF3E3E4C;
-        private static final int BTN_BG_DISABLED = 0xFF232329;
-        private static final int BTN_BORDER = 0xFF8B8B9E;
-        private static final int BTN_BORDER_HOVER = 0xFFE0E0F0;
-        private static final int VALUE_ON = 0xFF55FF55;
-        private static final int VALUE_OFF = 0xFFFF5555;
+        private static final int FOOTER_H = 64;
+        private final List<Button> optionButtons = new ArrayList<>();
+        private boolean draggingScrollbar;
 
         private final Screen parent;
         private final List<ConfigOption> options = new ArrayList<>();
         private int scrollOffset = 0;
-        // ANS 2.0.1: true only in singleplayer (integrated server). Gates the
+        // ANS 2.0.1: true only in singleplayer (integrated server). Gates the new
         // Mana Mode cycle row and the Save/Reset buttons — SERVER-config writes from a
         // client mirror are no-ops on a dedicated server.
         private boolean canMutate = false;
@@ -86,6 +58,8 @@ public class ConfigScreenFactory {
         @Override
         protected void init() {
             super.init();
+            clearWidgets();
+            optionButtons.clear();
 
             // Clear existing options
             options.clear();
@@ -96,7 +70,7 @@ public class ConfigScreenFactory {
             addSystemSettings();
 
             // ANS-HIGH-016 part 2: gate mutation buttons on singleplayer.
-            // AnsConfig is a SERVER-type config (registered server-side in ArsNSpells.java).
+            // AnsConfig is now a SERVER-type config (registered server-side in ArsNSpells.java).
             // On a dedicated server, AnsConfig.<KEY>.set(...) on the CLIENT side mutates only
             // the client's mirror — it never propagates to the server, so toggles in this
             // screen would be silent no-ops. Disable Save/Reset when not in singleplayer so
@@ -113,21 +87,28 @@ public class ConfigScreenFactory {
                     }
                     minecraft.setScreen(parent);
                 })
-                .bounds(this.width / 2 - 100, this.height - 28, 200, 20)
+                .bounds(this.width / 2 + 2, this.height - 28, 148, 20)
                 .build()
             );
 
             // Add Reset Toggles button — disabled in multiplayer
             // ANS-OPT-018: renamed from "Reset to Defaults" because resetToDefaults()
-            // only resets the boolean toggles visible in the UI, not the other
+            // only resets the 9 boolean toggles visible in the UI, not the 90+ other
             // config keys. "Reset Toggles" matches what the button actually does.
             Button resetButton = Button.builder(
                 Component.literal("Reset Toggles"),
                 button -> resetToDefaults())
-                .bounds(this.width / 2 - 205, this.height - 28, 100, 20)
+                .bounds(this.width / 2 - 150, this.height - 52, 148, 20)
                 .build();
             resetButton.active = canMutate;
             this.addRenderableWidget(resetButton);
+            this.addRenderableWidget(Button.builder(Component.translatable("ars_n_spells.icon_picker.library"),
+                b -> minecraft.setScreen(new SpellIconPickerScreen(this, "school/generic", "none", (icon, frame) -> {})))
+                .bounds(this.width / 2 + 2, this.height - 52, 148, 20).build());
+            this.addRenderableWidget(Button.builder(Component.translatable("ars_n_spells.compatibility.title"),
+                b -> minecraft.setScreen(new CompatibilityScreen(this)))
+                .bounds(this.width / 2 - 150, this.height - 28, 148, 20).build());
+            rebuildOptionButtons();
         }
 
         private void addMasterToggles() {
@@ -226,8 +207,10 @@ public class ConfigScreenFactory {
         // ---- Shared geometry: single source of truth for render AND click ----
 
         private int rowX() {
-            return this.width / 2 - ROW_WIDTH / 2;
+            return this.width / 2 - rowWidth() / 2;
         }
+
+        private int rowWidth() { return Math.min(ROW_WIDTH, this.width - 32); }
 
         /** First row y; the read-only note reserves an extra strip in multiplayer. */
         private int listTop() {
@@ -241,171 +224,135 @@ public class ConfigScreenFactory {
         /** Screen-space rect {x, y, w, h} of a row's control. */
         private int[] buttonRect(ConfigOption option, int rowY) {
             int w = option.isCycle() ? BTN_W_CYCLE : BTN_W_BOOL;
-            int x = rowX() + ROW_WIDTH - w - 6;
+            int x = rowX() + rowWidth() - w - 6;
             int y = rowY + (ROW_STRIDE - 2 - BTN_H) / 2;
             return new int[]{x, y, w, BTN_H};
         }
 
-        @Override
-        public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-            // No super call: on 1.21+ the vanilla renderBackground applies the
-            // gaussian blur + menu texture, which client blur mods amplify into
-            // unreadable frosted glass. An owned near-opaque fill keeps the text
-            // legible regardless of what is behind (world, menu, panorama).
-            graphics.fill(0, 0, this.width, this.height, BG_OVERLAY);
+        private void rebuildOptionButtons() {
+            // A control scrolled out of view must no longer receive Space/Enter.
+            if (optionButtons.contains(getFocused())) setFocused(null);
+            for (Button button : optionButtons) removeWidget(button);
+            optionButtons.clear();
+            scrollOffset = Math.max(0, Math.min(scrollOffset, options.size() - visibleRowCount()));
+            for (int i = scrollOffset; i < Math.min(options.size(), scrollOffset + visibleRowCount()); i++) {
+                ConfigOption option = options.get(i);
+                int[] rect = buttonRect(option, listTop() + (i - scrollOffset) * ROW_STRIDE);
+                Button control = Button.builder(optionLabel(option), button -> {
+                    if (!canMutate) return;
+                    if (option.isCycle()) option.onCycle.run();
+                    else option.toggle();
+                    button.setMessage(optionLabel(option));
+                }).bounds(rect[0], rect[1], rect[2], rect[3])
+                    .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(option.name + ": " + option.description)))
+                    .createNarration(supplier -> Component.literal(option.name + ". ").append(supplier.get()))
+                    .build();
+                control.active = canMutate;
+                optionButtons.add(addRenderableWidget(control));
+            }
         }
+
+        private Component optionLabel(ConfigOption option) {
+            // SERVER config is unavailable on the title screen. Do not present
+            // defaults or a previous world's values as a connected server's state.
+            if (minecraft == null || minecraft.level == null) return Component.literal("-");
+            return option.isCycle() ? Component.literal(option.displaySupplier.get())
+                : Component.translatable(option.getValue() ? "options.on" : "options.off");
+        }
+
+        // Settings owns its opaque backdrop; do not apply the 1.21 blur over it.
+        @Override public void renderBackground(GuiGraphics g, int x, int y, float tick) {}
 
         @Override
         public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-            // Super first: on 1.21+ Screen.render() paints the background as its
-            // FIRST step, so anything drawn before it gets covered. It runs our
-            // renderBackground override (opaque fill, no blur), then the
-            // Done/Reset widgets; the panel and rows draw after, on top.
-            super.render(graphics, mouseX, mouseY, partialTick);
-
-            // Bounded content panel behind title and rows
-            int panelX0 = rowX() - PANEL_PAD;
-            int panelX1 = rowX() + ROW_WIDTH + PANEL_PAD;
-            int panelY0 = 8;
-            int panelY1 = this.height - FOOTER_H;
-            graphics.fill(panelX0, panelY0, panelX1, panelY1, PANEL_BG);
-            graphics.renderOutline(panelX0, panelY0, panelX1 - panelX0, panelY1 - panelY0, PANEL_BORDER);
-
-            graphics.drawCenteredString(this.font, this.title, this.width / 2, 16, TEXT_PRIMARY);
-            graphics.drawCenteredString(this.font,
-                Component.literal("Configure Ars 'n' Spells Integration"),
-                this.width / 2, 28, TEXT_SECONDARY);
+            // Preserve the owned backdrop: third-party blur must not blur settings or labels.
+            graphics.fill(0, 0, this.width, this.height, 0xFF202020);
+            VanillaGui.panel(graphics, rowX() - PANEL_PAD, 8, rowWidth() + PANEL_PAD * 2, this.height - FOOTER_H - 8);
+            VanillaGui.centered(graphics, font, title, width / 2, 16, VanillaGui.TEXT);
+            VanillaGui.centered(graphics, font, Component.literal("Configure Ars 'n' Spells Integration"), width / 2, 28, VanillaGui.MUTED);
             if (!canMutate) {
-                graphics.drawCenteredString(this.font,
-                    Component.literal("Read-only: server-managed config."),
-                    this.width / 2, 42, TEXT_NOTE);
-                graphics.drawCenteredString(this.font,
-                    Component.literal("Edit the server TOML or use /ans commands."),
-                    this.width / 2, 52, TEXT_NOTE);
+                boolean connected = minecraft != null && minecraft.level != null;
+                VanillaGui.centered(graphics, font, Component.literal(connected ? "Read-only: server-managed config." : "Join a world to view its settings."), width / 2, 42, VanillaGui.TEXT);
+                VanillaGui.centered(graphics, font, Component.literal(connected ? "Edit the server TOML or use /ans commands." : "These settings are managed by the server."), width / 2, 52, VanillaGui.MUTED);
             }
-
+            for (int i = scrollOffset; i < Math.min(options.size(), scrollOffset + visibleRowCount()); i++) {
+                ConfigOption option = options.get(i);
+                int y = listTop() + (i - scrollOffset) * ROW_STRIDE;
+                int textWidth = buttonRect(option, y)[0] - rowX() - 14;
+                graphics.drawString(font, VanillaGui.ellipsize(font, option.name, textWidth), rowX() + 4, y + 5, VanillaGui.TEXT, false);
+                graphics.drawString(font, VanillaGui.ellipsize(font, option.description, textWidth), rowX() + 4, y + 17, VanillaGui.MUTED, false);
+                if (mouseX >= rowX() && mouseX < rowX() + textWidth && mouseY >= y && mouseY < y + ROW_STRIDE)
+                    setTooltipForNextRenderPass(font.split(Component.literal(option.name + "\n" + option.description), 260));
+            }
             int visible = visibleRowCount();
-            int y = listTop();
-            for (int i = scrollOffset; i < options.size() && i < scrollOffset + visible; i++) {
-                renderRow(graphics, options.get(i), y, mouseX, mouseY);
-                y += ROW_STRIDE;
-            }
-
-            // Slim scrollbar when the list is clipped
             if (options.size() > visible) {
-                int trackX0 = panelX1 - 6;
-                int trackX1 = panelX1 - 3;
-                int trackY0 = listTop();
-                int trackY1 = listTop() + visible * ROW_STRIDE - 2;
-                graphics.fill(trackX0, trackY0, trackX1, trackY1, ROW_BG);
-                int trackH = trackY1 - trackY0;
-                int maxOffset = options.size() - visible;
-                int thumbH = Math.max(8, trackH * visible / options.size());
-                int thumbY = trackY0 + (trackH - thumbH) * Math.min(scrollOffset, maxOffset) / maxOffset;
-                graphics.fill(trackX0, thumbY, trackX1, thumbY + thumbH, BTN_BORDER);
+                int x = rowX() + rowWidth() - 3;
+                int track = visible * ROW_STRIDE - 2;
+                int thumb = Math.max(12, track * visible / options.size());
+                int y = listTop() + (track - thumb) * scrollOffset / (options.size() - visible);
+                graphics.fill(x, listTop(), x + 6, listTop() + track, 0xFF000000);
+                graphics.fill(x, y, x + 6, y + thumb, 0xFF808080);
+                graphics.fill(x, y, x + 5, y + thumb - 1, VanillaGui.PANEL);
             }
+            super.render(graphics, mouseX, mouseY, partialTick);
         }
 
-        private void renderRow(GuiGraphics graphics, ConfigOption option, int rowY, int mouseX, int mouseY) {
-            int x = rowX();
-            boolean rowHovered = mouseX >= x && mouseX < x + ROW_WIDTH
-                && mouseY >= rowY && mouseY < rowY + ROW_STRIDE - 2;
-            graphics.fill(x, rowY, x + ROW_WIDTH, rowY + ROW_STRIDE - 2,
-                rowHovered && canMutate ? ROW_BG_HOVER : ROW_BG);
-
-            graphics.drawString(this.font, option.name, x + 6, rowY + 6,
-                canMutate ? TEXT_PRIMARY : TEXT_SECONDARY, true);
-
-            int[] rect = buttonRect(option, rowY);
-
-            // Description: truncate to the space left of the control; full text
-            // shows as a tooltip on hover instead of smearing under the button.
-            int maxDescWidth = rect[0] - (x + 6) - 8;
-            String desc = option.description;
-            boolean truncated = false;
-            if (this.font.width(desc) > maxDescWidth) {
-                desc = this.font.plainSubstrByWidth(desc, maxDescWidth - this.font.width("...")) + "...";
-                truncated = true;
-            }
-            graphics.drawString(this.font, desc, x + 6, rowY + 18,
-                canMutate ? TEXT_SECONDARY : TEXT_DISABLED, true);
-            if (truncated && rowHovered) {
-                setTooltipForNextRenderPass(this.font.split(Component.literal(option.description), 200));
-            }
-
-            String label;
-            int labelColor;
-            if (option.isCycle()) {
-                label = option.displaySupplier.get();
-                labelColor = canMutate ? TEXT_PRIMARY : TEXT_DISABLED;
-            } else {
-                boolean on = option.getValue();
-                label = on ? "ON" : "OFF";
-                labelColor = canMutate ? (on ? VALUE_ON : VALUE_OFF) : TEXT_DISABLED;
-            }
-            boolean btnHovered = canMutate
-                && mouseX >= rect[0] && mouseX < rect[0] + rect[2]
-                && mouseY >= rect[1] && mouseY < rect[1] + rect[3];
-            drawButtonChrome(graphics, rect[0], rect[1], rect[2], rect[3],
-                label, labelColor, btnHovered, canMutate);
-        }
-
-        private void drawButtonChrome(GuiGraphics graphics, int x, int y, int w, int h,
-                                      String label, int labelColor, boolean hovered, boolean enabled) {
-            graphics.fill(x, y, x + w, y + h,
-                !enabled ? BTN_BG_DISABLED : hovered ? BTN_BG_HOVER : BTN_BG);
-            graphics.renderOutline(x, y, w, h, hovered ? BTN_BORDER_HOVER : BTN_BORDER);
-            String clipped = label;
-            if (this.font.width(clipped) > w - 8) {
-                clipped = this.font.plainSubstrByWidth(clipped, w - 8 - this.font.width("...")) + "...";
-            }
-            graphics.drawCenteredString(this.font, clipped, x + w / 2, y + (h - 8) / 2, labelColor);
+        private void scrollRows(int delta) {
+            scrollOffset = Math.max(0, Math.min(Math.max(0, options.size() - visibleRowCount()), scrollOffset + delta));
+            rebuildOptionButtons();
         }
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            // ANS 3.0.1: in multiplayer the whole list is read-only — SERVER-config
-            // writes from the client mirror are silent no-ops on a dedicated server.
-            // Gating here fixes the old bug where boolean rows toggled ungated
-            // (cycle rows were already gated).
-            if (canMutate && button == 0) {
-                int visible = visibleRowCount();
-                int y = listTop();
-                for (int i = scrollOffset; i < options.size() && i < scrollOffset + visible; i++) {
-                    ConfigOption option = options.get(i);
-                    // Hit-test the exact rect the control is drawn at (shared geometry).
-                    int[] rect = buttonRect(option, y);
-                    if (mouseX >= rect[0] && mouseX < rect[0] + rect[2] &&
-                        mouseY >= rect[1] && mouseY < rect[1] + rect[3]) {
-                        if (option.isCycle()) {
-                            option.onCycle.run();
-                        } else {
-                            option.toggle();
-                        }
-                        if (minecraft != null) {
-                            minecraft.getSoundManager().play(
-                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
-                        }
-                        return true;
-                    }
-                    y += ROW_STRIDE;
-                }
-            }
-
+            draggingScrollbar = button == 0 && options.size() > visibleRowCount()
+                && mouseX >= rowX() + rowWidth() - 3 && mouseX < rowX() + rowWidth() + 3
+                && mouseY >= listTop() && mouseY < listTop() + visibleRowCount() * ROW_STRIDE - 2;
+            if (draggingScrollbar) { dragScrollbar(mouseY); return true; }
             return super.mouseClicked(mouseX, mouseY, button);
         }
 
+        private void dragScrollbar(double y) {
+            int track = visibleRowCount() * ROW_STRIDE - 2;
+            int thumb = Math.max(12, track * visibleRowCount() / options.size());
+            int target = (int) Math.round((y - listTop() - thumb / 2.0)
+                * (options.size() - visibleRowCount()) / Math.max(1, track - thumb));
+            scrollRows(target - scrollOffset);
+        }
+
         @Override
-        public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-            int maxOffset = Math.max(0, options.size() - visibleRowCount());
-            scrollOffset = Math.max(0, Math.min(maxOffset, scrollOffset - (int) scrollY));
+        public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+            if (draggingScrollbar && button == 0) { dragScrollbar(y); return true; }
+            return super.mouseDragged(x, y, button, dx, dy);
+        }
+
+        @Override
+        public boolean mouseReleased(double x, double y, int button) {
+            draggingScrollbar = false;
+            return super.mouseReleased(x, y, button);
+        }
+
+        @Override
+        public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double delta) {
+            if (mouseX < rowX() - PANEL_PAD || mouseX >= rowX() + rowWidth() + PANEL_PAD
+                || mouseY < listTop() || mouseY >= height - FOOTER_H) return false;
+            scrollRows(delta > 0 ? -1 : delta < 0 ? 1 : 0);
             return true;
         }
 
+        @Override
+        public boolean keyPressed(int key, int scan, int modifiers) {
+            if (key == 266 || key == 267) {
+                scrollRows(key == 266 ? -visibleRowCount() : visibleRowCount());
+                if (!optionButtons.isEmpty()) setFocused(optionButtons.get(0));
+                return true;
+            }
+            return super.keyPressed(key, scan, modifiers);
+        }
+
         private void saveConfig() {
-            // ANS-HIGH-017: safeSave() only SCHEDULES an async write and always
-            // returns true — the real outcome lands in the log. The message below
-            // is worded accordingly instead of claiming the file was written.
+            // ANS-HIGH-017 / audit D5: safeSave() only SCHEDULES an async write —
+            // the real outcome lands in the log. The message below is worded
+            // accordingly instead of claiming the file was written.
             AnsConfig.safeSave();
 
             // ANS 2.0.1: apply config changes (notably a Mana Mode cycle) live. This

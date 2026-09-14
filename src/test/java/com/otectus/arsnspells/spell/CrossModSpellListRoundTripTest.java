@@ -124,4 +124,28 @@ class CrossModSpellListRoundTripTest {
         assertTrue(result.error().isPresent());
         assertNotNull(result.error().get().message());
     }
+    @Test void arsPayloadIsDefensivelyCopiedOnWriteAndRead() {
+        CompoundTag original = new CompoundTag();
+        original.putString("recipe", "saved");
+        CrossModSpell entry = sampleArs("spell", 1, original);
+        original.putString("recipe", "mutated input");
+        assertEquals("saved", entry.arsSpellTag().orElseThrow().getString("recipe"));
+        entry.arsSpellTag().orElseThrow().putString("recipe", "mutated output");
+        assertEquals("saved", entry.arsSpellTag().orElseThrow().getString("recipe"));
+    }
+
+    @Test void unknownEntryAndListFieldsSurviveCodecRoundTripWithoutAliasing() {
+        CompoundTag raw = (CompoundTag) CrossModSpellList.CODEC.encodeStart(NbtOps.INSTANCE,
+            new CrossModSpellList(List.of(sampleIrons("fireball", 1)), 0)).getOrThrow();
+        CompoundTag future = new CompoundTag();
+        future.putString("custom:addon", "recoverable");
+        raw.put("future_list_data", future);
+        raw.getList("spells", Tag.TAG_COMPOUND).getCompound(0).put("future_entry_data", future.copy());
+        CrossModSpellList decoded = CrossModSpellList.CODEC.parse(NbtOps.INSTANCE, raw).getOrThrow();
+        decoded.unknownFields().remove("future_list_data");
+        decoded.spells().get(0).unknownFields().remove("future_entry_data");
+        Tag output = CrossModSpellList.CODEC.encodeStart(NbtOps.INSTANCE, decoded).getOrThrow();
+        assertEquals(raw, output);
+    }
+
 }

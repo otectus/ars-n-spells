@@ -8,10 +8,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 
 public final class CrossCastContext {
-    // ANS-OPT-006: 100 ticks (5 seconds at 20 TPS), not 200. Faster eviction means less
-    // stale-state hazard if anything in the pipeline forgets to clear() on its own - and a
-    // stale entry here is not inert: peek() hands it to the cost-calc handler, which applies
-    // the cross-cast premium to an unrelated later cast.
+    // ANS-OPT-006: 200 -> 100 ticks (5 seconds at 20 TPS) so the cross-cast context
+    // TTL aligns with CursedRingHandler.PENDING_COST_TTL_TICKS and
+    // VirtueRingHandler.PENDING_COST_TTL_TICKS. Faster eviction = less stale-state
+    // hazard if anything in the pipeline forgets to clear() on its own.
     private static final long DEFAULT_TTL_TICKS = 100L;
     private static final Map<UUID, Entry> ACTIVE_CASTS = new ConcurrentHashMap<>();
     private static final ThreadLocal<ManaCheckOverride> MANA_CHECK_OVERRIDE = new ThreadLocal<>();
@@ -20,48 +20,36 @@ public final class CrossCastContext {
     }
 
     public static void begin(Player player, CrossSpellType type, long gameTime) {
+        beginWithAttempt(player, type, gameTime, UUID.randomUUID());
+    }
+
+    public static void beginWithAttempt(Player player, CrossSpellType type, long gameTime, UUID attemptId) {
         if (player == null) {
             return;
         }
-        ACTIVE_CASTS.put(player.getUUID(), new Entry(type, gameTime + DEFAULT_TTL_TICKS));
+        ACTIVE_CASTS.put(player.getUUID(), new Entry(type, gameTime + DEFAULT_TTL_TICKS, attemptId));
     }
 
     public static void begin(Player player, CrossSpellType type, long gameTime, float arsCost, float issCost) {
-        if (player == null) {
-            return;
-        }
-        Entry entry = new Entry(type, gameTime + DEFAULT_TTL_TICKS);
-        entry.arsCost = arsCost;
-        entry.issCost = issCost;
-        entry.costsReady = true;
-        ACTIVE_CASTS.put(player.getUUID(), entry);
+        begin(player, type, gameTime, arsCost, issCost, null, UUID.randomUUID());
     }
 
     public static void begin(Player player, CrossSpellType type, long gameTime, float arsCost, float issCost,
         String spellId) {
+        begin(player, type, gameTime, arsCost, issCost, spellId, UUID.randomUUID());
+    }
+
+    public static void begin(Player player, CrossSpellType type, long gameTime, float arsCost, float issCost,
+        String spellId, UUID attemptId) {
         if (player == null) {
             return;
         }
-        Entry entry = new Entry(type, gameTime + DEFAULT_TTL_TICKS);
+        Entry entry = new Entry(type, gameTime + DEFAULT_TTL_TICKS, attemptId);
         entry.arsCost = arsCost;
         entry.issCost = issCost;
         entry.costsReady = true;
         entry.spellId = spellId;
         ACTIVE_CASTS.put(player.getUUID(), entry);
-    }
-
-    /**
-     * As {@link #begin(Player, CrossSpellType, long, float, float, String)}, additionally
-     * recording the trace attempt id so the Iron's-side cost stage can be correlated with
-     * the request that started it.
-     */
-    public static void begin(Player player, CrossSpellType type, long gameTime, float arsCost, float issCost,
-        String spellId, java.util.UUID attemptId) {
-        begin(player, type, gameTime, arsCost, issCost, spellId);
-        Entry entry = ACTIVE_CASTS.get(player == null ? null : player.getUUID());
-        if (entry != null) {
-            entry.attemptId = attemptId;
-        }
     }
 
     public static Entry peek(Player player) {
@@ -87,15 +75,12 @@ public final class CrossCastContext {
         return entry;
     }
 
+    public static void clearAll() { ACTIVE_CASTS.clear(); }
+
     public static void clear(Player player) {
         if (player != null) {
             ACTIVE_CASTS.remove(player.getUUID());
         }
-    }
-
-    /** Drop every player's in-flight cast context. Server stop / integrated-server exit. */
-    public static void clearAll() {
-        ACTIVE_CASTS.clear();
     }
 
     public static void cleanupExpired(Player player, long gameTime) {
@@ -141,47 +126,35 @@ public final class CrossCastContext {
 
     public static final class Entry {
         public final CrossSpellType type;
-        private final long expiresAt;
         /**
-         * Server-side attempt id minted by {@code CrossCastRequestPayload.handleOnServer},
-         * threaded through every {@link com.otectus.arsnspells.util.CrossCastTrace} stage so
-         * one multiplayer failure can be grepped end to end. Null for casts that did not
-         * originate from a cross-cast request (e.g. a native-wheel proxy cast); the trace
-         * logger substitutes the nil UUID.
+         * Per-attempt UUID used to correlate trace logs across the cross-cast
+         * pipeline (client packet send -> server receive -> validate ->
+         * resource check -> upstream cast -> effect). Always non-null; the
+         * Phase 2 packet path generates a server-side UUID, while non-packet
+         * callers default to a random UUID.
          */
-        public volatile java.util.UUID attemptId;
-        // ANS-HIGH-004: volatile so writes from the cost-calc event are visible to the payment
-        // boundary (which may run on a different thread under exotic mod chains) and to
-        // concurrent peek() readers. A torn read here charges the wrong pool. These now carry a
-        // quoted price rather than a running total, so a repeated cost query rewrites them with
-        // the same values instead of compounding them.
+        public final UUID attemptId;
+        private final long expiresAt;
+        // ANS-HIGH-004: volatile so writes from the cost-calc event are visible to the
+        // TAIL mixin (which may run on a different thread under exotic mod chains) and
+        // to concurrent peek() readers.
         public volatile float arsCost;
         public volatile float issCost;
         public volatile boolean costsReady;
         public volatile boolean blocked;
         public volatile String spellId;
         /**
-         * Opaque identity of the item this cast came from, as
-         * {@link com.otectus.arsnspells.casting.CarrierIdentity} derives it. This is the key the
-         * {@link com.otectus.arsnspells.contract.AttemptLedger} files the attempt under, so the
-         * cost-calc handler can find the quote that belongs to <em>this</em> cast rather than
-         * re-deriving one.
+         * V01: {@code issPaid} and the {@code multiplierApplied} latch are gone. Nothing
+         * is pre-paid during cost calculation any more, so there is no payment to record
+         * here, and cost-query idempotence is now per cost event rather than per attempt -
+         * a per-attempt latch is what made the second query of a cast answer a different
+         * price from the first. The money lives on the ledger's CastAttempt.
          */
-        public volatile String carrierIdentity;
-        /**
-         * ANS-CRIT-002 / ANS-HIGH-030: Iron's share pre-paid during Ars cost-calc in SEPARATE
-         * mode.
-         *
-         * <p>Audit V01 retired the prepayment itself - a cost <em>query</em> must not move mana -
-         * so this is written only by the payment boundary, and only with what the ledger actually
-         * reserved. It is kept because the Iron's-side handler and the refund path both need to
-         * know whether this leg has been paid, and because zero is a meaningful answer there.
-         */
-        public volatile float issPaid;
 
-        private Entry(CrossSpellType type, long expiresAt) {
+        private Entry(CrossSpellType type, long expiresAt, UUID attemptId) {
             this.type = type;
             this.expiresAt = expiresAt;
+            this.attemptId = attemptId != null ? attemptId : UUID.randomUUID();
         }
 
         public boolean isExpired(long gameTime) {
@@ -198,8 +171,19 @@ public final class CrossCastContext {
             this.issPercent = issPercent;
         }
 
-        public boolean isUnlimited() {
+        /**
+         * ANS-LOW-014: renamed from {@code isUnlimited} — the actual semantic is
+         * "ISS contributes 0% of dual cost, so the Iron's pool sufficiency check
+         * should be bypassed". The old name suggested an infinite resource.
+         */
+        public boolean bypassesIronsCheck() {
             return issPercent <= 0.0f;
+        }
+
+        /** @deprecated misleading name — use {@link #bypassesIronsCheck()} instead. */
+        @Deprecated
+        public boolean isUnlimited() {
+            return bypassesIronsCheck();
         }
     }
 }

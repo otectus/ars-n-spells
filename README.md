@@ -1,10 +1,10 @@
-# Ars 'n' Spells (v3.3.0, NeoForge 1.21.1)
+# Ars 'n' Spells (v3.3.2, NeoForge 1.21.1)
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.21.1 on **NeoForge**. It unifies mana, scaling, and progression while keeping each mod playable on its own.
 
-> **Status (v3.3.0, NeoForge 1.21.1).** Feature parity with the Forge 1.20.1 **3.3.0** line.
->
-> Compile targets: **Ars Nouveau 5.13.1.1400**, **Iron's Spells 1.21.1-3.16.3**, **Ars Elemental 0.7.10.1**, **Ars Elemancy 1.18.3**, **Ars Zero 2.0.2**, **NeoForge 21.1.248**.
+3.3.0 includes the economic, school/inscription, network, equipment and icon/background audit implementation. See the [full audit closure ledger](docs/3.3.0-audit-status.md) for fresh validation and open acceptance gates. Compilation or an installed dependency alone is not a runtime support certification.
+
+Pinned development targets: **Ars Nouveau 5.13.1.1400**, **Iron's Spells 1.21.1-3.16.3**, **NeoForge 21.1.248**, **Java 21**. Other accepted versions in the loader metadata require their own runtime evidence.
 
 ## Requirements
 
@@ -15,17 +15,7 @@ Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for M
 | Ars Nouveau | 5.13+ (built against 5.13.1.1400) | Yes |
 | Iron's Spells 'n Spellbooks | 1.21.1-3.15.0+ (built against 3.16.3) | No |
 
-If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior.
-
-**Scenarios with or without Iron's Spellbooks:**
-- **Fresh configuration** — starting a new world with Iron's never installed works correctly, as the mod runs as a pure Ars Nouveau addon.
-- **Dormant ANS payloads** — ANS cross-cast data already written to items in a saved world remains inert and does not break the world.
-- **Missing registry items** — items belonging to Iron's that the save references only affect those individual items, not the world itself.
-- **Whole-world dimension compatibility** — if the world references `irons_spellbooks:pocket_dimension_type`, an **upstream Iron's Spellbooks resource** that Iron's writes into level data, the world may fail to decode entirely. This is not an ANS defect, and ANS cannot repair it.
-
-**Always keep backups** when removing Iron's from an established world. ANS does not automatically delete dimensions or cross-cast payloads that refer to the mod.
-
-The mod will not load on Forge or on Minecraft versions other than 1.21.1.
+If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior. The mod will not load on Forge or on Minecraft versions other than 1.21.1.
 
 ## Features
 
@@ -69,7 +59,7 @@ Cross-mod spell damage scales bidirectionally when Iron's Spellbooks is installe
 
 **Multi-school policy split:** damage scaling uses all schools the policy resolves; affinity and progression credit the primary (first-resolved) school only. This means a dual-element spell scales with the caster's better element and trains exactly one affinity track.
 
-Implementation: both directions subscribe directly to spell-damage events (`SpellDamageEvent.Pre` from Ars Nouveau and `SpellDamageEvent` from Iron's) with the actual spell context, not a 60-tick staging map or damage-source message guessing. A delayed projectile is scaled by the spell that fired it, not by whatever the player cast most recently. Iron's must be installed for cross-mod scaling to fire — without Iron's, Ars spells use their native damage values, and Iron's applies no Ars perk bonus. Cross-mod combat scaling is independent of the mana-unification mode and remains active even when mana unification is `DISABLED`.
+Implementation: both directions subscribe directly to spell-damage events (`SpellDamageEvent.Pre` from Ars Nouveau and `SpellDamageEvent` from Iron's) with no time window or damage-string guessing. Iron's must be installed for cross-mod scaling to fire — without Iron's, Ars spells use their native damage values, and Iron's applies no Ars perk bonus. Cross-mod combat scaling is independent of the mana-unification mode and remains active even when mana unification is `DISABLED`.
 
 ### Resonance
 
@@ -194,7 +184,7 @@ An **in-game config screen** is available from the mod list (**Mods → Ars 'n' 
 
 ### Covenant of the Seven integration (removed in 3.2.1)
 
-Covenant of the Seven has no 1.21.1 or NeoForge release, so the Cursed Ring LP subsystem, Virtue Ring aura, Blasphemy curios, and all associated config keys were removed in the 3.2.1 parity pass. If Covenant returns to NeoForge, those keys and their hooks will be re-added alongside the integration.
+This NeoForge adapter does not include the Cursed Ring LP subsystem, Virtue Ring aura or Blasphemy integration from the Forge build. Its configuration therefore exposes mana-only payment behavior.
 
 `virtue_ring_discount` and `max_total_curio_discount` are kept and live — they were repurposed as the generic `#ars_n_spells:curio_spell_discount` per-curio discount and its stacking cap, extensible through datapack tags.
 
@@ -229,13 +219,13 @@ With `debug_mode` enabled, `OverlayDiagnostics` logs every rendered GUI layer id
 | `/ans info <player>` | Op 2 | Show mana, resonance, and the player's per-school affinity (plus the registered Iron's school count). |
 | `/ans mode` | — | Show current mana unification mode. |
 
-## Roadmap (deferred past 3.2.2)
+## Compatibility and remaining acceptance
 
-The 1.21.1 port is functionally complete; the items below are intentionally deferred, not broken. The mana-unification mixins disabled during the early port were repaired and re-enabled in 2.0.1; the cross-cast / rituals / scaling re-attach work tracked as "Phase 3" is done; and 2.6.1 restored the last stubbed pieces (in-game config screen, Ars mana-potion mirroring, mana-only pre-cast validation, debug overlay). The remaining deferral is the **LP/Cursed-Ring and Aura/Virtue-Ring** systems, which depend on Sanctified Legacy / Covenant of the Seven — no NeoForge 1.21.1 build of those exists yet.
+NeoForge has mana-only payment adapters. The Forge Covenant LP/aura integration is not included in this build. Optional addon support is scoped to the exact profiles and scenarios recorded in the audit ledger.
 
-- **Event-first mana bridge.** The bridge routes through two repaired mixins (`MixinManaCapability`, `MixinIronsMagicDataMana`) plus the Ars `SpellResolver` context/cost mixins. Every inject now uses `require = 0` and the mixin plugin probes its target classes (`ManaCap`/`ManaData`/`SpellResolver`), so a dependency point-release fails soft on **method** drift — but a **field** rename would still abort load. Migrating the bridge to Ars/Iron's public events (`MaxManaCalcEvent`, `SpellCostCalcEvent`, `ChangeManaEvent`, …) removes that fragility and is the main deferred item.
-- **Larger optional-mod integrations** (Apotheosis affixes, Ars Elemental focus mapping, familiar/summon synergy, Iron's Restrictions gating, ISS upgrade orbs, DailyBoss) from the compatibility plan are scoped for a later release. Ars Elemental, Ars Zero, and Ars Elemancy are now verified optional addons with working profiles and GameTests; deeper per-item feature integrations remain deferred.
-- **In-game runtime validation** — the build environment has no Minecraft, so the scenarios in [TESTING_GUIDE.md](TESTING_GUIDE.md) remain to be run manually.
+The pinned runtime hooks use native API and bytecode boundaries. Critical payment hooks require their injection targets; an arbitrary upstream version change cannot be described as automatically safe. Real-client gameplay, two-player latency, complete viewer/addon combinations and performance thresholds remain explicit release acceptance work.
+
+Missing optional glyphs are preserved as dormant descriptors and refused before native decoding changes their meaning. Removing a mod from a saved world may also remove native registry entries, blocks, entities or dimensions. A fresh optional-absent boot and a dormant-item roundtrip do not guarantee that upstream world removal is supported; `/ans removal_report` is a read-only aid.
 
 ## Building from source
 
@@ -249,22 +239,7 @@ Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMa
 
 Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`.
 
-Output jar: `build/libs/ars_n_spells-3.3.0.jar` (version tracks `mod_version` in `gradle.properties`)
-
-## Testing
-
-**Tested versions (this release):** Ars Nouveau 5.13.1.1400, Iron's Spellbooks 1.21.1-3.16.3, Ars Elemental 0.7.10.1, Ars Elemancy 1.18.3, Ars Zero 2.0.2.
-
-`./gradlew test` runs the JUnit suite. GameTests run on a real server via `runGameTestServer`, with opt-in profiles:
-
-| Command | Covers |
-| --- | --- |
-| `./gradlew runGameTestServer` | Iron's-absent fallback and boot safety |
-| `./gradlew runGameTestServer -PwithIronsRuntimeGameTests -PwithArsElemental -PwithArsElemancy -PwithArsZero` | The cross-cast pipeline against real Iron's, plus Ars addon integrations |
-
-**What is not tested this cycle:** No graphical client session, no real multiplayer session, no full Covenant dependency stack, no JEI/EMI client matrix, no performance load test, no cross-Minecraft-version world conversion.
-
-GameTest success requires three independent checks: process exit code, expected executed-scenario count, and a clean log (no failure signatures). See [.github/workflows/ci.yml](.github/workflows/ci.yml) for the full matrix.
+Output jar: `build/libs/ars_n_spells-3.3.2.jar` (version tracks `mod_version` in `gradle.properties`)
 
 ## Changelog
 

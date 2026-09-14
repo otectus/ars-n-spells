@@ -1,0 +1,19 @@
+Built-in imagegen edit. Input: nearest-neighbor 512x512 enlargement of the original 16x16 tabletop texture.
+
+Use case: precise-object-edit.
+Edit target: the attached enlarged version of an existing 16x16 Minecraft Spell Loom tabletop texture. It has EXACTLY 16 columns and 16 rows of logical pixels, each currently shown as a 32x32 flat square. This is a one-pixel repair, not a redesign.
+Primary request: change ONLY logical pixel (x=8, y=12), using zero-based coordinates with origin at the upper-left. This is the ninth column and thirteenth row. It is the dark purple square immediately to the right of the single gold square at the diamond's bottom point. Recolor that square to the SAME gold color as its immediate left neighbor at (7,12), completing the bottom tip as TWO adjacent gold pixels, symmetrical with the two-pixel top tip.
+Every other pixel must remain exactly unchanged: preserve the existing 16x16 pixel grid, all colors, wood border, dark plum background, purple corner flecks, central 2x2 lavender square, and all other gold diamond pixels. Do not add, shift, smooth or invent any other detail.
+Output: only the repaired flat square texture, edge-to-edge. Keep 16x16 logical pixels enlarged uniformly to 1024x1024 (each logical pixel is a solid 64x64 square). No labels, grid lines, antialiasing, blur, gradients, shadows, borders outside the texture, perspective, furniture or presentation layout.
+Gold coordinates for checking the EXISTING diamond outline (all already present except the one missing pixel):
+row3: x7,8
+row4: x6,9
+row5: x5,10
+row6: x4,11
+row7: x3,12
+row8: x3,12
+row9: x4,11
+row10: x5,10
+row11: x6,9
+row12: x7,8 (repair only x8).
+Change exactly the missing one logical pixel; preserve the other 255.

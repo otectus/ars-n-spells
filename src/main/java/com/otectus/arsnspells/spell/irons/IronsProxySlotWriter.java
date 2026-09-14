@@ -30,7 +30,8 @@ public final class IronsProxySlotWriter {
      */
     public static boolean addProxySlot(ItemStack book, int poolId, int level) {
         AbstractSpell proxy = ArsCrossProxyRegistry.get(poolId);
-        if (proxy == null || book == null || book.isEmpty()) {
+        if (proxy == null || book == null || book.isEmpty()
+            || !com.otectus.arsnspells.spell.IronsBookBindingUtil.isIronsSpellBook(book)) {
             return false;
         }
         ISpellContainer container = ISpellContainer.getOrCreate(book);
@@ -43,6 +44,9 @@ public final class IronsProxySlotWriter {
         boolean added = mutable.addSpellAtIndex(proxy, Math.max(1, level), newIndex, false);
         if (added) {
             ISpellContainer.set(book, mutable.toImmutable());
+            if (!book.has(com.otectus.arsnspells.spell.ModDataComponents.NATIVE_BASE_CAPACITY.get())) {
+                book.set(com.otectus.arsnspells.spell.ModDataComponents.NATIVE_BASE_CAPACITY.get(), newIndex);
+            }
         }
         return added;
     }
@@ -75,54 +79,18 @@ public final class IronsProxySlotWriter {
         return removed;
     }
 
-    /**
-     * Remove every proxy slot in {@code poolIds} from {@code book} in a single native write
-     * (audit V20).
-     *
-     * <p>Where {@link #removeProxySlot} publishes a container per pool id, this builds one
-     * mutable copy, removes all of them, and calls {@code ISpellContainer.set} once. A failure
-     * part-way through therefore leaves the book exactly as it was, rather than half
-     * reconciled - which matters because the ANS sidecar holding the pool ids is cleared
-     * immediately afterwards, so a partial pass is unrecoverable.
-     *
-     * <p>Max spell count is not shrunk, for the same deliberate reason as
-     * {@link #removeProxySlot}: shrinking re-indexes the player's own spells.
-     *
-     * @return how many proxy slots were removed; {@code 0} means the book was not written to
-     */
-    public static int removeProxySlots(ItemStack book, Iterable<Integer> poolIds) {
-        if (book == null || book.isEmpty() || poolIds == null
-            || !ISpellContainer.isSpellContainer(book)) {
-            return 0;
-        }
-        try {
-            ISpellContainer container = ISpellContainer.get(book);
-            if (container == null) {
-                return 0;
-            }
+    /** Shrink only empty ANS-added tail slots; preserve later native spells above the baseline. */
+    public static void restoreBaseCapacity(ItemStack book) {
+        Integer baseline = book.get(com.otectus.arsnspells.spell.ModDataComponents.NATIVE_BASE_CAPACITY.get());
+        if (baseline == null || baseline < 0 || !ISpellContainer.isSpellContainer(book)) return;
+        ISpellContainer container = ISpellContainer.get(book);
+        if (container == null) return;
+        int count = container.getMaxSpellCount();
+        while (count > baseline && io.redspace.ironsspellbooks.api.spells.SpellData.EMPTY.equals(container.getSpellAtIndex(count - 1))) count--;
+        if (count != container.getMaxSpellCount()) {
             ISpellContainerMutable mutable = container.mutableCopy();
-            int removed = 0;
-            for (Integer poolId : poolIds) {
-                if (poolId == null) {
-                    continue;
-                }
-                AbstractSpell proxy = ArsCrossProxyRegistry.get(poolId);
-                if (proxy == null) {
-                    continue;
-                }
-                int index = mutable.getIndexForSpell(proxy);
-                if (index >= 0 && mutable.removeSpellAtIndex(index)) {
-                    removed++;
-                }
-            }
-            if (removed > 0) {
-                ISpellContainer.set(book, mutable.toImmutable());
-            }
-            return removed;
-        } catch (Exception e) {
-            // Narrow to Exception so LinkageError still propagates. Nothing was published:
-            // every mutation above happened on the local mutable copy.
-            return 0;
+            mutable.setMaxSpellCount(count);
+            ISpellContainer.set(book, mutable.toImmutable());
         }
     }
 }

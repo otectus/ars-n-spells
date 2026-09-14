@@ -12,8 +12,14 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 
 public class IronsCooldownHandler {
+    /**
+     * ANS-LOW-032: renamed from {@code onIronsSpellCast} because the handler listens
+     * to {@code SpellPreCastEvent}, not {@code SpellOnCastEvent}. Forge auto-discovers
+     * {@code @SubscribeEvent} methods by signature, so the rename is transparent to
+     * the event bus.
+     */
     @SubscribeEvent
-    public void onIronsSpellCast(SpellPreCastEvent event) {
+    public void onIronsSpellPreCast(SpellPreCastEvent event) {
         // ANS cross-cast proxies carry a 0s cooldown of their own; the delegated Ars
         // cast applies the real category cooldown. Running the unified cooldown here
         // would gate the wheel slot on a cooldown the Ars spell also charges.
@@ -40,15 +46,21 @@ public class IronsCooldownHandler {
         }
         
         CooldownCategory category = SpellCategorizer.categorizeIronsSpell(event.getSchoolType().getId());
-        
-        // CRITICAL FIX: Only check IRONS-namespaced cooldowns
+
+        // Cooldowns are global per category — an Iron's OFFENSIVE cast collides with an
+        // Ars OFFENSIVE cast and vice versa. This is the documented behavior in 1.9.0+.
         if (UnifiedCooldownManager.isOnCooldown(player, category)) {
             event.setCanceled(true);
-        } else {
-            long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);
-            if (!player.level().isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-                PacketHandler.sendToClient(new CooldownSyncPayload(category, cooldownEnd), serverPlayer);
-            }
         }
+    }
+
+    public static void commit(Player player, io.redspace.ironsspellbooks.api.spells.AbstractSpell spell,
+                              io.redspace.ironsspellbooks.api.spells.CastSource source, boolean cross) {
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)
+                || !source.respectsCooldown() || CrossModSpellComponents.isArsCrossProxyId(spell.getSpellId())
+                || !UnifiedCooldownManager.isEnabled() || !AnsConfig.ENABLE_CROSS_MOD_COOLDOWNS.get()) return;
+        CooldownCategory category = SpellCategorizer.categorizeIronsSpell(spell.getSchoolType().getId());
+        long end = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, cross);
+        PacketHandler.sendToClient(new CooldownSyncPayload(category, end), serverPlayer);
     }
 }

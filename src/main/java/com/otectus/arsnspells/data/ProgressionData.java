@@ -26,7 +26,7 @@ public class ProgressionData {
                     if (school == null || school.isEmpty() || count == null || count <= 0) {
                         return;
                     }
-                    d.schoolCastCounts.put(school, count);
+                    d.schoolCastCounts.merge(com.otectus.arsnspells.util.SchoolKeys.normalize(school), count, Math::max);
                 });
                 return d;
             },
@@ -36,11 +36,11 @@ public class ProgressionData {
     private final Map<String, Integer> schoolCastCounts = new HashMap<>();
 
     public int getCastCount(String school) {
-        return schoolCastCounts.getOrDefault(school, 0);
+        return schoolCastCounts.getOrDefault(com.otectus.arsnspells.util.SchoolKeys.normalize(school), 0);
     }
 
     public void incrementCastCount(String school) {
-        schoolCastCounts.put(school, getCastCount(school) + 1);
+        schoolCastCounts.put(com.otectus.arsnspells.util.SchoolKeys.normalize(school), (int) Math.min(Integer.MAX_VALUE, (long) getCastCount(school) + 1));
     }
 
     /**

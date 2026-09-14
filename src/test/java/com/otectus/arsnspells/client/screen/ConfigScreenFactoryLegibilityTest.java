@@ -1,21 +1,26 @@
 package com.otectus.arsnspells.client.screen;
 
-import com.otectus.arsnspells.TestPaths;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import com.otectus.arsnspells.TestPaths;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The config screen has to stay readable and honest.
+ * ANS 3.0.1 legibility pass — verifies the config screen fixes for the
+ * "blurry / frosted glass" report:
  *
- * <p>Two properties, both of which have been got wrong before. It paints its own opaque
- * background rather than relying on the vanilla dim, so a shader or blur mod cannot leave the
- * rows unreadable. And because the config is server-authoritative, every mutation path is
- * gated on {@code canMutate} with a visible explanation - a screen that silently ignores
- * clicks is worse than one that says why.
+ * <ul>
+ *   <li>The screen paints its own opaque background instead of the vanilla
+ *       translucent dim ({@code renderBackground}), which client blur mods hook.</li>
+ *   <li>Native button actions are gated on {@code canMutate} (boolean rows used to toggle
+ *       ungated in multiplayer, silently mutating the client's SERVER-config mirror).</li>
+ *   <li>Native widgets own rendering, hit testing and keyboard activation,
+ *       so hitboxes always match the drawn buttons.</li>
+ * </ul>
  */
 class ConfigScreenFactoryLegibilityTest {
 
@@ -26,36 +31,38 @@ class ConfigScreenFactoryLegibilityTest {
 
     @Test
     void render_paintsOwnedOpaqueBackground() throws IOException {
-        assertTrue(source().contains("graphics.fill(0, 0, this.width, this.height"),
-            "the screen must paint its own opaque background; a blur/shader mod cannot frost "
-                + "an owned fill, but it can render the vanilla dim unreadable");
+        String src = source();
+        assertTrue(src.contains("graphics.fill(0, 0, this.width, this.height"),
+            "render must paint a deterministic full-screen fill");
+        assertFalse(src.contains("renderBackground(graphics)"),
+            "render must not call renderBackground — blur mods hook it (frosted-glass report)");
     }
 
     @Test
-    void mouseClicked_gatesEveryRowOnCanMutate() throws IOException {
+    void nativeControls_gatePointerAndKeyboardMutations() throws IOException {
         String src = source();
-        int clickIdx = src.indexOf("public boolean mouseClicked");
-        assertTrue(clickIdx > 0, "mouseClicked must exist");
-        int gateIdx = src.indexOf("canMutate", clickIdx);
-        assertTrue(gateIdx > clickIdx,
-            "mouseClicked must consult canMutate before mutating any row - on a dedicated "
-                + "server the set() calls are silent no-ops");
+        int gate = src.indexOf("if (!canMutate) return;");
+        assertTrue(gate > 0 && gate < src.indexOf("option.toggle()"),
+            "the native button action must refuse changes in read-only mode");
+        assertTrue(src.contains("control.active = canMutate;"),
+            "disabled controls must also reject keyboard activation");
     }
 
     @Test
-    void hitboxesShareGeometryWithRender() throws IOException {
+    void controls_useNativeWidgetHitboxesAndNarration() throws IOException {
         String src = source();
-        assertTrue(src.contains("buttonRect("),
-            "render and hit-testing must derive their geometry from one helper, or the "
-                + "clickable area drifts from the drawn button");
+        assertTrue(src.contains("Button.builder(optionLabel(option)"));
+        assertTrue(src.contains("optionButtons.add(addRenderableWidget(control))"));
+        assertTrue(src.contains(".createNarration("));
+        assertFalse(src.contains("drawButtonChrome("), "native buttons own drawing and hit testing");
     }
 
     @Test
-    void readOnlyModeExplainsItself() throws IOException {
+    void readOnlyMode_showsExplanatoryNote() throws IOException {
         String src = source();
-        assertTrue(src.toLowerCase().contains("read-only"),
-            "a screen that cannot be edited must say so");
-        assertTrue(src.contains("/ans"),
-            "and must point at the command that CAN change these values on a server");
+        assertTrue(src.contains("Read-only: server-managed config."),
+            "multiplayer clients must see a note that the config is server-managed");
+        assertTrue(src.contains("/ans commands"),
+            "the note must point at the /ans command path");
     }
 }

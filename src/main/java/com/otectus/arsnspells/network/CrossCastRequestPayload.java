@@ -2,6 +2,8 @@ package com.otectus.arsnspells.network;
 
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
+import com.otectus.arsnspells.contract.RequestAdmission;
+import net.minecraft.network.chat.Component;
 import com.otectus.arsnspells.util.CrossCastTrace;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -27,7 +29,8 @@ import java.util.UUID;
 public record CrossCastRequestPayload(InteractionHand hand,
                                       Action action,
                                       int clientSelectedIndex,
-                                      UUID clientAttemptId) implements CustomPacketPayload {
+                                      UUID clientAttemptId,
+                                      String carrierFingerprint) implements CustomPacketPayload {
 
     public enum Action { CAST, CYCLE }
 
@@ -49,17 +52,24 @@ public record CrossCastRequestPayload(InteractionHand hand,
                 buf.writeEnum(value.action());
                 buf.writeVarInt(value.clientSelectedIndex());
                 buf.writeUUID(value.clientAttemptId());
+                buf.writeUtf(value.carrierFingerprint(), 64);
             },
             buf -> new CrossCastRequestPayload(
                 buf.readEnum(InteractionHand.class),
                 buf.readEnum(Action.class),
                 buf.readVarInt(),
-                buf.readUUID()
+                buf.readUUID(),
+                buf.readUtf(64)
             )
         );
 
     public CrossCastRequestPayload {
         clientAttemptId = clientAttemptId != null ? clientAttemptId : NIL_UUID;
+        carrierFingerprint = carrierFingerprint == null ? "" : carrierFingerprint;
+    }
+
+    public CrossCastRequestPayload(InteractionHand hand, Action action, int selected, UUID attempt) {
+        this(hand, action, selected, attempt, "");
     }
 
     @Override
@@ -72,10 +82,19 @@ public record CrossCastRequestPayload(InteractionHand hand,
      * there is no {@code enqueueWork} wrapper as there was under SimpleChannel).
      */
     public static void handleOnServer(CrossCastRequestPayload payload, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
-        if (!(ctx.player() instanceof ServerPlayer sender)) {
+        if (!(ctx.player() instanceof ServerPlayer sender) || payload.hand() != InteractionHand.MAIN_HAND
+            || payload.action() == null || !sender.isAlive() || sender.isSpectator() || sender.isSleeping()
+            || sender.containerMenu != sender.inventoryMenu) {
             return;
         }
+        if (NetworkRequestGuard.admit(sender, payload.clientAttemptId()) != RequestAdmission.Result.ACCEPTED) return;
         ItemStack stack = sender.getItemInHand(payload.hand());
+        if (payload.carrierFingerprint().isEmpty()
+            || !payload.carrierFingerprint().equals(CarrierFingerprint.of(stack))) {
+            sender.displayClientMessage(Component.translatable("arsnspells.crosscast.stale_carrier"), true);
+            sender.inventoryMenu.broadcastChanges();
+            return;
+        }
         UUID serverAttemptId = UUID.randomUUID();
 
         CrossCastTrace.log(serverAttemptId, sender, CrossCastTrace.Side.S,

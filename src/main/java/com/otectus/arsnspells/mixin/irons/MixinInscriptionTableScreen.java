@@ -22,6 +22,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Client-side half of the Inscription Table guard - the reported NPE. Stops the screen
  * dereferencing a scroll Iron's cannot read before the packet is ever sent.
  *
+ * <p>A well-formed ANS carrier is <em>not</em> cancelled any more: as of 3.3.3 the click is
+ * what asks the server to bind, and javap confirms the screen is safe for it - Iron's
+ * dead-store SpellData fetch tolerates {@code SpellData.EMPTY}, and the inscribe button is
+ * active for any {@code Scroll}. Only the two malformed-scroll verdicts still stop the click.
+ *
  * <p>The server-side twin is {@link MixinInscriptionTableMenu}; both read the same verdict
  * from {@link IronsInscriptionPolicy}.
  */
@@ -39,6 +44,8 @@ public abstract class MixinInscriptionTableScreen {
     private void arsnspells$guardInscription(CallbackInfo ci) {
         IronsInscriptionPolicy.Verdict verdict =
             IronsInscriptionPolicy.evaluate(arsnspells$scrollSlotItem());
+        // ALLOW and BIND_CARRIER both let the click through: the first is Iron's own
+        // inscription, the second is the packet the server-side router turns into a bind.
         if (!verdict.isRejection()) {
             return;
         }

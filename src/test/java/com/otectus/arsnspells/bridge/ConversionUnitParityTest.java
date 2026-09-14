@@ -1,174 +1,173 @@
 package com.otectus.arsnspells.bridge;
 
-import com.otectus.arsnspells.casting.AnsQuotes;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.contract.CarrierPolicy;
 import com.otectus.arsnspells.contract.ConversionKind;
 import com.otectus.arsnspells.contract.CostQuote;
 import com.otectus.arsnspells.contract.CostRules;
+import com.otectus.arsnspells.contract.ResourceAmount;
 import com.otectus.arsnspells.contract.ResourceUnit;
 import com.otectus.arsnspells.contract.RoundingRule;
+import com.otectus.arsnspells.contract.StandardQuotePolicy;
+import net.minecraft.world.entity.player.Player;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.DynamicTest;
-import org.junit.jupiter.api.TestFactory;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Audit V05 - the amount validated must equal the amount charged, <b>in the unit charged</b>.
+ * Audit V05 - the amount validated must equal the amount charged, in the unit charged.
  *
- * <p>The defect this pins is not a rounding slip, it is two different formulas. Pre-cast
- * validation priced a cast one way and the charging seam priced it another:
+ * <p>The regression: validation and charging each carried their own copy of the conversion.
+ * {@code CastingAuthority} multiplied by a directional rate; {@code BridgeManager} then split
+ * the same figure by the dual-cost percentages and charged that. At the shipped 1:1 rate the
+ * two coincided, which is why it survived; move the rate off 1.0 and a cast validated against
+ * one number and took another - in SEPARATE it took a converted rate <em>and</em> a share, so
+ * the price checked and the price paid were different quantities in different units.
  *
- * <ul>
- *   <li>In SEPARATE, {@code CastingAuthority.effectiveIronsCost} multiplied by the configured
- *       conversion rate while the charge went out at the native cost. At the config's maximum
- *       rate a spell was validated at ten times what it actually cost; at the {@code 0.01} floor
- *       it was validated at a hundredth, so a player was refused a spell they could afford - or
- *       waved through one they could not.</li>
- *   <li>The Iron's cross-cast handler applied a <em>pool-aware</em> rate,
- *       {@code configRate * arsMax / ironsMax}, while the validator applied the raw config
- *       value. Check and charge therefore differed by the ratio of the two mana pools, roughly
- *       tenfold at default sizes.</li>
- * </ul>
- *
- * <p>Both now read one {@link CostQuote} from one {@link CostRules} snapshot, so this test asks
- * the only question that matters: quote the same cast twice, as the check does and as the charge
- * does, and demand the same number out. It sweeps every mode and the config's full documented
- * rate range, because at the shipped {@code 1.0} rate every one of these formulas agrees - which
- * is exactly why the disagreement went unnoticed.
- *
- * <p>Bootstrap-free: prices are computed from an explicit {@link CostRules}, so nothing here
- * needs a loaded config spec or a {@code Player}.
+ * <p>Both paths now go through one {@link CostQuote}. This asserts the property that makes
+ * that worth doing: a pool holding exactly the quoted legs is exactly emptied, and a pool one
+ * unit short is refused rather than partly drained.
  */
 class ConversionUnitParityTest {
 
-    /** The config's documented range: the floor, the shipped default, and the ceiling. */
     private static final double[] RATES = {0.01d, 1.0d, 10.0d};
 
-    private static final int[] BASE_COSTS = {1, 7, 49, 50, 100, 333};
+    private static final class SpyBridge implements IManaBridge {
+        private final String type;
+        float pool;
+
+        SpyBridge(String type, float pool) {
+            this.type = type;
+            this.pool = pool;
+        }
+
+        @Override public float getMana(Player player) { return pool; }
+        @Override public void setMana(Player player, float amount) { pool = amount; }
+        @Override public boolean consumeMana(Player player, float amount) {
+            if (pool < amount) {
+                return false;
+            }
+            pool -= amount;
+            return true;
+        }
+        @Override public void addMana(Player player, float amount) { pool += amount; }
+        @Override public float getMaxMana(Player player) { return Float.MAX_VALUE; }
+        @Override public String getBridgeType() { return type; }
+    }
 
     @AfterEach
-    void clearRouting() {
-        BridgeManager.testSetRouting(null);
+    void resetRouting() {
+        BridgeManager.testSetRouting(ManaUnificationMode.DISABLED, false,
+            new SpyBridge("ARS_NATIVE", 0.0f), null);
     }
 
-    private static CostRules rules(ManaUnificationMode mode, double rate, ConversionKind kind) {
-        return CostRules.of(mode.getConfigName(), rate, rate, 0.5d, 0.5d, kind, 1.25d,
-            RoundingRule.HALF_UP, 1);
+    private static CostRules rulesFor(ManaUnificationMode mode, double rate) {
+        return CostRules.of(mode.getConfigName(), rate, rate, 0.5d, 0.5d,
+            ConversionKind.FLAT_LEGACY, 1.25d, RoundingRule.HALF_UP, 1);
     }
 
-    /**
-     * Put the routing snapshot in the state the mode implies, since {@link AnsQuotes} reads the
-     * authoritative pool from it to decide whether a leg is converted at all.
-     */
-    private static void installRouting(ManaUnificationMode mode) {
-        BridgeManager.testSetMode(mode);
+    /** The pool that a leg denominated in {@code unit} is actually billed to. */
+    private static SpyBridge poolFor(ManaUnificationMode mode, ResourceUnit unit,
+                                     SpyBridge ars, SpyBridge irons) {
+        boolean shared = mode == ManaUnificationMode.ISS_PRIMARY
+            || mode == ManaUnificationMode.ARS_PRIMARY
+            || mode == ManaUnificationMode.HYBRID;
+        if (!shared) {
+            return unit == ResourceUnit.IRONS_MANA ? irons : ars;
+        }
+        boolean ironsAuthoritative = mode == ManaUnificationMode.ISS_PRIMARY
+            || mode == ManaUnificationMode.HYBRID;
+        return ironsAuthoritative ? irons : ars;
     }
 
-    @TestFactory
-    Stream<DynamicTest> validatedEqualsChargedForEveryModeAndRate() {
-        List<DynamicTest> tests = new ArrayList<>();
+    @Test
+    void everyModeAndRate_chargesExactlyWhatItValidated() {
         for (ManaUnificationMode mode : ManaUnificationMode.values()) {
             for (double rate : RATES) {
-                for (ConversionKind kind : ConversionKind.values()) {
-                    for (ResourceUnit origin : new ResourceUnit[] {
-                            ResourceUnit.ARS_MANA, ResourceUnit.IRONS_MANA}) {
-                        String name = mode.getConfigName() + "/rate=" + rate + "/" + kind
-                            + "/" + origin;
-                        tests.add(DynamicTest.dynamicTest(name,
-                            () -> assertParity(mode, rate, kind, origin)));
+                for (ResourceUnit origin : new ResourceUnit[]{
+                        ResourceUnit.ARS_MANA, ResourceUnit.IRONS_MANA}) {
+                    String where = mode.getConfigName() + "/rate=" + rate + "/origin=" + origin;
+
+                    CostRules rules = rulesFor(mode, rate);
+                    CostQuote quote = StandardQuotePolicy.INSTANCE.quote(
+                        new ResourceAmount(origin, 200.0d), rules,
+                        CarrierPolicy.REUSABLE_BOOK_SEMANTICS);
+
+                    SpyBridge ars = new SpyBridge("ARS_NATIVE", 0.0f);
+                    SpyBridge irons = new SpyBridge("IRONS_SPELLS", 0.0f);
+                    // Fund each pool with precisely the legs it is going to be asked for.
+                    for (ResourceAmount leg : quote.legs()) {
+                        poolFor(mode, leg.unit(), ars, irons).pool += (float) leg.amount();
                     }
-                }
-            }
-        }
-        return tests.stream();
-    }
+                    BridgeManager.testSetRouting(mode, true, ars, irons);
 
-    private static void assertParity(ManaUnificationMode mode, double rate, ConversionKind kind,
-                                     ResourceUnit origin) {
-        installRouting(mode);
-        CostRules rules = rules(mode, rate, kind);
+                    assertTrue(BridgeManager.canAffordQuote(null, quote),
+                        where + ": a pool holding exactly the quote must validate");
+                    assertTrue(BridgeManager.consumeQuote(null, quote),
+                        where + ": what validated must charge");
 
-        for (int base : BASE_COSTS) {
-            for (CarrierPolicy carrier : CarrierPolicy.values()) {
-                // The check and the charge are two calls, deliberately: they are two call sites
-                // in production and the point is that they cannot disagree any more.
-                CostQuote validated = AnsQuotes.quote(base, origin, carrier, rules);
-                CostQuote charged = AnsQuotes.quote(base, origin, carrier, rules);
-
-                for (ResourceUnit unit : ResourceUnit.values()) {
-                    assertEquals(validated.total(unit), charged.total(unit), 1.0e-12d,
-                        "base " + base + " " + carrier + ": the amount validated in " + unit
-                            + " must equal the amount charged in " + unit);
-                    assertEquals(
-                        AnsQuotes.legAsFloat(validated, unit),
-                        AnsQuotes.legAsFloat(charged, unit), 1.0e-6f,
-                        "base " + base + " " + carrier + ": the narrowed float charged to a "
-                            + "bridge must match the narrowed float checked against it");
-                    assertEquals(
-                        AnsQuotes.legAsInt(validated, unit, rules),
-                        AnsQuotes.legAsInt(charged, unit, rules),
-                        "base " + base + " " + carrier + ": the rounded int stamped on a cost "
-                            + "event must match the one validated - rounding once, by the cast's "
-                            + "single declared rule, is what stops a sub-50-mana spell going "
-                            + "free at the 0.01 rate floor");
+                    assertEquals(0.0f, ars.pool, 1.0e-3f,
+                        where + ": the Ars pool must be emptied to the unit, not to a "
+                            + "differently-converted figure");
+                    assertEquals(0.0f, irons.pool, 1.0e-3f,
+                        where + ": the Iron's pool must be emptied to the unit");
                 }
             }
         }
     }
 
-    /**
-     * The legs are denominated, and a mode that bills two pools bills them in two units. A quote
-     * whose total is read in the wrong unit is the "in the unit charged" half of the finding.
-     */
-    @TestFactory
-    Stream<DynamicTest> dualCostQuotesCarryBothUnits() {
-        List<DynamicTest> tests = new ArrayList<>();
-        for (double rate : RATES) {
-            tests.add(DynamicTest.dynamicTest("separate/rate=" + rate, () -> {
-                installRouting(ManaUnificationMode.SEPARATE);
-                CostRules rules =
-                    rules(ManaUnificationMode.SEPARATE, rate, ConversionKind.FLAT_LEGACY);
-                CostQuote quote = AnsQuotes.quote(100, ResourceUnit.ARS_MANA,
-                    CarrierPolicy.REUSABLE_BOOK_SEMANTICS, rules);
+    @Test
+    void everyModeAndRate_refusesRatherThanPartlyDraining() {
+        for (ManaUnificationMode mode : ManaUnificationMode.values()) {
+            for (double rate : RATES) {
+                String where = mode.getConfigName() + "/rate=" + rate;
 
-                double total = 100.0d * rules.crossCastMultiplier();
-                assertEquals(total * 0.5d, quote.total(ResourceUnit.ARS_MANA), 1.0e-9d,
-                    "the Ars leg is the origin share of the multiplied total");
-                assertEquals(total * 0.5d * rate, quote.total(ResourceUnit.IRONS_MANA), 1.0e-9d,
-                    "the Iron's leg is the cross share, converted - and it is a separate leg, "
-                        + "not a second reading of the same number");
-            }));
+                CostRules rules = rulesFor(mode, rate);
+                CostQuote quote = StandardQuotePolicy.INSTANCE.quote(
+                    new ResourceAmount(ResourceUnit.ARS_MANA, 200.0d), rules,
+                    CarrierPolicy.REUSABLE_BOOK_SEMANTICS);
+
+                SpyBridge ars = new SpyBridge("ARS_NATIVE", 0.0f);
+                SpyBridge irons = new SpyBridge("IRONS_SPELLS", 0.0f);
+                for (ResourceAmount leg : quote.legs()) {
+                    poolFor(mode, leg.unit(), ars, irons).pool += (float) leg.amount();
+                }
+                // Take one unit off whichever pool pays the origin leg.
+                SpyBridge shortPool = poolFor(mode, ResourceUnit.ARS_MANA, ars, irons);
+                shortPool.pool -= 1.0f;
+                float arsBefore = ars.pool;
+                float ironsBefore = irons.pool;
+
+                BridgeManager.testSetRouting(mode, true, ars, irons);
+
+                assertFalse(BridgeManager.canAffordQuote(null, quote),
+                    where + ": one unit short must not validate");
+                assertFalse(BridgeManager.consumeQuote(null, quote),
+                    where + ": one unit short must not charge");
+                assertEquals(arsBefore, ars.pool, 1.0e-4f,
+                    where + ": a refused cast must leave the Ars pool untouched");
+                assertEquals(ironsBefore, irons.pool, 1.0e-4f,
+                    where + ": a refused cast must leave the Iron's pool untouched");
+            }
         }
-        return tests.stream();
     }
 
-    /**
-     * A native cast is never dual-split. {@code ModeRoutingSnapshot.routeNativeArsSpend()} routes
-     * it to {@code nativeOwned} in SEPARATE - each system pays for its own spells out of its own
-     * pool - so pricing it across both pools would bill a leg nobody charges.
-     */
-    @TestFactory
-    Stream<DynamicTest> nativeCastsAreNotDualSplit() {
-        List<DynamicTest> tests = new ArrayList<>();
-        for (double rate : RATES) {
-            tests.add(DynamicTest.dynamicTest("separate/native/rate=" + rate, () -> {
-                installRouting(ManaUnificationMode.SEPARATE);
-                CostRules rules =
-                    rules(ManaUnificationMode.SEPARATE, rate, ConversionKind.FLAT_LEGACY);
-                CostQuote quote = AnsQuotes.quote(100, ResourceUnit.ARS_MANA,
-                    CarrierPolicy.NATIVE_ONLY, rules);
-                assertEquals(100.0d, quote.total(ResourceUnit.ARS_MANA), 1.0e-9d,
-                    "a native Ars cast pays its own pool, unconverted and unmultiplied");
-                assertEquals(0.0d, quote.total(ResourceUnit.IRONS_MANA), 1.0e-9d,
-                    "and owes the Iron's pool nothing");
-            }));
-        }
-        return tests.stream();
+    @Test
+    void dualCostLegsAreDenominatedInDifferentUnits_notOneUnitCountedTwice() {
+        // The unit half of V05: in SEPARATE the two legs are not the same quantity, and the
+        // Iron's leg carries the flat rate while the Ars leg does not.
+        CostRules rules = rulesFor(ManaUnificationMode.SEPARATE, 10.0d);
+        CostQuote quote = StandardQuotePolicy.INSTANCE.quote(
+            new ResourceAmount(ResourceUnit.ARS_MANA, 200.0d), rules,
+            CarrierPolicy.REUSABLE_BOOK_SEMANTICS);
+
+        double total = 200.0d * 1.25d;
+        assertEquals(total * 0.5d, quote.total(ResourceUnit.ARS_MANA), 1.0e-6d,
+            "the origin leg is the share of the total, unconverted");
+        assertEquals(total * 0.5d * 10.0d, quote.total(ResourceUnit.IRONS_MANA), 1.0e-6d,
+            "the cross leg is the share of the total, converted once");
     }
 }

@@ -6,6 +6,7 @@ import com.otectus.arsnspells.spell.ArsSpellExportUtil;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.CrossModSpell;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+import com.otectus.arsnspells.spell.IronsSpellbookBinder;
 import com.otectus.arsnspells.util.AdvancementUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -21,7 +22,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Binds an exported Ars spell carried by a real Iron's scroll onto a real Iron's
@@ -106,37 +106,24 @@ public class SpellbookBindingRitual extends AnsRitual {
         ItemStack scrollStack = scrollEntity.getItem();
         ItemStack bookStack = bookEntity.getItem();
 
-        Optional<CrossModSpell> entryOpt = IronsBookBindingUtil.extractSingleEntry(scrollStack);
-        if (entryOpt.isEmpty() || entryOpt.get().arsSpellTag().isEmpty()) {
-            // Classification said this was a valid carrier but a second read
-            // failed -- a transient parse problem, not a validation error.
-            error(LANG_PREFIX + "error.scroll_parse_failed",
-                scrollStack.getHoverName().getString());
-            return;
-        }
-        CrossModSpell entry = entryOpt.get();
-        CompoundTag arsTag = entry.arsSpellTag().get();
+        // Whoever the feedback goes to is also whoever the bind is credited to: the ritual has
+        // no owning player of its own, so resolving it once here keeps the message, the
+        // diagnostics and the advancement from ever disagreeing (audit H4).
+        ServerPlayer credited =
+            recipient() instanceof ServerPlayer player ? player : null;
 
-        // 3.0.3: refuse an unreadable payload BEFORE anything is consumed. Ars 5.x
-        // substitutes EffectBreak for a glyph whose mod is gone, so a stale carrier still
-        // decodes and would bind an entry that casts something the player never built - and
-        // the scroll would already have been eaten by the time anyone noticed.
-        if (!IronsBookBindingUtil.isCastableArsPayload(arsTag)) {
-            error(LANG_PREFIX + "error.uncastable",
-                scrollStack.getHoverName().getString());
-            return;
-        }
+        // Read the entry for the success label only. The binder is the authority on whether
+        // this scroll may be bound; a label we cannot build degrades to a generic one.
+        CompoundTag arsTag = IronsBookBindingUtil.extractSingleEntry(scrollStack)
+            .flatMap(CrossModSpell::arsSpellTag)
+            .orElseGet(CompoundTag::new);
 
-        // Validation complete -- mutation begins here. The util allocates a
-        // native-wheel proxy slot and mirrors the entry (with the scroll's chosen
-        // display name/nature/icon) into Iron's container.
+        // Validation and mutation both live in the shared binder, so the ritual, the command
+        // and Iron's Inscription Table cannot drift apart on what a bind is allowed to do.
+        // Consumption, feedback wording and the advancement stay here.
         int maxCap = AnsConfig.MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK.get();
-        IronsBookBindingUtil.AppendResult result =
-            IronsBookBindingUtil.appendArsSpellToBook(bookStack, arsTag,
-                entry.customName().orElse(null),
-                entry.nature().orElse(null),
-                entry.iconSymbol().orElse(null),
-                maxCap);
+        IronsSpellbookBinder.BindResult result = IronsSpellbookBinder.bind(
+            credited, scrollStack, bookStack, IronsSpellbookBinder.Caller.RITUAL);
         switch (result) {
             case ADDED:
                 break;
@@ -148,6 +135,27 @@ public class SpellbookBindingRitual extends AnsRitual {
                 error(LANG_PREFIX + "error.book_full",
                     bookStack.getHoverName().getString(),
                     IronsBookBindingUtil.effectiveProxyCeiling(maxCap));
+                return;
+            case DISABLED:
+                error(LANG_PREFIX + "error.disabled");
+                return;
+            case NO_BOOK:
+                error(LANG_PREFIX + "error.no_book");
+                return;
+            case UNCASTABLE:
+                // 3.0.3: an unreadable payload is refused BEFORE anything is consumed. Ars 5.x
+                // substitutes EffectBreak for a glyph whose mod is gone, so a stale carrier
+                // still decodes and would bind an entry that casts something the player never
+                // built - and the scroll would already have been eaten.
+                error(LANG_PREFIX + "error.uncastable",
+                    scrollStack.getHoverName().getString());
+                return;
+            case NOT_A_CARRIER:
+            case INVALID_CARRIER:
+                // Classification said this was a valid carrier but the binder's own read
+                // failed -- a transient parse problem, not a validation error.
+                error(LANG_PREFIX + "error.scroll_parse_failed",
+                    scrollStack.getHoverName().getString());
                 return;
             case FAILED:
             default:
@@ -172,12 +180,7 @@ public class SpellbookBindingRitual extends AnsRitual {
         playBindEffects(level, pos);
         success(LANG_PREFIX + "success", spellLabel(arsTag));
 
-        // Audit H4: the ritual has no owning player of its own, so credit whoever the success
-        // message just went to -- the player who lit the brazier, or the nearest one if they have
-        // since logged off. Resolving it the same way keeps the message and the advancement from
-        // ever disagreeing about who ran the ritual, which they did back when this kept its own
-        // 16-block radius while feedback searched only 8.
-        if (recipient() instanceof ServerPlayer credited) {
+        if (credited != null) {
             AdvancementUtil.grant(credited, "bind_spell");
         }
     }

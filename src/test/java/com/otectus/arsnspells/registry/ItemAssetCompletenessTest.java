@@ -45,7 +45,8 @@ class ItemAssetCompletenessTest {
         com.otectus.arsnspells.rituals.SpellbookBindingRitual.REGISTRY_PATH,
         com.otectus.arsnspells.rituals.SpellUninscriptionRitual.REGISTRY_PATH,
         com.otectus.arsnspells.rituals.ManaInfusionRitual.REGISTRY_PATH,
-        com.otectus.arsnspells.rituals.ManaWellRitual.REGISTRY_PATH
+        com.otectus.arsnspells.rituals.ManaWellRitual.REGISTRY_PATH,
+        "blank_scroll"
     );
 
     @Test
@@ -119,7 +120,9 @@ class ItemAssetCompletenessTest {
             TestPaths.of("src/main/java/com/otectus/arsnspells/registry/ModItemsRegistry.java"));
         // Count the tablet suppliers, not `ITEMS.register(` — the latter also matches the
         // bus registration at the bottom of the class.
-        long registrations = Pattern.compile("new RitualTablet\\(").matcher(source).results().count();
+        long registrations = Pattern
+            .compile("new RitualTablet\\(|new Item\\(new Item\\.Properties")
+            .matcher(source).results().count();
         assertEquals(ITEM_PATHS.size(), registrations,
             "ModItemsRegistry registers " + registrations + " items but this test knows about "
                 + ITEM_PATHS.size() + ". Add the new item to ITEM_PATHS and ship a "

@@ -1,0 +1,16 @@
+{
+  "category": "ars_nouveau:ars_n_spells",
+  "icon": "ars_n_spells:mana_infusion",
+  "name": "ars_n_spells.book.rules.name",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.rules.1"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.rules.2"
+    }
+  ]
+}

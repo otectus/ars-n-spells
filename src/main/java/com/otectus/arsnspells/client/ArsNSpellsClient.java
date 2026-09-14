@@ -28,6 +28,11 @@ public class ArsNSpellsClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(ArsNSpellsClient.class);
 
     @SubscribeEvent
+    public static void registerIconReload(net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent event) {
+        event.registerReloadListener(com.otectus.arsnspells.client.icons.SpellIconRegistry.INSTANCE);
+    }
+
+    @SubscribeEvent
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.SPELL_LOOM.get(), SpellLoomScreen::new);
     }

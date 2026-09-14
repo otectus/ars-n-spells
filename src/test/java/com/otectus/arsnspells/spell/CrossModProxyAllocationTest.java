@@ -141,9 +141,10 @@ class CrossModProxyAllocationTest {
 
     @Test
     void whitelists_matchShippedIconSet() {
-        // The nature/icon whitelists pair 1:1 with shipped textures and lang
-        // keys; pool size pairs with the registered ars_cross_1..N proxies.
-        assertEquals(8, CrossModSpellComponents.NATURE_KEYS.size());
+        // Cosmetic breadth does not change the eight persistent native proxy IDs.
+        assertEquals(com.otectus.arsnspells.icons.IconCatalog.BACKGROUNDS, CrossModSpellComponents.NATURE_KEYS);
+        assertEquals(274, com.otectus.arsnspells.icons.IconCatalog.IDS.size());
+        assertEquals(11, CrossModSpellComponents.NATURE_KEYS.size());
         assertEquals(8, CrossModSpellComponents.ICON_SYMBOLS.size());
         assertEquals(8, CrossModSpellComponents.PROXY_POOL_SIZE);
     }

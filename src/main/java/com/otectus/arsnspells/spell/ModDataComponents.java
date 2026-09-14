@@ -56,5 +56,11 @@ public final class ModDataComponents {
         COMPONENTS.register(bus);
     }
 
+    /** Native book capacity before ANS appended its first proxy; removed on full teardown. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> NATIVE_BASE_CAPACITY =
+        COMPONENTS.registerComponentType("native_base_capacity", b -> b
+            .persistent(com.mojang.serialization.Codec.INT)
+            .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
+
     private ModDataComponents() {}
 }

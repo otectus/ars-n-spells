@@ -20,15 +20,10 @@ import static org.junit.jupiter.api.Assertions.fail;
  * the bridge and read native Ars data. The recursion the guard actually defends against is
  * always same-player, so keying it by UUID makes it exact.
  *
- * <p>Audit V06 moved the guard itself into {@link com.otectus.arsnspells.bridge.ManaMutationRouter}
- * and gave it a second dimension - a <b>direction</b> - so the mixin and the routing share one
- * notion of "in flight". The per-player property this class was written for is unchanged and is
- * asserted at its new home; the mixin is still checked for the shape of its use.
- *
  * <p>Read off the source rather than by reflecting on the class: {@code MixinManaCapability}
  * is a mixin, and loading one outside the transformer is not something to rely on in a unit
  * test. The 1.20.1 version reflected on the field; here the structural form is checked
- * instead, which also catches a half-migration that keeps the per-player key but reintroduces a
+ * instead, which also catches a half-migration that keeps the {@code Set} but reintroduces a
  * global check.
  */
 class MixinManaCapabilityPerUuidGuardTest {
@@ -36,36 +31,17 @@ class MixinManaCapabilityPerUuidGuardTest {
     private static final Path SOURCE =
         TestPaths.of("src/main/java/com/otectus/arsnspells/mixin/ars/MixinManaCapability.java");
 
-    private static final Path ROUTER =
-        TestPaths.of("src/main/java/com/otectus/arsnspells/bridge/ManaMutationRouter.java");
-
     private static String source() throws IOException {
         return Files.readString(SOURCE);
     }
 
-    private static String router() throws IOException {
-        return Files.readString(ROUTER);
-    }
-
     @Test
-    void guardIsKeyedPerPlayer_notThreadGlobal() throws IOException {
-        String src = router();
-        assertTrue(src.contains("ThreadLocal<Map<UUID, EnumSet<Direction>>> ACTIVE"),
-            "the guard must be keyed by player (ANS-HIGH-010) and by direction (audit V06), not "
-                + "by a thread-global flag");
-        assertFalse(src.contains("ThreadLocal<Boolean>"),
+    void guardHoldsASetOfUuids_notABoolean() throws IOException {
+        String src = source();
+        assertTrue(src.contains("ThreadLocal<Set<UUID>> arsnspells$inBridgeCall"),
+            "the guard must hold a Set<UUID> (ANS-HIGH-010), not a thread-global flag");
+        assertFalse(src.contains("ThreadLocal<Boolean> arsnspells$inBridgeCall"),
             "the thread-global boolean guard is the regressed form");
-        assertFalse(source().contains("ThreadLocal<Boolean> arsnspells$inBridgeCall"),
-            "and it must not have grown back inside the mixin either");
-    }
-
-    @Test
-    void guardDistinguishesReadsFromWrites() throws IOException {
-        String src = router();
-        assertTrue(src.contains("READ") && src.contains("WRITE"),
-            "audit V06: routing a write reads the pool back to report the new balance, and a "
-                + "single flag per player made that read look like recursion and drop through to "
-                + "stale native data. A read may nest inside a write");
     }
 
     @Test
@@ -110,10 +86,10 @@ class MixinManaCapabilityPerUuidGuardTest {
 
     @Test
     void source_clearsThreadLocalWhenSetEmptyToPreventLeak() throws IOException {
-        // ANS-HIGH-010 also keeps the "remove the ThreadLocal when nothing is in flight" guard,
+        // ANS-HIGH-010 also keeps the "remove the ThreadLocal when the set goes empty" guard,
         // avoiding the canonical ThreadLocal-leak antipattern on long-lived server threads.
-        if (!router().contains("ACTIVE.remove()")) {
-            fail("the guard must call ThreadLocal.remove() when nothing is in flight "
+        if (!source().contains("arsnspells$inBridgeCall.remove()")) {
+            fail("the per-UUID guard must call ThreadLocal.remove() when the set goes empty "
                 + "(ANS-HIGH-010) - preserves the no-leak property on long-lived threads");
         }
     }

@@ -40,6 +40,7 @@ public final class ModItemsRegistry {
     private static DeferredHolder<Item, RitualTablet> spellbookBindingTablet;
     private static DeferredHolder<Item, RitualTablet> manaInfusionTablet;
     private static DeferredHolder<Item, RitualTablet> manaWellTablet;
+    private static DeferredHolder<Item, Item> blankScroll;
 
     private ModItemsRegistry() {}
 
@@ -75,8 +76,13 @@ public final class ModItemsRegistry {
     }
 
     /**
-     * Registers items that work even without Iron's Spellbooks loaded.
-     * Must be called from the mod constructor.
+     * Registers items that work even without Iron's Spellbooks loaded. The
+     * uninscribe tablet is here so players can clean up legacy inscribed
+     * items after removing Iron's. The blank scroll is here because stock
+     * Iron's ships no recipe for a bare {@code irons_spellbooks:scroll}, so
+     * the Spell Loom needs a blank of our own to accept as a target; it is a
+     * plain item with no behaviour and is inert without Iron's. Must be
+     * called from the mod constructor.
      */
     public static void registerCommonItems() {
         if (spellUninscriptionTablet != null) {
@@ -86,6 +92,7 @@ public final class ModItemsRegistry {
             SpellUninscriptionRitual.REGISTRY_PATH,
             () -> new RitualTablet(new SpellUninscriptionRitual())
         );
+        blankScroll = ITEMS.register("blank_scroll", () -> new Item(new Item.Properties()));
     }
 
     public static void register(IEventBus modBus) {
@@ -110,5 +117,9 @@ public final class ModItemsRegistry {
 
     public static DeferredHolder<Item, RitualTablet> manaWellTablet() {
         return manaWellTablet;
+    }
+
+    public static DeferredHolder<Item, Item> blankScroll() {
+        return blankScroll;
     }
 }

@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "entries": [
+    "ars_n_spells:blank_scroll_library",
+    "ars_n_spells:blank_scroll_treasure",
+    "ars_n_spells:blank_scroll_common",
+    "ars_n_spells:blank_scroll_irons"
+  ]
+}

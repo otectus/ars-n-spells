@@ -1,9 +1,12 @@
 package com.otectus.arsnspells.block;
 
-import com.otectus.arsnspells.contract.InscriptionPlan;
 import com.otectus.arsnspells.menu.SpellLoomMenu;
 import com.otectus.arsnspells.registry.ModBlockEntities;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.items.IItemHandler;
+import com.otectus.arsnspells.inscription.LoomInscription;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -13,7 +16,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.ItemStackHandler;
@@ -36,6 +38,15 @@ public class SpellLoomBlockEntity extends BlockEntity implements MenuProvider {
 
     private final ItemStackHandler items = new ItemStackHandler(SLOT_COUNT) {
         @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            return switch (slot) {
+                case SLOT_SOURCE -> LoomInscription.isSource(stack);
+                case SLOT_SCROLL -> LoomInscription.isTarget(stack);
+                default -> false;
+            };
+        }
+
+        @Override
         protected void onContentsChanged(int slot) {
             setChanged();
         }
@@ -47,6 +58,28 @@ public class SpellLoomBlockEntity extends BlockEntity implements MenuProvider {
 
     public ItemStackHandler getItems() {
         return items;
+    }
+
+    /** Top supplies sources; horizontal faces supply scrolls; bottom extracts output.
+     * Unsided pipes may supply either input and extract output. Only the menu can remove inputs. */
+    public IItemHandler automation(@Nullable Direction side) {
+        return new IItemHandler() {
+            @Override public int getSlots() { return SLOT_COUNT; }
+            @Override public ItemStack getStackInSlot(int slot) { return items.getStackInSlot(slot); }
+            @Override public int getSlotLimit(int slot) { return items.getSlotLimit(slot); }
+            @Override public boolean isItemValid(int slot, ItemStack stack) {
+                boolean face = side == null || (side == Direction.UP && slot == SLOT_SOURCE)
+                    || (side != Direction.UP && side != Direction.DOWN && slot == SLOT_SCROLL);
+                return face && items.isItemValid(slot, stack);
+            }
+            @Override public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+                return isItemValid(slot, stack) ? items.insertItem(slot, stack, simulate) : stack;
+            }
+            @Override public ItemStack extractItem(int slot, int amount, boolean simulate) {
+                return slot == SLOT_OUTPUT && (side == null || side == Direction.DOWN)
+                    ? items.extractItem(slot, amount, simulate) : ItemStack.EMPTY;
+            }
+        };
     }
 
     @Override
@@ -74,44 +107,6 @@ public class SpellLoomBlockEntity extends BlockEntity implements MenuProvider {
         return new SpellLoomMenu(id, inv, this);
     }
 
-    /**
-     * Carry out an {@link InscriptionPlan} against the working slots: the whole mutation, in
-     * one place, after every decision has already been made (audit V18/V19).
-     *
-     * <p>Static and taking the handler so the arithmetic is exercisable without a placed block.
-     * Nothing here decides anything - a refused plan is refused, and the slots are not touched.
-     *
-     * <p>The source is charged {@link InscriptionPlan#consumedUnits()}, which is {@code 0} for a
-     * reusable book or focus: reading a spellbook is not allowed to destroy it. The target is
-     * charged {@link InscriptionPlan#outputCount()} units and the remainder stays in the slot -
-     * a full stack of blanks yields one inscribed item and 63 blanks back, not 64 stamped ones.
-     *
-     * @param output the finished carrier; its count is set to the plan's output count
-     * @return whether the inscription ran
-     */
-    public static boolean applyInscription(ItemStackHandler items, InscriptionPlan plan,
-                                           ItemStack output) {
-        if (items == null || plan == null || !plan.isPermitted()
-            || output == null || output.isEmpty()) {
-            return false;
-        }
-        if (!items.getStackInSlot(SLOT_OUTPUT).isEmpty()) {
-            return false;
-        }
-        ItemStack source = items.getStackInSlot(SLOT_SOURCE);
-        ItemStack target = items.getStackInSlot(SLOT_SCROLL);
-        if (source.getCount() < plan.consumedUnits() || target.getCount() < plan.outputCount()) {
-            return false;
-        }
-        if (plan.consumedUnits() > 0) {
-            items.extractItem(SLOT_SOURCE, plan.consumedUnits(), false);
-        }
-        items.extractItem(SLOT_SCROLL, plan.outputCount(), false);
-        output.setCount(plan.outputCount());
-        items.setStackInSlot(SLOT_OUTPUT, output);
-        return true;
-    }
-
     /** Drops the three working slots into the world (called on block removal). */
     public void dropContents() {
         if (level == null) {
@@ -119,7 +114,8 @@ public class SpellLoomBlockEntity extends BlockEntity implements MenuProvider {
         }
         SimpleContainer container = new SimpleContainer(items.getSlots());
         for (int i = 0; i < items.getSlots(); i++) {
-            container.setItem(i, items.getStackInSlot(i));
+            container.setItem(i, items.getStackInSlot(i).copy());
+            items.setStackInSlot(i, ItemStack.EMPTY);
         }
         Containers.dropContents(level, worldPosition, container);
     }

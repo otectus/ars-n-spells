@@ -1,0 +1,16 @@
+{
+  "type": "ars_n_spells:blank_scroll",
+  "conditions": [
+    {
+      "condition": "minecraft:any_of",
+      "terms": [
+        {
+          "condition": "neoforge:loot_table_id",
+          "loot_table_id": "minecraft:chests/stronghold_library"
+        }
+      ]
+    }
+  ],
+  "chance": 0.15,
+  "count": 1
+}

@@ -194,16 +194,8 @@ public class ArsCrossProxySpell extends AbstractSpell {
      * id - so a player carrying two bound books can never resolve to the wrong one.
      */
     private Carrier resolveCastingBook(ServerPlayer player, MagicData magicData) {
-        Carrier carrier = carrierOf(magicData.getPlayerCastingItem());
-        if (carrier != null) {
-            return carrier;
-        }
-        carrier = carrierOf(Utils.getPlayerSpellbookStack(player));
-        if (carrier != null) {
-            return carrier;
-        }
-        carrier = carrierOf(player.getMainHandItem());
-        return carrier != null ? carrier : carrierOf(player.getOffhandItem());
+        ProxyCarrierResolver.Carrier carrier = ProxyCarrierResolver.casting(player, magicData, poolId);
+        return carrier == null ? null : new Carrier(carrier.stack(), carrier.entry());
     }
 
     /**

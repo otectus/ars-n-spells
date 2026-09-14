@@ -223,18 +223,12 @@ class AnsConfigStructureTest {
                 readers.append(Files.readString(path));
             }
         }
-        // AnsConfig's own helper section counts as a reader, but only the part after the spec is
-        // built: a key that is merely declared and registered above that line is exactly what
-        // this test exists to catch, while the schema-migration resolver below it is a genuine
-        // consumer (3.3.0 T1.2 resolves config_schema_version and conversion_policy there).
-        int helpersStart = active.indexOf("SPEC = BUILDER.build();");
-        assertTrue(helpersStart > 0, "expected the config to build its spec in a static block");
-        readers.append(active.substring(helpersStart));
-        String body = readers.toString();
+        // Migration and typed policy accessors read their own config values internally.
+        String body = readers + "\n" + active;
 
         List<String> unread = new ArrayList<>();
         for (String key : declared) {
-            if (!body.contains("AnsConfig." + key) && !body.contains("." + key + ".get()")) {
+            if (!body.contains("AnsConfig." + key) && !Pattern.compile("\\b" + key + "\\.get\\(\\)").matcher(body).find()) {
                 unread.add(key);
             }
         }

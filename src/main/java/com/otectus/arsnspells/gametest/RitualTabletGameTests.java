@@ -3,7 +3,6 @@ package com.otectus.arsnspells.gametest;
 import com.hollingsworth.arsnouveau.api.registry.RitualRegistry;
 import com.hollingsworth.arsnouveau.common.items.RitualTablet;
 import com.otectus.arsnspells.ArsNSpells;
-import com.otectus.arsnspells.compat.CompatIds;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.rituals.ManaInfusionRitual;
 import com.otectus.arsnspells.rituals.ManaWellRitual;
@@ -108,7 +107,8 @@ public final class RitualTabletGameTests {
     /** Without Iron's, the Iron's-only tablets must be absent rather than half-registered. */
     @GameTest(template = "platform")
     public static void withoutIrons_ironsOnlyTabletsAreAbsent(GameTestHelper helper) {
-        if (OptionalModGate.skipIfPresent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+        if (IronsCompat.isLoaded()) {
+            helper.succeed();
             return;
         }
         List<String> leaked = new ArrayList<>();

@@ -5,24 +5,8 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public class AnsConfig {
     public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     public static final ModConfigSpec SPEC;
-
-    // ========================================
-    // SCHEMA MIGRATION
-    // ========================================
-    // 3.3.0: the config file now says which schema wrote it, so a key added in this release
-    // can resolve a different default for an existing world than for a new install. Without
-    // that distinction every migration is a forced choice between breaking existing worlds
-    // and shipping the unsafe behaviour to everyone forever.
-    //
-    // payment_open_failure_policy is deliberately absent here: the Cursed-Ring LP and
-    // Virtue-Ring aura payment paths were never ported to 1.21.1 (see
-    // casting/CastingAuthority.java), so there is no alternative payment leg that could fail
-    // to open. It lives only in the Forge 1.20.1 config.
+    public static final int CURRENT_SCHEMA_VERSION = 2;
     public static final ModConfigSpec.IntValue CONFIG_SCHEMA_VERSION;
-    public static final ModConfigSpec.ConfigValue<String> CONVERSION_POLICY;
-
-    /** The schema this build writes. A file that reads back lower than this predates 3.3.0. */
-    public static final int CURRENT_SCHEMA_VERSION = 1;
 
     // ========================================
     // MASTER TOGGLES
@@ -132,7 +116,10 @@ public class AnsConfig {
     // ========================================
     // CROSS-CAST INSCRIPTION
     // ========================================
+    public static final ModConfigSpec.ConfigValue<String> CONVERSION_POLICY;
     public static final ModConfigSpec.DoubleValue CROSS_CAST_COST_MULTIPLIER;
+    public static final ModConfigSpec.IntValue NETWORK_REQUEST_RATE_PER_SECOND;
+    public static final ModConfigSpec.IntValue NETWORK_REQUEST_BURST;
     public static final ModConfigSpec.BooleanValue ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS;
     public static final ModConfigSpec.IntValue MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK;
 
@@ -142,39 +129,8 @@ public class AnsConfig {
     public static final ModConfigSpec.DoubleValue SOURCE_JAR_CACHE_MOVE_THRESHOLD;
 
     static {
-        // ========================================
-        // SCHEMA MIGRATION
-        // ========================================
-        BUILDER.push("Schema Migration");
-        BUILDER.comment(
-            "How this file is migrated between Ars 'n' Spells versions.",
-            "Do not edit config_schema_version by hand: it is how the mod tells an existing",
-            "world apart from a new install when it resolves a new key's default."
-        );
-
-        CONFIG_SCHEMA_VERSION = BUILDER
-            .comment(
-                "Schema version of this config file. 0 means the file was written before 3.3.0,",
-                "when this key did not exist; a freshly generated file is stamped with the",
-                "current version instead. Keys added in a later release read this to decide",
-                "whether to preserve the old behaviour or adopt the new default."
-            )
+        CONFIG_SCHEMA_VERSION = BUILDER.comment("Written after config migration; do not edit manually.")
             .defineInRange("config_schema_version", 0, 0, Integer.MAX_VALUE);
-
-        CONVERSION_POLICY = BUILDER
-            .comment(
-                "Which policy prices a cross-system mana leg:",
-                "  flat_legacy   - Multiply the cross leg by the configured directional rate.",
-                "                  The historical arithmetic (DEFAULT; preserves current pricing).",
-                "  equal_percent - Each pool pays the same percentage of the spell's own price;",
-                "                  the directional rates are not consulted.",
-                "These are deliberately separate policies, not two spellings of one. They agree",
-                "only while both conversion rates are 1.0."
-            )
-            .define("conversion_policy", "flat_legacy");
-
-        BUILDER.pop();
-
         // ========================================
         // MASTER TOGGLES
         // ========================================
@@ -192,7 +148,7 @@ public class AnsConfig {
                 "  hybrid - Both systems share a unified mana pool",
                 "  separate - Separate pools with dual-cost mechanics",
                 "  disabled - No mana integration at all",
-                "NOTE: Changing this value requires a game restart to take effect."
+                "Runtime changes are applied on the server thread and synchronized to connected clients."
             )
             .define("mana_unification_mode", "iss_primary");
         
@@ -582,7 +538,7 @@ public class AnsConfig {
             .comment("Multiplier for Source Jar proximity regen bonus.",
                      "Higher values = stronger regen when standing near Source Jars.",
                      "Final bonus = CONVERSION_RATE_ARS_TO_IRON * this value per second.")
-            .defineInRange("source_jar_synergy_multiplier", 5.0, 0.1, 100.0);
+            .defineInRange("source_jar_synergy_multiplier", 5.0, 0.0, 2000.0);
 
         BUILDER.pop();
 
@@ -616,6 +572,12 @@ public class AnsConfig {
             "data/ars_n_spells/recipes/apparatus/ -- pack authors can swap ingredients there."
         );
 
+        CONVERSION_POLICY = BUILDER
+            .comment("Mana pricing policy: flat_legacy applies directional rates; equal_percent also applies target/source native maximum.",
+                "Server-owned. A quote captures the selected policy; reloading does not reprice a committed cast.")
+            .define("conversion_policy", "flat_legacy", value -> value instanceof String text
+                && ("flat_legacy".equals(text) || "equal_percent".equals(text)));
+
         CROSS_CAST_COST_MULTIPLIER = BUILDER
             .comment(
                 "Multiplier applied to the base mana cost of a spell cast from an inscribed item.",
@@ -625,6 +587,14 @@ public class AnsConfig {
                 "active mana unification mode and SEPARATE-mode dual-cost splitting."
             )
             .defineInRange("cross_cast_cost_multiplier", 1.25, 0.5, 5.0);
+
+        NETWORK_REQUEST_RATE_PER_SECOND = BUILDER
+            .comment("Maximum sustained cross-cast/cycle requests per player per second. Server-owned; live reload.",
+                "Repeated request IDs are ignored independently for 60 seconds. Does not limit native casts.")
+            .defineInRange("network_request_rate_per_second", 10, 1, 20);
+        NETWORK_REQUEST_BURST = BUILDER
+            .comment("Immediate cross-cast/cycle request burst per player. Allows ordinary double clicks and latency bursts.")
+            .defineInRange("network_request_burst", 4, 1, 20);
 
         ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS = BUILDER
             .comment(
@@ -766,117 +736,6 @@ public class AnsConfig {
         return flag(DEBUG_MODE, false);
     }
 
-    // ========================================
-    // SCHEMA MIGRATION (3.3.0)
-    // ========================================
-
-    private static final org.slf4j.Logger MIGRATION_LOG =
-        org.slf4j.LoggerFactory.getLogger(AnsConfig.class);
-
-    private static final java.util.concurrent.atomic.AtomicBoolean MIGRATION_REPORTED =
-        new java.util.concurrent.atomic.AtomicBoolean(false);
-
-    private static volatile com.otectus.arsnspells.contract.ConversionKind EFFECTIVE_CONVERSION_KIND =
-        com.otectus.arsnspells.contract.ConversionKind.FLAT_LEGACY;
-
-    /** The conversion policy in force, resolved at config load. */
-    public static com.otectus.arsnspells.contract.ConversionKind getConversionKind() {
-        return EFFECTIVE_CONVERSION_KIND;
-    }
-
-    /**
-     * Parse {@code conversion_policy}. An unrecognised value falls back to the shipped default
-     * rather than to whichever enum constant happens to be first, so a typo cannot silently
-     * reprice every spell in the pack.
-     */
-    public static com.otectus.arsnspells.contract.ConversionKind parseConversionPolicy(String raw) {
-        String value = raw == null ? "" : raw.trim().toLowerCase(java.util.Locale.ROOT);
-        if ("equal_percent".equals(value)) {
-            return com.otectus.arsnspells.contract.ConversionKind.EQUAL_PERCENT;
-        }
-        if (!"flat_legacy".equals(value)) {
-            MIGRATION_LOG.warn(
-                "Unknown conversion_policy '{}', falling back to flat_legacy. "
-                    + "Valid values: flat_legacy, equal_percent.", raw);
-        }
-        return com.otectus.arsnspells.contract.ConversionKind.FLAT_LEGACY;
-    }
-
-    /**
-     * Whether {@code configFile} was created by the load that is running right now.
-     *
-     * <p>NeoForge does not tell us. A SERVER config lives in the world's {@code serverconfig}
-     * directory, which does not exist until the server is already starting, so no mod code runs
-     * between "the path is knowable" and "NeoForge has written the file". By the time
-     * {@code ModConfigEvent.Loading} fires, a brand-new file and a corrected 3.2.x file look
-     * identical: both contain {@code config_schema_version = 0}, one because the spec default
-     * was written and one because the missing key was corrected to the spec default.
-     *
-     * <p>The file's creation timestamp does separate them: a pre-existing file was created in an
-     * earlier session, even though the correction pass just rewrote its contents.
-     *
-     * <p>Every failure mode resolves to "not fresh", which is the direction that preserves an
-     * existing world's behaviour. A filesystem with no birth time (some ext4 configurations)
-     * reports the modification time instead; in that case the answer may be wrong once, on the
-     * first 3.3.0 load.
-     */
-    public static boolean isFreshlyGeneratedConfig(java.nio.file.Path configFile) {
-        if (configFile == null) {
-            return false;
-        }
-        try {
-            java.nio.file.attribute.BasicFileAttributes attrs =
-                java.nio.file.Files.readAttributes(configFile, java.nio.file.attribute.BasicFileAttributes.class);
-            long created = attrs.creationTime().toMillis();
-            long jvmStart = java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime();
-            return created >= jvmStart;
-        } catch (Exception unreadable) {
-            return false;
-        }
-    }
-
-    /**
-     * Resolve the migrated keys and log the migration report once per game session.
-     *
-     * <p>Called from the mod's {@code ModConfigEvent.Loading} listener (MOD bus). The report
-     * names only the keys whose effective value came from migration rather than from the file,
-     * with the previous and the new effective value, so a server owner reading the log can see
-     * exactly what the upgrade decided on their behalf.
-     *
-     * @param configFile the path NeoForge loaded, used only for the freshness probe
-     */
-    public static void onConfigLoaded(java.nio.file.Path configFile) {
-        int schemaRead = AnsConfig.CONFIG_SCHEMA_VERSION.get();
-        boolean fresh = schemaRead < CURRENT_SCHEMA_VERSION && isFreshlyGeneratedConfig(configFile);
-
-        String rawConversion = AnsConfig.CONVERSION_POLICY.get();
-        EFFECTIVE_CONVERSION_KIND = parseConversionPolicy(rawConversion);
-
-        java.util.List<String> migrated = new java.util.ArrayList<>();
-        if (schemaRead < CURRENT_SCHEMA_VERSION) {
-            migrated.add("  conversion_policy: (absent) -> " + rawConversion
-                + " (effective " + EFFECTIVE_CONVERSION_KIND + "; preserves pre-3.3.0 pricing)");
-        }
-        if (fresh) {
-            // Stamp the schema so the next load reads it from the file instead of probing the
-            // filesystem again. Without this the same world would resolve differently on its
-            // second start, when the file is no longer new.
-            migrated.add("  config_schema_version: " + schemaRead + " -> " + CURRENT_SCHEMA_VERSION
-                + " (freshly generated config stamped with the current schema)");
-            AnsConfig.CONFIG_SCHEMA_VERSION.set(CURRENT_SCHEMA_VERSION);
-            safeSave();
-        }
-
-        if (migrated.isEmpty() || !MIGRATION_REPORTED.compareAndSet(false, true)) {
-            return;
-        }
-        MIGRATION_LOG.info("Ars 'n' Spells config migration report (schema {} -> {}):",
-            schemaRead, CURRENT_SCHEMA_VERSION);
-        for (String line : migrated) {
-            MIGRATION_LOG.info(line);
-        }
-    }
-
     /** Daemon executor so config writes never block the caller (render / server thread). */
     private static final java.util.concurrent.ExecutorService SAVE_EXEC =
         java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
@@ -896,6 +755,28 @@ public class AnsConfig {
      * could return would describe the queueing, not the save, and would read at call sites as
      * "the config was saved". The log is the source of truth for completion.
      */
+    /** Schema zero used mana per discovery scan. Preserve average income independently of scan cadence. */
+    public static void onConfigLoaded(java.nio.file.Path configFile) {
+        if (CONFIG_SCHEMA_VERSION.get() >= CURRENT_SCHEMA_VERSION) return;
+        var logger = org.slf4j.LoggerFactory.getLogger(AnsConfig.class);
+        if (configFile == null || !java.nio.file.Files.exists(configFile)) return;
+        java.nio.file.Path backup = configFile.resolveSibling(configFile.getFileName() + ".pre-3.3.0.bak");
+        try {
+            if (!java.nio.file.Files.exists(backup)) java.nio.file.Files.copy(configFile, backup);
+        } catch (java.io.IOException error) {
+            logger.error("Config backup failed; migration will retry without changing saved settings: {}", backup, error);
+            return;
+        }
+        double previous = SOURCE_JAR_SYNERGY_MULTIPLIER.get();
+        double migrated = com.otectus.arsnspells.util.SourceSynergyPolicy.migratePerScanMultiplier(
+            previous, SOURCE_JAR_SCAN_INTERVAL_TICKS.get());
+        SOURCE_JAR_SYNERGY_MULTIPLIER.set(migrated);
+        CONFIG_SCHEMA_VERSION.set(CURRENT_SCHEMA_VERSION);
+        safeSave();
+        logger.info("ANS config migrated to schema {}: Source proximity multiplier {} per scan -> {} per second; backup {}. Conversion remains {}.",
+            CURRENT_SCHEMA_VERSION, previous, migrated, backup, CONVERSION_POLICY.get());
+    }
+
     public static void safeSave() {
         SAVE_EXEC.submit(() -> {
             try {
@@ -909,4 +790,10 @@ public class AnsConfig {
             }
         });
     }
+    public static com.otectus.arsnspells.contract.ConversionKind getConversionKind() {
+        return "equal_percent".equals(CONVERSION_POLICY.get())
+            ? com.otectus.arsnspells.contract.ConversionKind.EQUAL_PERCENT
+            : com.otectus.arsnspells.contract.ConversionKind.FLAT_LEGACY;
+    }
+
 }

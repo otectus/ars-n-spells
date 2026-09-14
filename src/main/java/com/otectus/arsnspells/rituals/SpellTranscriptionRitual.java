@@ -1,6 +1,9 @@
 package com.otectus.arsnspells.rituals;
 
 import com.otectus.arsnspells.contract.InscriptionPlan;
+import com.otectus.arsnspells.contract.InscriptionPlanner;
+import com.otectus.arsnspells.inscription.InscriptionOutcome;
+import com.otectus.arsnspells.inscription.StackInscriptionView;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.spell.CrossSpellType;
 import net.minecraft.core.BlockPos;
@@ -100,18 +103,6 @@ public class SpellTranscriptionRitual extends AnsRitual {
             return;
         }
 
-        // Audit V18/V19. One planner decides both questions the ritual used to answer for
-        // itself: is the target actually blank (asked of its own mod's container, not of
-        // "does it carry ANS data"), and does reading this source cost the player anything.
-        // It also fixes the sizing: the ritual used to stamp whatever stack it was handed,
-        // so a dropped stack of 64 blanks became 64 inscribed items for one source.
-        InscriptionPlan plan = LoomInscriptionView.plan(sourceStack, targetStack);
-        if (!plan.isPermitted()) {
-            error(LANG_PREFIX + "error.rejected", plan.reasonCode(),
-                targetStack.getHoverName().getString());
-            return;
-        }
-
         InscriptionSource source = InscriptionInputs.readSource(sourceStack);
         if (source == null) {
             // Classify said this was a source but a second read failed -- a
@@ -132,11 +123,30 @@ public class SpellTranscriptionRitual extends AnsRitual {
             }
         }
 
+        // Audit V18: the authoritative blank/filled decision. The bucket split above only
+        // says which dropped entity plays which role; whether the target may legally be
+        // written is the planner's call, taken from what the items are and from the target's
+        // own native container -- never from "ANS has not written here".
+        InscriptionPlan plan = InscriptionPlanner.plan(
+            new StackInscriptionView(sourceStack, targetStack));
+        if (!plan.isPermitted()) {
+            error(LANG_PREFIX + "error.refused." + reasonSuffix(plan.reasonCode()),
+                targetStack.getHoverName().getString());
+            return;
+        }
+        // Audit V19: one inscription is one unit on both sides. The ritual used to hand the
+        // whole target stack to the mutation below, so a stack of 64 blanks came back as 64
+        // inscribed items for the price of one source.
+        InscriptionOutcome outcome =
+            InscriptionOutcome.of(plan, sourceStack.getCount(), targetStack.getCount());
+        if (!outcome.isPermitted()) {
+            error(LANG_PREFIX + "error.refused." + reasonSuffix(outcome.reasonCode()),
+                targetStack.getHoverName().getString());
+            return;
+        }
+
         // Validation complete -- mutation begins here.
-        // V19: split off exactly the units the plan authorises and inscribe those. The
-        // remainder goes back to the item entity untouched, so a stack of 64 blanks yields
-        // one inscribed item and 63 blanks rather than 64 stamped ones.
-        ItemStack inscribed = targetStack.split(plan.outputCount());
+        ItemStack inscribed = targetStack.copyWithCount(outcome.transformedTargets());
         switch (source.type) {
             case ARS_NOUVEAU:
                 CrossCastingHandler.addCrossModSpell(inscribed, source.arsSpell);
@@ -146,20 +156,22 @@ public class SpellTranscriptionRitual extends AnsRitual {
                     source.spellLevel, CrossSpellType.IRONS_SPELLBOOKS);
                 break;
         }
-        if (targetStack.isEmpty()) {
-            targetEntity.setItem(inscribed);
+        // Split the untouched remainder back into the world instead of transforming it.
+        if (outcome.targetRemainder() > 0) {
+            // EntityJoinLevelEvent may refuse a new entity. Never remove the paid target or
+            // source until its output has actually entered the world.
+            if (!dropBeside(level, targetEntity, inscribed)) {
+                error(LANG_PREFIX + "error.refused.unknown");
+                return;
+            }
+            targetEntity.setItem(targetStack.copyWithCount(outcome.targetRemainder()));
         } else {
-            targetEntity.setItem(targetStack);
-            spawnRemainder(level, targetEntity, inscribed);
+            targetEntity.setItem(inscribed);
         }
-        // Consume ONE source item, not the whole entity - Iron's scrolls stack to 16, and
-        // discarding a stacked source destroyed the extras. Same fix, same reason, as
-        // SpellbookBindingRitual's scroll consumption.
-        // V18: only a disposable source is charged. A spellbook or focus used as a source is
-        // read and handed back - the plan's consumedUnits is 0 for those, and InscriptionPlan
-        // refuses to be built saying otherwise.
-        if (plan.consumedUnits() > 0) {
-            sourceStack.shrink(plan.consumedUnits());
+        // A reusable book or focus is read, not eaten: the plan says zero units for one, and
+        // InscriptionPlan refuses to be constructed saying otherwise.
+        if (outcome.consumedFromSource() > 0) {
+            sourceStack.shrink(outcome.consumedFromSource());
             if (sourceStack.isEmpty()) {
                 sourceEntity.discard();
             } else {
@@ -171,12 +183,29 @@ public class SpellTranscriptionRitual extends AnsRitual {
         success(LANG_PREFIX + "success", sourceLabel(source));
     }
 
-    /** Drop the inscribed unit beside the stack it came from, so neither is lost. */
-    private void spawnRemainder(Level level, ItemEntity origin, ItemStack inscribed) {
-        ItemEntity spawned = new ItemEntity(level, origin.getX(), origin.getY(), origin.getZ(),
-            inscribed);
-        spawned.setDefaultPickUpDelay();
-        level.addFreshEntity(spawned);
+    /**
+     * Put the single inscribed item into the world next to the stack it was split off, so the
+     * player can see that one item changed and the rest did not.
+     */
+    private boolean dropBeside(Level level, ItemEntity origin, ItemStack inscribed) {
+        ItemEntity dropped = new ItemEntity(level, origin.getX(), origin.getY() + 0.25,
+            origin.getZ(), inscribed, 0.0, 0.0, 0.0);
+        dropped.setPickUpDelay(10);
+        return level.addFreshEntity(dropped);
+    }
+
+    /**
+     * Reason code to lang-key suffix. The codes are stable machine-readable strings from
+     * {@link InscriptionPlan}; the mapping is here so the ritual can name the actual rule that
+     * refused it instead of the old catch-all "no blank target".
+     */
+    private static String reasonSuffix(String reasonCode) {
+        return switch (reasonCode) {
+            case InscriptionPlan.REASON_NOT_BLANK -> "not_blank";
+            case InscriptionPlan.REASON_TARGET_NOT_EMPTY -> "target_not_empty";
+            case InscriptionPlan.REASON_INSUFFICIENT_STACK -> "insufficient_stack";
+            default -> "unknown";
+        };
     }
 
     private void playInscribeEffects(Level level, BlockPos pos) {

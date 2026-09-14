@@ -1,212 +1,44 @@
 package com.otectus.arsnspells.mixin.ars;
 
-import com.hollingsworth.arsnouveau.api.ArsNouveauAPI;
-import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.hollingsworth.arsnouveau.api.spell.SpellContext;
 import com.hollingsworth.arsnouveau.api.spell.SpellResolver;
-import com.hollingsworth.arsnouveau.api.spell.SpellValidationError;
-import com.hollingsworth.arsnouveau.common.util.PortUtil;
-import com.otectus.arsnspells.bridge.BridgeManager;
-import com.otectus.arsnspells.casting.AnsQuotes;
-import com.otectus.arsnspells.casting.AttemptLedgerService;
-import com.otectus.arsnspells.casting.CarrierIdentity;
-import com.otectus.arsnspells.casting.CastingAuthority;
-import com.otectus.arsnspells.contract.AttemptState;
-import com.otectus.arsnspells.contract.CastAttempt;
-import com.otectus.arsnspells.contract.CostQuote;
-import com.otectus.arsnspells.contract.CostRules;
-import com.otectus.arsnspells.contract.ResourceUnit;
-import com.otectus.arsnspells.spell.CrossCastContext;
-import com.otectus.arsnspells.util.CrossCastTrace;
+import com.otectus.arsnspells.casting.ArsCastPayments;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.*;
+import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.util.List;
-import java.util.UUID;
-
-/**
- * PRE-CAST VALIDATION MIXIN
- *
- * <p>This is the HARD GATE that prevents Ars Nouveau spells from executing if the
- * player does not have sufficient resources.
- *
- * <p>Injects at the HEAD of {@code SpellResolver.canCast()} to validate BEFORE any
- * spell logic executes. {@code canCast()} is called by {@code onCast()},
- * {@code onCastOnBlock()} and {@code onCastOnEntity()} — covering every Ars cast path.
- *
- * <p><b>Why it takes full ownership of the result.</b> We cancel the native
- * {@code canCast()} outright rather than letting it continue, because Ars's own
- * {@code enoughMana()} reads {@code ManaCap.getCurrentMana()}, which can be stale in
- * ISS_PRIMARY mode where {@code playerOnTick} is suppressed. Since we bypass the rest
- * of the method we must also replicate its native recipe validation — hence the
- * explicit {@code getSpellCastingSpellValidator().validate(...)} call.
- *
- * <p><b>Covenant of the Seven on 1.21.1.</b> The 1.20.1 build also validated Cursed
- * Ring LP and Virtue Ring aura in the {@code cost <= 0} branch, because those handlers
- * zero the mana cost during {@code SpellCostCalcEvent} and stash a pending alternate
- * cost. Covenant has no 1.21.1 release, so a zero cost here means only "genuinely free
- * spell" and that path has no consumer here.
- */
+/** Ars 5.13.1: native validator -> enoughMana -> postEvent -> cast method -> expendMana. */
 @Mixin(value = SpellResolver.class, remap = false)
 public abstract class MixinSpellResolverPreCast {
-    private static final Logger LOGGER = LoggerFactory.getLogger(MixinSpellResolverPreCast.class);
-
     @Shadow public SpellContext spellContext;
-    @Shadow public Spell spell;
-    @Shadow public boolean silent;
     @Shadow public abstract int getResolveCost();
 
-    @Inject(method = "canCast", at = @At("HEAD"), cancellable = true, require = 0)
-    private void arsnspells$validatePreCast(LivingEntity entity, CallbackInfoReturnable<Boolean> cir) {
-        if (!(entity instanceof Player player)) {
-            return;
-        }
-
-        if (player.level().isClientSide()) {
-            return;
-        }
-
-        // When mana unification is off, let Ars Nouveau handle canCast() natively: with no
-        // bridged pool there is nothing for us to validate against, and interposing would
-        // only risk disagreeing with Ars's own accounting.
-        //
-        // The 1.20.1 build had a second clause here, allowing a Covenant ring's ACTIVE cost
-        // path to take over validation even with unification off. Inert on 1.21.1.
-        if (!BridgeManager.isUnificationEnabled()) {
-            return;
-        }
-
-        // Replicate native spell recipe validation since we bypass the rest of canCast().
-        // This checks: non-empty recipe, starts with a cast method, at most one cast method,
-        // augment caps and glyph limits — matching Ars Nouveau's StandardSpellValidator.
-        // Ars 5.x made Spell.recipe private; unsafeList() is the List-typed accessor the
-        // validator's signature wants (recipe() returns only an Iterable).
-        List<SpellValidationError> validationErrors = ArsNouveauAPI.getInstance()
-            .getSpellCastingSpellValidator()
-            .validate(this.spell.unsafeList());
-
-        if (!validationErrors.isEmpty()) {
-            if (!this.silent) {
-                PortUtil.sendMessageNoSpam(entity, validationErrors.get(0).makeTextComponentExisting());
-            }
-            arsnspells$finish(cir, false);
-            return;
-        }
-
-        SpellResolver resolver = (SpellResolver) (Object) this;
-
-        int cost = resolver.getResolveCost();
-
-        if (player.isCreative()) {
-            arsnspells$finish(cir, true);
-            return;
-        }
-
-        if (cost <= 0) {
-            // Zero-cost spell: always allow, bypassing native enoughMana() so a stale
-            // ManaCap read cannot deny a spell that costs nothing.
-            arsnspells$finish(cir, true);
-            return;
-        }
-
-        LOGGER.debug("PRE-CAST VALIDATION: Player={}, Cost={}", player.getName().getString(), cost);
-
-        // HARD GATE: validate resources BEFORE spell execution.
-        boolean canCast = CastingAuthority.canCastArsSpell(player, resolver);
-
-        if (!canCast) {
-            LOGGER.warn("SPELL CAST DENIED for {}", player.getName().getString());
-        }
-
-        CrossCastContext.Entry entry = CrossCastContext.peek(player);
-        UUID attemptId = entry != null ? entry.attemptId : null;
-
-        // Audit V01: open -> validate -> quote -> RESERVE, in that order, and deny with a reason
-        // on failure. Reserving here is what makes the price a fact rather than a prediction: the
-        // pool can move between the check above and the payment boundary - regen, another mod, a
-        // second concurrent cast - and a check that is not backed by a held reservation is only
-        // ever a guess. Nothing below re-derives a price; the payment boundary commits this
-        // reservation and nothing else.
-        if (canCast && entry != null && entry.carrierIdentity != null) {
-            canCast = arsnspells$reserve(player, entry, cost);
-        }
-
-        CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-            CrossCastTrace.Stage.RESOURCE_CHECK,
-            "cost", cost, "approved", canCast);
-
-        // Always set the return value — both pass and fail — to prevent Ars's native
-        // enoughMana() from running against possibly-stale ManaCap data.
-        arsnspells$finish(cir, canCast);
-    }
-
-    /**
-     * Reserve the open attempt's quoted legs, or deny the cast with a reason.
-     *
-     * <p>The attempt was opened and quoted by {@code CrossCastingHandler.castArsSpell}; this is
-     * the one place its legs are debited. A partial drain reserves less than it asked for, and
-     * {@link com.otectus.arsnspells.contract.AttemptLedger} refunds exactly that smaller amount -
-     * which is why the reservation, not the request, is what gets released.
-     */
-    @Unique
-    private static boolean arsnspells$reserve(Player player, CrossCastContext.Entry entry, int cost) {
-        CastAttempt attempt =
-            AttemptLedgerService.findOpen(player, entry.carrierIdentity).orElse(null);
-        if (attempt == null || attempt.state() != AttemptState.QUOTED) {
-            // No open attempt, or one already past reservation (a long cast re-entering
-            // canCast). Nothing to reserve, and re-reserving would double-charge.
-            return true;
-        }
-        try {
-            java.util.List<com.otectus.arsnspells.contract.ResourceAmount> reserved =
-                AttemptLedgerService.reserve(attempt, player);
-            for (com.otectus.arsnspells.contract.ResourceAmount leg : attempt.quote().legs()) {
-                double taken = 0.0d;
-                for (com.otectus.arsnspells.contract.ResourceAmount got : reserved) {
-                    if (got.unit() == leg.unit()) {
-                        taken += got.amount();
-                    }
-                }
-                if (taken + 1.0e-3d < leg.amount()) {
-                    AttemptLedgerService.fail(attempt, player);
-                    CastingAuthority.sendDenialMessage(player,
-                        "§cNot Enough Mana: Need " + (int) Math.ceil(leg.amount()) + " "
-                            + arsnspells$unitName(leg.unit()) + ", have " + (int) taken);
-                    return false;
-                }
-            }
-            // Record what the Iron's leg actually cost so a later failure compensates the real
-            // amount rather than the quoted one.
-            entry.issPaid = (float) attempt.reservedLegs().stream()
-                .filter(a -> a.unit() == ResourceUnit.IRONS_MANA)
-                .mapToDouble(com.otectus.arsnspells.contract.ResourceAmount::amount)
-                .sum();
-            return true;
-        } catch (IllegalStateException illegalTransition) {
-            // An illegal edge means some other path already settled this attempt. Denying is
-            // the safe answer: the alternative is casting against a reservation nobody holds.
-            LOGGER.warn("Refusing an Ars cast whose attempt is no longer reservable: {}",
-                illegalTransition.toString());
-            return false;
+    @Inject(method = "enoughMana", at = @At("HEAD"), cancellable = true)
+    private void arsnspells$validateResources(LivingEntity caster, CallbackInfoReturnable<Boolean> cir) {
+        if (!(caster instanceof Player player) || player.level().isClientSide()) return;
+        getResolveCost();
+        if (ArsCastPayments.handles(spellContext)) {
+            cir.setReturnValue(ArsCastPayments.canAfford(player, (SpellResolver)(Object)this));
         }
     }
 
-    @Unique
-    private static String arsnspells$unitName(ResourceUnit unit) {
-        return unit == ResourceUnit.IRONS_MANA ? "Iron's mana" : "mana";
+    @Inject(method = "postEvent", at = @At("RETURN"), cancellable = true)
+    private void arsnspells$reserveAfterEvent(CallbackInfoReturnable<com.hollingsworth.arsnouveau.api.event.SpellCastEvent> cir) {
+        if (spellContext == null || !(spellContext.getUnwrappedCaster() instanceof Player player)
+                || player.level().isClientSide()) return;
+        if (cir.getReturnValue().isCanceled()) {
+            ArsCastPayments.finish(spellContext);
+        } else if (!ArsCastPayments.prepare(player, spellContext)) {
+            ArsCastPayments.finish(spellContext);
+            cir.getReturnValue().setCanceled(true); // Ars inspects this event before invoking the cast method.
+        }
     }
 
-    /** Set the result and cancel. */
-    private static void arsnspells$finish(CallbackInfoReturnable<Boolean> cir, boolean result) {
-        cir.setReturnValue(result);
-        cir.cancel();
+    @Inject(method = {"onCast", "onCastOnEntity", "onCastOnBlock"}, at = @At("RETURN"))
+    private void arsnspells$finishCast(CallbackInfoReturnable<?> cir) {
+        // Includes native failure, downstream event veto, and SUCCESS_NO_EXPEND.
+        ArsCastPayments.finish(spellContext);
     }
 }

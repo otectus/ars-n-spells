@@ -74,9 +74,7 @@ repositories {
     }
 }
 
-// Game directory for runGameTestServer. Overridable per profile so the absent and loaded runs
-// never reuse each other's saved world; see the gameTestServer run block below.
-def gametestRunDir = project.findProperty('gametestRunDir') ?: 'run'
+ext.gametestRunDir = project.findProperty('gametestRunDir') ?: 'run'
 
 neoForge {
     version = neoforge_version
@@ -94,7 +92,10 @@ neoForge {
         }
         client {
             client()
-            gameDirectory = project.file('run')
+            gameDirectory = project.file(gametestRunDir)
+            systemProperty 'ans.iconSmoke', project.hasProperty('withIconClientSmoke').toString()
+            systemProperty 'ans.iconSmoke.packs', project.hasProperty('withIconPackReview').toString()
+            systemProperty 'ans.worldUiSmoke', project.hasProperty('withWorldUiSmoke').toString()
             programArguments.addAll '--username', 'Dev'
         }
         server {
@@ -103,16 +104,14 @@ neoForge {
             programArgument '--nogui'
         }
         // Headless gameplay tests. Namespace-gated so other mods' GameTests do not run.
-        //
-        // -PgametestRunDir picks the game directory (default 'run', the historical behaviour).
-        // The absent and loaded profiles MUST NOT share one: the loaded profile writes a world
-        // whose chunks reference irons_spellbooks registry entries, and re-opening it without
-        // Iron's fails to decode while Gradle still prints BUILD SUCCESSFUL - a green run over
-        // a server that never started. CI passes a distinct directory per profile.
         gameTestServer {
             type = 'gameTestServer'
             gameDirectory = project.file(gametestRunDir)
             systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
+            systemProperty 'ans.gametest.expected.irons_spellbooks', project.hasProperty('withIronsRuntimeGameTests').toString()
+            systemProperty 'ans.gametest.expected.ars_elemental', (project.hasProperty('withArsElemental') || project.hasProperty('withArsZero') || project.hasProperty('withArsElemancy')).toString()
+            systemProperty 'ans.gametest.expected.ars_zero', project.hasProperty('withArsZero').toString()
+            systemProperty 'ans.gametest.expected.ars_elemancy', project.hasProperty('withArsElemancy').toString()
         }
         data {
             data()
@@ -232,14 +231,8 @@ tasks.register('stageGameTestStructures', Copy) {
     from 'src/test/resources/gameteststructures'
     into "${gametestRunDir}/gameteststructures"
 }
-// runClient uses 'run' unconditionally, so stage into both when a profile moved the gametest
-// directory elsewhere. Cheap: it is four small .snbt files.
-tasks.register('stageGameTestStructuresDefault', Copy) {
-    from 'src/test/resources/gameteststructures'
-    into 'run/gameteststructures'
-}
 tasks.matching { it.name in ['runGameTestServer', 'runClient', 'runServer'] }.configureEach {
-    dependsOn 'stageGameTestStructures', 'stageGameTestStructuresDefault'
+    dependsOn 'stageGameTestStructures'
 }
 
 processResources {

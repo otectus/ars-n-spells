@@ -48,7 +48,7 @@ public final class ArsManaCalcHandler {
         } catch (Throwable t) {
             return;
         }
-        if (ironsRegen <= 0.0) {
+        if (!Double.isFinite(ironsRegen) || ironsRegen == 0.0) {
             return;
         }
         double absAdd = ManaRegenBridge.convertIronsToArs(ironsRegen, player) * conversionRate();
@@ -69,7 +69,7 @@ public final class ArsManaCalcHandler {
         } catch (Throwable t) {
             return;
         }
-        if (ironsMax <= 0.0) {
+        if (!Double.isFinite(ironsMax) || ironsMax == 0.0) {
             return;
         }
         event.setMax(event.getMax() + (int) Math.round(ironsMax * conversionRate()));

@@ -14,13 +14,13 @@ run/
 # ModDevGradle gives each run task its own game directory (build.gradle `runs` block).
 run-server/
 run-data/
-# -PgametestRunDir puts each GameTest profile in its own game directory so the absent and
-# loaded runs never share a saved world (see build.gradle and .github/workflows/ci.yml).
-run-gametest-*/
+# Isolated optional-dependency/client smoke profiles.
+run-*/
 
 # Dependencies & local copies
 dependencies/
 mods/
+libs/
 io/
 /com/
 gradle-8.12/
@@ -35,3 +35,6 @@ gradle-8.12-bin.zip
 nul
 $null
 *.log
+
+# Python tooling bytecode
+__pycache__/

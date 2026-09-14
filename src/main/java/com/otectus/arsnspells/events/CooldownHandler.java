@@ -19,15 +19,22 @@ public class CooldownHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             // Use standard Ars Nouveau 4.12.7 field: spell
             CooldownCategory category = SpellAnalysis.analyze(event.spell).category();
-            
-            // CRITICAL FIX: Only check ARS-namespaced cooldowns
+
             if (UnifiedCooldownManager.isOnCooldown(player, category)) {
+                // ANS-MED-027 (NEEDS VERIFY): Ars Nouveau's SpellCastEvent is documented
+                // as @Cancelable in 4.12.x (parent SpellEvent class). If a future Ars
+                // version makes it non-cancellable, this will be a silent no-op and
+                // cooldown enforcement will fall back to the per-spell-class gating in
+                // SpellResolver. Verify cancellability in dev when upgrading Ars.
                 event.setCanceled(true);
-            } else {
-                long cooldownEnd = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category, false);
-                // Logic: High-fidelity sync ensuring the client HUD mirrors the lockout
-                PacketHandler.sendToClient(new CooldownSyncPayload(category, cooldownEnd), player);
             }
         }
+    }
+    public static void commit(ServerPlayer player, com.hollingsworth.arsnouveau.api.spell.SpellContext context) {
+        if (!UnifiedCooldownManager.isEnabled()) return;
+        CooldownCategory category = SpellAnalysis.analyze(context.getSpell()).category();
+        long end = UnifiedCooldownManager.applyCooldownAndGetEnd(player, category,
+            com.otectus.arsnspells.casting.ArsCastPayments.isCrossCast(context));
+        PacketHandler.sendToClient(new CooldownSyncPayload(category, end), player);
     }
 }

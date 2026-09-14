@@ -40,14 +40,17 @@ class ResourcePresenceTest {
             "/data/ars_n_spells/recipe/apparatus/spell_uninscription.json",
             "/data/ars_n_spells/recipe/apparatus/spellbook_binding.json",
             "/data/ars_n_spells/recipe/spell_loom.json",
+            "/data/ars_n_spells/recipe/blank_scroll.json",
             "/data/ars_n_spells/tags/item/curio_spell_discount.json",
             "/data/ars_n_spells/tags/item/irons_spell_books.json",
             "/data/ars_n_spells/loot_table/blocks/spell_loom.json",
             "/data/ars_n_spells/advancement/recipes/misc/spell_loom.json",
+            "/data/ars_n_spells/advancement/recipes/misc/blank_scroll.json",
             "/assets/ars_n_spells/blockstates/spell_loom.json",
             "/assets/ars_n_spells/models/block/spell_loom.json",
             "/assets/ars_n_spells/models/item/spell_loom.json",
             "/assets/ars_n_spells/models/item/spellbook_binding.json",
+            "/assets/ars_n_spells/models/item/blank_scroll.json",
             "/assets/ars_n_spells/lang/en_us.json",
             "/ars_n_spells.mixins.json",
             "/pack.mcmeta",
@@ -72,8 +75,12 @@ class ResourcePresenceTest {
                 "missing icon texture for whitelisted symbol: " + symbol);
         }
         for (String nature : com.otectus.arsnspells.spell.CrossModSpellComponents.NATURE_KEYS) {
-            assertNotNull(res("/assets/ars_n_spells/textures/gui/icons/spell/nature_" + nature + ".png"),
-                "missing nature texture for whitelisted key: " + nature);
+            assertNotNull(res("/assets/ars_n_spells/textures/gui/icons/v2/background/" + nature + ".png"),
+                "missing composition background for whitelisted key: " + nature);
+        }
+        for (String id : com.otectus.arsnspells.icons.IconCatalog.IDS) {
+            assertNotNull(res("/assets/ars_n_spells/textures/gui/icons/v2/" + id + ".png"),
+                "missing canonical icon: " + id);
         }
         assertNotNull(res("/assets/ars_n_spells/textures/gui/icons/spell/ars_cross_default.png"));
         for (int k = 1; k <= com.otectus.arsnspells.spell.CrossModSpellComponents.PROXY_POOL_SIZE; k++) {

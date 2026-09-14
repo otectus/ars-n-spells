@@ -176,7 +176,7 @@ public class SpellScalingUtil {
         float globalPower = (float) player.getAttributeValue(AttributeRegistry.SPELL_POWER);
 
         SpellAnalysis.Result analysis = SpellAnalysis.analyze(spell);
-        String school = analysis.dominantSchool();
+        String school = analysis.schoolKey();
 
         // Additive scaling: base power + (elemental bonus - 1.0) prevents exponential stacking.
         //
@@ -192,9 +192,9 @@ public class SpellScalingUtil {
         MultiSchoolPowerPolicy policy =
             MultiSchoolPowerPolicy.fromString(AnsConfig.MULTI_SCHOOL_POWER_POLICY.get());
         Map<String, Float> schoolPowers = new LinkedHashMap<>();
-        for (String candidate : analysis.schools()) {
-            Holder<Attribute> elemental = elementMap().get(candidate);
-            if (elemental != null) {
+        for (String candidate : analysis.allSchoolKeys()) {
+            Holder<Attribute> elemental = com.otectus.arsnspells.compat.IronsSchoolAttributes.power(candidate);
+            if (elemental != null && player.getAttribute(elemental) != null) {
                 schoolPowers.put(candidate, (float) player.getAttributeValue(elemental));
             }
         }
@@ -207,7 +207,7 @@ public class SpellScalingUtil {
         // the correct track (including the aqua/geo/wind ars_n_spells:* tracks).
         float affinity = 1.0f;
         if (AnsConfig.ENABLE_AFFINITY_SYSTEM.get()) {
-            String affinityKey = SchoolKeys.fromArsSchool(school);
+            String affinityKey = com.otectus.arsnspells.compat.IronsSchoolAttributes.power(school) == null ? null : school;
             if (affinityKey != null) {
                 affinity = AffinityBonuses.getAttributeMultiplier(player, affinityKey);
             }

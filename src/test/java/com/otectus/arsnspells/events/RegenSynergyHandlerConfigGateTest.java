@@ -25,9 +25,9 @@ class RegenSynergyHandlerConfigGateTest {
     @Test
     void killSwitch_gatesTickBeforeScan() throws IOException {
         String src = source();
-        int tickIdx = src.indexOf("public static void onPlayerTickPost");
+        int tickIdx = src.indexOf("public void onPlayerTick");
         int gateIdx = src.indexOf("ENABLE_SOURCE_JAR_SYNERGY", tickIdx);
-        int scanIdx = src.indexOf("findSourceJar(level, pos", tickIdx);
+        int scanIdx = src.indexOf("scanForSourceJar(level, pos", tickIdx);
         assertTrue(gateIdx > tickIdx,
             "the tick must check ENABLE_SOURCE_JAR_SYNERGY (server-owner kill switch)");
         assertTrue(scanIdx > gateIdx, "the kill-switch check must precede the scan call");
@@ -55,7 +55,7 @@ class RegenSynergyHandlerConfigGateTest {
         String src = source();
         assertTrue(src.contains("maybeLogDebugSummary"),
             "debug output must go through the rate-limited summary");
-        int scanIdx = src.indexOf("private static BlockPos findSourceJar");
+        int scanIdx = src.indexOf("private static boolean scanForSourceJar");
         assertTrue(scanIdx > 0, "the scan method must exist");
         int scanEnd = src.indexOf("\n    }", scanIdx);
         String scanBody = src.substring(scanIdx, scanEnd);

@@ -57,6 +57,9 @@ public final class CrossCastValidator {
             return ValidationResult.failure("message.ars_n_spells.crosscast.invalid.empty");
         }
 
+        if (!entry.payloadWithinBudget()) {
+            return ValidationResult.failure("arsnspells.crosscast.invalid.payload_budget");
+        }
         CrossSpellType type = resolveType(entry);
         if (type == null) {
             return ValidationResult.failure("message.ars_n_spells.crosscast.invalid.type");

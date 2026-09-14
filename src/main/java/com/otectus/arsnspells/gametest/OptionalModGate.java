@@ -1,84 +1,64 @@
 package com.otectus.arsnspells.gametest;
 
-import com.otectus.arsnspells.compat.ModPresence;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.fml.ModList;
 
 /**
- * The single seam every optional-mod GameTest goes through, so a self-skip stops looking
- * like a pass.
+ * The single door every optional-mod GameTest goes through, so a skip is recorded as a skip
+ * instead of disappearing into the pass count (audit V26).
  *
- * <p><b>Why.</b> GameTest has no notion of "skipped": a test that calls
- * {@code helper.succeed()} because Iron's is absent is recorded by the harness exactly like
- * one that exercised the whole integration. The audit's Iron's-less run therefore reported
- * "71 required tests passed" while most of the Iron's-facing scenarios never executed a line
- * of the code they name. Routing every one of those guards through this class means
- * {@link ScenarioReport} can say which of the two actually happened, and CI can read that
- * instead of the pass count.
- *
- * <p><b>Use.</b> The gate both records and succeeds, so a caller only has to return:
+ * <p>Usage is always the first statement of the test:
  *
  * <pre>
- *   if (OptionalModGate.skipIfAbsent(helper, CompatIds.IRONS_SPELLBOOKS)) {
+ *   if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
  *       return;
  *   }
  * </pre>
  *
- * <p>Thread-safe: GameTest batches run concurrently, and the counters behind this live in
- * {@link ScenarioReport} as atomics.
+ * <p>GameTest still has no skip verdict, so an absent mod must succeed the test — but
+ * {@link ScenarioReport} now knows it did not run, and that is what CI asserts on.
+ *
+ * <p>The test name is read off the call stack rather than off {@code GameTestHelper}, whose
+ * {@code testInfo} field is private with no accessor in 1.20.1.
  */
 public final class OptionalModGate {
 
-    private OptionalModGate() {}
+    private OptionalModGate() {
+    }
 
     /**
-     * Skip the calling test when {@code modId} is absent.
+     * Succeed and record a skip when {@code modId} is absent; record an execution otherwise.
      *
-     * <p>Absent: records a skip against {@code modId}, calls {@code helper.succeed()} and
-     * returns {@code true} so the caller returns immediately. Present: records the scenario
-     * as executed and returns {@code false}.
+     * @return true when the caller must return immediately without asserting anything
      */
     public static boolean skipIfAbsent(GameTestHelper helper, String modId) {
-        if (ModPresence.isLoaded(modId)) {
-            ScenarioReport.executed(callerName());
+        String testName = callerTestName();
+        if (ModList.get().isLoaded(modId)) {
+            ScenarioReport.executed(testName);
             return false;
         }
-        ScenarioReport.skipped(modId, callerName());
+        ScenarioReport.skipped(modId, testName);
         helper.succeed();
         return true;
     }
 
-    /**
-     * The inverse gate, for the handful of tests that assert the <em>absent</em>-mod
-     * behaviour and are meaningless once the mod is installed (for example
-     * {@code ironAbsent_predicatesAreSafe}). Recorded as a skip against the same
-     * {@code modId}: either way the run did not exercise the scenario, and that is what the
-     * report exists to say.
-     */
-    public static boolean skipIfPresent(GameTestHelper helper, String modId) {
-        if (!ModPresence.isLoaded(modId)) {
-            ScenarioReport.executed(callerName());
-            return false;
-        }
-        ScenarioReport.skipped(modId, callerName());
-        helper.succeed();
-        return true;
-    }
-
-    /**
-     * The first frame outside this class, as {@code SimpleClassName#method}.
-     *
-     * <p>{@code GameTestHelper} keeps its {@code GameTestInfo} private with no accessor in
-     * 1.21.1, so the test name cannot be asked for; the stack is the only honest source.
-     * When a gate sits in a shared private helper (as in {@code AddonCompatGameTests}) the
-     * name reported is that helper's, which is accurate about where the decision was made.
-     * Names are for the DEBUG breakdown only - the counts are what CI reads.
-     */
-    private static String callerName() {
-        return StackWalker.getInstance().walk(frames -> frames
-            .filter(f -> !OptionalModGate.class.getName().equals(f.getClassName()))
-            .findFirst()
-            .map(f -> f.getClassName().substring(f.getClassName().lastIndexOf('.') + 1)
-                + "#" + f.getMethodName())
-            .orElse("<unknown>"));
+    /** The first frame outside this class, i.e. the {@code @GameTest} method that gated itself. */
+    private static String callerTestName() {
+        return StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+            .walk(frames -> frames
+                .filter(frame -> {
+                    try {
+                        return frame.getDeclaringClass().getDeclaredMethod(frame.getMethodName(), GameTestHelper.class)
+                            .isAnnotationPresent(net.minecraft.gametest.framework.GameTest.class);
+                    } catch (ReflectiveOperationException ignored) {
+                        return false;
+                    }
+                })
+                .findFirst()
+                .map(frame -> {
+                    String type = frame.getClassName();
+                    return type.substring(type.lastIndexOf('.') + 1) + "#" + frame.getMethodName();
+                })
+                .orElse("<unknown test>"));
     }
 }
