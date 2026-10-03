@@ -75,6 +75,14 @@ public final class CrossCastContext {
         return entry;
     }
 
+    /** Record the resolver's own result; the outermost resolver of a cast returns last. */
+    public static void recordResolution(Player player, boolean resolved) {
+        Entry entry = player == null ? null : ACTIVE_CASTS.get(player.getUUID());
+        if (entry != null && entry.type == CrossSpellType.ARS_NOUVEAU) entry.resolved = resolved;
+    }
+
+    public static void clearAll() { ACTIVE_CASTS.clear(); }
+
     public static void clear(Player player) {
         if (player != null) {
             ACTIVE_CASTS.remove(player.getUUID());
@@ -141,6 +149,12 @@ public final class CrossCastContext {
         public volatile boolean costsReady;
         public volatile boolean blocked;
         public volatile String spellId;
+        /**
+         * 3.3.5: what the Ars resolver itself answered for this attempt, null until it returns.
+         * Ars's caster reports CONSUME whether or not its resolver cast anything, so only this
+         * tells a resolved cast from one refused for mana, a veto or a failed validator.
+         */
+        public volatile Boolean resolved;
         /**
          * V01: {@code issPaid} and the {@code multiplierApplied} latch are gone. Nothing
          * is pre-paid during cost calculation any more, so there is no payment to record

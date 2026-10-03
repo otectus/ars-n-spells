@@ -1,0 +1,38 @@
+{
+  "scope": "Arithmetic model, separate from Minecraft runtime evidence",
+  "cases": [
+    {
+      "native_balance_before": 1000,
+      "native_balance_after": 980.0,
+      "quoted_cost": 20,
+      "native_debit": 20.0,
+      "observed_before": 1000.0,
+      "observed_after": 980.0,
+      "measured_debit": 20.0,
+      "existing_threshold": 0.001,
+      "existing_check_rejects": false
+    },
+    {
+      "native_balance_before": 32768.001,
+      "native_balance_after": 32767.000999999997,
+      "quoted_cost": 1,
+      "native_debit": 1.0,
+      "observed_before": 32768.0,
+      "observed_after": 32767.001953125,
+      "measured_debit": 0.998046875,
+      "existing_threshold": 0.001,
+      "existing_check_rejects": true
+    },
+    {
+      "native_balance_before": 65536.002,
+      "native_balance_after": 65535.00199999999,
+      "quoted_cost": 1,
+      "native_debit": 1.0,
+      "observed_before": 65536.0,
+      "observed_after": 65535.00390625,
+      "measured_debit": 0.99609375,
+      "existing_threshold": 0.001,
+      "existing_check_rejects": true
+    }
+  ]
+}

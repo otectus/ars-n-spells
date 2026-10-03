@@ -96,6 +96,7 @@ public final class ArsCastPayments {
     }
 
     public static boolean prepare(Player player, SpellContext context) {
+        if (!PaymentRecovery.available() || AlternativePayment.pending(player.getUUID()) || CastLedger.blocksPayment(player)) return false;
         Plan plan = PLANS.get(context);
         if (plan == null || player.isCreative() || plan.prepared) return true;
         if (plan.alternative != null) {
@@ -109,6 +110,7 @@ public final class ArsCastPayments {
                 RESERVED.put(context, player);
                 return true;
             }
+            if (result.leg() != null) return false; // Incomplete alternative compensation cannot authorize a fallback.
             if (status.isUsable() && plan.deathOnInsufficientLP && plan.alternative.unit() == ResourceUnit.LP) {
                 plan.prepared = true;
                 plan.deathPenalty = true;
@@ -122,12 +124,9 @@ public final class ArsCastPayments {
         plan.attempt = CastLedger.open(player.getUUID(), "ars-context:" + plan.id, 0, plan.quote,
             player.level().getGameTime());
         List<ResourceAmount> reserved = CastLedger.reserve(plan.attempt, plan.access);
-        for (ResourceAmount owed : plan.quote.legs()) {
-            double paid = reserved.stream().filter(leg -> leg.unit() == owed.unit()).mapToDouble(ResourceAmount::amount).sum();
-            if (Math.abs(paid - owed.amount()) > Math.max(0.001, Math.ulp((float) owed.amount()) * 2)) {
-                CastLedger.fail(plan.attempt, plan.access);
-                return false;
-            }
+        if (!plan.attempt.paymentAccepted()) {
+            CastLedger.fail(plan.attempt, plan.access);
+            return false;
         }
         plan.prepared = true;
         plan.reserved = reserved;

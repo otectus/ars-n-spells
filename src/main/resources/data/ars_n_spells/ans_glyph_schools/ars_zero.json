@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Ars Zero glyph-school overrides. Everything not listed here resolves from the school",
+    "metadata the glyph declares (Geometrize -> earth -> nature, Push -> air -> lightning,",
+    "the arcane shield / voxel / beam / convergence / enlarge / zero-gravity effects ->",
+    "manipulation -> ender). The forms and augments declare no school and fall to generic.",
+    "Conjure Blight declares Necromancy, which has no Iron's counterpart in the translation",
+    "table, so it is placed explicitly. The four control-flow glyphs also declare Manipulation,",
+    "but they only steer a Spell Staff's phases and are not a spell effect in their own right,",
+    "so they are kept out of Ender affinity and progression.",
+    "Ars Zero registers its glyphs without the glyph_ prefix Ars Nouveau uses for its own",
+    "(ars_zero:anchor_effect, not ars_zero:glyph_anchor_effect); the glyph_ form is only its",
+    "recipe id."
+  ],
+  "glyphs": {
+    "ars_zero:effect_conjure_blight": "eldritch",
+    "ars_zero:anchor_effect": "generic",
+    "ars_zero:select_effect": "generic",
+    "ars_zero:discard_effect": "generic",
+    "ars_zero:sustain_effect": "generic"
+  }
+}

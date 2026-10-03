@@ -1,0 +1,180 @@
+{
+  "schema": 1,
+  "loader": "forge",
+  "minecraft": "1.20.1",
+  "status": "verified_3.3.4_runtime",
+  "jars": [
+    {
+      "filename": "bloodmagic-1.20.1-3.3.3-45.jar",
+      "sha256": "87e2cf59e61875360d5a69417c510a631404bf0a32338f5e6ad820bcb9c86f75",
+      "bytes": 14419429,
+      "mods": {
+        "bloodmagic": "3.3.3-45"
+      }
+    },
+    {
+      "filename": "caelus-forge-3.1.0+1.20.jar",
+      "sha256": "3410966d93cd8f31bf4b48ea838f065f25c3f17c745a06fbc2a6cd0a89d4f785",
+      "bytes": 38169,
+      "mods": {
+        "caelus": "3.1.0+1.20"
+      }
+    },
+    {
+      "filename": "covenant_of_the_seven-2.2.6-hotfix.jar",
+      "sha256": "07de8088ad8235226d4256d9137b3c0985597227b785c3434c650f7b866cd411",
+      "bytes": 753704,
+      "mods": {
+        "covenant_of_the_seven": "2.2.6-hotfix"
+      }
+    },
+    {
+      "filename": "EnigmaticLegacy-2.30.1.jar",
+      "sha256": "cf8488350ccb03fdc5e1f3508a30137234b6dc85ea258b9ee37ceaa485f34024",
+      "bytes": 7276807,
+      "mods": {
+        "enigmaticlegacy": "2.30.1"
+      }
+    },
+    {
+      "filename": "NaturesAura-39.4.jar",
+      "sha256": "df1c4dffce5d02695031c674e6fd7b34b8a67cece88400c48e942bb27b8fff6d",
+      "bytes": 1435571,
+      "mods": {
+        "naturesaura": "39.4"
+      }
+    },
+    {
+      "filename": "Patchouli-1.20.1-81-FORGE.jar",
+      "sha256": "979c6466c5a1c0151e8c9791a08bf5d2a42c2ec4c7fa8c4b9a34bb071b175753",
+      "bytes": 637092,
+      "mods": {
+        "patchouli": "1.20.1-81-FORGE"
+      }
+    }
+  ],
+  "versions": {
+    "bloodmagic": "3.3.3-45",
+    "caelus": "3.1.0+1.20",
+    "covenant_of_the_seven": "2.2.6-hotfix",
+    "enigmaticlegacy": "2.30.1",
+    "naturesaura": "39.4",
+    "patchouli": "1.20.1-81-FORGE"
+  },
+  "required_dependencies": [
+    {
+      "owner": "bloodmagic",
+      "mod": "forge",
+      "range": "[47,)"
+    },
+    {
+      "owner": "bloodmagic",
+      "mod": "minecraft",
+      "range": "[1.20.1,1.21)"
+    },
+    {
+      "owner": "bloodmagic",
+      "mod": "patchouli",
+      "range": "[1.19.2-77,)"
+    },
+    {
+      "owner": "caelus",
+      "mod": "forge",
+      "range": "[46,)"
+    },
+    {
+      "owner": "caelus",
+      "mod": "minecraft",
+      "range": "[1.20,1.21)"
+    },
+    {
+      "owner": "covenant_of_the_seven",
+      "mod": "forge",
+      "range": "[47,)"
+    },
+    {
+      "owner": "covenant_of_the_seven",
+      "mod": "minecraft",
+      "range": "[1.20.1,1.21)"
+    },
+    {
+      "owner": "covenant_of_the_seven",
+      "mod": "irons_spellbooks",
+      "range": "[1.20.1-3.4.0.11,)"
+    },
+    {
+      "owner": "covenant_of_the_seven",
+      "mod": "curios",
+      "range": "[5.14.1+1.20.1,)"
+    },
+    {
+      "owner": "covenant_of_the_seven",
+      "mod": "bloodmagic",
+      "range": "[1.20.1-3.3.3-45,)"
+    },
+    {
+      "owner": "covenant_of_the_seven",
+      "mod": "enigmaticlegacy",
+      "range": "[2.30.1,)"
+    },
+    {
+      "owner": "covenant_of_the_seven",
+      "mod": "naturesaura",
+      "range": "[39.4,)"
+    },
+    {
+      "owner": "enigmaticlegacy",
+      "mod": "forge",
+      "range": "[43.1.0,)"
+    },
+    {
+      "owner": "enigmaticlegacy",
+      "mod": "minecraft",
+      "range": "[1.20,1.21)"
+    },
+    {
+      "owner": "enigmaticlegacy",
+      "mod": "curios",
+      "range": "[1.19.2-5.1.1.0,)"
+    },
+    {
+      "owner": "enigmaticlegacy",
+      "mod": "patchouli",
+      "range": "[1.19.2-77,)"
+    },
+    {
+      "owner": "enigmaticlegacy",
+      "mod": "caelus",
+      "range": "[1.19.2-3.0.0.6,)"
+    },
+    {
+      "owner": "naturesaura",
+      "mod": "forge",
+      "range": "[47,)"
+    },
+    {
+      "owner": "naturesaura",
+      "mod": "minecraft",
+      "range": "[1.20.1,1.21)"
+    },
+    {
+      "owner": "patchouli",
+      "mod": "forge",
+      "range": "[47.1.1,)"
+    },
+    {
+      "owner": "patchouli",
+      "mod": "minecraft",
+      "range": "[1.20.1,1.21)"
+    }
+  ],
+  "provided_by_gradle": [
+    "ars_nouveau",
+    "curios",
+    "forge",
+    "geckolib",
+    "irons_spellbooks",
+    "minecraft",
+    "playeranimator"
+  ]
+}

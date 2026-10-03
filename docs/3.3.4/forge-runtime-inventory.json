@@ -1,0 +1,668 @@
+[
+    {
+        "coordinate": "ca.weblite:java-objc-bridge:1.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/ca.weblite/java-objc-bridge/1.1/1227f9e0666314f9de41477e3ec277e542ed7f7b/java-objc-bridge-1.1.jar",
+        "bytes": 1330045,
+        "sha256": "77e34a13bccffc6c8b1a0e3ed46ddb0ea7dd56f2104ecdfacaaec9e4054ac332"
+    },
+    {
+        "coordinate": "com.electronwill.night-config:core:3.6.4",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.electronwill.night-config/core/3.6.4/510f174abbf1c947494db50ef2445683bd52c230/core-3.6.4.jar",
+        "bytes": 199834,
+        "sha256": "1bc71c67b54ba9c8e5030b3ddaef7dee16ae43fee6850368f76b0cffef819700"
+    },
+    {
+        "coordinate": "com.electronwill.night-config:toml:3.6.4",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.electronwill.night-config/toml/3.6.4/51d6cefb2b55ee55ee26b16391212fb2c7dfb4f4/toml-3.6.4.jar",
+        "bytes": 31816,
+        "sha256": "3cb3d0ef3352e204cda68215fbe41afdc7f56425ef4fd8e84006964a656117d4"
+    },
+    {
+        "coordinate": "com.github.oshi:oshi-core:6.2.2",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.github.oshi/oshi-core/6.2.2/54f5efc19bca95d709d9a37d19ffcbba3d21c1a6/oshi-core-6.2.2.jar",
+        "bytes": 947865,
+        "sha256": "efbca93df18f3eb16964a92d8342f0674dd5d90da575ef8e04ef2e4eabec6910"
+    },
+    {
+        "coordinate": "com.google.code.findbugs:jsr305:3.0.2",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.google.code.findbugs/jsr305/3.0.2/25ea2e8b0c338a877313bd4672d3fe056ea78f0d/jsr305-3.0.2.jar",
+        "bytes": 19936,
+        "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7"
+    },
+    {
+        "coordinate": "com.google.code.gson:gson:2.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.google.code.gson/gson/2.10/dd9b193aef96e973d5a11ab13cd17430c2e4306b/gson-2.10.jar",
+        "bytes": 286235,
+        "sha256": "0cdd163ce3598a20fc04eee71b140b24f6f2a3b35f0a499dbbdd9852e83fbfaf"
+    },
+    {
+        "coordinate": "com.google.errorprone:error_prone_annotations:2.11.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.google.errorprone/error_prone_annotations/2.11.0/c5a0ace696d3f8b1c1d8cc036d8c03cc0cbe6b69/error_prone_annotations-2.11.0.jar",
+        "bytes": 15979,
+        "sha256": "721cb91842b46fa056847d104d5225c8b8e1e8b62263b993051e1e5a0137b7ec"
+    },
+    {
+        "coordinate": "com.google.guava:failureaccess:1.0.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.google.guava/failureaccess/1.0.1/1dcf1de382a0bf95a3d8b0849546c88bac1292c9/failureaccess-1.0.1.jar",
+        "bytes": 4617,
+        "sha256": "a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26"
+    },
+    {
+        "coordinate": "com.google.guava:guava:31.1-jre",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.google.guava/guava/31.1-jre/60458f877d055d0c9114d9e1a2efb737b4bc282c/guava-31.1-jre.jar",
+        "bytes": 2959479,
+        "sha256": "a42edc9cab792e39fe39bb94f3fca655ed157ff87a8af78e1d6ba5b07c4a00ab"
+    },
+    {
+        "coordinate": "com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.google.guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/b421526c5f297295adef1c886e5246c39d4ac629/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+        "bytes": 2199,
+        "sha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99"
+    },
+    {
+        "coordinate": "com.google.j2objc:j2objc-annotations:1.3",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.google.j2objc/j2objc-annotations/1.3/ba035118bc8bac37d7eff77700720999acd9986d/j2objc-annotations-1.3.jar",
+        "bytes": 8781,
+        "sha256": "21af30c92267bd6122c0e0b4d20cccb6641a37eaf956c6540ec471d584e64a7b"
+    },
+    {
+        "coordinate": "com.ibm.icu:icu4j:71.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.ibm.icu/icu4j/71.1/9e7d3304c23f9ba5cb71915f7cce23231a57a445/icu4j-71.1.jar",
+        "bytes": 13963762,
+        "sha256": "91c4f8ebf0ceb489547098fe9d5c09a65eb419caea6ed714867f5280800bcf1a"
+    },
+    {
+        "coordinate": "com.machinezoo.noexception:noexception:1.7.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.machinezoo.noexception/noexception/1.7.1/b65330c98e38a1f915fa54a6e5eca496505e3f0a/noexception-1.7.1.jar",
+        "bytes": 250861,
+        "sha256": "3d70aaea3904918587a21bdf99ab6ade9ab1dd0eaf6119344ba513f60f575816"
+    },
+    {
+        "coordinate": "com.mojang:authlib:4.0.43",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.mojang/authlib/4.0.43/2ff9d747a77570a07a60d32ac77eb6162ad2a2d9/authlib-4.0.43.jar",
+        "bytes": 121766,
+        "sha256": "697043d19e0b84b04f011dbec1bec3d80c04d8c468e7e4c6b221c0183bc1c0ef"
+    },
+    {
+        "coordinate": "com.mojang:blocklist:1.0.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.mojang/blocklist/1.0.10/5c685c5ffa94c4cd39496c7184c1d122e515ecef/blocklist-1.0.10.jar",
+        "bytes": 964,
+        "sha256": "830bfd639c8db49236bbd8e45d3a2b8c96c56ff654a10118654958a6235d4c44"
+    },
+    {
+        "coordinate": "com.mojang:brigadier:1.1.8",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.mojang/brigadier/1.1.8/5244ce82c3337bba4a196a3ce858bfaecc74404a/brigadier-1.1.8.jar",
+        "bytes": 77121,
+        "sha256": "cf65afa612fffbe4dc976115dac0312f48b9c84b3ddaf58bec8018a9454440d7"
+    },
+    {
+        "coordinate": "com.mojang:datafixerupper:6.0.8",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.mojang/datafixerupper/6.0.8/3ba4a30557a9b057760af4011f909ba619fc5125/datafixerupper-6.0.8.jar",
+        "bytes": 689960,
+        "sha256": "6e38e9fc5404be7e45189aa14ca6058bc85df20d6760a212b6d48e666abf0fef"
+    },
+    {
+        "coordinate": "com.mojang:logging:1.1.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.mojang/logging/1.1.1/832b8e6674a9b325a5175a3a6267dfaf34c85139/logging-1.1.1.jar",
+        "bytes": 15343,
+        "sha256": "c1756eaf0685da94142bacc84309bb7ccddf65e004638c3299ab645710b5938c"
+    },
+    {
+        "coordinate": "com.mojang:patchy:2.2.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.mojang/patchy/2.2.10/da05971b07cbb379d002cf7eaec6a2048211fefc/patchy-2.2.10.jar",
+        "bytes": 4439,
+        "sha256": "16d70e7968b45caffc81576268eb000f473fb60bf257182d3447dea8ec919d5a"
+    },
+    {
+        "coordinate": "com.mojang:text2speech:1.17.9",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/com.mojang/text2speech/1.17.9/3cad216e3a7f0c19b4b394388bc9ffc446f13b14/text2speech-1.17.9.jar",
+        "bytes": 12243,
+        "sha256": "c2a95b499e76fada7dd63e9b0ec797b678d411c2b0ee6f37f4dc674662bfb0af"
+    },
+    {
+        "coordinate": "commons-codec:commons-codec:1.15",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/commons-codec/commons-codec/1.15/49d94806b6e3dc933dacbd8acb0fdbab8ebd1e5d/commons-codec-1.15.jar",
+        "bytes": 353793,
+        "sha256": "b3e9f6d63a790109bf0d056611fbed1cf69055826defeb9894a71369d246ed63"
+    },
+    {
+        "coordinate": "commons-io:commons-io:2.11.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/commons-io/commons-io/2.11.0/a2503f302b11ebde7ebc3df41daebe0e4eea3689/commons-io-2.11.0.jar",
+        "bytes": 327135,
+        "sha256": "961b2f6d87dbacc5d54abf45ab7a6e2495f89b75598962d8c723cea9bc210908"
+    },
+    {
+        "coordinate": "commons-logging:commons-logging:1.2",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/commons-logging/commons-logging/1.2/4bfc12adfe4842bf07b657f0369c4cb522955686/commons-logging-1.2.jar",
+        "bytes": 61829,
+        "sha256": "daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636"
+    },
+    {
+        "coordinate": "cpw.mods:bootstraplauncher:1.1.2",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/cpw.mods/bootstraplauncher/1.1.2/c546e00443d8432cda6baa1c860346980742628/bootstraplauncher-1.1.2.jar",
+        "bytes": 8284,
+        "sha256": "853b61fd165caf4103b5b969afbc5b2b037abc310ed644518cd967b50d5189a4"
+    },
+    {
+        "coordinate": "cpw.mods:modlauncher:10.0.9",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/cpw.mods/modlauncher/10.0.9/6d9443f56f50bb85cea383686ff9c867391458b/modlauncher-10.0.9.jar",
+        "bytes": 130343,
+        "sha256": "a9b3dcde1434d02702a251ef1d0671dbc90250b349778e1c27151d86c2a4aa81"
+    },
+    {
+        "coordinate": "cpw.mods:securejarhandler:2.1.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/cpw.mods/securejarhandler/2.1.10/51e6a22c6c716beb11e244bf5b8be480f51dd6b5/securejarhandler-2.1.10.jar",
+        "bytes": 88749,
+        "sha256": "7ec9207f47bc8847a16566b9a3b4ced8d073c49592897eb30ce2aaf643fdfcab"
+    },
+    {
+        "coordinate": "curse.maven:ars-nouveau-401955:6688854_mapped_official_1.20.1",
+        "file": "/home/otectus/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/ars-nouveau-401955/6688854_mapped_official_1.20.1/ars-nouveau-401955-6688854_mapped_official_1.20.1.jar",
+        "bytes": 12515718,
+        "sha256": "40744bab8f9e0d65d0ce8a009c77d8f024ed7c4010431e7aaafb155287b79f40"
+    },
+    {
+        "coordinate": "curse.maven:irons-spells-n-spellbooks-855414:7402504_mapped_official_1.20.1",
+        "file": "/home/otectus/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/irons-spells-n-spellbooks-855414/7402504_mapped_official_1.20.1/irons-spells-n-spellbooks-855414-7402504_mapped_official_1.20.1.jar",
+        "bytes": 14217355,
+        "sha256": "8ce1eb5d42c7c55d91d3d0b109b2dbb020497782eeb476e35fb4c5868fcd85fc"
+    },
+    {
+        "coordinate": "dev.kosmx.player-anim:player-animation-lib-forge:1.0.2-rc1+1.20_mapped_official_1.20.1",
+        "file": "/home/otectus/.gradle/caches/forge_gradle/deobf_dependencies/dev/kosmx/player-anim/player-animation-lib-forge/1.0.2-rc1+1.20_mapped_official_1.20.1/player-animation-lib-forge-1.0.2-rc1+1.20_mapped_official_1.20.1.jar",
+        "bytes": 181861,
+        "sha256": "75ad3ea0b79adb455e52e0cc932fbb0f48b85c1efea42c9a87f3feb7e8fab5b7"
+    },
+    {
+        "coordinate": "io.github.llamalad7:mixinextras-common:0.5.4",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.github.llamalad7/mixinextras-common/0.5.4/626e00b72e3879a07e6653d8015cd3466ff5b75/mixinextras-common-0.5.4.jar",
+        "bytes": 725799,
+        "sha256": "e2de9240ce39af783a83bcd315445b84d675c01e4655f3ad55c163071ce15fee"
+    },
+    {
+        "coordinate": "io.github.llamalad7:mixinextras-forge:0.5.4",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.github.llamalad7/mixinextras-forge/0.5.4/ff3cadb413a78c2b4a32a02dd1a9260f2e0b6238/mixinextras-forge-0.5.4.jar",
+        "bytes": 634046,
+        "sha256": "7922899a121a27f63a69a9ffe57470d8719cc52d239dfa9408e15d32a7b4c264"
+    },
+    {
+        "coordinate": "io.netty:netty-buffer:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-buffer/4.1.82.Final/a544270cf1ae8b8077082f5036436a9a9971ea71/netty-buffer-4.1.82.Final.jar",
+        "bytes": 304664,
+        "sha256": "a7ce7f6d8c1e82b044cd56765dab4338251596416de03b1f9a05d7402429c29d"
+    },
+    {
+        "coordinate": "io.netty:netty-codec:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-codec/4.1.82.Final/b77200379acb345a9ffdece1c605e591ac3e4e0a/netty-codec-4.1.82.Final.jar",
+        "bytes": 339155,
+        "sha256": "170c0ce091c2e1cc1d952d87a6a30deb773922507bbc609b962b539f03f53407"
+    },
+    {
+        "coordinate": "io.netty:netty-common:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-common/4.1.82.Final/22d148e85c3f5ebdacc0ce1f5aabb1d420f73f3/netty-common-4.1.82.Final.jar",
+        "bytes": 653880,
+        "sha256": "d5923db1cc68b26baf5368f1f76ec2c6100d12db8406c6de00eb6dbc08052550"
+    },
+    {
+        "coordinate": "io.netty:netty-handler:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-handler/4.1.82.Final/644041d1fa96a5d3130a29e8978630d716d76e38/netty-handler-4.1.82.Final.jar",
+        "bytes": 538569,
+        "sha256": "31015505983dc57eec491ad4873411ba51f0f3beb24d22d509336c72511019cb"
+    },
+    {
+        "coordinate": "io.netty:netty-resolver:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-resolver/4.1.82.Final/38f665ae8dcd29032eea31245ba7806bed2e0fa8/netty-resolver-4.1.82.Final.jar",
+        "bytes": 37776,
+        "sha256": "4cfeba7ec535964a35722178aeecc87ec186dba0203d04389a850e8e62575383"
+    },
+    {
+        "coordinate": "io.netty:netty-transport-classes-epoll:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-classes-epoll/4.1.82.Final/e7c7dd18deac93105797f30057c912651ea76521/netty-transport-classes-epoll-4.1.82.Final.jar",
+        "bytes": 142066,
+        "sha256": "73f827fca18870959b9581c6875130576e5de684cfb4e6f346f8c1c266840ba3"
+    },
+    {
+        "coordinate": "io.netty:netty-transport-native-epoll:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-native-epoll/4.1.82.Final/476409d6255001ca53a55f65b01c13822f8dc93a/netty-transport-native-epoll-4.1.82.Final-linux-aarch_64.jar",
+        "bytes": 39489,
+        "sha256": "c9551f4622b4c44c9e7dc8c6dc17874b4ddb953a943f402740e64126180ee85e"
+    },
+    {
+        "coordinate": "io.netty:netty-transport-native-epoll:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-native-epoll/4.1.82.Final/c7350a71920f3ae9142945e25fed4846cce53374/netty-transport-native-epoll-4.1.82.Final-linux-x86_64.jar",
+        "bytes": 37922,
+        "sha256": "d4651f6082fb60f4218f100322de33e350184f5287900d163698298cf72ddbe7"
+    },
+    {
+        "coordinate": "io.netty:netty-transport-native-unix-common:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport-native-unix-common/4.1.82.Final/3e895b35ca1b8a0eca56cacff4c2dde5d2c6abce/netty-transport-native-unix-common-4.1.82.Final.jar",
+        "bytes": 43684,
+        "sha256": "1096f16527a51dd5f44ced90636110a429cc7359a9a8a91db25000b747793429"
+    },
+    {
+        "coordinate": "io.netty:netty-transport:4.1.82.Final",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/io.netty/netty-transport/4.1.82.Final/e431a218d91acb6476ccad5f5aafde50aa3945ca/netty-transport-4.1.82.Final.jar",
+        "bytes": 485752,
+        "sha256": "c210069be4ab4120f5ac7cb5e4a126d3a007e78a64fd44c9971220e013dbaef1"
+    },
+    {
+        "coordinate": "it.unimi.dsi:fastutil:8.5.9",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/it.unimi.dsi/fastutil/8.5.9/bb7ea75ecdb216654237830b3a96d87ad91f8cc5/fastutil-8.5.9.jar",
+        "bytes": 23376043,
+        "sha256": "9578bf2a1700cf20d21746a2ee89e57ba1abbd37fa9feda68ff5e9a28473a7f9"
+    },
+    {
+        "coordinate": "net.java.dev.jna:jna-platform:5.12.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna-platform/5.12.1/97406a297c852f4a41e688a176ec675f72e8329/jna-platform-5.12.1.jar",
+        "bytes": 1356627,
+        "sha256": "8ce969116cac95bd61b07a8d5e07174b352e63301473caac72c395e3c08488d2"
+    },
+    {
+        "coordinate": "net.java.dev.jna:jna:5.12.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.12.1/b1e93a735caea94f503e95e6fe79bf9cdc1e985d/jna-5.12.1.jar",
+        "bytes": 1866196,
+        "sha256": "91a814ac4f40d60dee91d842e1a8ad874c62197984403d0e3c30d39e55cf53b3"
+    },
+    {
+        "coordinate": "net.jodah:typetools:0.6.3",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.jodah/typetools/0.6.3/a01aaa6ddaea9ec07ec4f209487b7a46a526283a/typetools-0.6.3.jar",
+        "bytes": 18281,
+        "sha256": "408300867804be05d1083cc0287dd3a21295a9e76090e288013ba5a4182dc96d"
+    },
+    {
+        "coordinate": "net.minecraft:client:1.20.1",
+        "file": "/home/otectus/.gradle/caches/forge_gradle/minecraft_repo/versions/1.20.1/client-extra.jar",
+        "bytes": 10436626,
+        "sha256": "f43d1ac034a8907edab190a17501fd4ca2b0af107d4231da364eeca8ab5ee317"
+    },
+    {
+        "coordinate": "net.minecraft:mappings_official:1.20.1",
+        "file": "/home/otectus/.gradle/caches/forge_gradle/mcp_repo/net/minecraft/mapping/1.20.1/mapping-1.20.1-mapping.zip",
+        "bytes": 493508,
+        "sha256": "84e2278aeeabd496194dbe2fa08031be58bad277d7e3aee036b79d9222d8cbc7"
+    },
+    {
+        "coordinate": "net.minecraftforge:JarJarFileSystems:0.3.19",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/JarJarFileSystems/0.3.19/2464eb7d6b9ddb9db36a82cf8a95193e5c6fe020/JarJarFileSystems-0.3.19.jar",
+        "bytes": 32195,
+        "sha256": "beaa1875dd433f2dd152395c3e3c52ef2bb99f20b74860a07d70f7c4626e56d4"
+    },
+    {
+        "coordinate": "net.minecraftforge:JarJarMetadata:0.3.19",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/JarJarMetadata/0.3.19/83feaa9b770e6ac0e96ee4fc23fa89325c5fe2/JarJarMetadata-0.3.19.jar",
+        "bytes": 15895,
+        "sha256": "6141c710b5b7b673bd544740a31339f0754d7a794cc46b952b7ef7897b7ce265"
+    },
+    {
+        "coordinate": "net.minecraftforge:JarJarSelector:0.3.19",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/JarJarSelector/0.3.19/376cc9c8ea60720cf027c01fc033de915699801c/JarJarSelector-0.3.19.jar",
+        "bytes": 17374,
+        "sha256": "f7acfbafc9a715ee7d7ce2d539815b3ebccebc5064e0a7252c4a6a1c71d1e740"
+    },
+    {
+        "coordinate": "net.minecraftforge:accesstransformers:8.0.4",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/accesstransformers/8.0.4/272d240aa73f42195b2a68e2ebd8b701ecf41f63/accesstransformers-8.0.4.jar",
+        "bytes": 77756,
+        "sha256": "3225e2a513f658df686fe8b2ae5b4808525851a2c238ce65e38847cc4ffc6441"
+    },
+    {
+        "coordinate": "net.minecraftforge:coremods:5.2.4",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/coremods/5.2.4/e30bab269d896613e38396274711410b3a0e4b87/coremods-5.2.4.jar",
+        "bytes": 31872,
+        "sha256": "db32dc040af2eea1216a145a3f5fc6bc45d006740fe696da5a9a445006167c9f"
+    },
+    {
+        "coordinate": "net.minecraftforge:eventbus:6.0.5",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/eventbus/6.0.5/699143dd438431d06b57416944f7cedbe52e1475/eventbus-6.0.5.jar",
+        "bytes": 53985,
+        "sha256": "ae8bd4ea6b32509ace6dba904698b52e13d222625488c8291a05ab870e66c1dd"
+    },
+    {
+        "coordinate": "net.minecraftforge:fmlcore:1.20.1-47.4.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/fmlcore/1.20.1-47.4.10/94dae566be650566ea9115a1414ab76bfcf5a804/fmlcore-1.20.1-47.4.10.jar",
+        "bytes": 118913,
+        "sha256": "14cbfb1c8037cad687c3195b10f2775c016b0e32a4aab8263b98e98e023020c4"
+    },
+    {
+        "coordinate": "net.minecraftforge:fmlearlydisplay:1.20.1-47.4.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/fmlearlydisplay/1.20.1-47.4.10/a262fa19e65f643aae210b4275b53bee053aa765/fmlearlydisplay-1.20.1-47.4.10.jar",
+        "bytes": 170518,
+        "sha256": "eb28f2cfed8bd7636bf043cc8b6be03a1bdfd30861f3085e74dd429a5ba2b12c"
+    },
+    {
+        "coordinate": "net.minecraftforge:fmlloader:1.20.1-47.4.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/fmlloader/1.20.1-47.4.10/55c46d27e7cfc8b829af8a28e562a7d290fa38b6/fmlloader-1.20.1-47.4.10.jar",
+        "bytes": 267079,
+        "sha256": "12d27a5d59286ab5fa8cc90cb2c73eb21f4624b765ce2e6408d5e397a6a6699b"
+    },
+    {
+        "coordinate": "net.minecraftforge:forge:1.20.1-47.4.10_mapped_official_1.20.1",
+        "file": "/home/otectus/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/1.20.1-47.4.10_mapped_official_1.20.1/forge-1.20.1-47.4.10_mapped_official_1.20.1.jar",
+        "bytes": 19355242,
+        "sha256": "70057ae4af87eb6eeb48e4418f9a7802ddd3fd3817d294cf2f0ed23bea05e7a1"
+    },
+    {
+        "coordinate": "net.minecraftforge:forgespi:7.0.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/forgespi/7.0.1/3b4972a0cdb135853dba219be61a79b22cff1309/forgespi-7.0.1.jar",
+        "bytes": 29831,
+        "sha256": "2298eaba25d066afd9b329de7f75e7bf78ef47f3045e6ecb0e40428d875e4b84"
+    },
+    {
+        "coordinate": "net.minecraftforge:javafmllanguage:1.20.1-47.4.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/javafmllanguage/1.20.1-47.4.10/ccc533c7dd67e0983217197d7549c8b49e7ab453/javafmllanguage-1.20.1-47.4.10.jar",
+        "bytes": 16854,
+        "sha256": "d3f6fb3c6e0a569ff475c1f5757406e5aa1ea956fd0c289bba361402b76e4232"
+    },
+    {
+        "coordinate": "net.minecraftforge:lowcodelanguage:1.20.1-47.4.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/lowcodelanguage/1.20.1-47.4.10/e9a2879fe3612ea34b9728ec2633304a1e67d480/lowcodelanguage-1.20.1-47.4.10.jar",
+        "bytes": 7398,
+        "sha256": "f5233104da2d303dbb4394aceb36ace4d51c7b14e2fc48c8dcdbaca2335e6607"
+    },
+    {
+        "coordinate": "net.minecraftforge:mclanguage:1.20.1-47.4.10",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/mclanguage/1.20.1-47.4.10/ec5cefbbc65c67302b8fac317010faab85fa14b9/mclanguage-1.20.1-47.4.10.jar",
+        "bytes": 4999,
+        "sha256": "de63a3c96c2202c821ca6e9c5d3a66b66b39626074cab824fcaa5629ad033ed0"
+    },
+    {
+        "coordinate": "net.minecraftforge:mergetool:1.1.5",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/mergetool/1.1.5/f3da18e12c696d35a47c82cbb2cc8b5aa15e1154/mergetool-1.1.5-api.jar",
+        "bytes": 2572,
+        "sha256": "39d9a3d9277c1402b8e7b97f917ce278241cf1796312aec85b87f19a376dd99a"
+    },
+    {
+        "coordinate": "net.minecraftforge:srgutils:0.4.11",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/srgutils/0.4.11/fbad1341ffdb47d276bbdc40ecb06da49e053e74/srgutils-0.4.11.jar",
+        "bytes": 69289,
+        "sha256": "800a5463e85692f31dafc86aba9878139e4a68a3b6e79ec85ac3b400c3b0e6ee"
+    },
+    {
+        "coordinate": "net.minecraftforge:unsafe:0.2.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecraftforge/unsafe/0.2.0/54d7a0a5e8fdb71b973025caa46f341ae5904f39/unsafe-0.2.0.jar",
+        "bytes": 2834,
+        "sha256": "946937e182ab3b518b5b88264f367e1f35ac12bc83abed220490c60c717be239"
+    },
+    {
+        "coordinate": "net.minecrell:terminalconsoleappender:1.2.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.minecrell/terminalconsoleappender/1.2.0/96d02cd3b384ff015a8fef4223bcb4ccf1717c95/terminalconsoleappender-1.2.0.jar",
+        "bytes": 15977,
+        "sha256": "912e432c9355c4b2025d788ed87fd72bb95542e2fc967ad6875fbbeb6e1c7a1c"
+    },
+    {
+        "coordinate": "net.sf.jopt-simple:jopt-simple:5.0.4",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/net.sf.jopt-simple/jopt-simple/5.0.4/4fdac2fbe92dfad86aa6e9301736f6b4342a3f5c/jopt-simple-5.0.4.jar",
+        "bytes": 78146,
+        "sha256": "df26cc58f235f477db07f753ba5a3ab243ebe5789d9f89ecf68dd62ea9a66c28"
+    },
+    {
+        "coordinate": "org.abego.treelayout:org.abego.treelayout.core:1.0.3",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.abego.treelayout/org.abego.treelayout.core/1.0.3/457216e8e6578099ae63667bb1e4439235892028/org.abego.treelayout.core-1.0.3.jar",
+        "bytes": 26773,
+        "sha256": "fa5e31395c39c2e7d46aca0f81f72060931607b2fa41bd36038eb2cb6fb93326"
+    },
+    {
+        "coordinate": "org.antlr:ST4:4.3",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.antlr/ST4/4.3/92f2c1ad8d84abcbeead6cf7f2c53a04166293c2/ST4-4.3.jar",
+        "bytes": 251104,
+        "sha256": "28547dba48cfceb77b6efbfe069aebe9ed3324ae60dbd52093d13a1d636ed069"
+    },
+    {
+        "coordinate": "org.antlr:antlr-runtime:3.5.2",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.antlr/antlr-runtime/3.5.2/cd9cd41361c155f3af0f653009dcecb08d8b4afd/antlr-runtime-3.5.2.jar",
+        "bytes": 167761,
+        "sha256": "ce3fc8ecb10f39e9a3cddcbb2ce350d272d9cd3d0b1e18e6fe73c3b9389c8734"
+    },
+    {
+        "coordinate": "org.antlr:antlr4-runtime:4.9.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.antlr/antlr4-runtime/4.9.1/428664f05d2b7f7b7610204b5aa7c1763f62011a/antlr4-runtime-4.9.1.jar",
+        "bytes": 337868,
+        "sha256": "a80502c3140ae7acfbb1f57847c8eb1c101461a969215ec38c3f1ebdff61ac29"
+    },
+    {
+        "coordinate": "org.antlr:antlr4:4.9.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.antlr/antlr4/4.9.1/e92af8ab33e428461927b484e90bb155a4f3a052/antlr4-4.9.1.jar",
+        "bytes": 1231658,
+        "sha256": "e6bd18f14126ab85a42dcb80ba5f67da2f35ba164ec5a64d40024bd0e7436584"
+    },
+    {
+        "coordinate": "org.apache.commons:commons-compress:1.21",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-compress/1.21/4ec95b60d4e86b5c95a0e919cb172a0af98011ef/commons-compress-1.21.jar",
+        "bytes": 1018316,
+        "sha256": "6aecfd5459728a595601cfa07258d131972ffc39b492eb48bdd596577a2f244a"
+    },
+    {
+        "coordinate": "org.apache.commons:commons-lang3:3.12.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.12.0/c6842c86792ff03b9f1d1fe2aab8dc23aa6c6f0e/commons-lang3-3.12.0.jar",
+        "bytes": 587402,
+        "sha256": "d919d904486c037f8d193412da0c92e22a9fa24230b9d67a57855c5c31c7e94e"
+    },
+    {
+        "coordinate": "org.apache.httpcomponents:httpclient:4.5.13",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents/httpclient/4.5.13/e5f6cae5ca7ecaac1ec2827a9e2d65ae2869cada/httpclient-4.5.13.jar",
+        "bytes": 780321,
+        "sha256": "6fe9026a566c6a5001608cf3fc32196641f6c1e5e1986d1037ccdbd5f31ef743"
+    },
+    {
+        "coordinate": "org.apache.httpcomponents:httpcore:4.4.15",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents/httpcore/4.4.15/7f2e0c573eaa7a74bac2e89b359e1f73d92a0a1d/httpcore-4.4.15.jar",
+        "bytes": 328324,
+        "sha256": "3cbaed088c499a10f96dde58f39dc0e7985171abd88138ca1655a872011bb142"
+    },
+    {
+        "coordinate": "org.apache.logging.log4j:log4j-api:2.19.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.apache.logging.log4j/log4j-api/2.19.0/ea1b37f38c327596b216542bc636cfdc0b8036fa/log4j-api-2.19.0.jar",
+        "bytes": 317566,
+        "sha256": "5ccb24ad9f92e768d0bc456d3061a737951262df803e004d2cad096b75a88d60"
+    },
+    {
+        "coordinate": "org.apache.logging.log4j:log4j-core:2.19.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.apache.logging.log4j/log4j-core/2.19.0/3b6eeb4de4c49c0fe38a4ee27188ff5fee44d0bb/log4j-core-2.19.0.jar",
+        "bytes": 1864386,
+        "sha256": "b4a1796fab7bfc36df015c1b4052459147997e8d215a7199d71d05f9e747e4f4"
+    },
+    {
+        "coordinate": "org.apache.logging.log4j:log4j-slf4j2-impl:2.19.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.apache.logging.log4j/log4j-slf4j2-impl/2.19.0/5c04bfdd63ce9dceb2e284b81e96b6a70010ee10/log4j-slf4j2-impl-2.19.0.jar",
+        "bytes": 27721,
+        "sha256": "825605eacb2d5605b105c53d4108c18125e0f82f62960d0be583278b9c524f3c"
+    },
+    {
+        "coordinate": "org.apache.maven:maven-artifact:3.8.5",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.apache.maven/maven-artifact/3.8.5/4433f50c07debefaed0553bd0068f4f48d449313/maven-artifact-3.8.5.jar",
+        "bytes": 58077,
+        "sha256": "91172bc294d6eab02fc9f45f4ea01fd0e418962d128cf489abea7b6957d988ee"
+    },
+    {
+        "coordinate": "org.checkerframework:checker-qual:3.12.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.checkerframework/checker-qual/3.12.0/d5692f0526415fcc6de94bb5bfbd3afd9dd3b3e5/checker-qual-3.12.0.jar",
+        "bytes": 208835,
+        "sha256": "ff10785ac2a357ec5de9c293cb982a2cbb605c0309ea4cc1cb9b9bc6dbe7f3cb"
+    },
+    {
+        "coordinate": "org.codehaus.plexus:plexus-utils:3.3.0",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.codehaus.plexus/plexus-utils/3.3.0/cf43b5391de623b36fe066a21127baef82c64022/plexus-utils-3.3.0.jar",
+        "bytes": 263253,
+        "sha256": "76d174792540e2775af94d03d10fb2d3c776e2cd0ac0ebf427d3e570072bb9ce"
+    },
+    {
+        "coordinate": "org.glassfish:javax.json:1.0.4",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.glassfish/javax.json/1.0.4/3178f73569fd7a1e5ffc464e680f7a8cc784b85a/javax.json-1.0.4.jar",
+        "bytes": 85147,
+        "sha256": "0e1dec40a1ede965941251eda968aeee052cc4f50378bc316cc48e8159bdbeb4"
+    },
+    {
+        "coordinate": "org.jetbrains:annotations:24.0.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/24.0.1/13c5c75c4206580aa4d683bffee658caae6c9f43/annotations-24.0.1.jar",
+        "bytes": 30651,
+        "sha256": "61666dbce7e42e6c85b43c04fcfb8293a21dcb55b3c80e869270ce42c01a6b35"
+    },
+    {
+        "coordinate": "org.jline:jline-reader:3.12.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.jline/jline-reader/3.12.1/4382ab1382c7b6f379377ed5f665dc2f6e1218bc/jline-reader-3.12.1.jar",
+        "bytes": 150765,
+        "sha256": "4d1037c7110027ed64816c510fad2afa0a5aa9bbc38fb9f0e772870823fcad2a"
+    },
+    {
+        "coordinate": "org.jline:jline-terminal:3.12.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.jline/jline-terminal/3.12.1/c777448314e050d980a6b697c140f3bfe9eb7416/jline-terminal-3.12.1.jar",
+        "bytes": 211712,
+        "sha256": "eb6115680f732562f0e8e6777f127dece81e23b25015925f3c4a2a900d48cc9e"
+    },
+    {
+        "coordinate": "org.joml:joml:1.10.5",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/22566d58af70ad3d72308bab63b8339906deb649/joml-1.10.5.jar",
+        "bytes": 712082,
+        "sha256": "cac9f22f83a7aa33eebda73c16ff5261e3cb4911b6bafcf4c79ea486099d0c9a"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-glfw:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-glfw/3.3.1/cbac1b8d30cb4795149c1ef540f912671a8616d0/lwjgl-glfw-3.3.1.jar",
+        "bytes": 128801,
+        "sha256": "08bbc34eb752f863e37f83ab1c7b0c22f7cb26d0f8fb0a4a4a8c6028ac45b385"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-glfw:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-glfw/3.3.1/81716978214ecbda15050ca394b06ef61501a49e/lwjgl-glfw-3.3.1-natives-linux.jar",
+        "bytes": 119817,
+        "sha256": "65ed04bff7d07fec9b7fde7c3b11c405286c8d66e4eb4f4c9b792e267ece5b06"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-jemalloc:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-jemalloc/3.3.1/a817bcf213db49f710603677457567c37d53e103/lwjgl-jemalloc-3.3.1.jar",
+        "bytes": 36601,
+        "sha256": "ee49fc0a8d9456452e54cd6f777823eda666e2c63fc14d65b2fd2cc2cfed5dbe"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-jemalloc:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-jemalloc/3.3.1/33dbb017b6ed6b25f993ad9d56741a49e7937718/lwjgl-jemalloc-3.3.1-natives-linux.jar",
+        "bytes": 166524,
+        "sha256": "9b79af5c7fd0d94906ee1d2a53a3420a27507d66224b4ff46b9f6772645ded34"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-openal:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-openal/3.3.1/2623a6b8ae1dfcd880738656a9f0243d2e6840bd/lwjgl-openal-3.3.1.jar",
+        "bytes": 88237,
+        "sha256": "7325ee1b91a8a10c0626c69b557a88f2df6ac1bdca0e52e2a92d324249f2cad0"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-openal:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-openal/3.3.1/f906b6439f6daa66001182ea7727e3467a93681b/lwjgl-openal-3.3.1-natives-linux.jar",
+        "bytes": 476825,
+        "sha256": "0b7381f51edc610cb607245dc34a762d2b21b7447814044068a1a6003bb87838"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-opengl:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-opengl/3.3.1/831a5533a21a5f4f81bbc51bb13e9899319b5411/lwjgl-opengl-3.3.1.jar",
+        "bytes": 921563,
+        "sha256": "e436d2144f3a36fff772fd64233316809b795f390defd4d55660fc686e7c2834"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-opengl:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-opengl/3.3.1/ab9ab6fde3743e3550fa5d46d785ecb45b047d99/lwjgl-opengl-3.3.1-natives-linux.jar",
+        "bytes": 79125,
+        "sha256": "bcfcd9f8dfd229488ad9ec353d48c7b02de5ca21badd4092f1902239a1ed0690"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-stb:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-stb/3.3.1/b119297cf8ed01f247abe8685857f8e7fcf5980f/lwjgl-stb-3.3.1.jar",
+        "bytes": 112380,
+        "sha256": "64e5ccce2fc7cbcf0c834a5be8642d9e2498ce3fe31c14ff1df741878a3f8121"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-stb:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-stb/3.3.1/3ee7aec8686e52867677110415566a5342a80230/lwjgl-stb-3.3.1-natives-linux.jar",
+        "bytes": 227237,
+        "sha256": "f81b998e8c5d623d571e2fcd46fcb87b7d30ed25df77de63aec8cfedb34c4a70"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-tinyfd:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-tinyfd/3.3.1/ff1914111ef2e3e0110ef2dabc8d8cdaad82347/lwjgl-tinyfd-3.3.1.jar",
+        "bytes": 6767,
+        "sha256": "488f51ed95f0fac48d1d87cb0e3bac08c012dcbf6ef3c1688685d708cdbccd56"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl-tinyfd:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-tinyfd/3.3.1/a35110b9471bea8cde826ab297550ee8c22f5035/lwjgl-tinyfd-3.3.1-natives-linux.jar",
+        "bytes": 45389,
+        "sha256": "7bd70b28233f46219da1989ac3e9f6eef72ebf211ce3752ff1e645cea418a4cf"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl/3.3.1/ae58664f88e18a9bb2c77b063833ca7aaec484cb/lwjgl-3.3.1.jar",
+        "bytes": 724243,
+        "sha256": "cf83f90e32fb973ff5edfca4ef35f55ca51bb70a579b6a1f290744f552e8e484"
+    },
+    {
+        "coordinate": "org.lwjgl:lwjgl:3.3.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl/3.3.1/1de885aba434f934201b99f2f1afb142036ac189/lwjgl-3.3.1-natives-linux.jar",
+        "bytes": 110704,
+        "sha256": "22ef2afa31a1740a337ec9c6806c6b8d97e931a63e2c43270cbaf14fb3f6fc4e"
+    },
+    {
+        "coordinate": "org.openjdk.nashorn:nashorn-core:15.4",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.openjdk.nashorn/nashorn-core/15.4/f67f5ffaa5f5130cf6fb9b133da00c7df3b532a5/nashorn-core-15.4.jar",
+        "bytes": 2167292,
+        "sha256": "6f816e84dfd63a81d4eaa7829c08337bbaff3ec683ff3bf6bbd90d017a00dc6f"
+    },
+    {
+        "coordinate": "org.ow2.asm:asm-analysis:9.8",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-analysis/9.8/b9747a320844b6cb1eacd90d8ecfd260a16c01d3/asm-analysis-9.8.jar",
+        "bytes": 35151,
+        "sha256": "e640732fbcd3c6271925a504f125e38384688f4dfbbf92c8622dfcee0d09edb9"
+    },
+    {
+        "coordinate": "org.ow2.asm:asm-commons:9.8",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-commons/9.8/36e4d212970388e5bd2c5180292012502df461bb/asm-commons-9.8.jar",
+        "bytes": 73498,
+        "sha256": "3301a1c1cb4c59fcc5292648dac1d7c5aed4c0f067dfbe88873b8cdfe77404f4"
+    },
+    {
+        "coordinate": "org.ow2.asm:asm-tree:9.8",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-tree/9.8/18419ca5b77a2f81097c741e7872e6ab8d2f40d/asm-tree-9.8.jar",
+        "bytes": 51934,
+        "sha256": "14b7880cb7c85eed101e2710432fc3ffb83275532a6a894dc4c4095d49ad59f1"
+    },
+    {
+        "coordinate": "org.ow2.asm:asm-util:9.8",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-util/9.8/395f1c1f035258511f27bc9b2583d76e4b143f59/asm-util-9.8.jar",
+        "bytes": 94559,
+        "sha256": "8ba0460ecb28fd0e2980e5f3ef3433a513a457bc077f81a53bdc75b587a08d15"
+    },
+    {
+        "coordinate": "org.ow2.asm:asm:9.8",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm/9.8/dc19ecb3f7889b7860697215cae99c0f9b6f6b4b/asm-9.8.jar",
+        "bytes": 126113,
+        "sha256": "876eab6a83daecad5ca67eb9fcabb063c97b5aeb8cf1fca7a989ecde17522051"
+    },
+    {
+        "coordinate": "org.slf4j:slf4j-api:2.0.1",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-api/2.0.1/f48d81adce2abf5ad3cfe463df517952749e03bc/slf4j-api-2.0.1.jar",
+        "bytes": 61388,
+        "sha256": "b36b99b8d99ea7857554d9b25dfdbd1fb25378c926f7b9e0249983c99335b2c4"
+    },
+    {
+        "coordinate": "org.slf4j:slf4j-simple:1.7.30",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-simple/1.7.30/e606eac955f55ecf1d8edcccba04eb8ac98088dd/slf4j-simple-1.7.30.jar",
+        "bytes": 15239,
+        "sha256": "8b9279cbff6b9f88594efae3cf02039b6995030eec023ed43928748c41670fee"
+    },
+    {
+        "coordinate": "org.spongepowered:mixin:0.8.5",
+        "file": "/home/otectus/.gradle/caches/modules-2/files-2.1/org.spongepowered/mixin/0.8.5/9d1c0c3a304ae6697ecd477218fa61b850bf57fc/mixin-0.8.5.jar",
+        "bytes": 1089277,
+        "sha256": "ca15a907e4d1f6b38cefed51d7df96a83347dcfb0bc8ced53111519e991d887d"
+    },
+    {
+        "coordinate": "software.bernie.geckolib:geckolib-forge-1.20.1:4.7.1.3_mapped_official_1.20.1",
+        "file": "/home/otectus/.gradle/caches/forge_gradle/deobf_dependencies/software/bernie/geckolib/geckolib-forge-1.20.1/4.7.1.3_mapped_official_1.20.1/geckolib-forge-1.20.1-4.7.1.3_mapped_official_1.20.1.jar",
+        "bytes": 1018294,
+        "sha256": "5a3a8ad1800ec840f3e229e46ec8e27f866072a6a565cacdbedf9655df8a743f"
+    },
+    {
+        "coordinate": "top.theillusivec4.curios:curios-forge:5.14.1+1.20.1_mapped_official_1.20.1",
+        "file": "/home/otectus/.gradle/caches/forge_gradle/deobf_dependencies/top/theillusivec4/curios/curios-forge/5.14.1+1.20.1_mapped_official_1.20.1/curios-forge-5.14.1+1.20.1_mapped_official_1.20.1.jar",
+        "bytes": 400471,
+        "sha256": "d5060c7ec9325c92f7118982e5a134e25334fbbbca4453ce45c4d29ee98de3ec"
+    }
+]

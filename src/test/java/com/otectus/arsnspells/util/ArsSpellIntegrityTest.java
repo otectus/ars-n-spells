@@ -18,6 +18,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ArsSpellIntegrityTest {
 
     @Test
+    void blacklistedGlyphIds_isEmptyWithNothingToCheck() {
+        assertTrue(ArsSpellIntegrity.blacklistedGlyphIds((net.minecraft.nbt.CompoundTag) null).isEmpty());
+        assertTrue(ArsSpellIntegrity.blacklistedGlyphIds(new net.minecraft.nbt.CompoundTag()).isEmpty());
+        assertTrue(ArsSpellIntegrity.blacklistedGlyphIds((com.hollingsworth.arsnouveau.api.spell.Spell) null)
+            .isEmpty());
+    }
+
+    @Test
     void describeMissing_isEmptyForAnIntactPayload() {
         assertEquals("", ArsSpellIntegrity.describeMissing(List.of()));
         assertEquals("", ArsSpellIntegrity.describeMissing(null));

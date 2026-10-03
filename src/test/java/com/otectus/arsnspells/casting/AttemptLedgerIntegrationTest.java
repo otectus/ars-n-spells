@@ -147,8 +147,8 @@ class AttemptLedgerIntegrationTest {
 
         CastLedger.fail(attempt, access);
 
-        assertEquals(35.0d, access.totalCredited, 1.0e-9d,
-            "the refund is what was taken (10 + 25), not what was quoted (40 + 25)");
+        assertEquals(10.0d, access.totalCredited, 1.0e-9d,
+            "the first refused leg stops reservation before touching the Iron pool");
         assertEquals(10.0d, access.current(player, ResourceUnit.ARS_MANA), 1.0e-9d);
         assertEquals(500.0d, access.current(player, ResourceUnit.IRONS_MANA), 1.0e-9d);
     }

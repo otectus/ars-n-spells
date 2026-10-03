@@ -15,6 +15,11 @@ import net.minecraft.world.entity.player.Player;
  */
 public interface IManaBridge {
     float getMana(Player player);
+    default double transactionMana(Player player) { return getMana(player); }
+    default double transactionMax(Player player) { return getMaxMana(player); }
+    default boolean transactionDebit(Player player, double amount) { return consumeMana(player, (float) amount); }
+    default void transactionCredit(Player player, double amount) { addMana(player, (float) amount); }
+
     void setMana(Player player, float amount);
     boolean consumeMana(Player player, float amount);
 

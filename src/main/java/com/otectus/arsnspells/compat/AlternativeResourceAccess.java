@@ -128,6 +128,23 @@ public final class AlternativeResourceAccess {
         private final SanctifiedLegacyCompat.LPSourceMode sourceMode;
         private boolean bloodReceipt;
         private double remainingReceipt;
+        private double observedBalance(Player p) {
+            if (p == null) throw new IllegalStateException("Alternative payer unavailable");
+            return bloodReceipt ? SanctifiedLegacyCompat.getBloodMagicLP(p) : Math.round(healthBalance(p));
+        }
+        @Override public com.otectus.arsnspells.contract.ResourceMovement observeDebit(UUID id, ResourceUnit unit, double amount) {
+            Player p = player(id);
+            if (p == null) return com.otectus.arsnspells.contract.ResourceMovement.observe(amount, () -> {throw new IllegalStateException("Alternative payer unavailable");}, () -> 0);
+            int blood = bloodEnabled() ? SanctifiedLegacyCompat.getBloodMagicLP(p) : 0;
+            bloodReceipt = LpSourcePolicy.select(sourceMode.name(), bloodEnabled(), blood, (int)Math.ceil(amount)) == LpSourcePolicy.Source.BLOOD_MAGIC;
+            var move = com.otectus.arsnspells.contract.ResourceMovement.observe(amount, () -> observedBalance(player(id)), () -> debit(id, unit, amount));
+            if (move.known()) remainingReceipt = move.debited();
+            return move;
+        }
+        @Override public com.otectus.arsnspells.contract.ResourceMovement observeCredit(UUID id, ResourceUnit unit, double amount) {
+            return com.otectus.arsnspells.contract.ResourceMovement.observe(amount, () -> observedBalance(player(id)), () -> credit(id, unit, amount));
+        }
+
 
         LpAccess(Function<UUID, Player> resolver) {
             super(resolver, ResourceUnit.LP);
@@ -223,7 +240,10 @@ public final class AlternativeResourceAccess {
                 return 0.0d;
             }
             int moved = SanctifiedLegacyCompat.releaseCovenantAura(receipt, (int) Math.floor(amount));
-            receipt = null;
+            if (receipt != null) {
+                int remaining = Math.max(0, receipt.amount() - moved);
+                receipt = remaining == 0 ? null : new SanctifiedLegacyCompat.AuraReceipt(receipt.chunk(), receipt.spot(), remaining);
+            }
             return moved;
         }
     }

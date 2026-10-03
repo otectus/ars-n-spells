@@ -17,6 +17,7 @@ The 3.3.0 release review covers Forge 1.20.1 and the separate NeoForge 1.21.1 bu
 | Blood Magic | Any | No |
 | Apotheosis / Apothic Curios | Any | No² |
 | Curios API | Any | Included via Ars |
+| Ars Affinity | -- | Not available for Forge 1.20.1⁴ |
 
 If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior; all Iron's-dependent handlers, mixins, items, and recipes are gated on Iron's presence.
 
@@ -30,7 +31,8 @@ If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars b
 
 ¹ Covenant 2.2.6 has a bytecode-surface check; its complete dependency graph and graphical HUD have not been runtime-certified by this release review. Other admitted versions are unverified.
 ² No hard dependency — mana stats on curios are read generically through the Curios API (see [Gear perks and enchantments](#gear-perks-and-enchantments)).
-³ The pinned Forge runtime is Iron's `1.20.1-3.15.0` (CurseForge file 7402504). The broader admitted 3.x range is not a runtime verification claim; test another version with the loaded profile before deployment.
+³ The pinned Forge runtime is Iron's `1.20.1-3.15.0` (CurseForge file 7402504). 3.3.5 also passed the loaded GameTest suite against `1.20.1-3.16.3` (file 8680180, with irons_lib `1.20.1-2.1.0`) using `-PwithIrons316RuntimeGameTests`. The rest of the admitted 3.x range is not a runtime verification claim; test another version with the loaded profile before deployment.
+⁴ Every published Ars Affinity file targets NeoForge 1.21.1. The NeoForge build of Ars 'n' Spells is tested with Ars Affinity 1.1.1; this Forge build makes no Ars Affinity claim.
 
 ## Features
 
@@ -66,13 +68,27 @@ Bonuses come from attribute modifiers, `IManaEquipment` implementations, mana-re
 
 Worn **curios** (rings, amulets, belts) have their attribute modifiers read the same way armor and weapons do, so mana stats applied by **Apotheosis / Apothic Curios** affixes and sockets — and by other curio mana gear like Magical Jewelry and Jewelcraft — feed the unified pool too. No hard dependency on Apotheosis is required; the read is generic and gated by the `read_curio_attribute_modifiers` config (default on). Apothic Attributes' combat stats (crit, armor pierce, fire/cold damage) are not mana or spell-power and are not bridged.
 
+In `iss_primary`, the Ars gear bonus (the max-mana and regen contribution of worn equipment and, with `read_curio_attribute_modifiers` on, curios), times `conversion_rate_ars_to_iron`, is added to Iron's `MAX_MANA` and `MANA_REGEN`. In `hybrid` and `ars_primary`, Iron's `MAX_MANA` is instead raised to cover Ars's real maximum (the shared-pool ceiling), because Iron's clamps every mana write to that attribute; `hybrid` also mirrors the Ars gear regen. With `respect_armor_bonuses` off the gear bonuses are dropped but the `hybrid` ceiling stays. The enchantment and curio toggles decide what is transferred, never Ars's own maximum. Both loaders apply exactly these rules.
+
+### Mana potions
+
+When Iron's is the primary pool (`iss_primary`), Ars mana potions feed the unified pool instead of the now-unread Ars pool: each level of `ars_nouveau:mana_regen` adds 0.5 mana/sec (times `conversion_rate_ars_to_iron`, converted through the regen bridge) to Iron's `MANA_REGEN`, refreshed every tick. The potion's own modifier on Ars's regen attribute is not gear, so it is mirrored once. Leaving `iss_primary` removes the mirrored modifier. Requires Iron's; no-op in the other modes (Ars handles its own pool natively there).
+
 ### Spell scaling
 
-Ars spell potency scales with Iron's spell power attributes. The base `SPELL_POWER` attribute applies to every Ars cast; when the spell resolves to an element (fire, ice, lightning, holy, ender, blood, evocation, nature, eldritch), the matching Iron's elemental spell-power attribute layers on additively. Affinity (per-school) and resonance (mana fullness) further shape the multiplier. The final scalar is clamped to `spell_power_cap` (default 3.0).
+Cross-mod spell damage scales bidirectionally when Iron's Spellbooks is installed:
+
+**Iron's → Ars:** Ars spell damage multiplies by `globalSpellPower + (schoolSpellPower - 1.0)`, where `globalSpellPower` is Iron's generic `SPELL_POWER` and `schoolSpellPower` is the matching elemental attribute for the spell's resolved school(s). When a spell resolves to multiple schools (dual-element addon glyphs, compound-school recipes), the configured `multi_school_power_policy` (`primary` [default], `max`, or `average`) decides how those schools combine. The result is then multiplied by affinity (per-school) and resonance (mana fullness) bonuses. The final scalar is clamped to `spell_power_cap` (default 3.0).
+
+**Ars → Iron's:** Iron's spell damage adds the caster's Ars `SPELL_DAMAGE_BONUS` perk value as a flat addition. This value is picked up automatically from any source — Ars armor threads, curios with Spell Damage modifiers, potions, or other mods. Plain Ars armor with no offensive perk grants no Iron's damage bonus. The perk addition is **not** subject to the `spell_power_cap`.
+
+**Multi-school policy split:** damage scaling uses all schools the policy resolves; affinity and progression credit the primary (first-resolved) school only. This means a dual-element spell scales with the caster's better element and trains exactly one affinity track.
+
+`enable_cross_mod_combat_stats` switches both directions; `enable_irons_power_for_ars_damage` and `enable_ars_damage_for_irons_damage` switch one each. `/ans debug combat` reports the settings, both mods' spell-damage attributes and the last hit each direction scaled (recorded while `debug_mode` is on).
 
 Since 3.1.0 the school comes from **Ars Nouveau's own glyph metadata** (`AbstractSpellPart.spellSchools`) rather than from guessing at the glyph's registry name, so addon glyphs classify correctly without ANS shipping a hardcoded list — see [Spell schools](#spell-schools).
 
-Implementation: scaling subscribes directly to Ars Nouveau's `SpellDamageEvent.Pre`, which carries the caster, target, spell context, and damage. A delayed projectile is scaled by the spell that fired it, not by whatever the player cast most recently, and the school is resolved from the spell that is actually being scaled. Iron's must be installed for the scaling path to fire — without Iron's, Ars spells use their native damage values.
+Implementation: both directions subscribe directly to spell-damage events (`SpellDamageEvent.Pre` from Ars Nouveau and `SpellDamageEvent` from Iron's) with no time window or damage-string guessing. A delayed projectile is scaled by the spell that fired it, not by whatever the player cast most recently. Iron's must be installed for cross-mod scaling to fire — without Iron's, Ars spells use their native damage values, and Iron's applies no Ars perk bonus. Cross-mod combat scaling is independent of the mana-unification mode and remains active even when mana unification is `DISABLED`.
 
 ### Resonance
 
@@ -85,6 +101,8 @@ Standing near Ars Nouveau **Source Jars** passively boosts mana regeneration, mu
 ### Cooldowns
 
 A unified cooldown system groups spells into four categories (OFFENSIVE, DEFENSIVE, UTILITY, MOVEMENT) and locks out *all* spells in that category — across both mods — while a cooldown is active. **Cooldowns are global per category, by design**: an Ars OFFENSIVE cast and an Iron's OFFENSIVE cast intentionally collide on the same slot. Earlier versions exposed a `modNamespace` parameter that suggested per-mod isolation; it never actually affected the storage and was removed in 1.9.0. Disabled by default.
+
+**Inscribed Ars spell cooldown (3.3.5).** An Ars spell bound into an Iron's spellbook can put its wheel slot on an Iron's cooldown after each successful cast. Set the length with `inscribed_ars_default_cooldown_ticks` (20 ticks = 1 s); new configs default to 40 ticks, and configs from 3.3.4 or earlier migrate to 0, which is no cooldown as before. The cooldown uses Iron's own system, so Iron's cooldown reduction, the wheel's cooldown display and saving across relogs work as for any Iron's spell. A cast that fails, is refused or cannot be paid starts no cooldown. Each wheel slot is a shared proxy spell (`ars_n_spells:ars_cross_N`), so two books that bind different Ars spells to the same slot number share that slot's cooldown. Ordinary Ars casts, ordinary Iron's spells and Iron's spells inscribed into Ars items are unaffected. If category cooldowns are on, both checks apply to these casts.
 
 ### Progression and affinity
 
@@ -208,8 +226,9 @@ Root command: `/ans`. Mutating subcommands require permission level 2; read-only
 | `/ans mode set <mode>` | Op 2 | Switch the mana unification mode live (no restart) |
 | `/ans mana getdefault` | -- | View the current default max mana fallback |
 | `/ans mana setdefault <1–100000>` | Op 2 | Set the default max mana fallback (persisted to config) |
-| `/ans info <player>` | Op 2 | Diagnostics: mana, aura, resonance, and ring status (plus raw Iron's mana when Iron's is loaded) |
+| `/ans info <player>` | Op 2 | Diagnostics: mana, aura, resonance, ring status, per-school affinity, the registered Iron's school count and raw Iron's mana (the last two when Iron's is loaded) |
 | `/ans debug` | Op 2 | Toggle debug logging at runtime |
+| `/ans debug combat` | Op 2 | Cross-mod combat diagnostics: settings, spell-damage attributes and the last scaled hit in each direction |
 | `/ans aura` | -- | Show your own current Covenant aura |
 | `/ans export_to_irons_scroll` | Op 2 | Export the held Ars spell onto a real Iron's scroll (requires Iron's; the Spell Loom is the survival path) |
 | `/ans bind_scroll_to_irons_book` | Op 2 | Bind a held exported scroll into a held Iron's spellbook (requires Iron's) |
@@ -288,7 +307,9 @@ Config file (per-world, server-authoritative, auto-synced to clients): `<world>/
 
 | Option | Default | Range | Description |
 | --- | --- | --- | --- |
-| `enable_curio_discounts` | `true` | -- | Enable Blasphemy curio discounts. |
+| `enable_curio_discounts` | `true` | -- | Enable curio mana discounts: the tagged-curio discount below and, with Covenant installed, Blasphemy discounts. |
+| `virtue_ring_discount` | `0.20` | 0–1 | Per-curio discount for each worn item in `#ars_n_spells:curio_spell_discount` (0.20 = cost × 0.80 per curio), on Ars and Iron's casts. The key name is shared with the NeoForge build. |
+| `max_total_curio_discount` | `0.50` | 0–1 | Cap on the combined tagged-curio discount (0.50 = never below half cost). |
 | `blasphemy_discount` | `0.15` | 0–1 | Base Blasphemy mana discount (15%). |
 | `blasphemy_matching_school_bonus` | `0.10` | 0–1 | Extra discount for a matching school (+10%). |
 | `read_curio_attribute_modifiers` | `true` | -- | Read mana attribute modifiers off worn curios (Apotheosis/Apothic Curios affixes & sockets, Magical Jewelry, etc.) and mirror them across the unified pool. |
@@ -331,7 +352,11 @@ The aura pool (max, regen, persistence, HUD) belongs to Covenant of the Seven; t
 | Option | Default | Range | Description |
 | --- | --- | --- | --- |
 | `scroll_cost_mode` | `full` | see desc. | Scroll resource cost mode (`full`/`lp_only`/`free`). |
-| `spell_power_cap` | `3.0` | 1–10 | Maximum total spell power multiplier from Iron's attributes. |
+| `spell_power_cap` | `3.0` | 1–10 | Maximum total spell power multiplier from Iron's attributes. Caps multipliers only; does not apply to the Ars flat bonus. |
+| `enable_cross_mod_combat_stats` | `true` | -- | Master switch for Iron's → Ars and Ars → Iron's spell damage scaling. Active even when mana unification is `disabled`. |
+| `enable_irons_power_for_ars_damage` | `true` | -- | Iron's spell power scales Ars spell damage. |
+| `enable_ars_damage_for_irons_damage` | `true` | -- | Ars Spell Damage Bonus adds to Iron's spell damage. |
+| `multi_school_power_policy` | `primary` | `primary`/`max`/`average` | How multiple matching schools combine; unknown values fall back to `max`. |
 
 ### Source Jar synergy
 
@@ -350,6 +375,7 @@ The aura pool (max, regen, persistence, HUD) belongs to Covenant of the Seven; t
 | `cross_cast_cost_multiplier` | `1.25` | 0.5–5 | Overhead multiplier on spells cast from inscribed items, applied once per cast in every mode. |
 | `allow_ars_spells_in_irons_spellbooks` | `true` | -- | Allow binding exported Ars spells into Iron's spellbooks. |
 | `max_ars_cross_spells_per_irons_spellbook` | `-1` | -1–64 | Cap on Ars spells per Iron's spellbook (`-1` = no cap; hard-bounded by the proxy pool size of 8). |
+| `inscribed_ars_default_cooldown_ticks` | `40` (new configs), `0` (migrated from ≤3.3.4) | 0–12000 | Iron's cooldown, in ticks, started on an Iron's-wheel slot after its bound Ars spell casts successfully. `0` = none. Applies from the next cast after a config reload, and Iron's cooldown reduction applies. It is the only source of these slots' cooldown: Iron's per-spell config files are not read for the `ars_cross_N` proxies. Also on the in-game settings screen. |
 
 ### Rituals
 
@@ -376,6 +402,8 @@ All cross-mod item/block detection is tag-driven and datapack-extensible. Shippe
 | `ars_n_spells:virtue_rings` | item | Covenant `virtue_ring` | Which rings trigger the aura-cost path. |
 | `ars_n_spells:blasphemy_curios` | item | Covenant's 13 blasphemies | Which curios grant school discounts. School matching is by item path `<school>_blasphemy` (any namespace), so name custom entries accordingly (e.g. `mypack:fire_blasphemy`). |
 | `ars_n_spells:source_jars` | block | Ars `source_jar`, `creative_source_jar` | Which blocks count for Source Jar regen synergy. |
+| `ars_n_spells:curio_spell_discount` | item | `#irons_spellbooks:school_focus` | Worn curios that grant the per-curio mana discount (`virtue_ring_discount`, capped by `max_total_curio_discount`). |
+| `ars_n_spells:cross_cast_blacklist` | item | Ars Zero's temporal context form and anchor/select/sustain/discard effects | Glyphs that only work in their own caster: refused by the Spell Loom, `/ans export_to_irons_scroll`, Spell Transcription and every cross-cast. |
 
 ### Spell schools
 
@@ -426,6 +454,8 @@ While a Cursed or Virtue Ring is equipped, both mana bars are hidden (`hide_mana
 
 Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 
+- **3.3.5 — Channels end cleanly, `ars_primary` keeps its mana, and inscribed Ars spells get a cooldown.** Channelled Iron's spells such as BielGG's Crystal Barrage no longer stop with a payment error when mana runs low. Each paid pulse is checked at its final price, and the channel finishes the way Iron's itself would, with cooldown and scroll use. In `ars_primary`, Iron's regeneration can no longer lower the Ars pool to Iron's rounded-down `max_mana`, the most likely cause of mana dipping while scrolling (the report itself was not reproduced). Shortages now say what was needed and what you had. New setting: `inscribed_ars_default_cooldown_ticks`. See [CHANGELOG.md](CHANGELOG.md) and [docs/3.3.5](docs/3.3.5/).
+
 - **3.2.1 — A mixin conflict that stopped an entire modpack from loading; scrolls have been free this whole time.** Installing ANS alongside One Mana Bar made the game fail to start and took twelve mods down with it, Iron's Spellbooks included. The cause was ours: we adjusted Iron's mana check with a `@Redirect` aimed at one instruction inside `AbstractSpell.canBeCastedBy`, and One Mana Bar replaces that whole method, which Mixin treats as fatal rather than skippable — `require = 0` does not help, because the check runs before the requirement count is consulted. The adjustment now uses only `HEAD` and `RETURN` injection points, which Mixin permits into a replaced method by design. Separately, mixins targeting the *optional* Iron's and Covenant integrations moved to a non-required config, so a future conflict skips one mixin instead of aborting startup for every mod in the chain. And `MixinScrollItem` never applied in **any** released build — it targeted `use`, which is renamed to `m_7203_` in a shipped jar — so Iron's scrolls have been casting with no mana, no LP and no aura cost since the feature shipped. That is fixed, which means scrolls now cost what `scroll_cost_mode` says; set it to `free` if you prefer the old behaviour. See [CHANGELOG.md](CHANGELOG.md).
 - **3.2.0 — Hybrid mana no longer eats your pool; ritual tablets have art; two rituals finally exist.** On `hybrid`, one Ars cast could drain the entire pool: Iron's clamps every mana write down to its `max_mana` attribute, and hybrid only ever pushed the *gear-derived* slice of Ars's max into it, so a spell book tier or glyph bonus raised the pool you were shown without raising the ceiling that governs writes. The shared pool now has one ceiling at `max(Ars max, Iron's own max)`, re-applied on dimension change and re-checked immediately before any deduction. The three ritual tablets, which have had no item model or texture since 3.0.0 and rendered as the missing-texture checkerboard, now ship artwork — and **Mana Infusion and Mana Well are obtainable for the first time**, having been registered as rituals with no tablet item at all. Hovering a Spell Loom scroll can no longer crash the client. See [CHANGELOG.md](CHANGELOG.md) for the full mechanism on each.
 - **3.1.0 — Crash fix, honest addon compatibility, no more recipe-viewer ghosts.** Exported scrolls no longer crash Iron's Inscription Table — the reported client NPE turned out to be one of *three* unguarded dereferences, two of them on the server thread, so this was a remote-crash vector on dedicated servers; legacy carriers are repaired in place. Unbinding now removes the native wheel entry instead of leaving a selectable no-op. The Virtue Ring no longer makes Ars spells free when `enable_virtue_aura_system` is off. `ars_cross_*` ghosts are gone from JEI, EMI and the creative menu. Spell schools come from Ars Nouveau's own glyph metadata with datapack overrides, filter glyphs no longer decide a spell's school, and removing an addon now fails loudly instead of silently turning a bound spell into a different one. Verified against Ars Elemental 0.6.8.0 and Too Many Glyphs in every profile combination.
@@ -454,6 +484,9 @@ Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 - **Loot chests contain "Ars Spell" scrolls whose tooltip is a raw key like `spell.ars_n_spells.ars_cross_1.guide`**: Fixed in 3.2.2. Those are ANS's internal `ars_cross_*` proxy spells, which do nothing outside a spellbook carrying the matching Ars entry. ANS never removes or replaces loot entries; since 3.3.3 it appends a Blank Scroll to some chest tables via global loot modifiers, only when Iron's is loaded ([data/forge/loot_modifiers/global_loot_modifiers.json](src/main/resources/data/forge/loot_modifiers/global_loot_modifiers.json)) — but the raw-key `ars_cross_1` scroll itself was never ANS's loot table entry: the proxies simply never declared `allowLooting=false`, so Iron's own random-spell rolls could pick them — at `COMMON`, the heaviest weight in that table. Update the mod and no new one can generate. A scroll already in your world becomes a blank Iron's scroll the first time you right-click it. Unopened chests were never affected, since loot is rolled when a chest is first opened.
 - **An addon glyph gets the wrong school**: Override it from a datapack; see [Spell schools](#spell-schools). No mod update needed.
 - **Aura bar looks wrong with a newer Covenant version**: The aura-bar HUD mixin is verified against Covenant 2.2.6; the client logs a warning when the overlay has drifted. Gameplay is unaffected.
+- **A channelled spell (for example BielGG's Crystal Barrage) stops after one or two pulses with "Cast stopped. Check your resources; details are in the server log."**: Fixed in 3.3.5. Channels charge every pulse; a channel now finishes normally on the last pulse you can pay for. If you still see a message, it names the resource, the amount needed and the amount available. Crystal Barrage costs 250 mana per pulse, so with less than 500 mana it can only ever run one pulse, with or without ANS.
+- **The Ars mana bar drops a little while I scroll the hotbar in `ars_primary`**: 3.3.5 stops Iron's regeneration from lowering the Ars pool to Iron's rounded-down `max_mana`. That is the most likely cause, but the reported dip has not been reproduced, so report it if you still see it. Holding an item that really adds maximum mana, then putting it away, lowers your maximum, and the balance is capped to it once; that is expected. To report a remaining dip, turn on `debug_mode` and reproduce it: `[ManaTrace]` lines show both pools, the ceiling and the held item at every change.
+- **An Ars spell in my Iron's spellbook is on cooldown right after casting**: That is `inscribed_ars_default_cooldown_ticks` (40 ticks on new configs). Set it to `0` for no cooldown. Books that bind different spells to the same wheel slot share that slot's cooldown.
 
 ## Building from source
 
@@ -470,7 +503,7 @@ Output jar: `build/libs/ars_n_spells-<mod_version>.jar`, where `<mod_version>` c
 
 ### Test profiles
 
-**Tested versions (this release):** Ars Nouveau 4.12.7, Iron's Spellbooks 1.20.1-3.15.0, Ars Elemental 0.6.8.0, Ars Zero 2.0.2 (Forge).
+**Tested versions (this release):** Ars Nouveau 4.12.7, Iron's Spellbooks 1.20.1-3.15.0 and 1.20.1-3.16.3, Ars Elemental 0.6.8.0, Ars Zero 2.0.2 (Forge). See [docs/3.3.5/testing.md](docs/3.3.5/testing.md) for the 3.3.5 commands and results.
 
 `./gradlew test` runs the JUnit suite (272 tests). GameTests run on a real server via `runGameTestServer`, with opt-in profiles:
 
@@ -478,6 +511,7 @@ Output jar: `build/libs/ars_n_spells-<mod_version>.jar`, where `<mod_version>` c
 | --- | --- |
 | `./gradlew runGameTestServer` | Iron's-absent fallback and boot safety |
 | `./gradlew runGameTestServer -PwithIronsRuntimeGameTests` | The cross-cast pipeline against real Iron's 1.20.1-3.15.0 |
+| `./gradlew runGameTestServer -PwithIrons316RuntimeGameTests` | The same suite against Iron's 1.20.1-3.16.3 with irons_lib 1.20.1-2.1.0 (compiles against 3.16.3 too) |
 | `./gradlew runGameTestServer -PwithArsElemental` | Ars Elemental 0.6.8.0 glyph round-trip and school resolution |
 | `./gradlew runGameTestServer -PwithArsZero` | Ars Zero 2.0.2 glyph round-trip and school resolution (local-only: requires jar in `libs/`) |
 | Any combination of the above | Mixed-addon recipes |

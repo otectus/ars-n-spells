@@ -39,7 +39,7 @@ public class StartupValidator {
         // Checks 3-4: File I/O checks (debug only — invasive and unnecessary on most setups)
         boolean debugMode = false;
         try {
-            debugMode = com.otectus.arsnspells.config.AnsConfig.DEBUG_MODE.get();
+            debugMode = com.otectus.arsnspells.config.AnsConfig.debugEnabled();
         } catch (Exception ignored) {}
         if (debugMode) {
             allChecks &= checkConfigWritable();
@@ -84,7 +84,7 @@ public class StartupValidator {
      */
     private static boolean checkFileLocks() {
         try {
-            Path configPath = FMLPaths.CONFIGDIR.get().resolve("ars_n_spells-common.toml");
+            Path configPath = FMLPaths.CONFIGDIR.get().resolve("ars_n_spells-server.toml");
             
             if (!Files.exists(configPath)) {
                 LOGGER.info("OK Config file doesn't exist yet (will be created)");

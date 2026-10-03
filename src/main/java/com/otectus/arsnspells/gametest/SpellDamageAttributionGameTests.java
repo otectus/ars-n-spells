@@ -121,8 +121,8 @@ public final class SpellDamageAttributionGameTests {
         boost(iceCaster, AttributeRegistry.ICE_SPELL_POWER.get(), 2.0);
 
         try {
-            float fireMultiplier = SpellScalingUtil.getMultiplierForCaster(fireCaster, fire);
-            float iceMultiplier = SpellScalingUtil.getMultiplierForCaster(iceCaster, ice);
+            float fireMultiplier = SpellScalingUtil.getMultiplierForCaster(fireCaster, fire).multiplier();
+            float iceMultiplier = SpellScalingUtil.getMultiplierForCaster(iceCaster, ice).multiplier();
             if (Math.abs(fireMultiplier - iceMultiplier) < 0.1f) {
                 helper.fail("the two casters must scale differently for this test to mean anything; "
                     + "got fire=" + fireMultiplier + " ice=" + iceMultiplier);

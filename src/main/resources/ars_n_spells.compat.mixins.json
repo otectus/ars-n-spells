@@ -10,12 +10,15 @@
     "irons.MagicDataAccessor",
     "irons.MixinIronsCastValidation",
     "irons.MixinIronsCastPayment",
+    "irons.MixinIronsCastTicker",
+    "irons.MixinIronsManaRegen",
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem",
     "irons.MixinInscriptionTableMenu",
     "sanctified.MixinSanctifiedAbstractSpell",
-    "sanctified.MixinCovenantSpellEvents"
+    "sanctified.MixinCovenantSpellEvents",
+    "gametest.MixinCastProbe"
   ],
   "client": [
     "irons.MixinIronsManaBarVisibility",

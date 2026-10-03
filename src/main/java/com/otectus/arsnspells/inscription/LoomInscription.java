@@ -98,6 +98,11 @@ public final class LoomInscription {
             return new InscriptionPlan(InscriptionClassifier.classify(source),
                 InscriptionClassifier.classify(target), 0, 0, failure);
         }
+        if (!com.otectus.arsnspells.util.ArsSpellIntegrity.blacklistedGlyphIds(
+                ArsSpellExportUtil.extractArsSpell(source).orElseThrow()).isEmpty()) {
+            return new InscriptionPlan(InscriptionClassifier.classify(source),
+                InscriptionClassifier.classify(target), 0, 0, "blacklisted glyphs");
+        }
         ItemStack planned = convert ? InscriptionClassifier.blankedSingleCopy(target) : target;
         return InscriptionPlanner.plan(new StackInscriptionView(source, planned));
     }

@@ -381,9 +381,16 @@ public final class CrossCastGameTests {
             return;
         }
         ItemStack book = bindHealSpellOntoRealBook(helper);
-        ServerPlayer player = emptyHandedPlayer(helper);
+        ServerPlayer player = scenarioPlayer(helper, "funded_ars_proxy");
         player.setGameMode(GameType.SURVIVAL);
-        IronsProxyCastDriver.setIronsMana(player, 10000.0f);
+        // Seed both real pools: the profile may use Ars-primary routing, and a fresh
+        // MagicData has not yet received the server-player link used by routed setMana.
+        com.otectus.arsnspells.bridge.NativeManaAccess.with(player,
+            com.otectus.arsnspells.contract.ResourceUnit.ARS_MANA, () -> {
+                var mana = com.otectus.arsnspells.util.ManaUtil.getNativeMana(player).orElseThrow(IllegalStateException::new);
+                mana.setMaxMana(10000); mana.setMana(10000); return null;
+            });
+        com.otectus.arsnspells.bridge.BridgeManager.getNativeIronsBridge().setMana(player, 10000);
         IronsProxyCastDriver.castViaEquippedSpellbook(player, book, 1);
         if (player.getHealth() <= 10.0f) {
             helper.fail("survival proxy cast with ample mana must resolve the bound Ars spell; "
@@ -1007,6 +1014,69 @@ public final class CrossCastGameTests {
         if (!IronsProxyCastDriver.castingItemIsEmpty(player)) {
             helper.fail("Iron's now records a real casting item for spellbook casts — revisit "
                 + "ArsCrossProxySpell.resolveCastingBook, which exists only because it did not");
+        }
+        helper.succeed();
+    }
+
+    // ---- NeoForge parity: pool reuse and the reconciler ----
+
+    /** A freed proxy pool id must be reused rather than the pool leaking upward. */
+    @GameTest(template = "platform")
+    public static void poolIdsAreReusedAfterRemoval(GameTestHelper helper) {
+        ItemStack book = new ItemStack(Items.BOOK);
+        IronsBookBindingUtil.appendArsSpellToBook(book, arsPayload("a"));
+        IronsBookBindingUtil.appendArsSpellToBook(book, arsPayload("b"));
+
+        if (!CrossCastNbt.removeEntryByProxyPoolId(book.getOrCreateTag(), 1)) {
+            helper.fail("removing an existing pool id must report success");
+            return;
+        }
+        IronsBookBindingUtil.appendArsSpellToBook(book, arsPayload("c"));
+
+        java.util.Set<Integer> used = CrossCastNbt.usedProxyPoolIds(book.getOrCreateTag());
+        if (!used.contains(1)) {
+            helper.fail("a freed pool id must be reused rather than the pool leaking upward "
+                + "until the book reports full; used=" + used);
+            return;
+        }
+        helper.succeed();
+    }
+
+    /** An item with no ANS data is left exactly as it was. */
+    @GameTest(template = "platform")
+    public static void reconciler_isANoOpOnAPlainItem(GameTestHelper helper) {
+        ItemStack plain = new ItemStack(Items.BOOK);
+        com.otectus.arsnspells.spell.irons.CarrierReconciler.Outcome outcome =
+            com.otectus.arsnspells.spell.irons.CarrierReconciler.reconcile(plain);
+        if (outcome != com.otectus.arsnspells.spell.irons.CarrierReconciler.Outcome.UNCHANGED) {
+            helper.fail("an item with no ANS data has nothing to reconcile, got " + outcome);
+            return;
+        }
+        if (!ItemStack.isSameItemSameTags(plain, new ItemStack(Items.BOOK))) {
+            helper.fail("the reconciler must not mutate an item it has nothing to do with");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /** Having looked an item over, the reconciler records that it did. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_reconciler_stampsTheSchemaVersion(GameTestHelper helper) {
+        // Both repairs the reconciler can make are about native proxy slots, so without Iron's
+        // there is nothing to look over and nothing to record having looked at.
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
+            return;
+        }
+        ItemStack book = new ItemStack(Items.BOOK);
+        IronsBookBindingUtil.appendArsSpellToBook(book, arsPayload("glyph_heal"));
+        book.getOrCreateTag().remove(CrossCastNbt.TAG_SCHEMA_VERSION);
+
+        com.otectus.arsnspells.spell.irons.CarrierReconciler.reconcile(book);
+
+        if (CrossCastNbt.schemaVersion(book.getTag()) != CrossCastNbt.SCHEMA_VERSION) {
+            helper.fail("having looked an item over, the reconciler must record that it did - "
+                + "otherwise a later pass cannot tell 'checked' from 'never seen'");
+            return;
         }
         helper.succeed();
     }

@@ -8,6 +8,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class IronsBridge implements IManaBridge {
+    // Transaction methods propagate recoverable failures to the observer; no fabricated zero reads.
+    @Override public double transactionMana(Player player) { return MagicData.getPlayerMagicData(player).getMana(); }
+    @Override public double transactionMax(Player player) { return (float) player.getAttributeValue(AttributeRegistry.MAX_MANA.get()); }
+    @Override public boolean transactionDebit(Player player, double amount) {
+        var data = MagicData.getPlayerMagicData(player);
+        if (data.getMana() < amount) return false;
+        data.addMana(-(float) amount);
+        return true;
+    }
+    @Override public void transactionCredit(Player player, double amount) {
+        MagicData.getPlayerMagicData(player).addMana((float) amount);
+    }
+
     private static final Logger LOGGER = LoggerFactory.getLogger(IronsBridge.class);
     // ANS-MED-007: per-op fail-once set instead of a single global boolean. The old
     // design latched true on the FIRST error of any kind and silenced ALL subsequent
@@ -23,7 +36,7 @@ public class IronsBridge implements IManaBridge {
                 return 0.0f;
             }
             return data.getMana();
-        } catch (Throwable e) {
+        } catch (RuntimeException e) {
             logCriticalError("getMana", e);
             return 0.0f;
         }
@@ -36,7 +49,7 @@ public class IronsBridge implements IManaBridge {
             MagicData data = MagicData.getPlayerMagicData(player);
             if (data == null) return;
             data.setMana(amount);
-        } catch (Throwable e) {
+        } catch (RuntimeException e) {
             logCriticalError("setMana", e);
         }
     }
@@ -77,7 +90,7 @@ public class IronsBridge implements IManaBridge {
                 warnOnce(player, before, amount, expected, after);
             }
             return true;
-        } catch (Throwable e) {
+        } catch (RuntimeException e) {
             logCriticalError("consumeMana", e);
         }
         return false;
@@ -107,7 +120,7 @@ public class IronsBridge implements IManaBridge {
             // MagicData.addMana is the atomic add; do NOT route through get+set or
             // we lose concurrent regen between the read and the write.
             data.addMana(amount);
-        } catch (Throwable e) {
+        } catch (RuntimeException e) {
             logCriticalError("addMana", e);
         }
     }
@@ -119,7 +132,7 @@ public class IronsBridge implements IManaBridge {
                 return AnsConfig.DEFAULT_MAX_MANA.get().floatValue();
             }
             return (float) player.getAttributeValue(AttributeRegistry.MAX_MANA.get());
-        } catch (Throwable e) {
+        } catch (RuntimeException e) {
             logCriticalError("getMaxMana", e);
             return AnsConfig.DEFAULT_MAX_MANA.get().floatValue();
         }

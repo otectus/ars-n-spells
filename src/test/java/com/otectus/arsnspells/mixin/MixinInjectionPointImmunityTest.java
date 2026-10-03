@@ -67,6 +67,7 @@ class MixinInjectionPointImmunityTest {
      */
     private static final Set<String> INSTRUCTION_LEVEL_ALLOWLIST =
         Set.of("MixinResourceBarOverlay.java", "MixinIronsCastPayment.java",
+        "MixinIronsCastTicker.java", "MixinCastProbe.java",
             "MixinSanctifiedAbstractSpell.java");
 
     /** Matches both {@code @At("HEAD")} and {@code @At(value = "INVOKE", ...)}. */
@@ -148,8 +149,8 @@ class MixinInjectionPointImmunityTest {
         assertFalse(source.contains("@Redirect("),
             "MixinIronsCastValidation must not reintroduce a @Redirect - it is the "
                 + "injection that crashed the reported pack");
-        assertTrue(source.contains("@At(\"HEAD\")") && source.contains("@At(\"RETURN\")"),
-            "the cast-gate scope needs both its HEAD producer and its RETURN consumer");
+        assertTrue(source.contains("@WrapMethod") && source.contains("CastValidationScope.with"),
+            "the cast gate must wrap the entire invocation for exceptional and cancelled exits");
     }
 
     @Test

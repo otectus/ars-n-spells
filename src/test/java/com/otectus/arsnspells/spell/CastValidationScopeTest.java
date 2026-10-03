@@ -151,4 +151,22 @@ class CastValidationScopeTest {
         assertEquals(Float.MAX_VALUE, CastValidationScope.apply(magicData, 6.0f),
             "and must still be live on the thread that opened it");
     }
+
+    @org.junit.jupiter.api.Test
+    void lexicalScopesRestoreNestingAndCleanExceptionalExit() {
+        Object outer = new Object(), inner = new Object();
+        java.util.UUID player = java.util.UUID.randomUUID();
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+            CastValidationScope.with(outer, player, true, 0, () -> {
+                org.junit.jupiter.api.Assertions.assertTrue(CastValidationScope.isActive(outer));
+                CastValidationScope.with(inner, player, true, 0, () -> {
+                    org.junit.jupiter.api.Assertions.assertFalse(CastValidationScope.isActive(outer));
+                    return null;
+                });
+                org.junit.jupiter.api.Assertions.assertTrue(CastValidationScope.isActive(outer));
+                throw new IllegalStateException("native validation failed");
+            }));
+        org.junit.jupiter.api.Assertions.assertEquals(12f, CastValidationScope.apply(outer, 12f));
+        org.junit.jupiter.api.Assertions.assertFalse(CastValidationScope.isActive(inner));
+    }
 }

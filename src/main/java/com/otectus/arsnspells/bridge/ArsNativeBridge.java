@@ -6,6 +6,22 @@ import com.otectus.arsnspells.util.ManaUtil;
 import net.minecraft.world.entity.player.Player;
 
 public class ArsNativeBridge implements IManaBridge {
+    @Override public double transactionMana(Player player) {
+        return ManaUtil.getNativeMana(player).orElseThrow(() -> new IllegalStateException("Ars mana unavailable")).getCurrentMana();
+    }
+    @Override public double transactionMax(Player player) {
+        return ManaUtil.getNativeMana(player).orElseThrow(() -> new IllegalStateException("Ars mana unavailable")).getMaxMana();
+    }
+    @Override public boolean transactionDebit(Player player, double amount) {
+        var cap = ManaUtil.getNativeMana(player).orElseThrow(() -> new IllegalStateException("Ars mana unavailable"));
+        if (cap.getCurrentMana() < amount) return false;
+        cap.removeMana(amount);
+        return true;
+    }
+    @Override public void transactionCredit(Player player, double amount) {
+        ManaUtil.getNativeMana(player).orElseThrow(() -> new IllegalStateException("Ars mana unavailable")).addMana(amount);
+    }
+
     @Override
     public float getMana(Player player) {
         // Unifying to float as per IManaBridge signature

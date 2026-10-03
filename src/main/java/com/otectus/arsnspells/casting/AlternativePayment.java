@@ -54,9 +54,18 @@ public final class AlternativePayment {
         private final UUID playerId;
         private final ResourceUnit unit;
         private final double requested;
-        private final double reserved;
+        private double reserved;
         private final PaymentOpenFailurePolicy policy;
         private boolean settled;
+        private boolean releaseRequested, releasing, unknown, reserving;
+        private double remaining;
+        private ResourceAccess access;
+        private com.otectus.arsnspells.contract.ResourceMovement movement;
+        public double remaining() { return remaining; }
+        public boolean unknown() { return unknown; }
+        public boolean releaseRequested() { return releaseRequested; }
+        public com.otectus.arsnspells.contract.ResourceMovement movement() { return movement; }
+
 
         private Leg(UUID attemptId, UUID playerId, ResourceUnit unit,
                     double requested, double reserved, PaymentOpenFailurePolicy policy) {
@@ -65,6 +74,7 @@ public final class AlternativePayment {
             this.unit = unit;
             this.requested = requested;
             this.reserved = reserved;
+            this.remaining = reserved;
             this.policy = policy;
         }
 
@@ -154,7 +164,7 @@ public final class AlternativePayment {
         Leg existing = OPEN.get(attemptId);
         if (existing != null) {
             // Reserving twice for one cast is the double-charge this class exists to prevent.
-            return new Result(existing.isShort() ? Outcome.RESERVED_SHORT : Outcome.RESERVED, existing);
+            return new Result(existing.reserving || existing.releaseRequested ? Outcome.DENIED : existing.isShort() ? Outcome.RESERVED_SHORT : Outcome.RESERVED, existing);
         }
         if (access == null || status == null || !status.isUsable()) {
             String reason = status == null ? "no adapter" : status.reason();
@@ -177,17 +187,24 @@ public final class AlternativePayment {
             return new Result(Outcome.DENIED, null);
         }
 
-        double moved = access.debit(playerId, unit, amount);
-        if (!Double.isFinite(moved) || moved < 0) {
-            LOGGER.error("{} adapter reported an invalid debit {}; refusing the cast", unit, moved);
-            return new Result(Outcome.DENIED, null);
+        if (OPEN.size() >= 4096) return new Result(Outcome.DENIED, null);
+        Leg leg = new Leg(attemptId, playerId, unit, amount, 0, policy);
+        leg.access = access; leg.reserving = true;
+        OPEN.put(attemptId, leg);
+        var movement = access.observeDebit(playerId, unit, amount);
+        double moved = movement.debited();
+        leg.reserved = moved; leg.remaining = moved; leg.movement = movement;
+        leg.unknown = movement.attempted() && !movement.known();
+        leg.reserving = false;
+        if (leg.releaseRequested) {
+            release(attemptId, access);
+            return new Result(Outcome.DENIED, leg.settled ? null : leg);
         }
-        if (moved > amount + SHORTFALL_TOLERANCE) {
-            access.credit(playerId, unit, moved);
-            LOGGER.error("{} adapter debited {} against quote {}; released and refused the cast", unit, moved, amount);
-            return new Result(Outcome.DENIED, null);
+        if (movement.error() != null || !movement.known() || !Double.isFinite(movement.reported()) || movement.reported() < 0 || (moved > 0 && movement.reported() == 0) || moved > amount + SHORTFALL_TOLERANCE) {
+            release(attemptId, access);
+            LOGGER.warn("[ANS] {} exceptional/modified debit for {}: {}; remaining={} unknown={}", unit, playerId, movement, leg.remaining, leg.unknown);
+            return new Result(Outcome.DENIED, leg.settled ? null : leg);
         }
-        Leg leg = new Leg(attemptId, playerId, unit, amount, Math.max(0.0d, moved), policy);
         if (!leg.isShort()) {
             OPEN.put(attemptId, leg);
             return new Result(Outcome.RESERVED, leg);
@@ -204,18 +221,11 @@ public final class AlternativePayment {
                 return new Result(Outcome.RESERVED_SHORT, leg);
             }
             default -> {
-                if (leg.reserved() > 0.0d) {
-                    double back = access.credit(playerId, unit, leg.reserved());
-                    if (back + SHORTFALL_TOLERANCE < leg.reserved()) {
-                        LOGGER.error("[ANS] {} leg for {} could not be fully released: took {}, "
-                                + "gave back {}. The adapter is lossy in both directions.",
-                            unit, playerId, leg.reserved(), back);
-                    }
-                }
+                release(attemptId, access);
                 LOGGER.warn("[ANS] {} drain came up short for {}: asked {}, moved {}. Denying the "
                     + "cast under payment_open_failure_policy={}.", unit, playerId, amount,
                     leg.reserved(), policy);
-                return new Result(Outcome.DENIED, null);
+                return new Result(Outcome.DENIED, leg.settled ? null : leg);
             }
         }
     }
@@ -227,11 +237,12 @@ public final class AlternativePayment {
      * @return the amount kept, or 0 when there was nothing open
      */
     public static double commit(UUID attemptId) {
-        Leg leg = OPEN.remove(attemptId);
-        if (leg == null || leg.settled) {
+        Leg leg = OPEN.get(attemptId);
+        if (leg == null || leg.settled || leg.reserving || leg.releaseRequested) {
             return 0.0d;
         }
         leg.settled = true;
+        OPEN.remove(attemptId);
         return leg.reserved();
     }
 
@@ -242,22 +253,28 @@ public final class AlternativePayment {
      * @return the amount actually returned to the pool
      */
     public static double release(UUID attemptId, ResourceAccess access) {
-        Leg leg = OPEN.remove(attemptId);
-        if (leg == null || leg.settled) {
-            return 0.0d;
-        }
-        leg.settled = true;
-        if (access == null || leg.reserved() <= 0.0d) {
-            return 0.0d;
-        }
-        double back = access.credit(leg.playerId(), leg.unit(), leg.reserved());
-        if (back + SHORTFALL_TOLERANCE < leg.reserved()) {
-            LOGGER.error("[ANS] released {} leg for {} but only {} of {} could be returned; "
-                    + "the adapter cannot undo its own drain.",
-                leg.unit(), leg.playerId(), back, leg.reserved());
-        }
-        return back;
+        Leg leg = OPEN.get(attemptId);
+        if (leg == null || leg.settled || leg.releasing) return 0;
+        leg.releaseRequested = true;
+        if (leg.unknown || leg.reserving || access == null) return 0;
+        leg.releasing = true;
+        try {
+            var movement = access.observeCredit(leg.playerId, leg.unit, leg.remaining);
+            if (movement.attempted() && !movement.known()) leg.unknown = true;
+            if (movement.known()) leg.remaining = Math.max(0, leg.remaining - movement.credited());
+            if (leg.remaining == 0 && !leg.unknown) { leg.settled = true; OPEN.remove(attemptId); }
+            return movement.credited();
+        } finally { leg.releasing = false; }
     }
+    public static java.util.List<Leg> allOpen() { return java.util.List.copyOf(OPEN.values()); }
+    public static void retryReleases() {
+        for (Leg leg : allOpen()) if (leg.releaseRequested) release(leg.attemptId, leg.access);
+    }
+    public static void releaseAll() { for (Leg leg : allOpen()) release(leg.attemptId, leg.access); }
+    public static boolean pending(UUID player) {
+        return OPEN.values().stream().anyMatch(leg -> leg.playerId.equals(player) && leg.releaseRequested);
+    }
+    public static void clearAfterSave() { OPEN.clear(); }
 
     /** The leg held for this attempt, or {@code null}. Diagnostic and test seam. */
     public static Leg peek(UUID attemptId) {
@@ -269,9 +286,9 @@ public final class AlternativePayment {
         return OPEN.size();
     }
 
-    /** Drop every leg held for a player without refunding. Logout only. */
+    /** Retain logout obligations until the original resource is available for compensation. */
     public static void forgetPlayer(UUID playerId) {
-        OPEN.entrySet().removeIf(e -> e.getValue().playerId().equals(playerId));
+        for (Leg leg : allOpen()) if (leg.playerId.equals(playerId)) leg.releaseRequested = true;
     }
 
     /** Test seam: start from an empty table. */

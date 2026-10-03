@@ -196,12 +196,28 @@ public class ConfigScreenFactory {
                 value -> AnsConfig.ENABLE_SOURCE_JAR_SYNERGY.set(value)
             ));
 
+            // 3.3.5: the native cooldown an Ars spell bound into an Iron's spellbook starts after
+            // a successful wheel cast. Cycles through common values; any 0..12000 tick value can
+            // still be set in the server TOML, and an off-preset value advances to the next preset.
+            options.add(new ConfigOption(
+                "Inscribed Ars Cooldown",
+                "Iron's cooldown after an Ars spell cast from an Iron's spellbook (20 ticks = 1s)",
+                () -> com.otectus.arsnspells.config.InscribedCooldownPresets.describe(
+                    AnsConfig.INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS.get()),
+                this::cycleInscribedCooldown
+            ));
+
             options.add(new ConfigOption(
                 "Debug Mode",
                 "Enable debug logging",
                 () -> AnsConfig.DEBUG_MODE.get(),
                 value -> AnsConfig.DEBUG_MODE.set(value)
             ));
+        }
+
+        private void cycleInscribedCooldown() {
+            AnsConfig.INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS.set(com.otectus.arsnspells.config.InscribedCooldownPresets.next(
+                AnsConfig.INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS.get()));
         }
 
         // ---- Shared geometry: single source of truth for render AND click ----

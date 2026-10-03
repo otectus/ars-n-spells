@@ -17,8 +17,14 @@ public class AnsConfig {
     public static final ForgeConfigSpec.ConfigValue<String> CONVERSION_POLICY;
     public static final ForgeConfigSpec.ConfigValue<String> PAYMENT_OPEN_FAILURE_POLICY;
 
-    /** The schema this build writes. A file that reads back lower than this predates 3.3.0. */
-    public static final int CURRENT_SCHEMA_VERSION = 2;
+    /**
+     * The schema this build writes. 0 predates 3.3.0; 1 is 3.3.0-3.3.2; 2 is 3.3.3-3.3.4 (Source
+     * income per second); 3 is 3.3.5 (inscribed Ars spell cooldown).
+     */
+    public static final int CURRENT_SCHEMA_VERSION = 3;
+
+    /** The schema that introduced {@code inscribed_ars_default_cooldown_ticks}. */
+    public static final int INSCRIBED_COOLDOWN_SCHEMA = 3;
 
     /**
      * The {@code payment_open_failure_policy} value that means "let the migration decide".
@@ -115,6 +121,8 @@ public class AnsConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_CURIO_DISCOUNTS;
     public static final ForgeConfigSpec.DoubleValue BLASPHEMY_DISCOUNT;
     public static final ForgeConfigSpec.DoubleValue BLASPHEMY_MATCHING_SCHOOL_BONUS;
+    public static final ForgeConfigSpec.DoubleValue VIRTUE_RING_DISCOUNT;
+    public static final ForgeConfigSpec.DoubleValue MAX_TOTAL_CURIO_DISCOUNT;
     // ANS-MED-044: ALLOW_DISCOUNT_STACKING removed — never read. The Virtue Ring
     // moved to aura conversion (zeroes cost before CurioDiscountHandler runs), so
     // there is no second discount left to stack with Blasphemy's.
@@ -167,6 +175,10 @@ public class AnsConfig {
     // SPELL SCALING
     // ========================================
     public static final ForgeConfigSpec.DoubleValue SPELL_POWER_CAP;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_CROSS_MOD_COMBAT_STATS;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_IRONS_POWER_FOR_ARS_DAMAGE;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_ARS_DAMAGE_FOR_IRONS_DAMAGE;
+    public static final ForgeConfigSpec.ConfigValue<String> MULTI_SCHOOL_POWER_POLICY;
 
     // ========================================
     // BLASPHEMY RING DISCOUNTS
@@ -196,6 +208,10 @@ public class AnsConfig {
     public static final ForgeConfigSpec.IntValue NETWORK_REQUEST_BURST;
     public static final ForgeConfigSpec.BooleanValue ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS;
     public static final ForgeConfigSpec.IntValue MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK;
+    public static final ForgeConfigSpec.IntValue INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS;
+    /** The shipped value; a pre-3.3.5 file holding it received it from Forge's correction pass. */
+    public static final int INSCRIBED_ARS_COOLDOWN_DEFAULT_TICKS = 40;
+    public static final int INSCRIBED_ARS_COOLDOWN_MAX_TICKS = 12000;
     // ANS-HIGH-027: ENABLE_PER_CAST_REAGENT removed — was a reserved hook with zero
     // readers; setting it had no effect. If the per-cast reagent feature ever lands,
     // re-add the key alongside the implementation.
@@ -236,7 +252,8 @@ public class AnsConfig {
                 "  equal_percent - Each pool pays the same percentage of the spell's own price;",
                 "                  the directional rates are not consulted.",
                 "These are deliberately separate policies, not two spellings of one. They agree",
-                "only while both conversion rates are 1.0."
+                "only while both conversion rates are 1.0.",
+                "Server-owned. A quote captures the selected policy; reloading does not reprice a committed cast."
             )
             .define("conversion_policy", "flat_legacy");
 
@@ -274,7 +291,7 @@ public class AnsConfig {
                 "  hybrid - Both systems share a unified mana pool",
                 "  separate - Separate pools with dual-cost mechanics",
                 "  disabled - No mana integration at all",
-                "NOTE: Changing this value requires a game restart to take effect."
+                "Runtime changes are applied on the server thread and synchronized to connected clients."
             )
             .define("mana_unification_mode", "iss_primary");
         
@@ -430,11 +447,22 @@ public class AnsConfig {
             .defineInRange("resonance_strength", 1.0, 0.0, 10.0);
         
         RESONANCE_THRESHOLD = BUILDER
-            .comment("Mana percentage required to trigger resonance (0.95 = 95%)")
+            .comment("Mana fraction at or above which resonance applies (0.95 = 95% full).",
+                     "The bonus itself still scales with how full the pool is; this only",
+                     "gates whether it applies at all.",
+                     "Set 0.0 to leave the gate open.",
+                     "Existing saved values are preserved.")
             .defineInRange("resonance_threshold", 0.95, 0.0, 1.0);
         
         RESONANCE_DURATION = BUILDER
-            .comment("How long resonance lasts after dropping below threshold (ticks)")
+            .comment("How long resonance keeps applying after the pool drops below",
+                     "resonance_threshold, in ticks (20 = 1 second).",
+                     "This is what makes a raised threshold playable: spending mana to cast",
+                     "necessarily drops you below it, so without a linger the bonus would",
+                     "switch off on the very cast that earned it.",
+                     "Has no effect while resonance_threshold is 0.",
+                     "Resolution is the recompute interval (40 ticks), so the effective",
+                     "linger is this value give or take one interval.")
             .defineInRange("resonance_duration", 100, 0, 1200);
         
         MAX_DAMAGE_MULTIPLIER = BUILDER
@@ -535,7 +563,7 @@ public class AnsConfig {
             .defineInRange("affinity_decay_rate", 0.01, 0.0, 1.0);
 
         AFFINITY_DECAY_INTERVAL_TICKS = BUILDER
-            .comment("How often (in ticks) the decay handler ticks each player. 1200 = once per minute.")
+            .comment("Ticks between AffinityDecayHandler runs (20 = 1s, 1200 = 60s). Decay per run is prorated from AFFINITY_DECAY_RATE.")
             .defineInRange("affinity_decay_interval_ticks", 1200, 20, 24000);
 
         BUILDER.pop();
@@ -550,9 +578,10 @@ public class AnsConfig {
         );
         
         ENABLE_CURIO_DISCOUNTS = BUILDER
-            .comment("Enable mana cost discounts from Blasphemy curios.",
-                     "Note: the Ring of Virtue is no longer a mana discount — it converts mana to",
-                     "aura via VirtueRingHandler. The legacy virtue_ring_discount key was removed in 1.10.0.")
+            .comment("Enable mana cost discounts from curios tagged #ars_n_spells:curio_spell_discount",
+                     "and, with Covenant of the Seven installed, from Blasphemy curios.",
+                     "Note: the Ring of Virtue is not a mana discount - it converts mana to aura via",
+                     "VirtueRingHandler.")
             .define("enable_curio_discounts", true);
 
         BLASPHEMY_DISCOUNT = BUILDER
@@ -565,6 +594,21 @@ public class AnsConfig {
         
         // ANS-MED-044: allow_discount_stacking removed — never read (the Virtue
         // Ring's aura conversion leaves no second discount to stack).
+
+        // The key name is a leftover from Covenant's Ring of Virtue (removed in 1.10.0 and
+        // reintroduced in 3.3.5 with this meaning). It is kept identical to the NeoForge 1.21.1
+        // build's key so one config applies to both.
+        VIRTUE_RING_DISCOUNT = BUILDER
+            .comment("Per-curio mana cost discount for items in #ars_n_spells:curio_spell_discount",
+                     "(0.20 = each tagged curio multiplies cost by 0.80). Applies to both Ars and",
+                     "Iron's Spellbooks casts.")
+            .defineInRange("virtue_ring_discount", 0.20, 0.0, 1.0);
+
+        MAX_TOTAL_CURIO_DISCOUNT = BUILDER
+            .comment("Hard cap on the COMBINED tagged-curio discount across all worn curios",
+                     "(0.50 = spells never cost less than 50% after curio discounts). Prevents",
+                     "stacked discount curios from trivialising mana cost.")
+            .defineInRange("max_total_curio_discount", 0.50, 0.0, 1.0);
 
         READ_CURIO_ATTRIBUTE_MODIFIERS = BUILDER
             .comment("Read max-mana / mana-regen attribute modifiers from worn Curios (rings, amulets,",
@@ -778,6 +822,46 @@ public class AnsConfig {
                      "Prevents stacking from exceeding this value. Set higher to allow more scaling.")
             .defineInRange("spell_power_cap", 3.0, 1.0, 10.0);
 
+        ENABLE_CROSS_MOD_COMBAT_STATS = BUILDER
+            .comment("Master switch for both directions of cross-mod spell damage scaling:",
+                     "Iron's spell power scaling Ars spell damage, and Ars' Spell Damage Bonus",
+                     "perk adding to Iron's spell damage.",
+                     "This is independent of the mana-unification mode: both directions stay",
+                     "active even when mana unification is DISABLED, because a player who earned",
+                     "the stats on either side should keep them regardless of how mana is pooled.")
+            .define("enable_cross_mod_combat_stats", true);
+
+        ENABLE_IRONS_POWER_FOR_ARS_DAMAGE = BUILDER
+            .comment("Iron's -> Ars direction: scale Ars Nouveau spell damage by the caster's",
+                     "Iron's spell power attributes (generic + the matching school), affinity and",
+                     "resonance, capped by spell_power_cap.",
+                     "Independent of the mana-unification mode; active even when mana",
+                     "unification is DISABLED.")
+            .define("enable_irons_power_for_ars_damage", true);
+
+        ENABLE_ARS_DAMAGE_FOR_IRONS_DAMAGE = BUILDER
+            .comment("Ars -> Iron's direction: add the caster's Ars Nouveau Spell Damage Bonus",
+                     "perk value to Iron's spell damage as a flat addition, matching how Ars",
+                     "itself applies that attribute. Not affected by spell_power_cap, which is a",
+                     "multiplier cap and must not clamp a flat bonus.",
+                     "Independent of the mana-unification mode; active even when mana",
+                     "unification is DISABLED.")
+            .define("enable_ars_damage_for_irons_damage", true);
+
+        MULTI_SCHOOL_POWER_POLICY = BUILDER
+            .comment("How a spell that resolves to more than one school picks the Iron's elemental",
+                     "spell power attribute it scales with (dual-element and compound-element",
+                     "addon glyphs, and recipes that chain effects from different schools):",
+                     "  primary (default) - only the first-resolved school scales the spell, the same one",
+                     "            affinity and progression credit",
+                     "  max - the single strongest matching elemental attribute",
+                     "  average - the mean of all matching elemental attributes",
+                     "There is deliberately no 'sum' option: adding every matching bonus would",
+                     "make a spell stronger purely for carrying more school labels, so an",
+                     "all-element glyph would collect fire, ice, lightning and nature power at",
+                     "once. Unknown values fall back to 'max'.")
+            .define("multi_school_power_policy", "primary");
+
         BUILDER.pop();
 
         // ========================================
@@ -899,6 +983,26 @@ public class AnsConfig {
             )
             .defineInRange("max_ars_cross_spells_per_irons_spellbook", -1, -1, 64);
 
+        INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS = BUILDER
+            .comment(
+                "Iron's native cooldown, in game ticks (20 ticks = 1 second at the normal tick rate),",
+                "started after an Ars Nouveau spell bound into an Iron's spellbook casts successfully",
+                "from Iron's spell wheel. It is applied to that wheel slot's proxy spell",
+                "(ars_n_spells:ars_cross_N) through Iron's own cooldown pipeline, so Iron's cooldown",
+                "reduction attribute, the spell wheel's cooldown display and persistence across relogs",
+                "all apply. A failed, refused or unpaid cast starts no cooldown. Books that bind",
+                "different Ars spells to the same proxy slot share that slot's cooldown.",
+                "0 = no native cooldown, the behaviour before 3.3.5. This is the only source of the",
+                "proxies' cooldown: Iron's own per-spell config files are not consulted for them.",
+                "Freshly generated configs use 40 (2 seconds); configs from earlier versions are",
+                "migrated to 0 so existing worlds keep their behaviour. Read on every cast: an edit",
+                "applies to the next cast after the config reloads, and running cooldowns keep their",
+                "length. Never applies to ordinary Ars casts, ordinary Iron's spells, or Iron's spells",
+                "inscribed into Ars items. The optional category cooldowns remain a separate gate."
+            )
+            .defineInRange("inscribed_ars_default_cooldown_ticks", INSCRIBED_ARS_COOLDOWN_DEFAULT_TICKS,
+                0, INSCRIBED_ARS_COOLDOWN_MAX_TICKS);
+
         // ANS-HIGH-027: ENABLE_PER_CAST_REAGENT registration removed — had no readers,
         // setting it had zero effect. Re-add alongside an implementation if/when shipped.
 
@@ -937,7 +1041,43 @@ public class AnsConfig {
         }
         return ManaUnificationMode.fromString(MANA_UNIFICATION_MODE.get());
     }
-    
+
+    /**
+     * Get the aggregation policy for spells that resolve to several schools.
+     *
+     * <p>The same read {@code SpellScalingUtil} performs, named here so command and UI callers
+     * do not each repeat the parse. Unknown or removed values degrade to
+     * {@link MultiSchoolPowerPolicy#MAX} rather than throwing, so an edited config never takes
+     * damage scaling down.
+     */
+    public static MultiSchoolPowerPolicy getMultiSchoolPowerPolicy() {
+        return MultiSchoolPowerPolicy.fromString(MULTI_SCHOOL_POWER_POLICY.get());
+    }
+
+    /**
+     * Read a boolean key without ever throwing.
+     *
+     * <p>{@code ForgeConfigSpec.ConfigValue#get()} throws {@link IllegalStateException} when
+     * the owning config has not been loaded, which is reachable on a client at the main menu or
+     * during a world transition. The combat bridges read their toggles through this so a hit
+     * processed then cannot crash.
+     */
+    public static boolean flag(ForgeConfigSpec.BooleanValue value, boolean fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return value.get();
+        } catch (IllegalStateException configNotLoaded) {
+            return fallback;
+        }
+    }
+
+    /** {@link #flag} for the debug toggle, whose fallback is always "off". */
+    public static boolean debugEnabled() {
+        return flag(DEBUG_MODE, false);
+    }
+
     /**
      * Check if a specific system is enabled
      */
@@ -1037,6 +1177,35 @@ public class AnsConfig {
     }
 
     /**
+     * Resolve {@code inscribed_ars_default_cooldown_ticks} for the file being loaded.
+     *
+     * <p>A file stamped with schema 3 or later, or one generated by this load, is taken as
+     * written. A file from before 3.3.5 never contained the key: Forge's correction pass filled in
+     * the shipped default, so that value resolves to 0 and the world keeps its cooldown-free
+     * inscribed casts. Any other value in such a file was typed by hand and is kept.
+     *
+     * <p>Pure, so the migration decision is unit-testable without a mod loading context.
+     */
+    public static int resolveInscribedCooldownTicks(int fileTicks, int schemaRead, boolean freshlyGenerated) {
+        int bounded = Math.max(0, Math.min(INSCRIBED_ARS_COOLDOWN_MAX_TICKS, fileTicks));
+        if (schemaRead >= INSCRIBED_COOLDOWN_SCHEMA || freshlyGenerated) return bounded;
+        return bounded == INSCRIBED_ARS_COOLDOWN_DEFAULT_TICKS ? 0 : bounded;
+    }
+
+    /**
+     * The configured inscribed-spell cooldown in ticks, or 0 while no server config is loaded
+     * (a client on the title screen, or before the server has started).
+     */
+    public static int inscribedArsCooldownTicks() {
+        try {
+            if (!SPEC.isLoaded()) return 0;
+            return Math.max(0, INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS.get());
+        } catch (IllegalStateException notLoaded) {
+            return 0;
+        }
+    }
+
+    /**
      * Whether {@code configFile} was created by the load that is running right now.
      *
      * <p>This is the one thing Forge does not tell us. A SERVER config lives in the world's
@@ -1082,7 +1251,11 @@ public class AnsConfig {
      */
     public static void onConfigLoaded(java.nio.file.Path configFile) {
         int schemaRead = AnsConfig.CONFIG_SCHEMA_VERSION.get();
-        boolean fresh = schemaRead < CURRENT_SCHEMA_VERSION && isFreshlyGeneratedConfig(configFile);
+        // Only an unstamped file can be new: Forge writes the spec default 0, and every load that
+        // completes a migration stamps the file. A stamped file is never re-probed, which matters
+        // where the filesystem (or Java 17 on Linux) reports the modification time as creation
+        // time and Forge's correction pass has just rewritten an existing file.
+        boolean fresh = schemaRead == 0 && isFreshlyGeneratedConfig(configFile);
 
         String rawConversion = AnsConfig.CONVERSION_POLICY.get();
         String rawPayment = AnsConfig.PAYMENT_OPEN_FAILURE_POLICY.get();
@@ -1090,7 +1263,18 @@ public class AnsConfig {
         EFFECTIVE_PAYMENT_POLICY = resolvePaymentOpenFailurePolicy(rawPayment, schemaRead, fresh);
 
         java.util.List<String> migrated = new java.util.ArrayList<>();
-        if (schemaRead < CURRENT_SCHEMA_VERSION) {
+        // 3.3.5 first: it only ever preserves an existing world's behaviour, so it must apply
+        // even when an older step below cannot complete and defers the schema stamp.
+        if (schemaRead < INSCRIBED_COOLDOWN_SCHEMA) {
+            int fileTicks = INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS.get();
+            int resolvedTicks = resolveInscribedCooldownTicks(fileTicks, schemaRead, fresh);
+            if (resolvedTicks != fileTicks) INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS.set(resolvedTicks);
+            migrated.add("  inscribed_ars_default_cooldown_ticks: (absent) -> " + resolvedTicks + (fresh
+                ? " (freshly generated config: the shipped default)"
+                : resolvedTicks == 0 ? " (config written before 3.3.5: no native cooldown, as before)"
+                    : " (explicit value kept)"));
+        }
+        if (schemaRead < 1) {
             migrated.add("  conversion_policy: (absent) -> " + rawConversion
                 + " (effective " + EFFECTIVE_CONVERSION_KIND + "; preserves pre-3.3.0 pricing)");
         }
@@ -1101,7 +1285,9 @@ public class AnsConfig {
                     : " (config written before 3.3.0: existing behaviour preserved)"));
         }
         if (schemaRead < CURRENT_SCHEMA_VERSION) {
-            if (!fresh && configFile != null && java.nio.file.Files.exists(configFile)) {
+            // Schema 2 (3.3.3) moved Source income from per scan to per second. A file already at
+            // schema 2 was migrated then; repeating it would rescale the multiplier twice.
+            if (schemaRead < 2 && !fresh && configFile != null && java.nio.file.Files.exists(configFile)) {
                 java.nio.file.Path backup = configFile.resolveSibling(configFile.getFileName() + ".pre-3.3.0.bak");
                 try {
                     if (!java.nio.file.Files.exists(backup)) java.nio.file.Files.copy(configFile, backup);

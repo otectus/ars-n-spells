@@ -3,11 +3,19 @@ package com.otectus.arsnspells.events;
 import com.hollingsworth.arsnouveau.api.event.SpellCostCalcEvent;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.otectus.arsnspells.ArsNSpells;
+import com.otectus.arsnspells.compat.CompatIds;
+import com.otectus.arsnspells.compat.ModPresence;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
+import com.otectus.arsnspells.compat.curios.CuriosAccess;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.util.SpellAnalysis;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -15,13 +23,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles mana cost discounts from Covenant of the Seven curios.
- * Applies discounts from Ring of Virtue and Blasphemy curios to Ars Nouveau spells.
- * 
+ * Handles curio mana cost discounts on Ars Nouveau spells.
+ *
+ * <p>Two discounts, applied in this order:
+ * <ol>
+ *   <li>the tagged-curio discount, identical to the NeoForge 1.21.1 build: each worn curio in
+ *       {@code #ars_n_spells:curio_spell_discount} multiplies the cost by
+ *       {@code 1 - virtue_ring_discount}, the combined factor is floored at
+ *       {@code 1 - max_total_curio_discount}, and a spell that cost mana never rounds to free.
+ *       {@link com.otectus.arsnspells.compat.curios.IronsCurioDiscountHandler} applies the same
+ *       discount to Iron's casts;</li>
+ *   <li>with Covenant of the Seven installed, its Blasphemy curio discount (Forge 1.20.1 only;
+ *       Covenant has no 1.21.1 release).</li>
+ * </ol>
+ *
  * Priority: LOW - Applied after other cost modifiers to ensure proper stacking
  */
 @Mod.EventBusSubscriber(modid = "ars_n_spells")
 public class CurioDiscountHandler {
+
+    /** Item tag - any worn-curio stack matching this tag grants the discount. */
+    public static final TagKey<Item> CURIO_SPELL_DISCOUNT_TAG = ItemTags.create(
+        new ResourceLocation(ArsNSpells.MODID, "curio_spell_discount"));
     private static final Logger LOGGER = LoggerFactory.getLogger(CurioDiscountHandler.class);
     
     /**
@@ -34,15 +57,17 @@ public class CurioDiscountHandler {
         if (!AnsConfig.ENABLE_CURIO_DISCOUNTS.get()) {
             return;
         }
-        
-        // Check if Sanctified Legacy is available
-        if (!SanctifiedLegacyCompat.isAvailable()) {
-            return;
-        }
-        
+
         // Only apply to player casters
         LivingEntity caster = event.context != null ? event.context.getUnwrappedCaster() : null;
         if (!(caster instanceof Player player)) {
+            return;
+        }
+
+        applyTaggedCurioDiscount(event, player);
+
+        // Check if Sanctified Legacy is available
+        if (!SanctifiedLegacyCompat.isAvailable()) {
             return;
         }
         
@@ -76,6 +101,36 @@ public class CurioDiscountHandler {
         }
     }
     
+    /**
+     * The tagged-curio discount, the same arithmetic as the NeoForge build's handler.
+     */
+    private static void applyTaggedCurioDiscount(SpellCostCalcEvent event, Player player) {
+        if (!ModPresence.isLoaded(CompatIds.CURIOS)) {
+            return;
+        }
+        int matching = CuriosAccess.countTagged(player, CURIO_SPELL_DISCOUNT_TAG);
+        if (matching <= 0) {
+            return;
+        }
+        double perCurio = AnsConfig.VIRTUE_RING_DISCOUNT.get();
+        if (perCurio <= 0.0) {
+            return;
+        }
+        // Multiplicative stack: each tagged curio multiplies cost by (1 - perCurio),
+        // then clamped so the combined discount never exceeds the configured cap,
+        // and floored at 1 mana so spells never round to free unless 0-cost already.
+        double factor = Math.pow(Math.max(0.0, 1.0 - perCurio), matching);
+        factor = Math.max(factor, 1.0 - AnsConfig.MAX_TOTAL_CURIO_DISCOUNT.get());
+        int original = event.currentCost;
+        int discounted = (int) Math.max(original > 0 ? 1 : 0, Math.round(original * factor));
+        event.currentCost = discounted;
+
+        if (AnsConfig.debugEnabled()) {
+            LOGGER.info("[CurioDiscount] {} matching curios -> {}% cost -> {} (was {})",
+                matching, (int) (factor * 100), discounted, original);
+        }
+    }
+
     /**
      * Calculate the total discount multiplier from all equipped curios.
      * 

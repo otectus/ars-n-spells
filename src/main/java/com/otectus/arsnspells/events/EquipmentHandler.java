@@ -35,10 +35,13 @@ public class EquipmentHandler {
         // Clear equipment cache to force recalculation
         EquipmentIntegration.clearCache(player);
         
-        // Recalculate max mana based on new equipment
-        updatePlayerMaxMana(player);
-        
-        logDebug("Equipment changed for {}, recalculating mana bonuses", player.getName().getString());
+        // Deliberately no recalculation here. Forge posts this event before vanilla swaps the
+        // old item's attribute modifiers for the new one's, so a ceiling computed now mixes the
+        // new stack with the old attributes. Scrolling the hotbar then pushed a transient,
+        // wrong max into the shared pool's mirror. The DIRTY mark is reconciled at this
+        // player's tick END, after the swap, against the attributes actually in force.
+        logDebug("Equipment changed for {} in {}, reconciling mana bonuses at tick end",
+            player.getName().getString(), event.getSlot());
     }
     
     /**
@@ -120,7 +123,13 @@ public class EquipmentHandler {
         // effect, perk, learned-glyph, book-tier and dynamic attribute changes.
         if (DIRTY.remove(player.getUUID()) || player.tickCount % 20 == 0) {
             EquipmentIntegration.clearCache(player);
-            updatePlayerMaxMana(player);
+            if (com.otectus.arsnspells.bridge.ManaTrace.enabled()) {
+                var before = com.otectus.arsnspells.bridge.ManaTrace.Snapshot.of(player);
+                updatePlayerMaxMana(player);
+                com.otectus.arsnspells.bridge.ManaTrace.reconciled(player, before);
+            } else {
+                updatePlayerMaxMana(player);
+            }
         }
     }
 

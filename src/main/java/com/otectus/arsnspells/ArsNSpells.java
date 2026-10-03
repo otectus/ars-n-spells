@@ -132,11 +132,14 @@ public class ArsNSpells {
             MinecraftForge.EVENT_BUS.register(new ProgressionHandler());
             MinecraftForge.EVENT_BUS.register(new IronsProgressionHandler());
             MinecraftForge.EVENT_BUS.register(new IronsAffinityHandler());
-            MinecraftForge.EVENT_BUS.register(new ArsSpellScalingHandler());
+            // Cross-mod combat stat bridge, both directions (same pair as the NeoForge build).
+            MinecraftForge.EVENT_BUS.register(new com.otectus.arsnspells.combat.ArsDamageBridge());
+            MinecraftForge.EVENT_BUS.register(new com.otectus.arsnspells.combat.IronsDamageBridge());
             MinecraftForge.EVENT_BUS.register(new ResonanceEvents());
             MinecraftForge.EVENT_BUS.register(new RegenSynergyHandler());
             MinecraftForge.EVENT_BUS.register(new com.otectus.arsnspells.casting.IronsCastPayments());
             MinecraftForge.EVENT_BUS.register(new IronsLPHandler());
+            MinecraftForge.EVENT_BUS.register(new com.otectus.arsnspells.compat.curios.IronsCurioDiscountHandler());
             // IronsAuraHandler deleted: Covenant of the Seven's own Iron's integration
             // deducts aura natively for Iron's spells. We were double-paying.
         }
@@ -191,6 +194,11 @@ public class ArsNSpells {
                     LOGGER.error("FAILED to register rituals", e);
                 }
             });
+            // Snapshot the Iron's school registry for /ans diagnostics, after
+            // registries freeze. Gated so SchoolIndex never classloads without Iron's.
+            if (ModList.get().isLoaded("irons_spellbooks")) {
+                event.enqueueWork(com.otectus.arsnspells.compat.irons_spells.SchoolIndex::snapshot);
+            }
         } catch (Exception e) {
             LOGGER.error("========================================");
             LOGGER.error("CRITICAL: Ars 'n' Spells initialization failed");
@@ -317,11 +325,22 @@ public class ArsNSpells {
             ok = false;
         }
 
-        // 2. Did the mana + cast-gate mixins merge into their Iron's targets?
+        // 2. Did the mana, cast-gate, payment and ticker mixins merge into their Iron's
+        // targets? Several ANS mixins share a target (AbstractSpell receives the cast gate, the
+        // payment and the damage hooks), so each probe names the handlers it needs.
         ok &= appendMixinProbe(report, "MagicData.mana",
-            "io.redspace.ironsspellbooks.api.magic.MagicData");
+            "io.redspace.ironsspellbooks.api.magic.MagicData",
+            "getMana", "scaleManaForCastGate", "setMana", "addMana", "clearCastQuote", "bindCarrier");
         ok &= appendMixinProbe(report, "AbstractSpell.castGate",
-            "io.redspace.ironsspellbooks.api.spells.AbstractSpell");
+            "io.redspace.ironsspellbooks.api.spells.AbstractSpell", "validation");
+        ok &= appendMixinProbe(report, "AbstractSpell.payment",
+            "io.redspace.ironsspellbooks.api.spells.AbstractSpell",
+            "invocation", "priceAfterEvent", "nativeWrite", "effect");
+        ok &= appendMixinProbe(report, "MagicManager.ticker",
+            "io.redspace.ironsspellbooks.capabilities.magic.MagicManager",
+            "caller", "stopAfterRejectedEffect", "deferChannelAffordability");
+        ok &= appendMixinProbe(report, "MagicManager.regenScope",
+            "io.redspace.ironsspellbooks.capabilities.magic.MagicManager", "scopeRegen");
         ok &= appendMixinProbe(report, "Scroll.cost",
             "io.redspace.ironsspellbooks.item.Scroll");
 
@@ -353,21 +372,35 @@ public class ArsNSpells {
     }
 
     /**
-     * Report whether any of our mixins merged a member into {@code targetClassName}.
+     * Report whether our mixins merged into {@code targetClassName}, and every named handler
+     * with them. Mixin renames a merged handler with a prefix
+     * ({@code wrapMethod$zdp000$ars_n_spells$arsnspells$invocation}), so a handler is matched by
+     * the {@code arsnspells$<handler>} its name contains. No names accepts any merged member.
      *
      * @return true if the probe passed, so callers can fold it into an overall status
      */
-    private static boolean appendMixinProbe(StringBuilder report, String label, String targetClassName) {
+    private static boolean appendMixinProbe(StringBuilder report, String label, String targetClassName,
+                                            String... handlers) {
         report.append(" | ").append(label).append('=');
         try {
-            Class<?> target = Class.forName(targetClassName);
+            Class<?> target = Class.forName(targetClassName, false, ArsNSpells.class.getClassLoader());
+            java.util.List<String> merged = new java.util.ArrayList<>();
             for (java.lang.reflect.Method m : target.getDeclaredMethods()) {
-                if (m.getName().contains("arsnspells$")) {
-                    report.append("OK");
-                    return true;
-                }
+                if (m.getName().contains("arsnspells$")) merged.add(m.getName());
             }
-            report.append("NOT-APPLIED");
+            if (merged.isEmpty()) {
+                report.append("NOT-APPLIED");
+                return false;
+            }
+            java.util.List<String> missing = new java.util.ArrayList<>();
+            for (String handler : handlers) {
+                if (merged.stream().noneMatch(name -> name.contains("arsnspells$" + handler))) missing.add(handler);
+            }
+            if (missing.isEmpty()) {
+                report.append("OK");
+                return true;
+            }
+            report.append("MISSING(").append(String.join(",", missing)).append(')');
             return false;
         } catch (Throwable t) {
             report.append("ERROR(").append(t.getClass().getSimpleName()).append(')');

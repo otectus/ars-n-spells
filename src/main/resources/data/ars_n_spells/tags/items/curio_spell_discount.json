@@ -1,0 +1,6 @@
+{
+  "replace": false,
+  "values": [
+    { "id": "#irons_spellbooks:school_focus", "required": false }
+  ]
+}

@@ -45,6 +45,19 @@ public final class ModTags {
     public static final TagKey<Item> IRONS_SPELL_BOOKS =
         ItemTags.create(new ResourceLocation(ArsNSpells.MODID, "irons_spell_books"));
 
+    /**
+     * Glyph items whose spell part must not be exported onto an Iron's scroll or cast through
+     * the cross-cast pipeline.
+     *
+     * <p>Exists for addon glyphs that only work inside their own caster's context. The shipped
+     * file lists Ars Zero's multi-phase glyphs (temporal context, sustain, anchor, select,
+     * discard): outside a Spell Staff they have no phase context to act on, so a scroll carrying
+     * them would cast a spell the player never built. Entries are {@code required: false}, so
+     * the tag loads cleanly when the addon is absent; packs extend or {@code replace} it.
+     */
+    public static final TagKey<Item> CROSS_CAST_BLACKLIST =
+        ItemTags.create(new ResourceLocation(ArsNSpells.MODID, "cross_cast_blacklist"));
+
     /** Blocks that count as Source Jars for the regen synergy scan. */
     public static final TagKey<Block> SOURCE_JARS =
         BlockTags.create(new ResourceLocation(ArsNSpells.MODID, "source_jars"));

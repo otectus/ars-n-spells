@@ -65,6 +65,8 @@ class ArsNSpellsMixinPluginGatingTest {
         String[] gatedSuffixes = {
             "MixinIronsSpellDamage",
             "MixinIronsMagicDataMana",
+            "MixinIronsCastTicker",
+            "MixinIronsManaRegen",
             "MixinScrollItem",
             "MixinSanctifiedAbstractSpell",
         };
@@ -72,6 +74,29 @@ class ArsNSpellsMixinPluginGatingTest {
             String fqn = "com.otectus.arsnspells.mixin.irons." + suffix;
             assertFalse(plugin.shouldApplyMixin("any.target", fqn),
                 suffix + " must NOT apply when Iron's is absent (regression check)");
+        }
+    }
+
+    @Test
+    void castProbeAppliesOnlyWithTheGameTestPropertyAndIrons() throws Exception {
+        // MixinCastProbe stands in for another mod inside Iron's mana block during GameTests.
+        // It must never apply in a normal game, and never without Iron's.
+        String target = "io.redspace.ironsspellbooks.api.spells.AbstractSpell";
+        String mixin = "com.otectus.arsnspells.mixin.gametest.MixinCastProbe";
+        String property = "ans.gametest.castProbe";
+        String previous = System.getProperty(property);
+        try {
+            System.clearProperty(property);
+            assertFalse(newPluginWithIronsPresent(true).shouldApplyMixin(target, mixin),
+                "the GameTest cast probe must not apply without its property");
+            System.setProperty(property, "true");
+            assertTrue(newPluginWithIronsPresent(true).shouldApplyMixin(target, mixin),
+                "the GameTest cast probe applies when the GameTest run sets its property");
+            assertFalse(newPluginWithIronsPresent(false).shouldApplyMixin(target, mixin),
+                "the GameTest cast probe targets Iron's and must not apply without it");
+        } finally {
+            if (previous == null) System.clearProperty(property);
+            else System.setProperty(property, previous);
         }
     }
 

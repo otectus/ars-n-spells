@@ -90,9 +90,8 @@ public final class AttemptLedger {
     /**
      * Debit the quoted legs and hold them.
      *
-     * <p>Each leg is recorded at the amount {@link ResourceAccess#debit} says it actually moved,
-     * not the amount asked for. A partial drain therefore produces a smaller reservation rather
-     * than a phantom one, and the release below returns exactly that smaller amount.
+     * <p>Each leg records protected native before/after observations, including a failed or
+     * throwing API call. Compensation owns only the observed debit and retains unpaid credit.
      *
      * @return what was actually reserved, per leg
      */
@@ -107,12 +106,24 @@ public final class AttemptLedger {
                 "Illegal cast-attempt transition " + attempt.state() + " -> " + AttemptState.RESERVED
                     + " for attempt " + attempt.attemptId());
         }
-        List<ResourceAmount> reserved = new ArrayList<>();
+        attempt.reserve(List.of());
+        attempt.beginReservation();
+        try {
         for (ResourceAmount leg : attempt.quote().legs()) {
-            double moved = access.debit(attempt.playerId(), leg.unit(), leg.amount());
-            reserved.add(new ResourceAmount(leg.unit(), Math.max(0.0d, moved)));
+            ResourceMovement move = access.observeDebit(attempt.playerId(), leg.unit(), leg.amount());
+            boolean accepted;
+            try { accepted = access.acceptsDebit(leg.unit(), move); }
+            catch (RuntimeException error) {
+                if (move.error() != null) error.addSuppressed(move.error());
+                move = new ResourceMovement(move.before(), move.requested(), move.after(), move.reported(), move.attempted(), error);
+                accepted = false;
+            }
+            // Publish before another API call can throw or re-enter the ledger.
+            attempt.recordDebit(leg.unit(), move, accepted);
+            if (!accepted || attempt.releaseRequested()) break;
         }
-        attempt.reserve(reserved);
+        } finally { attempt.endReservation(); }
+        if (attempt.releaseRequested()) settle(attempt, access, attempt.failureRequested());
         return attempt.reservedLegs();
     }
 
@@ -171,6 +182,18 @@ public final class AttemptLedger {
         return Collections.unmodifiableList(expired);
     }
 
+    public void restore(UUID id, UUID player, List<ResourceAmount> owed, java.util.Set<ResourceUnit> unknown) {
+        CostQuote quote = new CostQuote(ResourceAmount.zero(ResourceUnit.ARS_MANA), List.of(), List.of(), 0);
+        CastAttempt attempt = new CastAttempt(id, player, "recovery:" + id, 0, quote);
+        attempt.restoreObligation(owed, unknown);
+        byPlayer.computeIfAbsent(player, ignored -> new LinkedHashMap<>()).put(id, new Entry(attempt, 0));
+    }
+    public List<CastAttempt> allOpen() {
+        return byPlayer.values().stream().flatMap(entries -> entries.values().stream()).map(e -> e.attempt).toList();
+    }
+    /** Detach only when the server has saved unresolved obligations. */
+    public void clear() { byPlayer.clear(); }
+
     /** Number of attempts still open, across every player. */
     public int openCount() {
         int count = 0;
@@ -183,6 +206,9 @@ public final class AttemptLedger {
     private List<ResourceAmount> settle(CastAttempt attempt, ResourceAccess access, boolean failed) {
         Objects.requireNonNull(attempt, "attempt");
         Objects.requireNonNull(access, "access");
+        // A re-entrant cancellation during an adapter call cannot release an observation
+        // that has not returned yet. Defer compensation until the after-read is recorded.
+        if (attempt.reserving()) { attempt.deferRelease(failed); return List.of(); }
         // Move first, refund second. An illegal settlement must throw before any resource
         // has been credited, or a rejected call still hands the player their mana back.
         if (!attempt.state().isTerminal()) {
@@ -195,15 +221,20 @@ public final class AttemptLedger {
         // Guard the credit, not the state change: a second caller still needs the attempt to end
         // up terminal, it just must not be paid twice.
         List<ResourceAmount> refunded = Collections.emptyList();
-        if (attempt.tryMarkReleased()) {
-            List<ResourceAmount> credits = new ArrayList<>();
-            for (ResourceAmount leg : attempt.reservedLegs()) {
-                double moved = access.credit(attempt.playerId(), leg.unit(), leg.amount());
-                credits.add(new ResourceAmount(leg.unit(), Math.max(0.0d, moved)));
-            }
-            refunded = Collections.unmodifiableList(credits);
+        if (attempt.beginCompensation()) {
+            try {
+                List<ResourceAmount> credits = new ArrayList<>();
+                for (ResourceAmount leg : attempt.remainingRefunds()) {
+                    if (attempt.unknownUnits().contains(leg.unit())) continue;
+                    ResourceMovement move = access.observeCredit(attempt.playerId(), leg.unit(), leg.amount());
+                    attempt.recordCredit(leg.unit(), move);
+                    credits.add(new ResourceAmount(leg.unit(), move.credited()));
+                }
+                refunded = Collections.unmodifiableList(credits);
+                if (attempt.compensationComplete()) attempt.tryMarkReleased();
+            } finally { attempt.endCompensation(); }
         }
-        forget(attempt);
+        if (attempt.isReleased()) forget(attempt);
         return refunded;
     }
 

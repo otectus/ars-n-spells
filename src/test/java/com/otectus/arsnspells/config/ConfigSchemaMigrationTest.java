@@ -124,7 +124,8 @@ class ConfigSchemaMigrationTest {
                 fail("AnsConfig." + name + " must exist (3.3.0 T1.2)");
             }
         }
-        assertEquals(2, AnsConfig.CURRENT_SCHEMA_VERSION,
-            "schema 2 migrates Source income from per scan to per second");
+        assertEquals(3, AnsConfig.CURRENT_SCHEMA_VERSION,
+            "schema 2 migrates Source income from per scan to per second; schema 3 adds the "
+                + "inscribed Ars spell cooldown");
     }
 }

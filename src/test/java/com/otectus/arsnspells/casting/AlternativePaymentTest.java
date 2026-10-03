@@ -119,7 +119,8 @@ class AlternativePaymentTest {
         var invalidReceipt = AlternativePayment.reserve(UUID.randomUUID(), PLAYER, ResourceUnit.LP, 100,
             lp, VERIFIED_LP, PaymentOpenFailurePolicy.LEGACY_OPEN);
         assertFalse(invalidReceipt.allowsCast());
-        assertEquals(0, AlternativePayment.openCount());
+        assertEquals(1, AlternativePayment.openCount());
+        assertTrue(invalidReceipt.leg().unknown(), "unobservable mutation must retain a quarantined obligation");
     }
 
     @Test
@@ -264,7 +265,12 @@ class AlternativePaymentTest {
         aura.creditFraction = 0.5d;
 
         assertEquals(50.0d, AlternativePayment.release(attempt, aura));
+        assertEquals(1, AlternativePayment.openCount());
+        assertEquals(50.0d, AlternativePayment.peek(attempt).remaining());
+        aura.creditFraction = 1;
+        assertEquals(50.0d, AlternativePayment.release(attempt, aura));
         assertEquals(0, AlternativePayment.openCount());
+        assertEquals(1000, aura.balance);
     }
 
     @Test
@@ -278,14 +284,15 @@ class AlternativePaymentTest {
     }
 
     @Test
-    void logoutDropsHeldLegsWithoutRefunding() {
+    void logoutRetainsHeldLegsForRecovery() {
         UUID attempt = UUID.randomUUID();
         FakePool lp = new FakePool(ResourceUnit.LP, 500.0d);
         AlternativePayment.reserve(attempt, PLAYER, ResourceUnit.LP, 100.0d, lp, VERIFIED_LP,
             PaymentOpenFailurePolicy.REFUSE);
 
         AlternativePayment.forgetPlayer(PLAYER);
-        assertEquals(0, AlternativePayment.openCount());
+        assertEquals(1, AlternativePayment.openCount());
+        assertTrue(AlternativePayment.peek(attempt).releaseRequested());
         assertEquals(0, lp.credits);
     }
 }

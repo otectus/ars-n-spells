@@ -12,6 +12,8 @@ import java.util.Set;
  * when the dependency is present on the classpath.
  */
 public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
+    /** Mirrors {@code CastProbe.PROPERTY}; a mixin plugin must not load mod classes. */
+    static final String CAST_PROBE_PROPERTY = "ans.gametest.castProbe";
     private boolean ironsPresent;
     private boolean sanctifiedPresent;
 
@@ -45,6 +47,11 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        // GameTest-only stand-in for another mod inside Iron's mana block. Never applied in a
+        // normal game: only the GameTest run configuration sets the property.
+        if (mixinClassName.endsWith("MixinCastProbe")) {
+            return ironsPresent && Boolean.getBoolean(CAST_PROBE_PROPERTY);
+        }
         // ANS-HIGH-009: MixinSanctifiedAbstractSpell needs BOTH Iron's (to load AbstractSpell)
         // AND Sanctified Legacy (which adds the canBeCraftedBy method). Without Sanctified,
         // require=0 saves us, but the explicit gate documents the intent and is robust to
@@ -83,6 +90,8 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.endsWith("MixinIronsManaBarVisibility")
             || mixinClassName.endsWith("MixinIronsCastValidation")
             || mixinClassName.endsWith("MixinIronsCastPayment")
+            || mixinClassName.endsWith("MixinIronsCastTicker")
+            || mixinClassName.endsWith("MixinIronsManaRegen")
             || mixinClassName.endsWith("MagicDataAccessor")
             || mixinClassName.endsWith("MixinScrollItem")
             || mixinClassName.endsWith("MixinInscriptionTableMenu")

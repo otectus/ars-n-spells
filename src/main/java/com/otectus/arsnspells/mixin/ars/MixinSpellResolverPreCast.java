@@ -40,5 +40,8 @@ public abstract class MixinSpellResolverPreCast {
     private void arsnspells$finishCast(CallbackInfoReturnable<?> cir) {
         // Includes native failure, downstream event veto, and SUCCESS_NO_EXPEND.
         ArsCastPayments.finish(spellContext);
+        if (spellContext != null && spellContext.getUnwrappedCaster() instanceof Player player
+                && !player.level().isClientSide() && cir.getReturnValue() instanceof Boolean resolved)
+            com.otectus.arsnspells.spell.CrossCastContext.recordResolution(player, resolved);
     }
 }

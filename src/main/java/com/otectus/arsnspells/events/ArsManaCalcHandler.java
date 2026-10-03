@@ -81,13 +81,47 @@ public class ArsManaCalcHandler {
         // tell() pattern has no observable behaviour change in the no-reentry case
         // (one-tick latency on attribute sync) but eliminates the stack-overflow
         // hazard if Iron's internal event behaviour ever evolves.
-        final int finalMax = event.getMax();
-        if (player.getServer() != null) {
-            player.getServer().tell(new net.minecraft.server.TickTask(0,
-                () -> EquipmentIntegration.syncIronsMaxToArs(player, finalMax)));
-        } else {
-            EquipmentIntegration.syncIronsMaxToArs(player, finalMax);
+        //
+        // 3.3.5: one deferred sync per player, applying the newest maximum. Ars recalculates
+        // its max several times a tick (both player-tick phases, equipment reconciliation), and
+        // each call used to queue its own task holding the value it saw. A value computed
+        // before an equipment change could then be applied after the newer one.
+        scheduleCeilingSync(player, event.getMax());
+    }
+
+    private static final java.util.Map<java.util.UUID, Integer> PENDING_CEILINGS =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    static void scheduleCeilingSync(Player player, int max) {
+        net.minecraft.server.MinecraftServer server = player.getServer();
+        if (server == null) {
+            EquipmentIntegration.syncIronsMaxToArs(player, max);
+            return;
         }
+        java.util.UUID id = player.getUUID();
+        // A queued task already exists; it will read this newer value when it runs.
+        if (PENDING_CEILINGS.put(id, max) != null) return;
+        server.tell(new net.minecraft.server.TickTask(server.getTickCount(), () -> {
+            Integer latest = PENDING_CEILINGS.remove(id);
+            net.minecraft.server.level.ServerPlayer live = server.getPlayerList().getPlayer(id);
+            // The player may have left, respawned into a new entity, or the mode may have
+            // changed since this was queued; the live entity and routing decide.
+            if (latest == null || live == null || live.isRemoved()) return;
+            ManaUnificationMode mode = BridgeManager.getCurrentMode();
+            if (!BridgeManager.isUnificationEnabled() || mode == null || !mode.isArsPrimary()) return;
+            EquipmentIntegration.syncIronsMaxToArs(live, latest);
+        }));
+    }
+
+    @SubscribeEvent
+    public static void onLogout(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        PENDING_CEILINGS.remove(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onServerStopping(net.minecraftforge.event.server.ServerStoppingEvent event) {
+        // An unrun task must not leave a mark that suppresses the next world's first sync.
+        PENDING_CEILINGS.clear();
     }
 
     @SubscribeEvent

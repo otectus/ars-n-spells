@@ -11,9 +11,11 @@ import com.otectus.arsnspells.cooldown.CooldownCategory;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Central spell analysis utility. Correctly identifies the first effect glyph
@@ -32,22 +34,31 @@ public final class SpellAnalysis {
         private final @Nullable AbstractSpellPart castMethod;
         private final List<AbstractSpellPart> allEffects;
         private final String dominantSchool;
+        private final Set<String> schools;
         private final CooldownCategory category;
         private final List<String> schoolKeys;
         private final String mappingDigest;
+        private final List<String> allSchoolKeys;
 
         Result(@Nullable AbstractSpellPart firstEffect,
                @Nullable AbstractSpellPart castMethod,
                List<AbstractSpellPart> allEffects,
                String dominantSchool,
+               Set<String> schools,
                CooldownCategory category) {
             this.firstEffect = firstEffect;
             this.castMethod = castMethod;
             this.allEffects = Collections.unmodifiableList(allEffects);
             this.dominantSchool = dominantSchool;
+            this.schools = Collections.unmodifiableSet(schools);
             this.category = category;
             this.schoolKeys = SchoolResolver.resolveKeys(firstEffect);
             this.mappingDigest = SchoolMappings.get().digest();
+            // Every non-generic school key across all effects, in order: the candidate set the
+            // multi_school_power_policy aggregates over. Affinity and progression keep using
+            // schoolKey(), the primary school only.
+            this.allSchoolKeys = allEffects.stream().flatMap(effect -> SchoolResolver.resolveKeys(effect).stream())
+                .filter(key -> !SchoolKeys.GENERIC.equals(key)).distinct().toList();
         }
 
         /** The first AbstractEffect glyph in the recipe, or null if none found. */
@@ -74,12 +85,19 @@ public final class SpellAnalysis {
 
         public String mappingDigest() { return mappingDigest; }
 
+        /** Every non-generic school key across all effects, primary first. */
+        public List<String> allSchoolKeys() { return allSchoolKeys; }
+
+        /** Every canonical school any effect resolves to, in recipe order. */
+        public Set<String> schools() { return schools; }
+
         /** The cooldown category for this spell. */
         public CooldownCategory category() { return category; }
     }
 
     private static final Result EMPTY = new Result(
-            null, null, Collections.emptyList(), "generic", CooldownCategory.UTILITY);
+            null, null, Collections.emptyList(), "generic", Collections.emptySet(),
+            CooldownCategory.UTILITY);
 
     /**
      * Analyze an Ars Nouveau spell and return structured information about its
@@ -139,9 +157,24 @@ public final class SpellAnalysis {
         AbstractSpellPart representative = firstEffect != null ? firstEffect : firstFilter;
 
         String school = deriveSchool(representative);
+        Set<String> schools = deriveSchools(allEffects);
         CooldownCategory category = deriveCategory(representative);
 
-        return new Result(representative, castMethod, allEffects, school, category);
+        return new Result(representative, castMethod, allEffects, school, schools, category);
+    }
+
+    /** Every canonical school the effects resolve to, in recipe order, GENERIC excluded. */
+    public static Set<String> deriveSchools(@Nullable List<AbstractSpellPart> effects) {
+        if (effects == null || effects.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<String> schools = new LinkedHashSet<>();
+        for (AbstractSpellPart effect : effects) {
+            for (SpellSchoolId school : SchoolResolver.resolveAll(effect)) {
+                schools.add(school.id());
+            }
+        }
+        return schools;
     }
 
     /**

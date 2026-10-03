@@ -6,6 +6,7 @@ import com.otectus.arsnspells.contract.CastAttempt;
 import com.otectus.arsnspells.contract.CostQuote;
 import com.otectus.arsnspells.contract.ResourceAccess;
 import com.otectus.arsnspells.contract.ResourceAmount;
+import com.otectus.arsnspells.contract.ResourceMovement;
 import com.otectus.arsnspells.contract.ResourceUnit;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
@@ -96,6 +97,7 @@ public final class CastLedger {
      * @return what was actually taken, per leg; empty when the attempt could not be reserved
      */
     public static List<ResourceAmount> reserve(CastAttempt attempt, ResourceAccess access) {
+        for (var leg : attempt.quote().legs()) access.prepare(attempt.playerId(), leg.unit());
         attempt.validate();
         attempt.markQuoted();
         return LEDGER.reserve(attempt, access);
@@ -131,17 +133,81 @@ public final class CastLedger {
         if (event.phase != TickEvent.Phase.END || event.getServer() == null) {
             return;
         }
-        if (LEDGER.openCount() == 0) {
+        if (event.getServer().overworld().getGameTime() % 20 == 0) AlternativePayment.retryReleases();
+        if (LEDGER.openCount() == 0 || event.getServer().overworld().getGameTime() % 20 != 0) {
             return;
         }
         MinecraftServer server = event.getServer();
+        ResourceAccess access = forServer(server);
         List<CastAttempt> expired = LEDGER.expireOlderThan(
-            server.overworld().getGameTime(), ATTEMPT_TTL_TICKS, forServer(server));
+            server.overworld().getGameTime(), ATTEMPT_TTL_TICKS, access);
         for (CastAttempt attempt : expired) {
-            LOGGER.warn("Swept a cast attempt that outlived its {}-tick TTL for {}; "
-                    + "its reservation has been released.",
-                ATTEMPT_TTL_TICKS, attempt.playerId());
+            if (!attempt.isReleased()) releaseIfCapped(LEDGER, attempt, access);
+            if (attempt.isReleased()) LOGGER.debug("Released expired attempt {} for {}", attempt.attemptId(), attempt.playerId());
         }
+    }
+
+    /**
+     * Whether an earlier attempt still owes this player a refund that must be settled before
+     * anything new is taken. What can be settled now is settled first.
+     *
+     * <p>A refund lands in a native pool that clamps at its ceiling. Once the pool has refilled
+     * to its ceiling (by regeneration, or because the ceiling fell under the balance), the rest
+     * of the refund has nowhere to go. Before this, that remainder stayed owed for good: each
+     * retry credited nothing, each new cast was refused as {@code INCOMPLETE_COMPENSATION}, and
+     * the recovery journal carried it across restarts, so the player could not cast at all. A
+     * remainder a full pool cannot hold is now released and logged as capped. A pool that still
+     * has room, or a movement whose outcome is unknown, keeps blocking as before.
+     */
+    public static boolean blocksPayment(Player player) {
+        return blocksPayment(LEDGER, player.getUUID(), () -> forPlayer(player));
+    }
+
+    /** {@link #blocksPayment(Player)} against any ledger and pool; the unit-test seam. */
+    static boolean blocksPayment(AttemptLedger ledger, UUID player, java.util.function.Supplier<ResourceAccess> pools) {
+        ResourceAccess access = null;
+        for (CastAttempt attempt : ledger.openFor(player)) {
+            if (!attempt.state().isTerminal() || attempt.isReleased()) continue;
+            if (access == null) access = pools.get();
+            ledger.cancel(attempt, access);
+            if (!attempt.isReleased()) releaseIfCapped(ledger, attempt, access);
+        }
+        return ledger.openFor(player).stream().anyMatch(a -> a.state().isTerminal() && !a.isReleased());
+    }
+
+    /** Release a terminal attempt whose known remainder only fails to land because its pool is full. */
+    private static void releaseIfCapped(AttemptLedger ledger, CastAttempt attempt, ResourceAccess access) {
+        if (!attempt.state().isTerminal() || !attempt.unknownUnits().isEmpty()) return;
+        List<ResourceAmount> owed = attempt.remainingRefunds();
+        if (owed.isEmpty()) return;
+        try {
+            for (ResourceAmount leg : owed) {
+                if (access.current(attempt.playerId(), leg.unit()) < access.max(attempt.playerId(), leg.unit())) return;
+            }
+        } catch (RuntimeException unavailable) {
+            // Offline or unreadable: the remainder may still fit later, so it stays owed.
+            return;
+        }
+        if (!attempt.tryMarkReleased()) return;
+        ledger.cancel(attempt, access); // A released attempt is only forgotten.
+        LOGGER.info("[CastPayment] refund for attempt {} capped: {} did not fit under the player's full pool and was released",
+            attempt.attemptId(), owed);
+    }
+
+    /**
+     * Whether a native payment write took effect, as the native mod and its listeners shaped it.
+     *
+     * <p>Both native pools clamp every write to their ceiling, and {@code ChangeManaEvent}
+     * listeners may change the new balance (a channel discount, a reprieve at zero). Native
+     * casting keeps whatever balance results, so ANS does too, and the reservation records
+     * exactly what moved. Only a write that left the pool unchanged is refused: a cancelled
+     * debit must not become a free spell. Requiring the arithmetic result instead refused every
+     * cast those rules touched and refunded it as a fault.
+     */
+    static boolean acceptsNativeWrite(ResourceMovement move) {
+        if (move.requested() == 0) return move.error() == null;
+        return move.error() == null && move.known() && Double.isFinite(move.reported()) && move.reported() >= 0
+            && move.before() >= move.requested() && move.after() != move.before();
     }
 
     /** A {@link ResourceAccess} bound to one player. */
@@ -172,38 +238,78 @@ public final class CastLedger {
         @Override
         public double current(UUID player, ResourceUnit unit) {
             Player p = resolver.apply(player);
-            return p == null ? 0.0d : BridgeManager.getNativeBridge(unit).getMana(p);
+            return BridgeManager.getNativeBridge(unit).transactionMana(requirePlayer(p));
         }
 
         @Override
         public double max(UUID player, ResourceUnit unit) {
             Player p = resolver.apply(player);
-            return p == null ? 0.0d : BridgeManager.getNativeBridge(unit).getMaxMana(p);
+            return BridgeManager.getNativeBridge(unit).transactionMax(requirePlayer(p));
         }
 
+        private Player requirePlayer(Player player) {
+            if (player == null || player.level().isClientSide() || !player.getServer().isSameThread())
+                throw new IllegalStateException("Native resource requires an available player on the server thread");
+            return player;
+        }
+        @Override public void prepare(UUID id, ResourceUnit unit) {
+            Player player = requirePlayer(resolver.apply(id));
+            if (unit == ResourceUnit.IRONS_MANA)
+                com.otectus.arsnspells.equipment.EquipmentIntegration.ensureSharedPoolCeiling(player);
+        }
+        @Override public double expectedAfterDebit(ResourceUnit unit, double before, double amount) {
+            return unit == ResourceUnit.IRONS_MANA ? (double) ((float) before - (float) amount) : before - amount;
+        }
+
+        /** See {@link CastLedger#acceptsNativeWrite}. */
+        @Override
+        public boolean acceptsDebit(ResourceUnit unit, ResourceMovement move) {
+            return acceptsNativeWrite(move);
+        }
+
+        /**
+         * Pay through the native write, including when the pool holds more than its ceiling.
+         *
+         * <p>A pool can sit above its ceiling for a while: Iron's {@code max_mana} or Ars's
+         * maximum can fall under a full pool when gear, curios, effects or another mod's
+         * modifiers change, and each mod clamps the surplus on its own next write. The payment is
+         * such a write and runs exactly as the native cast would: the price is subtracted and
+         * the result clamped. When the surplus is smaller than the price, only the price moves.
+         * 3.3.4 refused to pay in this state, and nothing ever cleared it, so every cast billed to
+         * that pool failed for as long as the ceiling stayed below the balance.
+         */
         @Override
         public double debit(UUID player, ResourceUnit unit, double amount) {
             Player p = resolver.apply(player);
             if (p == null || amount <= 0.0d) {
                 return 0.0d;
             }
-            double before = BridgeManager.getNativeBridge(unit).getMana(p);
-            if (!BridgeManager.getNativeBridge(unit).consumeMana(p, (float) amount)) {
-                return 0.0d;
-            }
-            double after = BridgeManager.getNativeBridge(unit).getMana(p);
+            requirePlayer(p);
+            double before = current(player, unit);
+            double ceiling = max(player, unit);
+            if (!BridgeManager.getNativeBridge(unit).transactionDebit(p, amount))
+                throw new IllegalStateException("Native debit refused");
+            double after = current(player, unit);
+            if (before > ceiling) com.otectus.arsnspells.bridge.ManaTrace.paidAboveCeiling(p, unit, before, ceiling, amount, after);
             return Math.max(0.0d, before - after);
         }
 
+        /**
+         * Return up to {@code amount}. A pool at or above its ceiling cannot hold more, and a
+         * native write there would clamp the balance down rather than raise it, so nothing is
+         * written; {@link CastLedger#blocksPayment} then releases the remainder as capped.
+         */
         @Override
         public double credit(UUID player, ResourceUnit unit, double amount) {
             Player p = resolver.apply(player);
             if (p == null || amount <= 0.0d) {
                 return 0.0d;
             }
-            double before = BridgeManager.getNativeBridge(unit).getMana(p);
-            BridgeManager.getNativeBridge(unit).addMana(p, (float) amount);
-            double after = BridgeManager.getNativeBridge(unit).getMana(p);
+            requirePlayer(p);
+            double before = current(player, unit);
+            if (before >= max(player, unit)) return 0.0d;
+            BridgeManager.getNativeBridge(unit).transactionCredit(p, amount);
+            double after = current(player, unit);
             return Math.max(0.0d, after - before);
         }
     }

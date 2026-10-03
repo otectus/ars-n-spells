@@ -35,8 +35,10 @@ minecraft {
             property 'ans.iconSmoke', project.hasProperty('withIconClientSmoke').toString()
             property 'ans.iconSmoke.packs', project.hasProperty('withIconPackReview').toString()
             property 'ans.worldUiSmoke', project.hasProperty('withWorldUiSmoke').toString()
+            property 'ans.castingSmoke.client', project.hasProperty('withCastingClientSmoke').toString()
+            property 'ans.castingSmoke.address', project.findProperty('castingSmokeAddress') ?: ''
         }
-        server { args '--nogui' }
+        server { args '--nogui'; property 'ans.castingSmoke.server', project.hasProperty('withCastingServerSmoke').toString() }
 
         // 2.0.0: gameTestServer run target for headless gameplay tests
         // (Phase 3.3 of the audit roadmap). Tests live in
@@ -46,7 +48,10 @@ minecraft {
             args '--nogui'
             // Verify the requested profile against the actual mod list before accepting a green
             // run. Optional tests self-skip, which alone cannot detect a missing runtime jar.
-            property 'ans.gametest.expected.irons_spellbooks', project.hasProperty('withIronsRuntimeGameTests').toString()
+            property 'ans.gametest.expected.irons_spellbooks', (project.hasProperty('withIronsRuntimeGameTests')
+                || project.hasProperty('withIrons316RuntimeGameTests')).toString()
+            property 'ans.gametest.expected.irons_version',
+                project.hasProperty('withIrons316RuntimeGameTests') ? '1.20.1-3.16.3' : '1.20.1-3.15.0'
             property 'ans.gametest.expected.ars_elemental', project.hasProperty('withArsElemental').toString()
             property 'ans.gametest.expected.ars_zero', project.hasProperty('withArsZero').toString()
             property 'ans.gametest.expected.toomanyglyphs', project.hasProperty('withTooManyGlyphs').toString()
@@ -54,6 +59,8 @@ minecraft {
             property 'ans.gametest.covenant.mods', covenantProfileVersions.keySet().join(',')
             covenantProfileVersions.each { id, expected -> property 'ans.gametest.covenant.version.' + id, expected }
             property 'forge.enabledGameTestNamespaces', 'ars_n_spells'
+            // Applies the GameTest-only MixinCastProbe (see ArsNSpellsMixinPlugin); inert until a test arms it.
+            property 'ans.gametest.castProbe', 'true'
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
         }
@@ -91,6 +98,12 @@ repositories {
         name = 'KosmX'
         url = 'https://maven.kosmx.dev/'
     }
+    // irons_lib - runtime dependency of Iron's 3.16.x, used only by -PwithIrons316RuntimeGameTests.
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
     // JEI — compile-only API for the optional client-side proxy-recipe filter.
     maven {
         name = 'BlameJared'
@@ -104,10 +117,23 @@ repositories {
     }
 }
 
+jarJar.enable()
+
 dependencies {
+    implementation(annotationProcessor('io.github.llamalad7:mixinextras-common:0.5.4'))
+    implementation('io.github.llamalad7:mixinextras-forge:0.5.4')
+    jarJar('io.github.llamalad7:mixinextras-forge:0.5.4') {
+        jarJar.ranged(it, '[0.5.4,)')
+    }
+
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf("curse.maven:${ars_nouveau_project}:${ars_nouveau_file}")
-    compileOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${irons_spellbooks_file}")
+    // ForgeGradle cannot deobfuscate two versions of one artifact in a build, so the 3.16.3
+    // profile compiles against 3.16.3 as well; that also proves the sources build against it.
+    def irons316 = project.hasProperty('withIrons316RuntimeGameTests')
+    def ironsFile = irons316 ? irons_spellbooks_316_file : irons_spellbooks_file
+    def geckoVersion = irons316 ? geckolib_316_version : geckolib_version
+    compileOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${ironsFile}")
     // ANS-3.0.0: opt-in Iron's-loaded GameTest profile. By default Iron's stays
     // compileOnly, so `runGameTestServer` exercises the Iron-LESS fallback path and the
     // Iron-loaded gametests self-skip on IronsCompat.isLoaded()==false. Pass
@@ -115,9 +141,14 @@ dependencies {
     // Iron-loaded cross-cast/export integration scenarios actually execute.
     // Iron's pulls a runtime graph that CurseMaven does not resolve transitively;
     // its extra pieces (PlayerAnimator) ride the same profile flag.
-    if (project.hasProperty('withIronsRuntimeGameTests')) {
-        runtimeOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${irons_spellbooks_file}")
+    // -PwithIrons316RuntimeGameTests is the same profile against Iron's 1.20.1-3.16.3, which
+    // additionally needs irons_lib and a newer GeckoLib at runtime (see gradle.properties).
+    if (project.hasProperty('withIronsRuntimeGameTests') || irons316) {
+        runtimeOnly fg.deobf("curse.maven:${irons_spellbooks_project}:${ironsFile}")
         runtimeOnly fg.deobf("dev.kosmx.player-anim:player-animation-lib-forge:${playeranimator_version}")
+    }
+    if (irons316) {
+        runtimeOnly fg.deobf("maven.modrinth:irons-lib:${irons_lib_version}")
     }
     // Optional Ars Nouveau addon profiles. Runtime-only and opt-in: ANS compiles against
     // neither, and the addon GameTests self-skip when the mod is absent, so the default run
@@ -157,8 +188,8 @@ dependencies {
     // (RitualBrazierTile implements GeoBlockEntity), so javac cannot resolve those types
     // without it -- which blocked the ritual GameTests from referencing a brazier at all.
     // Runtime classpath is unchanged; the line below already supplies it there.
-    compileOnly fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
-    runtimeOnly fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
+    compileOnly fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckoVersion}")
+    runtimeOnly fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckoVersion}")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
@@ -202,7 +233,11 @@ mixin {
     config "ars_n_spells.compat.mixins.json"
 }
 
+// The installable artifact must carry the invocation wrapper runtime.
+// Keep an explicitly named slim JAR only for development consumers.
+tasks.named('jarJar') { archiveClassifier = '' }
 jar {
+    archiveClassifier = 'slim'
     manifest {
         attributes([
                 "Specification-Title": mod_id,

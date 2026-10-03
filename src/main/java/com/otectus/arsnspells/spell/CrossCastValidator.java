@@ -74,6 +74,11 @@ public final class CrossCastValidator {
                 if (!com.otectus.arsnspells.util.PayloadBudget.arsSpell(arsTag)) {
                     return ValidationResult.failure("arsnspells.crosscast.invalid.payload_budget");
                 }
+                // Checked on the serialized ids, not the decoded spell: the tag is the source
+                // of truth for what the payload claims to contain.
+                if (!com.otectus.arsnspells.util.ArsSpellIntegrity.blacklistedGlyphIds(arsTag).isEmpty()) {
+                    return ValidationResult.failure("message.ars_n_spells.crosscast.invalid.blacklisted_glyphs");
+                }
                 ResourceLocation arsId = ResourceLocation.tryParse(spellEntry.getString(CrossCastNbt.TAG_SPELL_ID));
                 return ValidationResult.success(CrossSpellType.ARS_NOUVEAU, arsId);
 

@@ -1,0 +1,156 @@
+[
+  {
+    "label": "forge-original-regressions",
+    "source": "/tmp/ans-334-baseline-runtime-forge/logs/latest.log",
+    "archive": "logs/forge-original-regressions.log",
+    "sha256": "bc1ad6a94767a610d64ee7b5c9948374abf027d9297ae4267902cc57764c9f81",
+    "summaries": [
+      "[13Sep2026 22:49:16.090] [Server thread/ERROR] [net.minecraft.gametest.framework.LogTestReporter/]: ironsloaded_hotfixnativerestrictionsandmodechange failed! mode change must cancel latched cast: expected 10.0, got 15.005000114440918",
+      "[13Sep2026 22:49:16.110] [Server thread/ERROR] [net.minecraft.gametest.framework.LogTestReporter/]: ironsloaded_hotfixvetoandceiling failed! native replacement must not issue a second zero-delta write",
+      "[13Sep2026 22:49:16.172] [Server thread/ERROR] [net.minecraft.gametest.framework.LogTestReporter/]: ironsloaded_hotfixchannelfirstandlaterfailure failed! channel cooldown must depend on earlier output",
+      "[13Sep2026 22:49:16.186] [Server thread/ERROR] [net.minecraft.gametest.framework.LogTestReporter/]: ironsloaded_hotfixnativebookandfinalprices failed! ordinary native book initiation failed disabled",
+      "[13Sep2026 22:49:16.488] [Server thread/ERROR] [net.minecraft.gametest.framework.LogTestReporter/]: ironsloaded_hotfixarsprecision failed! one-mana debit from 32768.001 falsely rejected",
+      "[13Sep2026 22:49:19.412] [Server thread/INFO] [net.minecraft.gametest.framework.GameTestServer/]: 5 required tests failed :(",
+      "[13Sep2026 22:49:19.414] [Server thread/INFO] [com.otectus.arsnspells.ArsNSpells/]: ANS-GAMETEST executed=73 skipped=18 byMod={ars_elemental=10, ars_zero=6, toomanyglyphs=2}"
+    ]
+  },
+  {
+    "label": "neoforge-original-regressions",
+    "source": "/tmp/ans-334-baseline-runtime-neo/logs/latest.log",
+    "archive": "logs/neoforge-original-regressions.log",
+    "sha256": "b30e12f69d62a7a70dd3cba127cbd412fb1557b632dd3d6e3d1221360e34307a",
+    "summaries": [
+      "[13Sep2026 22:48:59.313] [Server thread/INFO] [net.minecraft.gametest.framework.GameTestServer/]: 5 required tests failed :(",
+      "[13Sep2026 22:48:59.319] [Server thread/INFO] [com.otectus.arsnspells.ArsNSpells/]: ANS-GAMETEST executed=60 skipped=13 byMod={ars_elemancy=3, ars_elemental=4, ars_zero=6}"
+    ]
+  },
+  {
+    "label": "forge-loaded",
+    "source": "/tmp/ans-334-release-forge-loaded/logs/latest.log",
+    "archive": "logs/forge-loaded.log",
+    "sha256": "7dc9a678034d1c2a0d7f1c6aa8e3bee13f092e68f6dc5d59444120a65abc5460",
+    "summaries": [
+      "[13Sep2026 23:18:50.129] [Server thread/INFO] [net.minecraft.gametest.framework.GameTestServer/]: All 123 required tests passed :)",
+      "[13Sep2026 23:18:50.131] [Server thread/INFO] [com.otectus.arsnspells.ArsNSpells/]: ANS-GAMETEST executed=74 skipped=19 byMod={ars_elemental=10, ars_zero=6, covenant_of_the_seven=1, toomanyglyphs=2}"
+    ]
+  },
+  {
+    "label": "forge-absent",
+    "source": "/tmp/ans-334-release-forge-absent/logs/latest.log",
+    "archive": "logs/forge-absent.log",
+    "sha256": "f1c822767f3271782aa5c48ae2efc84817bc502ea5feadfbd608ee97326eb481",
+    "summaries": [
+      "[13Sep2026 23:23:38.852] [Server thread/INFO] [net.minecraft.gametest.framework.GameTestServer/]: All 123 required tests passed :)",
+      "[13Sep2026 23:23:38.856] [Server thread/INFO] [com.otectus.arsnspells.ArsNSpells/]: ANS-GAMETEST executed=1 skipped=92 byMod={ars_elemental=10, ars_zero=6, covenant_of_the_seven=1, irons_spellbooks=73, toomanyglyphs=2}"
+    ]
+  },
+  {
+    "label": "forge-covenant",
+    "source": "/tmp/ans-334-release-forge-covenant/logs/latest.log",
+    "archive": "logs/forge-covenant.log",
+    "sha256": "dace5f9d031265eab7443a430568e1dfa1016c5d5258d11bac5841a62956eacc",
+    "summaries": [
+      "[13Sep2026 23:29:11.225] [Server thread/INFO] [net.minecraft.gametest.framework.GameTestServer/]: All 123 required tests passed :)",
+      "[13Sep2026 23:29:11.228] [Server thread/INFO] [com.otectus.arsnspells.ArsNSpells/]: ANS-GAMETEST executed=75 skipped=18 byMod={ars_elemental=10, ars_zero=6, toomanyglyphs=2}"
+    ]
+  },
+  {
+    "label": "neoforge-loaded",
+    "source": "/tmp/ans-334-release-neo-loaded/logs/latest.log",
+    "archive": "logs/neoforge-loaded.log",
+    "sha256": "0a7b8c0f88586d6f4a4ad87bacd209c91425c912e89d86c0c87faac3e6a2f5e8",
+    "summaries": [
+      "[13Sep2026 23:21:30.793] [Server thread/INFO] [net.minecraft.gametest.framework.GameTestServer/]: All 111 required tests passed :)",
+      "[13Sep2026 23:21:30.799] [Server thread/INFO] [com.otectus.arsnspells.ArsNSpells/]: ANS-GAMETEST executed=61 skipped=13 byMod={ars_elemancy=3, ars_elemental=4, ars_zero=6}"
+    ]
+  },
+  {
+    "label": "neoforge-absent",
+    "source": "/tmp/ans-334-release-neo-absent/logs/latest.log",
+    "archive": "logs/neoforge-absent.log",
+    "sha256": "fc5de41ecbf4164eb16a950c0a1fb33cef83038183e1bb29dca7e2d545c8ad95",
+    "summaries": [
+      "[13Sep2026 23:22:46.018] [Server thread/INFO] [net.minecraft.gametest.framework.GameTestServer/]: All 111 required tests passed :)",
+      "[13Sep2026 23:22:46.025] [Server thread/INFO] [com.otectus.arsnspells.ArsNSpells/]: ANS-GAMETEST executed=1 skipped=73 byMod={ars_elemancy=3, ars_elemental=4, ars_zero=6, irons_spellbooks=60}"
+    ]
+  },
+  {
+    "label": "forge-integrated-client",
+    "source": "/tmp/ans-334-client-forge/logs/latest.log",
+    "archive": "logs/forge-integrated-client.log",
+    "sha256": "de44d8f2a43e5ffa6ae4362f38e9c38dea2b98a7c33a73dc8d9d9dca77942364",
+    "summaries": [
+      "[13Sep2026 23:02:16.996] [Server thread/INFO] [com.otectus.arsnspells.gametest.CastingSmokeServer/]: ANS_CAST_SERVER_PASS player=380df991-f603-344c-a090-369bad2a924a health=16.012001 mana=970.0 nativeCooldown=true",
+      "[13Sep2026 23:02:18.985] [Render thread/INFO] [com.otectus.arsnspells.client.CastingClientSmoke/]: ANS_CAST_CLIENT_PASS integrated=true health=16.012001 mana=970.0 nativeCooldown=true"
+    ]
+  },
+  {
+    "label": "neoforge-integrated-client",
+    "source": "/tmp/ans-334-client-neoforge/logs/latest.log",
+    "archive": "logs/neoforge-integrated-client.log",
+    "sha256": "ec23c47cd09b80193511dca341f3d07c008966de2e2c756c511fa878bcfd075a",
+    "summaries": [
+      "[13Sep2026 23:05:36.906] [Server thread/INFO] [com.otectus.arsnspells.gametest.CastingSmokeServer/]: ANS_CAST_SERVER_PASS player=380df991-f603-344c-a090-369bad2a924a health=16.012001 mana=970.0 nativeCooldown=true",
+      "[13Sep2026 23:05:37.885] [Render thread/INFO] [com.otectus.arsnspells.client.CastingClientSmoke/]: ANS_CAST_CLIENT_PASS integrated=true health=16.512001 mana=970.0 nativeCooldown=true"
+    ]
+  },
+  {
+    "label": "forge-dedicated-server",
+    "source": "/tmp/ans-334-dedicated-forge/logs/latest.log",
+    "archive": "logs/forge-dedicated-server.log",
+    "sha256": "adc36347a9b7c485f27f8c998899762caba6622cf61f00831eebbe66701b058b",
+    "summaries": [
+      "[13Sep2026 23:08:13.859] [Server thread/INFO] [com.otectus.arsnspells.gametest.CastingSmokeServer/]: ANS_CAST_SERVER_PASS player=380df991-f603-344c-a090-369bad2a924a health=16.006 mana=970.0 nativeCooldown=true"
+    ]
+  },
+  {
+    "label": "forge-dedicated-client",
+    "source": "/tmp/ans-334-client-forge-dedicated/logs/latest.log",
+    "archive": "logs/forge-dedicated-client.log",
+    "sha256": "72e15244449c9996f782d1c77ac21175ed92231271aa745c8031e38f21abd80c",
+    "summaries": [
+      "[13Sep2026 23:08:16.062] [Render thread/INFO] [com.otectus.arsnspells.client.CastingClientSmoke/]: ANS_CAST_CLIENT_PASS integrated=false health=18.506 mana=970.0 nativeCooldown=true",
+      "[13Sep2026 23:08:16.067] [Render thread/INFO] [com.otectus.arsnspells.client.CastingClientSmoke/]: ANS_CAST_CLIENT_PASS integrated=false health=18.506 mana=970.0 nativeCooldown=true",
+      "[13Sep2026 23:08:16.072] [Render thread/INFO] [com.otectus.arsnspells.client.CastingClientSmoke/]: ANS_CAST_CLIENT_PASS integrated=false health=18.506 mana=970.0 nativeCooldown=true",
+      "[13Sep2026 23:08:16.076] [Render thread/INFO] [com.otectus.arsnspells.client.CastingClientSmoke/]: ANS_CAST_CLIENT_PASS integrated=false health=18.506 mana=970.0 nativeCooldown=true"
+    ]
+  },
+  {
+    "label": "neoforge-dedicated-server",
+    "source": "/tmp/ans-334-dedicated-neoforge/logs/latest.log",
+    "archive": "logs/neoforge-dedicated-server.log",
+    "sha256": "af19d140c122d0b4eec414a39f1075fe7dc9e06a877134b104462b516c1f1c33",
+    "summaries": [
+      "[13Sep2026 23:17:54.923] [Server thread/INFO] [com.otectus.arsnspells.gametest.CastingSmokeServer/]: ANS_CAST_SERVER_PASS player=380df991-f603-344c-a090-369bad2a924a health=16.018 mana=970.0 nativeCooldown=true"
+    ]
+  },
+  {
+    "label": "neoforge-dedicated-client",
+    "source": "/tmp/ans-334-client-neoforge-dedicated/logs/latest.log",
+    "archive": "logs/neoforge-dedicated-client.log",
+    "sha256": "4638843b8fb3d3bff28cd000bb97616ab93c25813b663df51a71956620c88cbc",
+    "summaries": [
+      "[13Sep2026 23:17:55.879] [Render thread/INFO] [com.otectus.arsnspells.client.CastingClientSmoke/]: ANS_CAST_CLIENT_PASS integrated=false health=16.018 mana=970.0 nativeCooldown=true"
+    ]
+  },
+  {
+    "label": "forge-final-junit",
+    "counts": {
+      "tests": 866,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 6
+    },
+    "archive": "junit/forge"
+  },
+  {
+    "label": "neoforge-final-junit",
+    "counts": {
+      "tests": 864,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "archive": "junit/neoforge"
+  }
+]

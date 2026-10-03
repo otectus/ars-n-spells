@@ -164,9 +164,10 @@ public class CrossCastingHandler {
         if (action == CrossCastRequestPacket.Action.CYCLE) {
             int nextIndex = (index + 1) % spellList.size();
             setSelectedIndex(tag, nextIndex);
-            Component msg = Component.literal("Cross spell selected: " + (nextIndex + 1)
-                + "/" + spellList.size());
-            player.displayClientMessage(msg, true);
+            player.displayClientMessage(
+                Component.translatable("arsnspells.crosscast.selected", nextIndex + 1, spellList.size())
+                    .withStyle(net.minecraft.ChatFormatting.AQUA),
+                true);
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
                 CrossCastTrace.Stage.CYCLE_APPLIED,
                 "from", index, "to", nextIndex, "size", spellList.size());
@@ -180,7 +181,8 @@ public class CrossCastingHandler {
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
                 CrossCastTrace.Stage.DESCRIPTOR_REJECTED,
                 "reason", vr.reasonKey(), "index", index);
-            player.displayClientMessage(Component.translatable(vr.reasonKey()), true);
+            player.displayClientMessage(
+                Component.translatable(vr.reasonKey()).withStyle(net.minecraft.ChatFormatting.RED), true);
             return false;
         }
         CrossSpellType type = vr.resolvedType();
@@ -253,7 +255,23 @@ public class CrossCastingHandler {
                 missingGlyphs.size(), missingGlyphs);
             player.displayClientMessage(
                 Component.translatable("arsnspells.crosscast.invalid.missing_glyphs",
-                    com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(missingGlyphs)),
+                    com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(missingGlyphs))
+                    .withStyle(net.minecraft.ChatFormatting.RED),
+                true);
+            return false;
+        }
+        // Same pre-decode discipline for glyphs that exist but must not leave their own caster
+        // (see ModTags.CROSS_CAST_BLACKLIST). CrossCastValidator already refuses these on the
+        // request path; this guards the proxy-spell path, which reaches castArsSpell directly.
+        java.util.List<String> blacklistedGlyphs =
+            com.otectus.arsnspells.util.ArsSpellIntegrity.blacklistedGlyphIds(arsSpellTag);
+        if (!blacklistedGlyphs.isEmpty()) {
+            LOGGER.warn("Cross-mod Ars spell uses {} glyph(s) tagged cross_cast_blacklist: {}",
+                blacklistedGlyphs.size(), blacklistedGlyphs);
+            player.displayClientMessage(
+                Component.translatable("message.ars_n_spells.crosscast.invalid.blacklisted_glyphs.detail",
+                    com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(blacklistedGlyphs))
+                    .withStyle(net.minecraft.ChatFormatting.RED),
                 true);
             return false;
         }
@@ -284,7 +302,11 @@ public class CrossCastingHandler {
             CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "runtime", "ARS");
         try {
             InteractionResultHolder<ItemStack> result = caster.castSpell(player.level(), player, hand, null, spell);
-            success = result.getResult().consumesAction();
+            // Ars's caster answers CONSUME even when its resolver refused the cast (no mana, a
+            // vetoed SpellCastEvent, a failed validator), so the resolver's own result decides.
+            CrossCastContext.Entry context = CrossCastContext.peek(player);
+            success = result.getResult().consumesAction()
+                && context != null && Boolean.TRUE.equals(context.resolved);
             return success;
         } finally {
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,

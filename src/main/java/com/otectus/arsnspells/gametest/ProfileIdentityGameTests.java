@@ -76,7 +76,9 @@ public final class ProfileIdentityGameTests {
         if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
-        assertVersion(helper, IronsCompat.MODID, IRONS_PINNED);
+        // The -PwithIrons316RuntimeGameTests profile deliberately runs against Iron's 3.16.3;
+        // the build names the version it put on the classpath so either profile is exact.
+        assertVersion(helper, IronsCompat.MODID, System.getProperty("ans.gametest.expected.irons_version", IRONS_PINNED));
         helper.succeed();
     }
 

@@ -468,6 +468,131 @@ public final class AddonCompatGameTests {
         helper.succeed();
     }
 
+    /** Ars Zero's {@code SpellResolver} subclasses, as of 2.0.2. Class names, never imports. */
+    private static final String[] ARS_ZERO_RESOLVERS = {
+        "com.github.ars_zero.common.spell.WrappedSpellResolver",
+        "com.github.ars_zero.api.spell.MobSpellResolver",
+    };
+
+    /**
+     * Ars Zero 2.0.2 for 1.20.1 declares TerraBlender as a required dependency (the 1.21.1
+     * build requires Ars Elemental instead); a classpath without it is a broken profile.
+     */
+    @GameTest(template = "platform")
+    public static void arsZero_profileIsComplete(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
+            return;
+        }
+        if (!net.minecraftforge.fml.ModList.get().isLoaded("terrablender")) {
+            helper.fail("ars_zero is loaded without terrablender, which it declares as a "
+                + "required dependency. The -PwithArsZero profile must also pull TerraBlender.");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The mana mixins inject into {@code SpellResolver.canCast} and
+     * {@code SpellResolver.expendMana}. A subclass that overrides either one silently takes
+     * every staff cast out of the shared pool, so an override here is a failure, not a warning.
+     */
+    @GameTest(template = "platform")
+    public static void arsZero_resolversInheritManaHooks(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
+            return;
+        }
+        for (String name : ARS_ZERO_RESOLVERS) {
+            Class<?> resolver;
+            try {
+                resolver = Class.forName(name);
+            } catch (ClassNotFoundException e) {
+                helper.fail("Ars Zero no longer ships " + name + "; the addon changed shape and "
+                    + "its mana path has to be re-verified against MixinSpellResolverPreCast");
+                return;
+            }
+            if (!com.hollingsworth.arsnouveau.api.spell.SpellResolver.class.isAssignableFrom(resolver)) {
+                helper.fail(name + " no longer extends SpellResolver, so ANS's mana mixins do not "
+                    + "apply to Spell Staff casts at all");
+                return;
+            }
+            if (declares(resolver, "canCast", net.minecraft.world.entity.LivingEntity.class)) {
+                helper.fail(name + " overrides canCast(LivingEntity): MixinSpellResolverPreCast is "
+                    + "bypassed for Spell Staff casts, so shared-pool mana is never validated");
+                return;
+            }
+            if (declares(resolver, "expendMana")) {
+                helper.fail(name + " overrides expendMana(): the resolver mana hook is bypassed for "
+                    + "Spell Staff casts, so shared-pool mana is never deducted");
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
+    private static boolean declares(Class<?> type, String method, Class<?>... params) {
+        try {
+            type.getDeclaredMethod(method, params);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Every glyph item in {@code #ars_n_spells:cross_cast_blacklist} must be reported by both
+     * integrity overloads. Also proves the shipped tag still names real Ars Zero glyphs: an
+     * empty tag while Zero is loaded means the ids drifted and the blacklist is silently dead.
+     */
+    @GameTest(template = "platform")
+    public static void arsZero_blacklistedGlyphsAreRejected(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, ARS_ZERO)) {
+            return;
+        }
+        List<AbstractSpellPart> tagged = new ArrayList<>();
+        net.minecraft.core.registries.BuiltInRegistries.ITEM
+            .getTag(com.otectus.arsnspells.registry.ModTags.CROSS_CAST_BLACKLIST).ifPresent(named -> {
+                for (net.minecraft.core.Holder<net.minecraft.world.item.Item> holder : named) {
+                    if (holder.value() instanceof com.hollingsworth.arsnouveau.common.items.Glyph glyph
+                        && glyph.spellPart != null
+                        && ARS_ZERO.equals(glyph.spellPart.getRegistryName().getNamespace())) {
+                        tagged.add(glyph.spellPart);
+                    }
+                }
+            });
+        if (tagged.isEmpty()) {
+            helper.fail("#ars_n_spells:cross_cast_blacklist resolves to no Ars Zero glyph item "
+                + "while ars_zero is loaded - the shipped ids no longer match the addon");
+            return;
+        }
+        for (AbstractSpellPart part : tagged) {
+            if (!ArsSpellIntegrity.isBlacklisted(part)) {
+                helper.fail(part.getRegistryName() + " is in the tag but isBlacklisted() says no");
+                return;
+            }
+            if (ArsSpellIntegrity.blacklistedGlyphIds(new Spell(part).serialize()).isEmpty()) {
+                helper.fail(part.getRegistryName() + " is tagged but its serialized payload passes "
+                    + "blacklistedGlyphIds(CompoundTag) - a scroll carrying it would cast");
+                return;
+            }
+            if (ArsSpellIntegrity.blacklistedGlyphIds(new Spell(part)).isEmpty()) {
+                helper.fail(part.getRegistryName() + " is tagged but passes "
+                    + "blacklistedGlyphIds(Spell) - the Spell Loom would export it");
+                return;
+            }
+        }
+        // And the control case: a stock Ars glyph must not be caught.
+        AbstractSpellPart stock = GlyphRegistry.getSpellpartMap().values().stream()
+            .filter(p -> p != null && p.getRegistryName() != null
+                && "ars_nouveau".equals(p.getRegistryName().getNamespace())
+                && !ArsSpellIntegrity.isBlacklisted(p))
+            .findFirst().orElse(null);
+        if (stock == null) {
+            helper.fail("every Ars Nouveau glyph is blacklisted - the tag file is wrong");
+            return;
+        }
+        helper.succeed();
+    }
+
     // ------------------------------------------------------------------
     // Too Many Glyphs
     // ------------------------------------------------------------------
