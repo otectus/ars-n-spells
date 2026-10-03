@@ -90,7 +90,7 @@ public record CrossCastRequestPayload(InteractionHand hand,
         if (NetworkRequestGuard.admit(sender, payload.clientAttemptId()) != RequestAdmission.Result.ACCEPTED) return;
         ItemStack stack = sender.getItemInHand(payload.hand());
         if (payload.carrierFingerprint().isEmpty()
-            || !payload.carrierFingerprint().equals(CarrierFingerprint.of(stack))) {
+            || !payload.carrierFingerprint().equals(CarrierFingerprint.of(stack, sender.level().registryAccess()))) {
             sender.displayClientMessage(Component.translatable("arsnspells.crosscast.stale_carrier"), true);
             sender.inventoryMenu.broadcastChanges();
             return;

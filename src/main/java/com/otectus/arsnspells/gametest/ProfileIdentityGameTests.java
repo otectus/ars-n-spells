@@ -45,7 +45,7 @@ public final class ProfileIdentityGameTests {
 
     @GameTest(template = "platform", batch = "ans_profile_identity")
     public static void requestedProfile_matchesRuntimeMods(GameTestHelper helper) {
-        for (String modId : new String[] {IronsCompat.MODID, ARS_ELEMENTAL, "ars_zero", "ars_elemancy"}) {
+        for (String modId : new String[] {IronsCompat.MODID, ARS_ELEMENTAL, "ars_zero", "ars_elemancy", "ars_affinity"}) {
             String expectedValue = System.getProperty("ans.gametest.expected." + modId);
             if (!"true".equals(expectedValue) && !"false".equals(expectedValue)) {
                 helper.fail("Missing expected profile property for " + modId

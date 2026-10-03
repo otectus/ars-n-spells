@@ -11,7 +11,10 @@
     "irons.MixinIronsSpellPowerResonance",
     "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem",
-    "irons.MixinInscriptionTableMenu"
+    "irons.MixinInscriptionTableMenu",
+    "irons.MixinIronsCastTicker",
+    "irons.MixinIronsManaRegen",
+    "gametest.MixinCastProbe"
   ],
   "client": [
     "irons.MixinIronsManaBarVisibility",

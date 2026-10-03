@@ -48,7 +48,11 @@ public final class EquipmentHandler {
                 event.getFrom(),
                 event.getTo());
         }
-        EquipmentIntegration.recomputeFor(player);
+        // Deliberately no recomputation here. NeoForge posts this event before vanilla removes
+        // the old stack's attribute modifiers and adds the new one's, so a ceiling computed now
+        // mixes the new stack with the old attributes; scrolling the hotbar then pushed a
+        // transient, wrong max into the shared pool's mirror. The DIRTY mark is reconciled at
+        // this player's tick end, after the swap, against the attributes actually in force.
         DIRTY.add(player.getUUID());
     }
 
@@ -67,7 +71,17 @@ public final class EquipmentHandler {
         // Once per second — picks up dynamic Ars perk/potion mana sources. The
         // recompute is cheap and only churns Iron's attributes when a value changed.
         if (DIRTY.remove(player.getUUID()) || player.tickCount % 20 == 0) {
-            EquipmentIntegration.recomputeFor(player);
+            if (com.otectus.arsnspells.bridge.ManaTrace.enabled()) {
+                var before = com.otectus.arsnspells.bridge.ManaTrace.Snapshot.of(player);
+                EquipmentIntegration.recomputeFor(player);
+                com.otectus.arsnspells.bridge.ManaTrace.reconciled(player, before);
+            } else {
+                EquipmentIntegration.recomputeFor(player);
+            }
+        }
+        // Ars potion effects mirrored onto Iron's in ISS_PRIMARY, every tick as on Forge.
+        if (com.otectus.arsnspells.compat.IronsCompat.isLoaded()) {
+            com.otectus.arsnspells.equipment.PotionContributions.reconcile(player);
         }
     }
 

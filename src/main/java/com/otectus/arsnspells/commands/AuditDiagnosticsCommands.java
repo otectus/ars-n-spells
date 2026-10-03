@@ -54,7 +54,7 @@ public final class AuditDiagnosticsCommands {
         say(source, "rates", AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get(), AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get());
         say(source, "mapping", SchoolMappings.get().glyphMappingCount(), SchoolMappings.get().digest());
         if (source.getEntity() instanceof ServerPlayer player) {
-            say(source, "carrier", CarrierFingerprint.of(player.getMainHandItem()));
+            say(source, "carrier", CarrierFingerprint.of(player.getMainHandItem(), player.level().registryAccess()));
         }
         say(source, "evidence");
         return 1;
@@ -78,7 +78,7 @@ public final class AuditDiagnosticsCommands {
         var source = context.getSource();
         ServerPlayer player = source.getPlayerOrException();
         var inspected = HeldSpellInspection.inspect(player, player.getMainHandItem());
-        say(source, "carrier", CarrierFingerprint.of(player.getMainHandItem()));
+        say(source, "carrier", CarrierFingerprint.of(player.getMainHandItem(), player.level().registryAccess()));
         if (!inspected.valid()) { source.sendFailure(Component.translatable(inspected.failureKey())); return 0; }
         Component selection = inspected.crossCast()
             ? Component.translatable("ars_n_spells.diagnostics.inspect_ans_selection", inspected.selection().substring("ans_entry_".length()))
@@ -141,7 +141,7 @@ public final class AuditDiagnosticsCommands {
         for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
             ItemStack stack = player.getInventory().getItem(slot);
             if (!CrossModSpellComponents.has(stack)) continue;
-            say(source, "inventory", slot, CrossModSpellComponents.get(stack).size(), CarrierFingerprint.of(stack));
+            say(source, "inventory", slot, CrossModSpellComponents.get(stack).size(), CarrierFingerprint.of(stack, player.level().registryAccess()));
             count++;
         }
         var dimensions = player.level().registryAccess().registryOrThrow(Registries.DIMENSION_TYPE).keySet().stream()

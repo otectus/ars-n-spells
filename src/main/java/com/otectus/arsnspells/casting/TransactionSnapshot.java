@@ -9,7 +9,7 @@ public record TransactionSnapshot(UUID attemptId, ResourceUnit origin, boolean c
                                   List<ResourceAmount> quoted, List<ResourceAmount> paid, List<ResourceAmount> refunded,
                                   Reason reason, ResourceUnit failureUnit) {
     public enum Stage { RESERVED, COMMITTED, REFUNDED, REFUSED }
-    public enum Reason { NONE, INSUFFICIENT_RESOURCE, CANCELLED, NATIVE_FAILURE, ADAPTER_UNAVAILABLE, RESOURCE_CHANGED }
+    public enum Reason { NONE, INSUFFICIENT_RESOURCE, CANCELLED, NATIVE_FAILURE, ADAPTER_UNAVAILABLE, RESOURCE_CHANGED, PRECISION_LIMIT, CEILING_INCONSISTENT, SETTLEMENT_EXCEPTION, INCOMPLETE_COMPENSATION, CONFIG_CHANGED, IDENTITY_CHANGED, DUPLICATE_EFFECT, INVALID_COST, NATIVE_VETO }
     public TransactionSnapshot {
         Objects.requireNonNull(attemptId);
         Objects.requireNonNull(origin);

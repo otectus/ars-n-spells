@@ -99,6 +99,14 @@
         {
           "condition": "neoforge:loot_table_id",
           "loot_table_id": "irons_spellbooks:chests/pyromancer_tower/pyromancer_supplies"
+        },
+        {
+          "condition": "neoforge:loot_table_id",
+          "loot_table_id": "irons_spellbooks:chests/catacombs/armory_loot"
+        },
+        {
+          "condition": "neoforge:loot_table_id",
+          "loot_table_id": "irons_spellbooks:chests/citadel/citadel_tomes"
         }
       ]
     }

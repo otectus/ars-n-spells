@@ -31,7 +31,8 @@ public final class PacketHandler {
      * server-authoritative cast path from the 1.20.1 build.
      * "6" = transaction_sync removed along with the transaction receipt HUD.
      */
-    public static final String PROTOCOL_VERSION = "6";
+    // 7: carrier revisions cover all native item components, matching Forge's full-NBT check.
+    public static final String PROTOCOL_VERSION = "7";
 
     private PacketHandler() {}
 

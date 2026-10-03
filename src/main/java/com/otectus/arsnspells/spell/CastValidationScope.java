@@ -83,6 +83,15 @@ public final class CastValidationScope {
 
     private static final ThreadLocal<Scope> ACTIVE = new ThreadLocal<>();
 
+    /** Lexical frames restore the outer invocation even if the wrapped native body throws. */
+    public static <T> T with(Object data, UUID player, boolean bypass, double rate, java.util.function.Supplier<T> action) {
+        Scope previous = ACTIVE.get();
+        Scope frame = new Scope(data, player, bypass, rate, System.nanoTime(), true);
+        ACTIVE.set(frame);
+        try { return action.get(); }
+        finally { if (previous == null) ACTIVE.remove(); else ACTIVE.set(previous); }
+    }
+
     private CastValidationScope() {
     }
 
@@ -184,7 +193,7 @@ public final class CastValidationScope {
         if (scope == null || magicData == null || scope.magicData != magicData) {
             return null;
         }
-        if (System.nanoTime() - scope.stampNanos > MAX_AGE_NANOS) {
+        if (!scope.lexical && System.nanoTime() - scope.stampNanos > MAX_AGE_NANOS) {
             // Leaked by a canBeCastedBy that exited without reaching our RETURN hook.
             ACTIVE.remove();
             return null;
@@ -199,7 +208,12 @@ public final class CastValidationScope {
         private final double rate;
         private final long stampNanos;
 
+        private final boolean lexical;
         private Scope(Object magicData, UUID playerId, boolean bypass, double rate, long stampNanos) {
+            this(magicData, playerId, bypass, rate, stampNanos, false);
+        }
+        private Scope(Object magicData, UUID playerId, boolean bypass, double rate, long stampNanos, boolean lexical) {
+            this.lexical = lexical;
             this.magicData = magicData;
             this.playerId = playerId;
             this.bypass = bypass;

@@ -56,6 +56,7 @@ class TagDrivenDetectionTest {
         for (String tag : new String[] {
                 "src/main/resources/data/ars_n_spells/tags/block/source_jars.json",
                 "src/main/resources/data/ars_n_spells/tags/item/curio_spell_discount.json",
+                "src/main/resources/data/ars_n_spells/tags/item/cross_cast_blacklist.json",
                 "src/main/resources/data/ars_n_spells/tags/item/irons_spell_books.json"}) {
             Path p = TestPaths.of(tag);
             assertTrue(Files.exists(p), tag + " must ship with the mod");

@@ -11,7 +11,7 @@
 
 All presets enable mana integration and use an equal normalized cross-cast split. They retain both directional exchange rates and all settings outside their listed changes. Source income is the chosen multiplier times the configured Ars-to-Iron rate per server second. Native casts in separate mode still pay only their own pool. NeoForge has no alternate LP/aura adapter, so its presets do not write Forge payment settings. Legacy-open explicitly allows an unresolved alternate payment to proceed; this compatibility choice appears in the diff and is never silently selected by another preset.
 
-First let 3.3.0 migrate the server configuration to schema 2. Stop the server, then preview its actual generated config:
+First let 3.3.0 or later migrate the server configuration: the tool accepts schema 2 and the schema 3 written by 3.3.5, and refuses anything else. Stop the server, then preview its actual generated config:
 
 ```bash
 python tools/pack_presets.py --list

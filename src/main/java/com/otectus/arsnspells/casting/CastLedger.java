@@ -96,6 +96,7 @@ public final class CastLedger {
      * @return what was actually taken, per leg; empty when the attempt could not be reserved
      */
     public static List<ResourceAmount> reserve(CastAttempt attempt, ResourceAccess access) {
+        for (var leg : attempt.quote().legs()) access.prepare(attempt.playerId(), leg.unit());
         attempt.validate();
         attempt.markQuoted();
         return LEDGER.reserve(attempt, access);
@@ -131,16 +132,15 @@ public final class CastLedger {
         if (event.getServer() == null) {
             return;
         }
-        if (LEDGER.openCount() == 0) {
+        if (event.getServer().overworld().getGameTime() % 20 == 0) AlternativePayment.retryReleases();
+        if (LEDGER.openCount() == 0 || event.getServer().overworld().getGameTime() % 20 != 0) {
             return;
         }
         MinecraftServer server = event.getServer();
         List<CastAttempt> expired = LEDGER.expireOlderThan(
             server.overworld().getGameTime(), ATTEMPT_TTL_TICKS, forServer(server));
         for (CastAttempt attempt : expired) {
-            LOGGER.warn("Swept a cast attempt that outlived its {}-tick TTL for {}; "
-                    + "its reservation has been released.",
-                ATTEMPT_TTL_TICKS, attempt.playerId());
+            if (attempt.isReleased()) LOGGER.debug("Released expired attempt {} for {}", attempt.attemptId(), attempt.playerId());
         }
     }
 
@@ -172,13 +172,27 @@ public final class CastLedger {
         @Override
         public double current(UUID player, ResourceUnit unit) {
             Player p = resolver.apply(player);
-            return p == null ? 0.0d : BridgeManager.getNativeBridge(unit).getMana(p);
+            return BridgeManager.getNativeBridge(unit).transactionMana(requirePlayer(p));
         }
 
         @Override
         public double max(UUID player, ResourceUnit unit) {
             Player p = resolver.apply(player);
-            return p == null ? 0.0d : BridgeManager.getNativeBridge(unit).getMaxMana(p);
+            return BridgeManager.getNativeBridge(unit).transactionMax(requirePlayer(p));
+        }
+
+        private Player requirePlayer(Player player) {
+            if (player == null || player.level().isClientSide() || !player.getServer().isSameThread())
+                throw new IllegalStateException("Native resource requires an available player on the server thread");
+            return player;
+        }
+        @Override public void prepare(UUID id, ResourceUnit unit) {
+            Player player = requirePlayer(resolver.apply(id));
+            if (unit == ResourceUnit.IRONS_MANA)
+                com.otectus.arsnspells.equipment.EquipmentIntegration.ensureSharedPoolCeiling(player);
+        }
+        @Override public double expectedAfterDebit(ResourceUnit unit, double before, double amount) {
+            return unit == ResourceUnit.IRONS_MANA ? (double) ((float) before - (float) amount) : before - amount;
         }
 
         @Override
@@ -187,11 +201,12 @@ public final class CastLedger {
             if (p == null || amount <= 0.0d) {
                 return 0.0d;
             }
-            double before = BridgeManager.getNativeBridge(unit).getMana(p);
-            if (!BridgeManager.getNativeBridge(unit).consumeMana(p, (float) amount)) {
-                return 0.0d;
-            }
-            double after = BridgeManager.getNativeBridge(unit).getMana(p);
+            requirePlayer(p);
+            double before = current(player, unit);
+            if (before > max(player, unit)) throw new IllegalStateException("Debit ceiling inconsistent");
+            if (!BridgeManager.getNativeBridge(unit).transactionDebit(p, amount))
+                throw new IllegalStateException("Native debit refused");
+            double after = current(player, unit);
             return Math.max(0.0d, before - after);
         }
 
@@ -201,9 +216,11 @@ public final class CastLedger {
             if (p == null || amount <= 0.0d) {
                 return 0.0d;
             }
-            double before = BridgeManager.getNativeBridge(unit).getMana(p);
-            BridgeManager.getNativeBridge(unit).addMana(p, (float) amount);
-            double after = BridgeManager.getNativeBridge(unit).getMana(p);
+            requirePlayer(p);
+            double before = current(player, unit);
+            if (before > max(player, unit)) throw new IllegalStateException("Refund ceiling inconsistent");
+            BridgeManager.getNativeBridge(unit).transactionCredit(p, amount);
+            double after = current(player, unit);
             return Math.max(0.0d, after - before);
         }
     }

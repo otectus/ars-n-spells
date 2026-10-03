@@ -104,6 +104,14 @@ public record CostRules(
             conversionKind, crossCastMultiplier, rounding, generation, false);
     }
 
+    /** A repeated synchronization may change the generation without changing the price. */
+    public boolean samePricingAs(CostRules other) {
+        return modeName.equals(other.modeName) && arsToIronsRate == other.arsToIronsRate
+            && ironsToArsRate == other.ironsToArsRate && arsShare == other.arsShare
+            && ironsShare == other.ironsShare && conversionKind == other.conversionKind
+            && crossCastMultiplier == other.crossCastMultiplier && rounding == other.rounding;
+    }
+
     /** Whether this mode splits a cross-system cast across both pools. */
     public boolean isDualCostMode() {
         return "separate".equals(modeName);

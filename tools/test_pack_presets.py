@@ -49,9 +49,18 @@ class PresetsTest(unittest.TestCase):
         self.assertEqual(8, leaves(tomllib.loads(updated))["source_jar_synergy_multiplier"][1])
 
     def test_missing_or_future_schema_refuses(self):
-        for schema in (0, 1, 3):
+        for schema in (0, 1, 4):
             with self.assertRaises(ValueError):
                 preview(CONFIG.replace("config_schema_version = 2", f"config_schema_version = {schema}"), "expert", "forge")
+
+    def test_schema_3_config_is_accepted_and_keeps_its_cooldown(self):
+        config = CONFIG.replace("config_schema_version = 2", "config_schema_version = 3").replace(
+            "cross_cast_cost_multiplier = 1.25", "cross_cast_cost_multiplier = 1.25\ninscribed_ars_default_cooldown_ticks = 40")
+        updated, changes = preview(config, "expert", "forge")
+        self.assertTrue(changes)
+        result = leaves(tomllib.loads(updated))
+        self.assertEqual(3, result["config_schema_version"][1])
+        self.assertEqual(40, result["inscribed_ars_default_cooldown_ticks"][1])
 
     def test_missing_assignment_and_duplicate_leaf_refuse(self):
         with self.assertRaises(ValueError):

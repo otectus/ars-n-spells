@@ -1,0 +1,109 @@
+{
+  "unit_tests": {
+    "tests": 876,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "runtime_profiles": {
+    "absent": {
+      "required_tests": 112,
+      "executed_optional_scenarios": 1,
+      "skipped_optional_scenarios": 74,
+      "identities": [
+        [
+          "irons_spellbooks",
+          "absent",
+          "<absent>"
+        ],
+        [
+          "ars_elemental",
+          "absent",
+          "<absent>"
+        ],
+        [
+          "ars_zero",
+          "absent",
+          "<absent>"
+        ],
+        [
+          "ars_elemancy",
+          "absent",
+          "<absent>"
+        ]
+      ],
+      "log": "evidence/absent.log.gz",
+      "log_sha256": "96adb50414263e6f577a2b7ad5bd02b648f0f05071de936e2dd589d6a9572252"
+    },
+    "irons": {
+      "required_tests": 112,
+      "executed_optional_scenarios": 62,
+      "skipped_optional_scenarios": 13,
+      "identities": [
+        [
+          "irons_spellbooks",
+          "present",
+          "1.21.1-3.16.3"
+        ],
+        [
+          "ars_elemental",
+          "absent",
+          "<absent>"
+        ],
+        [
+          "ars_zero",
+          "absent",
+          "<absent>"
+        ],
+        [
+          "ars_elemancy",
+          "absent",
+          "<absent>"
+        ]
+      ],
+      "log": "evidence/irons.log.gz",
+      "log_sha256": "e8862700cc3ad19c1c45685174e595ab300c643e43c7854aa4ec2ec7874e15aa"
+    },
+    "addons": {
+      "required_tests": 112,
+      "executed_optional_scenarios": 75,
+      "skipped_optional_scenarios": 0,
+      "identities": [
+        [
+          "irons_spellbooks",
+          "present",
+          "1.21.1-3.16.3"
+        ],
+        [
+          "ars_elemental",
+          "present",
+          "0.7.10.1"
+        ],
+        [
+          "ars_zero",
+          "present",
+          "2.0.2"
+        ],
+        [
+          "ars_elemancy",
+          "present",
+          "1.18.3"
+        ]
+      ],
+      "log": "evidence/addons.log.gz",
+      "log_sha256": "afacd7b942395b12c87048512055f934ee811d252bd1e5059fdb33e214e14f8f"
+    }
+  },
+  "artifacts": {
+    "ars_n_spells-3.3.4-sources.jar": {
+      "bytes": 1321142,
+      "sha256": "d0ddf3583d2c329eed5ffe33d6626d82c17f1b0e748ae04ff2e663a581a709f4"
+    },
+    "ars_n_spells-3.3.4.jar": {
+      "bytes": 2222971,
+      "sha256": "12700fe522db6cddc6f108931bd0b3e4542e1b52b443d59722ab7142938cf777"
+    }
+  },
+  "tool_tests": 26,
+  "portable_contract_files": 33
+}

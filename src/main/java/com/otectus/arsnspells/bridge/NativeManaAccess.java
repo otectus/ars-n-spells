@@ -37,6 +37,10 @@ public final class NativeManaAccess {
         return new Scoped(delegate, unit);
     }
     private record Scoped(IManaBridge delegate, ResourceUnit unit) implements IManaBridge {
+            public double transactionMana(Player p) { return with(p, unit, () -> delegate.transactionMana(p)); }
+            public double transactionMax(Player p) { return with(p, unit, () -> delegate.transactionMax(p)); }
+            public boolean transactionDebit(Player p, double amount) { return with(p, unit, () -> delegate.transactionDebit(p, amount)); }
+            public void transactionCredit(Player p, double amount) { with(p, unit, () -> { delegate.transactionCredit(p, amount); return null; }); }
             public float getMana(Player p) { return with(p, unit, () -> delegate.getMana(p)); }
             public float getMaxMana(Player p) { return with(p, unit, () -> delegate.getMaxMana(p)); }
             public void setMana(Player p, float amount) { with(p, unit, () -> { delegate.setMana(p, amount); return null; }); }

@@ -9,6 +9,11 @@ import com.otectus.arsnspells.bridge.SharedPoolCeiling;
 import com.otectus.arsnspells.compat.IronsCompat;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
+import com.otectus.arsnspells.casting.CastLedger;
+import com.otectus.arsnspells.casting.QuoteService;
+import com.otectus.arsnspells.contract.CastAttempt;
+import com.otectus.arsnspells.contract.CostQuote;
+import com.otectus.arsnspells.contract.ResourceUnit;
 import com.otectus.arsnspells.equipment.EquipmentIntegration;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
@@ -259,6 +264,95 @@ public final class SharedPoolManaGameTests {
             if (Math.abs(actual - expected) > 0.01f) {
                 helper.fail(casts + " casts of " + cost + " from " + poolBefore + " must leave "
                     + expected + ", left " + actual);
+            }
+        });
+        helper.succeed();
+    }
+
+    /** Distinct carrier identities so the ledger scenarios cannot find each other's attempts. */
+    private static final String COMMIT_CARRIER = "ans_gametest:commit";
+    private static final String CANCEL_CARRIER = "ans_gametest:cancel";
+
+    /** V01: a settled cast takes the quote, exactly, and never gives it back. (Forge parity.) */
+    @GameTest(template = "platform", batch = "ans_mana_config")
+    public static void ironsLoaded_successfulCastDebitsExactlyTheQuote(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
+            return;
+        }
+        ServerPlayer player = preparedPlayer(helper);
+        runInHybrid(helper, () -> {
+            MagicData data = MagicData.getPlayerMagicData(player);
+            EquipmentIntegration.syncIronsMaxToArs(player, 500.0f);
+            data.setMana(400.0f);
+            float before = data.getMana();
+
+            CostQuote quote = QuoteService.quoteNativeCast(
+                ResourceUnit.ARS_MANA, 100, QuoteService.currentRules());
+            float expectedLeg = QuoteService.legAsFloat(quote, ResourceUnit.IRONS_MANA);
+
+            CastAttempt attempt = CastLedger.open(player.getUUID(), COMMIT_CARRIER, 0, quote,
+                player.level().getGameTime());
+            CastLedger.reserve(attempt, CastLedger.forPlayer(player));
+
+            float afterReserve = data.getMana();
+            if (Math.abs((before - afterReserve) - expectedLeg) > 0.01f) {
+                helper.fail("reserving a " + expectedLeg + " quote moved the pool by "
+                    + (before - afterReserve));
+                return;
+            }
+
+            CastLedger.commitAndComplete(attempt);
+
+            float afterCommit = data.getMana();
+            if (Math.abs(afterCommit - afterReserve) > 0.01f) {
+                helper.fail("committing must not move the pool again: " + afterReserve
+                    + " became " + afterCommit + ". The reservation is the payment");
+            }
+        });
+        helper.succeed();
+    }
+
+    /**
+     * V01: a cancelled cast is refunded once, not once per exit path. (Forge parity.)
+     *
+     * <p>A long cast that was interrupted and then also ended normally used to run the release
+     * path twice and credit the player twice, because nothing tied a refund to the charge it
+     * reversed.
+     */
+    @GameTest(template = "platform", batch = "ans_mana_config")
+    public static void ironsLoaded_cancellationReleasesTheReservationExactlyOnce(
+            GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
+            return;
+        }
+        ServerPlayer player = preparedPlayer(helper);
+        runInHybrid(helper, () -> {
+            MagicData data = MagicData.getPlayerMagicData(player);
+            EquipmentIntegration.syncIronsMaxToArs(player, 500.0f);
+            data.setMana(400.0f);
+            float before = data.getMana();
+
+            CostQuote quote = QuoteService.quoteNativeCast(
+                ResourceUnit.ARS_MANA, 100, QuoteService.currentRules());
+            CastAttempt attempt = CastLedger.open(player.getUUID(), CANCEL_CARRIER, 0, quote,
+                player.level().getGameTime());
+            CastLedger.reserve(attempt, CastLedger.forPlayer(player));
+
+            CastLedger.cancel(attempt, CastLedger.forPlayer(player));
+            float afterFirstRelease = data.getMana();
+            if (Math.abs(afterFirstRelease - before) > 0.01f) {
+                helper.fail("a cancelled cast must return exactly what it took: " + before
+                    + " became " + afterFirstRelease);
+                return;
+            }
+
+            // A second exit path arrives. It must settle the attempt and pay nothing.
+            CastLedger.cancel(attempt, CastLedger.forPlayer(player));
+            float afterSecondRelease = data.getMana();
+            if (Math.abs(afterSecondRelease - afterFirstRelease) > 0.01f) {
+                helper.fail("the second release credited "
+                    + (afterSecondRelease - afterFirstRelease) + " more mana; a refund must "
+                    + "happen exactly once or a cancelled cast prints mana");
             }
         });
         helper.succeed();

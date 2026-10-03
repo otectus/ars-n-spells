@@ -151,7 +151,7 @@ public class CrossCastingHandler {
             int clientIndex = CrossModSpellComponents.get(stack).normalizedIndex();
             PacketHandler.sendToServer(
                 new CrossCastRequestPayload(hand, action, clientIndex, clientAttempt,
-                    com.otectus.arsnspells.network.CarrierFingerprint.of(stack)));
+                    com.otectus.arsnspells.network.CarrierFingerprint.of(stack, player.level().registryAccess())));
             CrossCastTrace.log(clientAttempt, player, CrossCastTrace.Side.C,
                 CrossCastTrace.Stage.REQUEST_SENT,
                 "hand", hand, "action", action, "index", clientIndex);
@@ -198,9 +198,6 @@ public class CrossCastingHandler {
         int index = list.normalizedIndex();
 
         if (action == CrossCastRequestPayload.Action.CYCLE) {
-            if (list.size() <= 1) {
-                return false;
-            }
             int nextIndex = (index + 1) % list.size();
             CrossModSpellComponents.setSelectedIndex(item, nextIndex);
             player.displayClientMessage(

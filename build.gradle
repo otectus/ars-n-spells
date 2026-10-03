@@ -96,20 +96,29 @@ neoForge {
             systemProperty 'ans.iconSmoke', project.hasProperty('withIconClientSmoke').toString()
             systemProperty 'ans.iconSmoke.packs', project.hasProperty('withIconPackReview').toString()
             systemProperty 'ans.worldUiSmoke', project.hasProperty('withWorldUiSmoke').toString()
+            // Casting smoke (same flags as the Forge build): -PwithCastingClientSmoke opens only the
+            // copied QA save, or -PcastingSmokeAddress=<host:port> a disposable QA server.
+            systemProperty 'ans.castingSmoke.client', project.hasProperty('withCastingClientSmoke').toString()
+            systemProperty 'ans.castingSmoke.address', (project.findProperty('castingSmokeAddress') ?: '').toString()
             programArguments.addAll '--username', 'Dev'
         }
         server {
             server()
-            gameDirectory = project.file('run-server')
+            // -PgametestRunDir gives a disposable dedicated-server directory, as on Forge.
+            gameDirectory = project.file(project.findProperty('gametestRunDir') ?: 'run-server')
             programArgument '--nogui'
+            systemProperty 'ans.castingSmoke.server', project.hasProperty('withCastingServerSmoke').toString()
         }
         // Headless gameplay tests. Namespace-gated so other mods' GameTests do not run.
         gameTestServer {
             type = 'gameTestServer'
             gameDirectory = project.file(gametestRunDir)
             systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
+            // Applies the GameTest-only MixinCastProbe (see ArsNSpellsMixinPlugin); inert until a test arms it.
+            systemProperty 'ans.gametest.castProbe', 'true'
             systemProperty 'ans.gametest.expected.irons_spellbooks', project.hasProperty('withIronsRuntimeGameTests').toString()
-            systemProperty 'ans.gametest.expected.ars_elemental', (project.hasProperty('withArsElemental') || project.hasProperty('withArsZero') || project.hasProperty('withArsElemancy')).toString()
+            systemProperty 'ans.gametest.expected.ars_elemental', (project.hasProperty('withArsElemental') || project.hasProperty('withArsZero') || project.hasProperty('withArsElemancy') || project.hasProperty('withArsAffinity')).toString()
+            systemProperty 'ans.gametest.expected.ars_affinity', project.hasProperty('withArsAffinity').toString()
             systemProperty 'ans.gametest.expected.ars_zero', project.hasProperty('withArsZero').toString()
             systemProperty 'ans.gametest.expected.ars_elemancy', project.hasProperty('withArsElemancy').toString()
         }
@@ -141,6 +150,11 @@ neoForge {
 }
 
 dependencies {
+    implementation 'io.github.llamalad7:mixinextras-neoforge:0.5.3'
+    jarJar(implementation('io.github.llamalad7:mixinextras-neoforge:0.5.3')) {
+        version { strictly '[0.5.3,)'; prefer '0.5.3' }
+    }
+
     // Ars Nouveau - hard dependency. Transitives are deliberately left ON so the dev runs get
     // Ars' real runtime graph (GeckoLib, Curios, Nuggets, Patchouli, JEI, TerraBlender, Jade,
     // Infiniverse) and `runClient` boots a genuine Ars install.
@@ -199,8 +213,12 @@ dependencies {
     // no way, and the addon GameTests self-skip when the mod is absent. Ars Zero 2.0.2 declares
     // Ars Elemental as a required dependency, so the Zero profile implies the Elemental one.
     if (project.hasProperty('withArsElemental') || project.hasProperty('withArsZero')
-            || project.hasProperty('withArsElemancy')) {
+            || project.hasProperty('withArsElemancy') || project.hasProperty('withArsAffinity')) {
         runtimeOnly "curse.maven:ars-elemental-${ars_elemental_project}:${ars_elemental_file}"
+    }
+    // Ars Affinity: runtime-only, opt-in, never compiled against (see gradle.properties).
+    if (project.hasProperty('withArsAffinity')) {
+        runtimeOnly "curse.maven:ars-affinity-${ars_affinity_project}:${ars_affinity_file}"
     }
     if (project.hasProperty('withArsZero')) {
         runtimeOnly "curse.maven:ars-zero-${ars_zero_project}:${ars_zero_file}"

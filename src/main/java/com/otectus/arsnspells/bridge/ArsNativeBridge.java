@@ -19,6 +19,23 @@ import net.minecraft.world.entity.player.Player;
  * the mixin's HEAD intercepts no-op so native ManaCap behavior wins.
  */
 public class ArsNativeBridge implements IManaBridge {
+    @Override public double transactionMana(Player player) {
+        return java.util.Objects.requireNonNull(CapabilityRegistry.getMana(player), "Ars mana unavailable").getCurrentMana();
+    }
+    @Override public double transactionMax(Player player) {
+        return java.util.Objects.requireNonNull(CapabilityRegistry.getMana(player), "Ars mana unavailable").getMaxMana();
+    }
+    @Override public boolean transactionDebit(Player player, double amount) {
+        var cap = java.util.Objects.requireNonNull(CapabilityRegistry.getMana(player), "Ars mana unavailable");
+        if (cap.getCurrentMana() < amount) return false;
+        cap.removeMana(amount);
+        return true;
+    }
+    @Override public void transactionCredit(Player player, double amount) {
+        java.util.Objects.requireNonNull(CapabilityRegistry.getMana(player), "Ars mana unavailable").addMana(amount);
+    }
+
+
 
     @Override
     public float getMana(Player player) {
@@ -29,7 +46,7 @@ public class ArsNativeBridge implements IManaBridge {
 
     @Override
     public void setMana(Player player, float amount) {
-        if (player == null) return;
+        if (player == null || player.level().isClientSide()) return;
         ManaCap cap = CapabilityRegistry.getMana(player);
         if (cap == null) return;
         cap.setMana(amount);
@@ -52,7 +69,8 @@ public class ArsNativeBridge implements IManaBridge {
 
     @Override
     public boolean consumeMana(Player player, float amount) {
-        if (player == null || amount <= 0.0f) return amount <= 0.0f;
+        if (player == null || player.level().isClientSide()) return false;
+        if (amount <= 0.0f) return true;
         ManaCap cap = CapabilityRegistry.getMana(player);
         if (cap == null) return false;
         double current = cap.getCurrentMana();

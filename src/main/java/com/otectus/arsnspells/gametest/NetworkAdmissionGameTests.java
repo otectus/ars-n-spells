@@ -23,15 +23,26 @@ public final class NetworkAdmissionGameTests {
     @GameTest(template = "platform")
     public static void staleCarrierFingerprintDetectsItemAndPayloadChanges(GameTestHelper helper) {
         ItemStack book = carrier();
-        String original = CarrierFingerprint.of(book);
-        if (original.isEmpty() || !original.equals(CarrierFingerprint.of(book.copy())))
+        String original = CarrierFingerprint.of(book, helper.getLevel().registryAccess());
+        if (original.isEmpty() || !original.equals(CarrierFingerprint.of(book.copy(), helper.getLevel().registryAccess())))
             helper.fail("Equivalent copied carriers need a stable nonempty fingerprint");
         ItemStack changed = book.copy();
         CrossModSpellComponents.setSelectedIndex(changed, 1);
-        if (original.equals(CarrierFingerprint.of(changed))) helper.fail("A changed selection is a new revision");
+        if (original.equals(CarrierFingerprint.of(changed, helper.getLevel().registryAccess()))) helper.fail("A changed selection is a new revision");
+        ItemStack nativeChanged = book.copy();
+        CompoundTag nativeData = new CompoundTag();
+        nativeData.putString("native_spell", "irons_spellbooks:heal");
+        nativeChanged.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
+            net.minecraft.world.item.component.CustomData.of(nativeData));
+        if (original.equals(CarrierFingerprint.of(nativeChanged, helper.getLevel().registryAccess())))
+            helper.fail("Native data changes must invalidate the request even when ANS inscriptions match");
+        ItemStack renamed = book.copy();
+        renamed.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("changed"));
+        if (original.equals(CarrierFingerprint.of(renamed, helper.getLevel().registryAccess())))
+            helper.fail("A component change must invalidate the carrier revision");
         ItemStack otherItem = new ItemStack(Items.STICK);
         otherItem.applyComponents(book.getComponents());
-        if (original.equals(CarrierFingerprint.of(otherItem))) helper.fail("An item swap must invalidate the request");
+        if (original.equals(CarrierFingerprint.of(otherItem, helper.getLevel().registryAccess()))) helper.fail("An item swap must invalidate the request");
         helper.succeed();
     }
 

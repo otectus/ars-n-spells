@@ -107,9 +107,7 @@ public class ArsNSpells {
         // ---- Game-bus instance handlers (NeoForge.EVENT_BUS) ----
         // NeoForge 1.21.1 rejects EVENT_BUS.register(x) when x has zero
         // @SubscribeEvent methods, so we only register classes that
-        // actually have at least one. Phase 3 will restore the stub
-        // handlers (RegenSynergyHandler, etc.) here as they gain real
-        // subscribed methods.
+        // actually have at least one.
         NeoForge.EVENT_BUS.register(new CooldownHandler());
         NeoForge.EVENT_BUS.register(new AffinityHandler());
         NeoForge.EVENT_BUS.register(new AffinityDecayHandler());
@@ -126,8 +124,10 @@ public class ArsNSpells {
             NeoForge.EVENT_BUS.register(new ResonanceEvents());
             NeoForge.EVENT_BUS.register(new com.otectus.arsnspells.casting.IronsCastPayments());
             NeoForge.EVENT_BUS.register(new IronsCurioDiscountHandler());
-            // RegenSynergyHandler (Source-Jar proximity regen) auto-registers via its
-            // @EventBusSubscriber annotation and self-gates on IronsCompat.isLoaded().
+            // Source-Jar proximity regen. Its handlers are instance methods, so it must be
+            // registered as an instance, as the Forge build does; it has no
+            // @EventBusSubscriber and was never reached before 3.3.5.
+            NeoForge.EVENT_BUS.register(new com.otectus.arsnspells.events.RegenSynergyHandler());
         }
 
         // ArsNSpells's own lifecycle methods (commonSetup, onConfigLoading) are

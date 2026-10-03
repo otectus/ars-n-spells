@@ -40,8 +40,8 @@ public class RitualRegistryHandler {
 
         RitualRegistry.registerRitual(new ManaInfusionRitual());
         RitualRegistry.registerRitual(new SpellTranscriptionRitual());
-        RitualRegistry.registerRitual(new ManaWellRitual());
         RitualRegistry.registerRitual(new SpellbookBindingRitual());
+        RitualRegistry.registerRitual(new ManaWellRitual());
 
         spliceTablet(SpellTranscriptionRitual.REGISTRY_PATH,
             ModItemsRegistry.spellTranscriptionTablet());

@@ -95,6 +95,16 @@ public abstract class MixinIronsMagicDataMana {
         if (!shouldRedirectToArs()) {
             return;
         }
+        // Iron's regeneration clamps to its mirrored max_mana, which can lag the real Ars
+        // ceiling. Routed into the Ars pool, that clamp was a silent debit; see IronsRegenScope.
+        if (com.otectus.arsnspells.bridge.IronsRegenScope.isRegenTickFor(player.getUUID())) {
+            float routed = BridgeManager.getBridge().getMana(player);
+            if (com.otectus.arsnspells.bridge.IronsRegenScope.suppresses(routed, amount)) {
+                com.otectus.arsnspells.bridge.ManaTrace.regenClampRefused(player, routed, amount);
+                ci.cancel();
+                return;
+            }
+        }
         BridgeManager.getBridge().setMana(player, amount);
 
         ci.cancel();
@@ -121,6 +131,11 @@ public abstract class MixinIronsMagicDataMana {
     @Inject(method = "resetCastingState", at = @At("RETURN"), require = 1)
     private void arsnspells$clearPayment(CallbackInfo ci) {
         com.otectus.arsnspells.casting.IronsCastPayments.clear((MagicData)(Object)this);
+    }
+
+    @Inject(method = "setPlayerCastingItem", at = @At("RETURN"), require = 1)
+    private void arsnspells$bindCarrier(net.minecraft.world.item.ItemStack item, CallbackInfo ci) {
+        com.otectus.arsnspells.casting.IronsCastLifecycle.bindCarrier((MagicData)(Object)this);
     }
 
     private static boolean shouldRedirectToArs() {

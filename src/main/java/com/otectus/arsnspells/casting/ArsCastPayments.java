@@ -61,13 +61,17 @@ public final class ArsCastPayments {
     public static boolean handles(SpellContext context) { return context != null && PLANS.containsKey(context); }
 
     public static boolean canAfford(Player player, SpellResolver resolver) {
-        resolver.getResolveCost();
+        int nativeCost = resolver.getResolveCost();
         Plan plan = PLANS.get(resolver.spellContext);
-        if (plan == null || player.isCreative() || plan.prepared) return true;
+        if (player.isCreative()) return true;
+        if (plan == null) return BridgeManager.getNativeArsBridge().getMana(player) >= nativeCost;
+        if (plan.prepared) return true;
         return BridgeManager.canAffordQuote(player, plan.quote);
     }
 
     public static boolean prepare(Player player, SpellContext context) {
+        if (!PaymentRecovery.available() || CastLedger.ledger().openFor(player.getUUID()).stream()
+                .anyMatch(a -> a.state().isTerminal() && !a.isReleased())) return false;
         Plan plan = PLANS.get(context);
         if (plan == null || player.isCreative() || plan.prepared) return true;
         if (!BridgeManager.canAffordQuote(player, plan.quote)) return false;
@@ -75,12 +79,9 @@ public final class ArsCastPayments {
         plan.attempt = CastLedger.open(player.getUUID(), "ars-context:" + plan.id, 0, plan.quote,
             player.level().getGameTime());
         List<ResourceAmount> reserved = CastLedger.reserve(plan.attempt, plan.access);
-        for (ResourceAmount owed : plan.quote.legs()) {
-            double paid = reserved.stream().filter(leg -> leg.unit() == owed.unit()).mapToDouble(ResourceAmount::amount).sum();
-            if (Math.abs(paid - owed.amount()) > Math.max(0.001, Math.ulp((float) owed.amount()) * 2)) {
-                CastLedger.fail(plan.attempt, plan.access);
-                return false;
-            }
+        if (!plan.attempt.paymentAccepted()) {
+            CastLedger.fail(plan.attempt, plan.access);
+            return false;
         }
         plan.prepared = true;
         plan.reserved = reserved;

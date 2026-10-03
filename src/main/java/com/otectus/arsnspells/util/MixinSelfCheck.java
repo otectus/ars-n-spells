@@ -46,8 +46,18 @@ public final class MixinSelfCheck {
 
     private MixinSelfCheck() {}
 
-    /** A mixin target: the human-facing feature name and the class our code merges into. */
-    private record Probe(String feature, String targetClass) {}
+    /**
+     * A mixin target: the human-facing feature name, the class our code merges into, and the
+     * handlers that must have merged. Several ANS mixins share a target ({@code AbstractSpell}
+     * receives the cast gate, the payment and the resonance hooks), so "some {@code arsnspells$}
+     * member is present" cannot tell a failed payment mixin from a working resonance one.
+     * An empty list accepts any merged member.
+     */
+    private record Probe(String feature, String targetClass, List<String> handlers) {
+        Probe(String feature, String targetClass, String... handlers) {
+            this(feature, targetClass, List.of(handlers));
+        }
+    }
 
     private static final Probe[] ARS_PROBES = {
         new Probe("ManaCap.bridge", "com.hollingsworth.arsnouveau.common.capability.ManaCap"),
@@ -55,8 +65,14 @@ public final class MixinSelfCheck {
     };
 
     private static final Probe[] IRONS_PROBES = {
-        new Probe("MagicData.mana", "io.redspace.ironsspellbooks.api.magic.MagicData"),
-        new Probe("AbstractSpell.castGate", "io.redspace.ironsspellbooks.api.spells.AbstractSpell"),
+        new Probe("MagicData.mana", "io.redspace.ironsspellbooks.api.magic.MagicData",
+            "getMana", "scaleManaForCastGate", "setMana", "addMana", "clearPayment", "bindCarrier"),
+        new Probe("AbstractSpell.castGate", "io.redspace.ironsspellbooks.api.spells.AbstractSpell", "validation"),
+        new Probe("AbstractSpell.payment", "io.redspace.ironsspellbooks.api.spells.AbstractSpell",
+            "invocation", "priceAfterEvent", "nativeWrite", "effect"),
+        new Probe("MagicManager.ticker", "io.redspace.ironsspellbooks.capabilities.magic.MagicManager",
+            "caller", "stopAfterRejectedEffect", "deferChannelAffordability"),
+        new Probe("MagicManager.regenScope", "io.redspace.ironsspellbooks.capabilities.magic.MagicManager", "scopeRegen"),
         new Probe("Scroll.cost", "io.redspace.ironsspellbooks.item.Scroll"),
         new Probe("InscriptionTable.guard",
             "io.redspace.ironsspellbooks.gui.inscription_table.InscriptionTableMenu"),
@@ -99,7 +115,11 @@ public final class MixinSelfCheck {
         LOGGER.error("[SelfCheck] 'ars_n_spells.compat.mixins.json' warnings.");
     }
 
-    /** Did any of our handlers get merged into the target class? */
+    /**
+     * Did our handlers get merged into the target class? Mixin renames a merged handler with a
+     * prefix ({@code wrapMethod$zdp000$ars_n_spells$arsnspells$invocation}), so names are matched
+     * by the {@code arsnspells$<handler>} they contain.
+     */
     private static void appendProbe(StringBuilder report, List<String> degraded, Probe probe) {
         report.append(" | ").append(probe.feature()).append('=');
         try {
@@ -107,14 +127,24 @@ public final class MixinSelfCheck {
                 MixinSelfCheck.class.getClassLoader());
             // getDeclaredMethods, NOT a hierarchy walk: a merged handler lands on the target
             // class itself, and walking up would let an unrelated superclass member pass.
+            List<String> merged = new ArrayList<>();
             for (Method m : target.getDeclaredMethods()) {
-                if (m.getName().contains("arsnspells$")) {
-                    report.append("OK");
-                    return;
-                }
+                if (m.getName().contains("arsnspells$")) merged.add(m.getName());
             }
-            report.append("NOT-APPLIED");
-            degraded.add(probe.feature());
+            if (merged.isEmpty()) {
+                report.append("NOT-APPLIED");
+                degraded.add(probe.feature());
+                return;
+            }
+            List<String> missing = probe.handlers().stream()
+                .filter(handler -> merged.stream().noneMatch(name -> name.contains("arsnspells$" + handler)))
+                .toList();
+            if (missing.isEmpty()) {
+                report.append("OK");
+                return;
+            }
+            report.append("MISSING(").append(String.join(",", missing)).append(')');
+            degraded.add(probe.feature() + " (" + String.join(", ", missing) + ")");
         } catch (Throwable t) {
             report.append("ERROR(").append(t.getClass().getSimpleName()).append(')');
             degraded.add(probe.feature());

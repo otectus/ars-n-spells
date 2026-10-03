@@ -125,6 +125,11 @@ public class UnifiedCooldownManager {
             CooldownData data = player.getData(AttachmentTypes.COOLDOWN.get());
             for (CooldownCategory cat : CooldownCategory.values()) {
                 data.setLastCast(cat, 0);
+                // ANS-MED-015: push the cleared end to the client so the HUD bar clears too.
+                if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                    com.otectus.arsnspells.network.PacketHandler.sendToClient(
+                        new com.otectus.arsnspells.network.CooldownSyncPayload(cat, 0L), sp);
+                }
             }
             logDebug("Cleared all cooldowns for {}", player.getName().getString());
         }
@@ -138,6 +143,10 @@ public class UnifiedCooldownManager {
     public static void clearCooldown(Player player, CooldownCategory category) {
         if (player != null && category != null) {
             player.getData(AttachmentTypes.COOLDOWN.get()).setLastCast(category, 0);
+            if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                com.otectus.arsnspells.network.PacketHandler.sendToClient(
+                    new com.otectus.arsnspells.network.CooldownSyncPayload(category, 0L), sp);
+            }
             logDebug("Cleared cooldown for category {} for {}",
                 category.getDisplayName(), player.getName().getString());
         }

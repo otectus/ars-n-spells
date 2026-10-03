@@ -5,9 +5,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.NbtOps;
-import com.otectus.arsnspells.spell.CrossModSpellComponents;
-import com.otectus.arsnspells.spell.CrossModSpellList;
+import net.minecraft.core.HolderLookup;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -21,14 +19,13 @@ public final class CarrierFingerprint {
     private CarrierFingerprint() {}
 
     /** Empty means oversized/recoverable data; the saved stack is never rewritten or discarded. */
-    public static String of(ItemStack stack) {
+    public static String of(ItemStack stack, HolderLookup.Provider registries) {
         if (stack == null || stack.isEmpty()) return "";
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             int[] remaining = {MAX_BYTES};
             append(digest, BuiltInRegistries.ITEM.getKey(stack.getItem()) + ":" + stack.getCount(), remaining);
-            Tag payload = CrossModSpellList.CODEC.encodeStart(NbtOps.INSTANCE, CrossModSpellComponents.get(stack))
-                .result().orElse(null);
+            Tag payload = stack.saveOptional(registries);
             if (payload == null) return "";
             appendTag(digest, payload, remaining, 0);
             return HexFormat.of().formatHex(digest.digest());

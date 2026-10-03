@@ -2,6 +2,144 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.3.5] - 2026-09-27
+
+### Fixed
+
+- Iron's spells no longer stop with "Cast stopped. Check your resources; details are in
+  the server log." when Animus, or another mod, checks mana inside Iron's own mana
+  payment. 3.3.4 took the price as soon as Iron's final cost event ended, before Iron's
+  own mana check and write. Animus checks affordability at that point for its
+  blood-magic casting. It saw the pool already debited and cancelled the cast; ANS
+  refunded it and logged `Effect boundary not reached`. Any spell costing more than half
+  the remaining pool failed, such as Scorch at level 9 (90 of 100 mana). ANS now takes
+  the price where Iron's writes its own mana debit and replaces that write. The check
+  sees the pool as Iron's would, and an Animus blood-magic top-up there pays for the
+  cast. The cost event then states what ANS will take from the pool Iron's reads: the
+  converted amount in `ars_primary`, the Iron's share of a dual-cost split, and 0 for
+  bound Ars spells.
+- A cast that another mod cancels before its effect now costs nothing and is not
+  reported as a payment failure: no warning and no "Cast stopped" message. Iron's own
+  follow-through runs as it would without ANS, and debug mode logs
+  `stage=vetoed_before_effect`.
+- The startup self-check now names each handler it needs and also covers the payment
+  and cast-ticker mixins. Before, any ANS method on `AbstractSpell` passed, so a failed
+  payment mixin would not have been reported.
+- Channelled Iron's spells no longer stop with a payment failure when mana runs low.
+  3.3.4 turned off Iron's own end-of-channel check, so a channel that ran low went on
+  into a pulse the caster could not pay and stopped with "Cast stopped. Check your
+  resources; details are in the server log." ANS now checks after every paid pulse, at that pulse's final price and in
+  the pool that paid it. When the balance cannot cover another pulse, the channel
+  finishes as Iron's native final pulse, with cooldown, scroll consumption and
+  completion. Cost changes made by `SpellOnCastEvent` listeners are honoured; Iron's own
+  check only ever saw the base cost.
+- `ars_primary`: Iron's mana regeneration can no longer lower the Ars pool. In this mode
+  Iron's regeneration reads and writes the Ars balance but capped it at Iron's mirrored
+  `max_mana`, which is rounded down to a whole number and can lag the real Ars maximum.
+  When the mirror was lower, that cap removed mana without any cast. It is the only such
+  path found and the most likely cause of the reported dip while scrolling the hotbar,
+  although the report itself (from a Forge pack) has not been reproduced. Regeneration
+  may now only raise the balance.
+- The shared-pool ceiling is no longer computed before an equipment change has taken
+  effect. NeoForge fires the change event before vanilla swaps the item's attribute
+  modifiers, so ANS now reconciles at the end of the player's tick. Delayed ceiling
+  updates are merged per player, so an older maximum can no longer be applied after a
+  newer one.
+- A resource shortage now names the resource and the spell and says what was needed
+  and what was available ("Not enough Iron's mana for <spell>: <needed> needed,
+  <available> available."), instead of the generic message. Shortages are ordinary gameplay and are no longer logged as warnings;
+  debug mode records one line per failed cast. Other payment faults still warn, now
+  including the price. These diagnostic lines identify the player by a pseudonymous
+  token instead of their UUID.
+
+### Added
+
+- `inscribed_ars_default_cooldown_ticks` (Cross-Cast Inscription, 0-12000 ticks, 20 ticks
+  = 1 s): Iron's cooldown after an Ars spell bound into an Iron's spellbook casts
+  successfully from Iron's spell wheel. It uses Iron's own cooldown system, so Iron's
+  cooldown reduction, the wheel's cooldown display and saving across relogs all apply. A
+  failed, refused or unpaid cast starts no cooldown. Newly generated configs use 40 ticks
+  (2 s); configs from earlier versions migrate to 0, which keeps the previous behaviour
+  (config schema 3). Changes take effect on the next cast after the config reloads. The
+  setting is also on the in-game settings screen. Books that reuse the same proxy slot
+  share its cooldown. Ordinary Ars casts, ordinary Iron's spells and Iron's spells
+  inscribed into Ars items are unaffected, and the unified category cooldowns remain a
+  separate check.
+- Debug mode logs both mana pools, the Iron's ceiling, the selected slot and the held
+  item whenever equipment reconciliation changes something (at most ten lines per second
+  per player), and each regeneration write refused because it would have lowered the Ars
+  pool.
+- New GameTests cover channels that run out of mana in all five modes, a SWORD channel
+  with a halved final cost, a delayed SWORD cast charged once at its final price,
+  `ars_primary` hotbar cycling with Iron's regeneration, removal of a real maximum-mana
+  bonus, the inscribed cooldown (success, failure, zero, cooldown reduction, shared
+  slots, category cooldowns) and Ars Affinity interoperability.
+- New GameTests reproduce the Scorch report with a GameTest-only mixin at the call
+  Animus uses: an affordability check in all five modes at conversion rates 0.5, 1 and
+  3, a top-up of an underfunded cast, a cancel before the effect, and a channel under
+  the check. Only `runGameTestServer` sets `-Dans.gametest.castProbe=true`, which
+  applies that mixin.
+- `-PwithArsAffinity` adds Ars Affinity 1.1.1 (and the Ars Elemental it requires) to the
+  GameTest runtime.
+- `tools/pack_presets.py` accepts config schema 3 as well as 2.
+
+### Compatibility
+
+- Ars Affinity 1.1.1 (CurseForge file 7416588) works with ANS without any integration
+  code. Tested with and without Iron's: an Ars cast, including one cast from Iron's spell
+  wheel, adds Affinity progress exactly once; a native Iron's spell adds no glyph
+  progress; Mana Tap restores the pool the current mana mode pays from, in all five
+  modes. ANS's own school affinity stays separate from Ars Affinity's perk tree. Other
+  perks, relog/death/dimension persistence and the two mods' screens were not tested.
+- Animus 5.2.13 was inspected from its jar and its mixin inside Iron's mana payment was
+  reproduced with a GameTest probe; Animus itself was not run. Better Spellcasting
+  1.2.0, Ace's Spell Utils 1.2.7.2, Caster Curios Bonus 1.1.1 and Iron's RPG Tweaks
+  2.2.3 were inspected and do not act inside that payment.
+- Tested: Minecraft 1.21.1, NeoForge 21.1.248, Ars Nouveau 5.13.1.1400, Iron's
+  Spellbooks 1.21.1-3.16.3, Ars Elemental 0.7.10.1, Ars Affinity 1.1.1. Commands and
+  results are in `docs/3.3.5/testing.md`.
+
+### Forge / NeoForge parity
+
+The Forge 1.20.1 and NeoForge 1.21.1 builds now have the same features, configuration, commands, datapack tags and translations, except for integrations whose mod has no build for the other Minecraft version (Covenant of the Seven and Too Many Glyphs exist only for 1.20.1; Ars Affinity and Ars Elemancy only for 1.21.1). `docs/3.3.5/parity-review.md` lists every remaining difference and why. Fixed on this build:
+
+- **Source Jar synergy never ran on NeoForge.** Its handler was never registered with the event bus, so standing near a Source Jar did nothing. It now regenerates the shared pool as documented (`source_jar_synergy_multiplier`).
+- **`iss_primary` gave Iron's pool the whole Ars maximum.** Iron's max mana was raised to Ars's real maximum (base, book tier and all) instead of receiving the Ars gear bonus. It now adds the Ars gear bonus times `conversion_rate_ars_to_iron`, as the README describes. **Players whose Ars maximum was larger than their Iron's maximum will see a smaller Iron's pool in `iss_primary`.**
+- `hybrid` with `respect_armor_bonuses = false` removed the shared-pool ceiling. It now keeps it and drops only the gear regen bonus. A lower ceiling deletes mana on the next write.
+- The shared-pool ceiling no longer shrinks when `respect_enchantments` or `read_curio_attribute_modifiers` is off. Those toggles decide what is transferred, not Ars's own maximum.
+- Ars gear regen mirrored onto Iron's now counts only worn equipment and curios. Ars Mana Regen potions are mirrored separately in `iss_primary` (0.5 mana/sec per level, times the conversion rate) and removed when the mode changes. Before, every Ars regen modifier was mirrored in both `iss_primary` and `hybrid`.
+- The Iron's ceiling uses the same amplification-aware formula as Forge when another mod multiplies Iron's max mana.
+- Iron's gear is folded into Ars's maximum and regen only on the server, and never below zero.
+- Mode and config changes remove every current and legacy ANS modifier identity through the shared `FeatureCleanup` contract, which now has a NeoForge implementation. A resulting clamp of the pool is logged.
+- `UnifiedCooldownManager.clearCooldowns` and `clearCooldown` also send the cleared state to the client, as on Forge. Nothing in ANS calls them; the change keeps the two APIs identical.
+- Cycling an item that carries a single spell reports "1/1" instead of doing nothing.
+- Translation punctuation and the uncastable-spell wording match the Forge build.
+
+Added: the casting smoke harness (`runClient -PwithCastingClientSmoke`, optionally `-PcastingSmokeAddress`, and `runServer -PwithCastingServerSmoke`; `runServer` honours `-PgametestRunDir`). Also added are GameTests ported from Forge: mode-change cleanup, the shared-pool ledger, named Ars Elemental and Ars Zero glyph schools, proxy casts from a Curios-equipped or held book, the bind command, exported carriers and unbinding, proxy registration, and ghost scrolls. The shared `ParityBehaviourGameTests` and three unit-test classes (`SharedPoolCeilingAmplificationTest`, `SchoolResolverAddonTest`, and the portable half of `ConfigSchemaMigrationTest`) were added as well. `tools/verify_loader_parity.py` now checks both directions, including GameTest coverage, and runs from either checkout (`--forge` or `--neoforge`).
+
+## [3.3.4] - 2026-09-14
+
+### Fixed
+
+- Ported Forge 3.3.4 native cast payment ownership: final cost listeners run once,
+  the replaced native debit is suppressed, and effects, channel cancellation,
+  scroll consumption and native/category cooldowns share the same cast lifecycle.
+- Added measured debit/refund recovery, exact Ars double balances, float precision
+  refusal, exception-safe validation scopes and persistent unresolved obligations.
+- Restored optional Iron's payment/ticker mixin gates and bundled MixinExtras 0.5.3.
+- Added the Curios attribute mirroring toggle and matched Forge's 0.5% affinity
+  helper, 95% fresh-config resonance threshold, Source Jar bounds and primary-school
+  default. Existing saved configuration choices remain unchanged.
+- Carrier revisions now cover every native item component. The client/server
+  network protocol advances to 7 so older clients cannot send incompatible revisions.
+- Restored blank-scroll drops in Iron's Catacombs armory and Citadel tomes loot tables.
+- Added portable translations, full casting regression fixtures, a native Curios
+  toggle fixture and repeatable cross-loader config/resource/contract checks.
+
+Covenant LP/aura/Blasphemy and Too Many Glyphs remain unavailable on 1.21.1, as
+agreed for this parity pass. Native data components, attachments and loader APIs
+remain in use. See `docs/3.3.4/parity-review.md` for exact validation and limits.
+
 ## [3.3.3] - 2026-09-12
 
 ### Changed

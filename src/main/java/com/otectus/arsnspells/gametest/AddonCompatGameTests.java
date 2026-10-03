@@ -216,6 +216,132 @@ public final class AddonCompatGameTests {
         everyGlyphResolvesWithoutThrowing(helper, CompatIds.ARS_ELEMENTAL);
     }
 
+    /**
+     * The named Ars Elemental effects from the audit brief, checked individually so a
+     * regression names the spell that broke rather than a count. (Forge parity.)
+     */
+    @GameTest(template = "platform")
+    public static void arsElemental_namedEffectsAreUsable(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ELEMENTAL)) {
+            return;
+        }
+        namedEffectsAreUsable(helper, CompatIds.ARS_ELEMENTAL, false,
+            "watery_grave", "discharge", "envenom", "spike", "spark");
+    }
+
+    /**
+     * A filter placed before the real effect must not decide the school: Filter-then-Effect
+     * used to be classified by the filter. (Forge parity.)
+     */
+    @GameTest(template = "platform")
+    public static void arsElemental_filterBeforeEffect_doesNotDecideTheSchool(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ELEMENTAL)) {
+            return;
+        }
+        AbstractSpellPart filter = findGlyph(CompatIds.ARS_ELEMENTAL, "_filter");
+        AbstractSpellPart effect = findGlyph(CompatIds.ARS_ELEMENTAL, "discharge");
+        if (filter == null || effect == null) {
+            helper.fail("expected a filter glyph and glyph_discharge in Ars Elemental");
+            return;
+        }
+        SpellSchoolId effectAlone = SchoolResolver.resolve(effect);
+        SpellSchoolId viaAnalysis = SpellSchoolId.fromId(com.otectus.arsnspells.util.SpellAnalysis
+            .analyze(List.of(filter, effect)).dominantSchool());
+        if (viaAnalysis != effectAlone) {
+            helper.fail("a filter placed before the effect changed the resolved school: effect "
+                + "alone = " + effectAlone + ", filter+effect = " + viaAnalysis + ". Filters "
+                + "select targets; they must not decide what the spell IS.");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Ars Elemental's undead/charm glyphs declare the Ars school {@code necromancy}; they belong
+     * to ELDRITCH. Life Link drains to heal and feeds the Blood track. (Forge parity.)
+     */
+    @GameTest(template = "platform")
+    public static void arsElemental_necromancyGlyphsResolve(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ELEMENTAL)) {
+            return;
+        }
+        assertGlyphSchool(helper, CompatIds.ARS_ELEMENTAL, "glyph_phantom_grasp", SpellSchoolId.ELDRITCH);
+        assertGlyphSchool(helper, CompatIds.ARS_ELEMENTAL, "glyph_charm", SpellSchoolId.ELDRITCH);
+        assertGlyphSchool(helper, CompatIds.ARS_ELEMENTAL, "glyph_life_link", SpellSchoolId.BLOOD);
+        helper.succeed();
+    }
+
+    /**
+     * Filters select targets. Every one of them must be GENERIC; propagators are chained forms
+     * and must not decide a school either. (Forge parity.)
+     */
+    @GameTest(template = "platform")
+    public static void arsElemental_filtersResolveGeneric(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ELEMENTAL)) {
+            return;
+        }
+        String[] bases = {"aerial", "aquatic", "fiery", "insect", "summon", "undead"};
+        int checked = 0;
+        for (String base : bases) {
+            for (String path : new String[] {"glyph_" + base + "_filter",
+                                             "glyph_not_" + base + "_filter"}) {
+                if (glyphById(CompatIds.ARS_ELEMENTAL, path) == null) {
+                    continue;
+                }
+                checked++;
+                assertGlyphSchool(helper, CompatIds.ARS_ELEMENTAL, path, SpellSchoolId.GENERIC);
+            }
+        }
+        if (checked == 0) {
+            helper.fail("Ars Elemental is loaded but registers none of its filter glyphs; the "
+                + "profile loaded an unexpected artifact");
+            return;
+        }
+        assertGlyphSchool(helper, CompatIds.ARS_ELEMENTAL, "glyph_propagator_arc", SpellSchoolId.GENERIC);
+        assertGlyphSchool(helper, CompatIds.ARS_ELEMENTAL, "glyph_propagator_homing", SpellSchoolId.GENERIC);
+        helper.succeed();
+    }
+
+    /**
+     * Ars Elemental and Ars Zero in one recipe. The two addons name their glyphs differently
+     * (Ars Elemental prefixes {@code glyph_}, Ars Zero does not), so this is also the case that
+     * would expose any id handling that assumes a fixed prefix length. (Forge parity.)
+     */
+    @GameTest(template = "platform")
+    public static void mixedArsElementalArsZero_recipe_survivesSerialization(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ELEMENTAL)
+                || OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ZERO)) {
+            return;
+        }
+        List<AbstractSpellPart> elemental = glyphsOf(CompatIds.ARS_ELEMENTAL);
+        List<AbstractSpellPart> zero = glyphsOf(CompatIds.ARS_ZERO);
+        if (elemental.isEmpty() || zero.isEmpty()) {
+            helper.fail("both addons are loaded but one registers no glyphs");
+            return;
+        }
+        Spell mixed = new Spell().setRecipe(List.of(elemental.get(0), zero.get(0)));
+        Tag encoded = Spell.CODEC.codec().encodeStart(NbtOps.INSTANCE, mixed).result().orElse(null);
+        CompoundTag tag = encoded instanceof CompoundTag compound ? compound : new CompoundTag();
+        List<String> missing = ArsSpellIntegrity.missingGlyphIds(tag);
+        if (!missing.isEmpty()) {
+            helper.fail("a mixed Ars Elemental + Ars Zero recipe reports missing glyphs: " + missing);
+            return;
+        }
+        Spell back = Spell.CODEC.codec().parse(NbtOps.INSTANCE, tag).result().orElse(null);
+        int parts = 0;
+        if (back != null) {
+            for (AbstractSpellPart ignored : back.recipe()) {
+                parts++;
+            }
+        }
+        if (parts != 2) {
+            helper.fail("a mixed Ars Elemental + Ars Zero recipe lost parts in round-trip: 2 in, "
+                + parts + " out");
+            return;
+        }
+        helper.succeed();
+    }
+
     // ---- Ars Zero ----
 
     @GameTest(template = "platform")
@@ -223,9 +349,157 @@ public final class AddonCompatGameTests {
         glyphsRoundTrip(helper, CompatIds.ARS_ZERO);
     }
 
+    /**
+     * Ars Zero's effects, pinned one by one (Forge parity), then the generic metadata sweep.
+     * Its glyph ids carry no {@code glyph_} prefix, so any code that strips one has to be
+     * guarded rather than offset-based.
+     */
     @GameTest(template = "platform")
     public static void arsZero_schoolsResolveFromDeclaredMetadata(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ZERO)) {
+            return;
+        }
+        assertGlyphSchool(helper, CompatIds.ARS_ZERO, "effect_geometrize", SpellSchoolId.NATURE);
+        assertGlyphSchool(helper, CompatIds.ARS_ZERO, "push_effect", SpellSchoolId.LIGHTNING);
+        assertGlyphSchool(helper, CompatIds.ARS_ZERO, "conjure_voxel_effect", SpellSchoolId.ENDER);
+        assertGlyphSchool(helper, CompatIds.ARS_ZERO, "zero_gravity_effect", SpellSchoolId.ENDER);
+        assertGlyphSchool(helper, CompatIds.ARS_ZERO, "effect_beam", SpellSchoolId.ENDER);
+        assertGlyphSchool(helper, CompatIds.ARS_ZERO, "effect_conjure_blight", SpellSchoolId.ELDRITCH);
+        assertGlyphSchool(helper, CompatIds.ARS_ZERO, "conjure_arcane_shield_effect", SpellSchoolId.HOLY);
         schoolsResolveFromDeclaredMetadata(helper, CompatIds.ARS_ZERO);
+    }
+
+    /**
+     * Ars Zero's multi-phase glyphs are control flow: they anchor, select, sustain and discard
+     * an ongoing spell. They declare MANIPULATION, which would translate to a real school and
+     * earn affinity for casting nothing. They have to be GENERIC. (Forge parity.)
+     */
+    @GameTest(template = "platform")
+    public static void arsZero_controlFlowGlyphsAreGeneric(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ZERO)) {
+            return;
+        }
+        String[] controlFlow = {"anchor_effect", "select_effect", "sustain_effect",
+                                "discard_effect", "effect_convergence", "enlarge_effect"};
+        for (String path : controlFlow) {
+            assertGlyphSchool(helper, CompatIds.ARS_ZERO, path, SpellSchoolId.GENERIC);
+        }
+        // Forms and augments are shape, not payload.
+        assertGlyphSchool(helper, CompatIds.ARS_ZERO, "near_form", SpellSchoolId.GENERIC);
+        assertGlyphSchool(helper, CompatIds.ARS_ZERO, "temporal_context_form", SpellSchoolId.GENERIC);
+        String[] augments = {"augment_amplify_two", "augment_amplify_three", "augment_aoe_two",
+                             "augment_aoe_three", "augment_cube", "augment_flatten",
+                             "augment_hollow", "augment_sphere"};
+        for (String path : augments) {
+            assertGlyphSchool(helper, CompatIds.ARS_ZERO, path, SpellSchoolId.GENERIC);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The Ars Zero analogue of the filter case: a form and an augment sit in front of the
+     * effect, and the effect still has to be what decides the school. (Forge parity.)
+     */
+    @GameTest(template = "platform")
+    public static void arsZero_augmentsAndFormsDoNotDecideTheSchool(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ZERO)) {
+            return;
+        }
+        AbstractSpellPart form = glyphById(CompatIds.ARS_ZERO, "near_form");
+        AbstractSpellPart augment = glyphById(CompatIds.ARS_ZERO, "augment_amplify_two");
+        AbstractSpellPart effect = glyphById(CompatIds.ARS_ZERO, "effect_geometrize");
+        if (form == null || augment == null || effect == null) {
+            helper.fail("expected near_form, augment_amplify_two and effect_geometrize in "
+                + "Ars Zero 2.0.2");
+            return;
+        }
+        SpellSchoolId viaAnalysis = SpellSchoolId.fromId(com.otectus.arsnspells.util.SpellAnalysis
+            .analyze(List.of(form, augment, effect)).dominantSchool());
+        if (viaAnalysis != SpellSchoolId.NATURE) {
+            helper.fail("near_form + augment_amplify_two + effect_geometrize analysed to "
+                + viaAnalysis + ", expected NATURE. Forms and augments shape a spell; they must "
+                + "not decide what it IS.");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The named Ars Zero effects, checked individually so a regression names the glyph that
+     * broke rather than a count. (Forge parity.)
+     */
+    @GameTest(template = "platform")
+    public static void arsZero_namedEffectsAreUsable(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, CompatIds.ARS_ZERO)) {
+            return;
+        }
+        namedEffectsAreUsable(helper, CompatIds.ARS_ZERO, true, "effect_geometrize", "push_effect",
+            "effect_beam", "conjure_voxel_effect", "effect_conjure_blight");
+    }
+
+    // ---- Named-glyph helpers (the same assertions as the Forge 1.20.1 suite) ----
+
+    /** First glyph of {@code modid} whose path contains {@code fragment}, or null. */
+    private static AbstractSpellPart findGlyph(String modid, String fragment) {
+        for (AbstractSpellPart candidate : glyphsOf(modid)) {
+            var id = candidate.getRegistryName();
+            if (id != null && id.getPath().contains(fragment)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /** The glyph registered as exactly {@code modid:path}, or null if the addon never had it. */
+    private static AbstractSpellPart glyphById(String modid, String path) {
+        return GlyphRegistry.getSpellpartMap().get(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(modid, path));
+    }
+
+    /**
+     * Asserts one named glyph's school. Skips silently when the glyph is absent from the
+     * registry; being present and resolving to the wrong school is a real regression and fails.
+     */
+    private static void assertGlyphSchool(GameTestHelper helper, String modid, String path,
+                                          SpellSchoolId expected) {
+        AbstractSpellPart part = glyphById(modid, path);
+        if (part == null) {
+            return;
+        }
+        SpellSchoolId actual = SchoolResolver.resolve(part);
+        if (actual != expected) {
+            helper.fail(modid + ":" + path + " resolved to " + actual + ", expected " + expected
+                + ". School resolution has drifted from the addon's declared metadata or from "
+                + "the explicit override table in SchoolMappings.");
+        }
+    }
+
+    /** Each named glyph (exact id, or a path fragment) survives serialization and resolves. */
+    private static void namedEffectsAreUsable(GameTestHelper helper, String modid, boolean exactIds,
+                                              String... wanted) {
+        List<String> found = new ArrayList<>();
+        for (String name : wanted) {
+            AbstractSpellPart part = exactIds ? glyphById(modid, name) : findGlyph(modid, name);
+            if (part == null) {
+                continue; // renamed upstream; the sweep tests still cover it
+            }
+            found.add(name);
+            if (!ArsSpellIntegrity.missingGlyphIds(serialize(part)).isEmpty()) {
+                helper.fail(modid + " " + name + " does not survive serialization intact");
+                return;
+            }
+            if (SchoolResolver.resolve(part) == null) {
+                helper.fail(modid + " " + name + " resolved to a null school");
+                return;
+            }
+        }
+        if (found.size() < wanted.length - 1) {
+            helper.fail("only found " + found + " of " + String.join(", ", wanted)
+                + " among " + modid + "'s glyphs - the profile may have loaded an unexpected "
+                + "artifact, or the addon renamed its effects");
+            return;
+        }
+        helper.succeed();
     }
 
     @GameTest(template = "platform")

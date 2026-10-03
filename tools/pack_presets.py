@@ -10,6 +10,9 @@ import re
 import tempfile
 import tomllib
 
+# Schema 3 (3.3.5) only added inscribed_ars_default_cooldown_ticks; every preset key is unchanged.
+SUPPORTED_SCHEMAS = (2, 3)
+
 PRESETS = {
     "legacy": {
         "description": "Classic shared Iron pool, flat exchange rates, and the shipped cross-cast premium. Existing rate, Source and saved progress values remain unchanged.",
@@ -61,8 +64,8 @@ def preview(text: str, preset: str, loader: str) -> tuple[str, list[dict]]:
     if len(text.encode("utf-8")) > 2_000_000:
         raise ValueError("Config exceeds 2 MB; no data changed")
     values = leaves(tomllib.loads(text))
-    if values.get("config_schema_version", (None, 0))[1] != 2:
-        raise ValueError("Load/migrate this config with 3.3.0 first; only schema 2 is supported")
+    if values.get("config_schema_version", (None, 0))[1] not in SUPPORTED_SCHEMAS:
+        raise ValueError("Load/migrate this config with 3.3.0 or later first; only schemas 2 and 3 are supported")
     selected = {"enable_mana_unification": True, **PRESETS[preset]["values"], **(PRESETS[preset]["forge"] if loader == "forge" else {})}
     missing = selected.keys() - values.keys()
     if missing:

@@ -5,7 +5,13 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public class AnsConfig {
     public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     public static final ModConfigSpec SPEC;
-    public static final int CURRENT_SCHEMA_VERSION = 2;
+    /**
+     * The schema this build writes. 2 is 3.3.3-3.3.4 (Source income per second); 3 is 3.3.5
+     * (inscribed Ars spell cooldown).
+     */
+    public static final int CURRENT_SCHEMA_VERSION = 3;
+    /** The schema that introduced {@code inscribed_ars_default_cooldown_ticks}. */
+    public static final int INSCRIBED_COOLDOWN_SCHEMA = 3;
     public static final ModConfigSpec.IntValue CONFIG_SCHEMA_VERSION;
 
     // ========================================
@@ -30,6 +36,7 @@ public class AnsConfig {
     public static final ModConfigSpec.DoubleValue DEFAULT_MAX_MANA;
     public static final ModConfigSpec.BooleanValue respectArmorBonuses;
     public static final ModConfigSpec.BooleanValue respectEnchantments;
+    public static final ModConfigSpec.BooleanValue READ_CURIO_ATTRIBUTE_MODIFIERS;
     public static final ModConfigSpec.ConfigValue<String> CROSS_SYSTEM_REGEN_CONVERSION;
     public static final ModConfigSpec.DoubleValue CROSS_SYSTEM_REGEN_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue CROSS_SYSTEM_REGEN_REFERENCE_POOL;
@@ -122,6 +129,10 @@ public class AnsConfig {
     public static final ModConfigSpec.IntValue NETWORK_REQUEST_BURST;
     public static final ModConfigSpec.BooleanValue ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS;
     public static final ModConfigSpec.IntValue MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK;
+    public static final ModConfigSpec.IntValue INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS;
+    /** The shipped value; a pre-3.3.5 file holding it received it from NeoForge's correction pass. */
+    public static final int INSCRIBED_ARS_COOLDOWN_DEFAULT_TICKS = 40;
+    public static final int INSCRIBED_ARS_COOLDOWN_MAX_TICKS = 12000;
 
     // ========================================
     // PERFORMANCE TUNING
@@ -129,7 +140,13 @@ public class AnsConfig {
     public static final ModConfigSpec.DoubleValue SOURCE_JAR_CACHE_MOVE_THRESHOLD;
 
     static {
-        CONFIG_SCHEMA_VERSION = BUILDER.comment("Written after config migration; do not edit manually.")
+        CONFIG_SCHEMA_VERSION = BUILDER
+            .comment(
+                "Schema version of this config file. 0 means the file was written before 3.3.0,",
+                "when this key did not exist; a freshly generated file is stamped with the",
+                "current version instead. Keys added in a later release read this to decide",
+                "whether to preserve the old behaviour or adopt the new default."
+            )
             .defineInRange("config_schema_version", 0, 0, Integer.MAX_VALUE);
         // ========================================
         // MASTER TOGGLES
@@ -153,7 +170,10 @@ public class AnsConfig {
             .define("mana_unification_mode", "iss_primary");
         
         ENABLE_MANA_UNIFICATION = BUILDER
-            .comment("Master toggle for all mana unification features")
+            .comment("Master toggle for all mana unification features.",
+                "NOTE: when false, mana_unification_mode is forced to DISABLED regardless",
+                "of its configured value. Prefer mana_unification_mode = \"disabled\" for",
+                "the canonical 'off' state — this boolean is the master kill-switch.")
             .define("enable_mana_unification", true);
         
         ENABLE_RESONANCE_SYSTEM = BUILDER
@@ -307,10 +327,9 @@ public class AnsConfig {
             .comment("Mana fraction at or above which resonance applies (0.95 = 95% full).",
                      "The bonus itself still scales with how full the pool is; this only",
                      "gates whether it applies at all.",
-                     "0.0 (the default) leaves the gate open at any mana level, which is how",
-                     "resonance has always behaved. Raise it to make resonance a burst window",
-                     "you top the pool off for, rather than a passive trickle.")
-            .defineInRange("resonance_threshold", 0.0, 0.0, 1.0);
+                     "Set 0.0 to leave the gate open.",
+                     "Existing saved values are preserved.")
+            .defineInRange("resonance_threshold", 0.95, 0.0, 1.0);
 
         RESONANCE_DURATION = BUILDER
             .comment("How long resonance keeps applying after the pool drops below",
@@ -370,13 +389,13 @@ public class AnsConfig {
             .define("enable_cross_mod_progression", true);
 
         PROGRESSION_BONUS_PER_CAST = BUILDER
-            .comment("Attribute bonus gained per cast in a school (audit F4 - was hardcoded 0.001).",
+            .comment("Attribute bonus gained per cast in a school (audit F4 — was hardcoded 0.001).",
                      "0.001 = +0.1% per cast. The bonus is transient (derived from the persistent",
                      "cast count), so changing this immediately rescales every player's bonus.")
             .defineInRange("progression_bonus_per_cast", 0.001, 0.0, 0.1);
 
         PROGRESSION_BONUS_CAP = BUILDER
-            .comment("Cap on the per-school progression attribute bonus (audit F4 - was hardcoded 0.25).",
+            .comment("Cap on the per-school progression attribute bonus (audit F4 — was hardcoded 0.25).",
                      "0.25 = +25% maximum, reached after bonus_cap / bonus_per_cast casts",
                      "(250 casts at defaults).")
             .defineInRange("progression_bonus_cap", 0.25, 0.0, 2.0);
@@ -393,11 +412,16 @@ public class AnsConfig {
         );
         
         ENABLE_AFFINITY_DECAY = BUILDER
-            .comment("Enable affinity decay when not using a school. Default off for fresh installs (1.9.0).")
+            .comment("Enable affinity decay when not casting matching-school spells.",
+                     "Default changed to false in 1.9.0 — the previous true default was a no-op",
+                     "(decay was never implemented), so flipping it on by default would surprise",
+                     "existing players. Existing config files retain their previous value.")
             .define("enable_affinity_decay", false);
 
         AFFINITY_DECAY_RATE = BUILDER
-            .comment("Rate of affinity decay per day (in-game)")
+            .comment("Fraction of current affinity to lose per Minecraft day (24000 ticks).",
+                     "0.01 = lose 1% of each school's affinity per in-game day; with the default",
+                     "interval (1200 ticks = 60s), each tick window decays roughly 0.05% of current.")
             .defineInRange("affinity_decay_rate", 0.01, 0.0, 1.0);
 
         AFFINITY_DECAY_INTERVAL_TICKS = BUILDER
@@ -433,6 +457,14 @@ public class AnsConfig {
                      "(0.50 = spells never cost less than 50% after curio discounts). Prevents",
                      "stacked discount curios from trivialising mana cost.")
             .defineInRange("max_total_curio_discount", 0.50, 0.0, 1.0);
+
+        READ_CURIO_ATTRIBUTE_MODIFIERS = BUILDER
+            .comment("Read max-mana / mana-regen attribute modifiers from worn Curios (rings, amulets,",
+                     "belts) and mirror them across the unified mana pool, the same way armor/weapon",
+                     "modifiers are handled. This is what lets Apotheosis (Apothic Curios) affixes and",
+                     "sockets, as well as other curio mana gear (Magical Jewelry, Jewelcraft, etc.),",
+                     "feed the Ars <-> Iron's bridge. Disable if a curio affix balance proves overpowered.")
+            .define("read_curio_attribute_modifiers", true);
 
         BUILDER.pop();
 
@@ -498,15 +530,15 @@ public class AnsConfig {
             .comment("How a spell that resolves to more than one school picks the Iron's elemental",
                      "spell power attribute it scales with (dual-element and compound-element",
                      "addon glyphs, and recipes that chain effects from different schools):",
-                     "  primary - only the first-resolved school scales the spell, the same one",
+                     "  primary (default) - only the first-resolved school scales the spell, the same one",
                      "            affinity and progression credit",
-                     "  max - the single strongest matching elemental attribute (DEFAULT)",
+                     "  max - the single strongest matching elemental attribute",
                      "  average - the mean of all matching elemental attributes",
                      "There is deliberately no 'sum' option: adding every matching bonus would",
                      "make a spell stronger purely for carrying more school labels, so an",
                      "all-element glyph would collect fire, ice, lightning and nature power at",
                      "once. Unknown values fall back to 'max'.")
-            .define("multi_school_power_policy", "max");
+            .define("multi_school_power_policy", "primary");
 
         BUILDER.pop();
 
@@ -537,8 +569,9 @@ public class AnsConfig {
         SOURCE_JAR_SYNERGY_MULTIPLIER = BUILDER
             .comment("Multiplier for Source Jar proximity regen bonus.",
                      "Higher values = stronger regen when standing near Source Jars.",
-                     "Final bonus = CONVERSION_RATE_ARS_TO_IRON * this value per second.")
-            .defineInRange("source_jar_synergy_multiplier", 5.0, 0.0, 2000.0);
+                     "Final bonus = CONVERSION_RATE_ARS_TO_IRON * this value per second.",
+                     "To disable the feature use enable_source_jar_synergy = false, not a zero multiplier.")
+            .defineInRange("source_jar_synergy_multiplier", 5.0, 0.01, 2000.0);
 
         BUILDER.pop();
 
@@ -573,8 +606,16 @@ public class AnsConfig {
         );
 
         CONVERSION_POLICY = BUILDER
-            .comment("Mana pricing policy: flat_legacy applies directional rates; equal_percent also applies target/source native maximum.",
-                "Server-owned. A quote captures the selected policy; reloading does not reprice a committed cast.")
+            .comment(
+                "Which policy prices a cross-system mana leg:",
+                "  flat_legacy   - Multiply the cross leg by the configured directional rate.",
+                "                  The historical arithmetic (DEFAULT; preserves current pricing).",
+                "  equal_percent - Each pool pays the same percentage of the spell's own price;",
+                "                  the directional rates are not consulted.",
+                "These are deliberately separate policies, not two spellings of one. They agree",
+                "only while both conversion rates are 1.0.",
+                "Server-owned. A quote captures the selected policy; reloading does not reprice a committed cast."
+            )
             .define("conversion_policy", "flat_legacy", value -> value instanceof String text
                 && ("flat_legacy".equals(text) || "equal_percent".equals(text)));
 
@@ -614,6 +655,26 @@ public class AnsConfig {
                 "Ars entries can be shown as distinct entries in Iron's spell wheel per book."
             )
             .defineInRange("max_ars_cross_spells_per_irons_spellbook", -1, -1, 64);
+
+        INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS = BUILDER
+            .comment(
+                "Iron's native cooldown, in game ticks (20 ticks = 1 second at the normal tick rate),",
+                "started after an Ars Nouveau spell bound into an Iron's spellbook casts successfully",
+                "from Iron's spell wheel. It is applied to that wheel slot's proxy spell",
+                "(ars_n_spells:ars_cross_N) through Iron's own cooldown pipeline, so Iron's cooldown",
+                "reduction attribute, the spell wheel's cooldown display and persistence across relogs",
+                "all apply. A failed, refused or unpaid cast starts no cooldown. Books that bind",
+                "different Ars spells to the same proxy slot share that slot's cooldown.",
+                "0 = no native cooldown, the behaviour before 3.3.5. This is the only source of the",
+                "proxies' cooldown: Iron's own per-spell config files are not consulted for them.",
+                "Freshly generated configs use 40 (2 seconds); configs from earlier versions are",
+                "migrated to 0 so existing worlds keep their behaviour. Read on every cast: an edit",
+                "applies to the next cast after the config reloads, and running cooldowns keep their",
+                "length. Never applies to ordinary Ars casts, ordinary Iron's spells, or Iron's spells",
+                "inscribed into Ars items. The optional category cooldowns remain a separate gate."
+            )
+            .defineInRange("inscribed_ars_default_cooldown_ticks", INSCRIBED_ARS_COOLDOWN_DEFAULT_TICKS,
+                0, INSCRIBED_ARS_COOLDOWN_MAX_TICKS);
 
         BUILDER.pop();
 
@@ -755,26 +816,94 @@ public class AnsConfig {
      * could return would describe the queueing, not the save, and would read at call sites as
      * "the config was saved". The log is the source of truth for completion.
      */
-    /** Schema zero used mana per discovery scan. Preserve average income independently of scan cadence. */
+    /**
+     * Migrate a config file written by an earlier schema.
+     *
+     * <p>Schema 2 (3.3.3): Source income moved from per discovery scan to per second, preserving
+     * the average income independently of scan cadence. Schema 3 (3.3.5): the inscribed Ars spell
+     * cooldown key; see {@link #resolveInscribedCooldownTicks}.
+     */
     public static void onConfigLoaded(java.nio.file.Path configFile) {
-        if (CONFIG_SCHEMA_VERSION.get() >= CURRENT_SCHEMA_VERSION) return;
+        int schemaRead = CONFIG_SCHEMA_VERSION.get();
+        if (schemaRead >= CURRENT_SCHEMA_VERSION) return;
         var logger = org.slf4j.LoggerFactory.getLogger(AnsConfig.class);
-        if (configFile == null || !java.nio.file.Files.exists(configFile)) return;
-        java.nio.file.Path backup = configFile.resolveSibling(configFile.getFileName() + ".pre-3.3.0.bak");
-        try {
-            if (!java.nio.file.Files.exists(backup)) java.nio.file.Files.copy(configFile, backup);
-        } catch (java.io.IOException error) {
-            logger.error("Config backup failed; migration will retry without changing saved settings: {}", backup, error);
-            return;
+        // Only an unstamped file can be new: NeoForge writes the spec default 0, and every load
+        // that completes a migration stamps the file, so a stamped file is never re-probed.
+        boolean fresh = schemaRead == 0 && isFreshlyGeneratedConfig(configFile);
+        // 3.3.5 first: it only ever preserves an existing world's behaviour, so it must apply
+        // even when the older step below cannot complete and defers the schema stamp.
+        if (schemaRead < INSCRIBED_COOLDOWN_SCHEMA) {
+            int fileTicks = INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS.get();
+            int resolvedTicks = resolveInscribedCooldownTicks(fileTicks, schemaRead, fresh);
+            if (resolvedTicks != fileTicks) INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS.set(resolvedTicks);
+            logger.info("ANS config migration: inscribed_ars_default_cooldown_ticks (absent) -> {} ({})", resolvedTicks,
+                fresh ? "freshly generated config: the shipped default"
+                    : resolvedTicks == 0 ? "config written before 3.3.5: no native cooldown, as before" : "explicit value kept");
         }
-        double previous = SOURCE_JAR_SYNERGY_MULTIPLIER.get();
-        double migrated = com.otectus.arsnspells.util.SourceSynergyPolicy.migratePerScanMultiplier(
-            previous, SOURCE_JAR_SCAN_INTERVAL_TICKS.get());
-        SOURCE_JAR_SYNERGY_MULTIPLIER.set(migrated);
+        if (schemaRead < 2) {
+            if (configFile == null || !java.nio.file.Files.exists(configFile)) return;
+            java.nio.file.Path backup = configFile.resolveSibling(configFile.getFileName() + ".pre-3.3.0.bak");
+            try {
+                if (!java.nio.file.Files.exists(backup)) java.nio.file.Files.copy(configFile, backup);
+            } catch (java.io.IOException error) {
+                logger.error("Config backup failed; migration will retry without changing saved settings: {}", backup, error);
+                return;
+            }
+            double previous = SOURCE_JAR_SYNERGY_MULTIPLIER.get();
+            double migrated = com.otectus.arsnspells.util.SourceSynergyPolicy.migratePerScanMultiplier(
+                previous, SOURCE_JAR_SCAN_INTERVAL_TICKS.get());
+            SOURCE_JAR_SYNERGY_MULTIPLIER.set(migrated);
+            logger.info("ANS config migration: Source proximity multiplier {} per scan -> {} per second; backup {}. Conversion remains {}.",
+                previous, migrated, backup, CONVERSION_POLICY.get());
+        }
         CONFIG_SCHEMA_VERSION.set(CURRENT_SCHEMA_VERSION);
         safeSave();
-        logger.info("ANS config migrated to schema {}: Source proximity multiplier {} per scan -> {} per second; backup {}. Conversion remains {}.",
-            CURRENT_SCHEMA_VERSION, previous, migrated, backup, CONVERSION_POLICY.get());
+        logger.info("ANS config migrated from schema {} to schema {}.", schemaRead, CURRENT_SCHEMA_VERSION);
+    }
+
+    /**
+     * Resolve {@code inscribed_ars_default_cooldown_ticks} for the file being loaded.
+     *
+     * <p>A file stamped with schema 3 or later, or one generated by this load, is taken as
+     * written. A file from before 3.3.5 never contained the key: the correction pass filled in the
+     * shipped default, so that value resolves to 0 and the world keeps its cooldown-free inscribed
+     * casts. Any other value in such a file was typed by hand and is kept.
+     *
+     * <p>Pure, so the migration decision is unit-testable without a mod loading context.
+     */
+    public static int resolveInscribedCooldownTicks(int fileTicks, int schemaRead, boolean freshlyGenerated) {
+        int bounded = Math.max(0, Math.min(INSCRIBED_ARS_COOLDOWN_MAX_TICKS, fileTicks));
+        if (schemaRead >= INSCRIBED_COOLDOWN_SCHEMA || freshlyGenerated) return bounded;
+        return bounded == INSCRIBED_ARS_COOLDOWN_DEFAULT_TICKS ? 0 : bounded;
+    }
+
+    /**
+     * The configured inscribed-spell cooldown in ticks, or 0 while no server config is loaded
+     * (a client on the title screen, or before the server has started).
+     */
+    public static int inscribedArsCooldownTicks() {
+        try {
+            if (!SPEC.isLoaded()) return 0;
+            return Math.max(0, INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS.get());
+        } catch (IllegalStateException notLoaded) {
+            return 0;
+        }
+    }
+
+    /**
+     * Whether {@code configFile} was created by the load that is running right now. Every failure
+     * resolves to "not fresh", the direction that preserves an existing world's behaviour.
+     */
+    public static boolean isFreshlyGeneratedConfig(java.nio.file.Path configFile) {
+        if (configFile == null) return false;
+        try {
+            java.nio.file.attribute.BasicFileAttributes attrs =
+                java.nio.file.Files.readAttributes(configFile, java.nio.file.attribute.BasicFileAttributes.class);
+            long jvmStart = java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime();
+            return attrs.creationTime().toMillis() >= jvmStart;
+        } catch (Exception unreadable) {
+            return false;
+        }
     }
 
     public static void safeSave() {
@@ -791,7 +920,17 @@ public class AnsConfig {
         });
     }
     public static com.otectus.arsnspells.contract.ConversionKind getConversionKind() {
-        return "equal_percent".equals(CONVERSION_POLICY.get())
+        return parseConversionPolicy(CONVERSION_POLICY.get());
+    }
+
+    /**
+     * Parse a {@code conversion_policy} value; anything but {@code equal_percent} prices as
+     * {@code flat_legacy}, so a typo can never silently reprice a pack. Same rule as the Forge
+     * 1.20.1 build (whose key has no validator and logs the fallback).
+     */
+    public static com.otectus.arsnspells.contract.ConversionKind parseConversionPolicy(String raw) {
+        String value = raw == null ? "" : raw.trim().toLowerCase(java.util.Locale.ROOT);
+        return "equal_percent".equals(value)
             ? com.otectus.arsnspells.contract.ConversionKind.EQUAL_PERCENT
             : com.otectus.arsnspells.contract.ConversionKind.FLAT_LEGACY;
     }

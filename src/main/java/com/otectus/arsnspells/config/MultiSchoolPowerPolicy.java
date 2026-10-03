@@ -18,15 +18,15 @@ package com.otectus.arsnspells.config;
 public enum MultiSchoolPowerPolicy {
     /**
      * Scale only with the primary (first-resolved) school — the same school affinity and
-     * progression credit. The most conservative option: multi-school spells behave exactly as
-     * they did before multi-school resolution existed. If the primary school has no Iron's
-     * counterpart, no elemental bonus applies at all.
+     * progression credit. The most conservative option and the default for new configs:
+     * multi-school spells behave exactly as they did before multi-school resolution existed.
+     * If the primary school has no Iron's counterpart, no elemental bonus applies at all.
      */
     PRIMARY("primary", "Only the primary (first-resolved) school scales the spell"),
 
     /**
-     * Scale with the single largest matching elemental attribute (DEFAULT). A dual-element
-     * spell rewards the caster's better element without stacking both.
+     * Scale with the single largest matching elemental attribute. A dual-element spell rewards
+     * the caster's better element without stacking both. Also the fallback for an unknown value.
      */
     MAX("max", "The single strongest matching elemental attribute scales the spell"),
 

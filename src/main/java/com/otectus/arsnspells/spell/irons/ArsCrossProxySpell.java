@@ -135,6 +135,24 @@ public class ArsCrossProxySpell extends AbstractSpell {
         return false;
     }
 
+    /**
+     * The native cooldown Iron's applies to this proxy after a successful delegated cast: the
+     * ANS {@code inscribed_ars_default_cooldown_ticks} setting, read on every call so a config
+     * reload takes effect on the next cast.
+     *
+     * <p>Iron's reads this through {@code MagicManager.getEffectiveSpellCooldown}, so its
+     * cooldown-reduction attribute, the spell wheel display and relog persistence all apply to
+     * the returned base. Iron's own per-spell config is deliberately not consulted: a proxy is a
+     * pooled wheel slot that different books fill with different Ars spells, and Iron's answers
+     * its global ten-second default for every spell until its JSON config map is first built on
+     * a datapack sync. A failed delegated cast never starts this cooldown:
+     * {@code IronsCooldownHandler} cancels that native cooldown.
+     */
+    @Override
+    public int getSpellCooldown() {
+        return com.otectus.arsnspells.config.AnsConfig.inscribedArsCooldownTicks();
+    }
+
     @Override
     public void onCast(Level level, int spellLevel, LivingEntity entity, CastSource castSource,
                        MagicData playerMagicData) {
@@ -177,7 +195,10 @@ public class ArsCrossProxySpell extends AbstractSpell {
         UUID attemptId = UUID.randomUUID();
         CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "runtime", "ARS_PROXY", "pool", poolId);
-        if (CrossCastingHandler.castArsSpell(player, carrier.book(), carrier.entry(), attemptId)) {
+        boolean success = CrossCastingHandler.castArsSpell(player, carrier.book(), carrier.entry(), attemptId);
+        // Only a delegated cast that actually resolved may start this proxy's native cooldown.
+        com.otectus.arsnspells.casting.IronsCastLifecycle.recordDelegatedResult(player, this, success);
+        if (success) {
             // Audit H4: the native-wheel path bypasses serverHandleCast, so the advancement is
             // granted here too (grant() is idempotent).
             AdvancementUtil.grant(player, "first_cross_cast");

@@ -192,10 +192,6 @@
         {
           "amount": 10.0,
           "unit": "ARS_MANA"
-        },
-        {
-          "amount": 20.0,
-          "unit": "IRONS_MANA"
         }
       ],
       "legs": [

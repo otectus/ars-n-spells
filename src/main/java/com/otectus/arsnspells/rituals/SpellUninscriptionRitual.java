@@ -34,6 +34,8 @@ import java.util.List;
  * Every violation produces a lang-keyed message naming the offending items.
  */
 public class SpellUninscriptionRitual extends AnsRitual {
+    private static final org.slf4j.Logger LOGGER =
+        org.slf4j.LoggerFactory.getLogger(SpellUninscriptionRitual.class);
     public static final String REGISTRY_PATH = "spell_uninscription";
     private static final String LANG_PREFIX = "ritual.ars_n_spells.spell_uninscription.";
     private static final int SEARCH_RADIUS = 3;
@@ -88,7 +90,11 @@ public class SpellUninscriptionRitual extends AnsRitual {
         // Strip cleanly, and in the right order: native wheel slots first, then the sidecar,
         // then the export marker. A bare component clear loses the pool ids that say which
         // wheel slots were ours, leaving selectable entries that cast nothing.
-        IronsBookBindingUtil.removeAllArsEntries(stack);
+        int proxiesRemoved = IronsBookBindingUtil.removeAllArsEntries(stack);
+        if (proxiesRemoved > 0) {
+            LOGGER.debug("Uninscribe removed {} native proxy slot(s) from {}",
+                proxiesRemoved, displayName);
+        }
         inscribedEntity.setItem(stack);
 
         playUninscribeEffects(level, pos);

@@ -1,0 +1,886 @@
+{
+  "source": "src/main/java/com/otectus/arsnspells/config/AnsConfig.java",
+  "sha256": "1f272b0d59f3964a800ff6061065ffee07710a9ba382e1bf456bd53003d34125",
+  "entries": [
+    {
+      "key": "config_schema_version",
+      "field": "CONFIG_SCHEMA_VERSION",
+      "default": "0",
+      "arguments": [
+        "0",
+        "Integer.MAX_VALUE"
+      ],
+      "description": "Written after config migration; do not edit manually.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Master Toggles.mana_unification_mode",
+      "field": "MANA_UNIFICATION_MODE",
+      "default": "\"iss_primary\"",
+      "arguments": [],
+      "description": "Mana Unification Mode - Controls how Ars Nouveau and Iron's Spellbooks mana systems interact:   iss_primary - Iron's Spellbooks mana is the single source (DEFAULT)   ars_primary - Ars Nouveau mana is the single source   hybrid - Both systems share a unified mana pool   separate - Separate pools with dual-cost mechanics   disabled - No mana integration at all Runtime changes are applied on the server thread and synchronized to connected clients.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/bridge/BridgeManager.java",
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java",
+        "src/main/java/com/otectus/arsnspells/gametest/SharedPoolManaGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java",
+        "src/main/java/com/otectus/arsnspells/gametest/SharedPoolManaGameTests.java",
+        "src/test/java/com/otectus/arsnspells/commands/AnsModeCommandTest.java"
+      ]
+    },
+    {
+      "key": "Master Toggles.enable_mana_unification",
+      "field": "ENABLE_MANA_UNIFICATION",
+      "default": "true",
+      "arguments": [],
+      "description": "Master toggle for all mana unification features",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Master Toggles.enable_resonance_system",
+      "field": "ENABLE_RESONANCE_SYSTEM",
+      "default": "true",
+      "arguments": [],
+      "description": "Master toggle for the Resonance system (full mana bonuses)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/augmentation/ResonanceManager.java",
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/events/CapabilityResyncHandler.java",
+        "src/main/java/com/otectus/arsnspells/util/SpellScalingUtil.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Master Toggles.enable_cooldown_system",
+      "field": "ENABLE_COOLDOWN_SYSTEM",
+      "default": "false",
+      "arguments": [],
+      "description": "Master toggle for unified cooldown system",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/cooldown/UnifiedCooldownManager.java",
+        "src/main/java/com/otectus/arsnspells/events/CapabilityResyncHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/CooldownHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/IronsCooldownHandler.java",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ]
+    },
+    {
+      "key": "Master Toggles.enable_progression_system",
+      "field": "ENABLE_PROGRESSION_SYSTEM",
+      "default": "true",
+      "arguments": [],
+      "description": "Master toggle for cross-mod progression system",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/events/IronsProgressionHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/ProgressionHandler.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Master Toggles.enable_affinity_system",
+      "field": "ENABLE_AFFINITY_SYSTEM",
+      "default": "true",
+      "arguments": [],
+      "description": "Master toggle for affinity/attunement system",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/events/AffinityDecayHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/AffinityHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/AffinitySyncOnLoginHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/CapabilityResyncHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/IronsAffinityHandler.java",
+        "src/main/java/com/otectus/arsnspells/util/SpellScalingUtil.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Master Toggles.debug_mode",
+      "field": "DEBUG_MODE",
+      "default": "false",
+      "arguments": [],
+      "description": "Enable debug logging for troubleshooting",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/casting/IronsCastLifecycle.java",
+        "src/main/java/com/otectus/arsnspells/client/ArsNSpellsClient.java",
+        "src/main/java/com/otectus/arsnspells/client/OverlayDiagnostics.java",
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java",
+        "src/main/java/com/otectus/arsnspells/gametest/CombatBridgeGameTests.java",
+        "src/main/java/com/otectus/arsnspells/util/CrossCastTrace.java",
+        "src/main/java/com/otectus/arsnspells/util/StartupValidator.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/CombatBridgeGameTests.java"
+      ]
+    },
+    {
+      "key": "Mana Unification.conversion_rate_ars_to_iron",
+      "field": "CONVERSION_RATE_ARS_TO_IRON",
+      "default": "1.0",
+      "arguments": [
+        "0.01",
+        "10.0"
+      ],
+      "description": "Conversion rate from Ars mana to Iron's mana (1.0 = 1:1)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/casting/QuoteService.java",
+        "src/main/java/com/otectus/arsnspells/commands/AuditDiagnosticsCommands.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/equipment/EquipmentIntegration.java",
+        "src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ]
+    },
+    {
+      "key": "Mana Unification.conversion_rate_iron_to_ars",
+      "field": "CONVERSION_RATE_IRON_TO_ARS",
+      "default": "1.0",
+      "arguments": [
+        "0.01",
+        "10.0"
+      ],
+      "description": "Conversion rate from Iron's mana to Ars mana (1.0 = 1:1)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/casting/QuoteService.java",
+        "src/main/java/com/otectus/arsnspells/commands/AuditDiagnosticsCommands.java",
+        "src/main/java/com/otectus/arsnspells/events/ArsManaCalcHandler.java",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ]
+    },
+    {
+      "key": "Mana Unification.hybrid_mana_bar",
+      "field": "HYBRID_MANA_BAR",
+      "default": "\"irons\"",
+      "arguments": [
+        "o -> o instanceof String s\n                    && (\"irons\".equalsIgnoreCase(s) || \"ars\".equalsIgnoreCase(s))"
+      ],
+      "description": "Which mana bar to display in HYBRID mode:   irons - Show Iron's Spellbooks mana bar   ars - Show Ars Nouveau mana bar Only applies when mana_unification_mode is set to 'hybrid'",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/client/ManaBarController.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Mana Unification.dual_cost_ars_percentage",
+      "field": "DUAL_COST_ARS_PERCENTAGE",
+      "default": "0.5",
+      "arguments": [
+        "0.0",
+        "1.0"
+      ],
+      "description": "Percentage of Ars mana cost in SEPARATE mode (0.5 = 50%)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/bridge/BridgeManager.java",
+        "src/main/java/com/otectus/arsnspells/casting/QuoteService.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ]
+    },
+    {
+      "key": "Mana Unification.dual_cost_iss_percentage",
+      "field": "DUAL_COST_ISS_PERCENTAGE",
+      "default": "0.5",
+      "arguments": [
+        "0.0",
+        "1.0"
+      ],
+      "description": "Percentage of ISS mana cost in SEPARATE mode (0.5 = 50%)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/bridge/BridgeManager.java",
+        "src/main/java/com/otectus/arsnspells/casting/QuoteService.java",
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ]
+    },
+    {
+      "key": "Mana Unification.default_max_mana",
+      "field": "DEFAULT_MAX_MANA",
+      "default": "100.0",
+      "arguments": [
+        "1.0",
+        "100000.0"
+      ],
+      "description": "Default maximum mana fallback when the native system returns no value. Can be changed at runtime with /ans mana setdefault <value> Applies to both Ars Nouveau and Iron's Spellbooks bridge fallbacks.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/bridge/ArsNativeBridge.java",
+        "src/main/java/com/otectus/arsnspells/bridge/IronsBridge.java",
+        "src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Mana Unification.respect_armor_bonuses",
+      "field": "respectArmorBonuses",
+      "default": "true",
+      "arguments": [],
+      "description": "Include armor bonuses in unified mana calculations",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/equipment/EquipmentIntegration.java",
+        "src/main/java/com/otectus/arsnspells/events/ArsManaCalcHandler.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Mana Unification.respect_enchantments",
+      "field": "respectEnchantments",
+      "default": "true",
+      "arguments": [],
+      "description": "Include enchantment bonuses in unified mana calculations",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/equipment/EquipmentIntegration.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Mana Unification.cross_system_regen_conversion",
+      "field": "CROSS_SYSTEM_REGEN_CONVERSION",
+      "default": "\"EQUAL_EFFECT\"",
+      "arguments": [],
+      "description": "How mana regen values are translated when crossing the Ars / Iron's boundary. Iron's regen is a percentage-of-pool multiplier; Ars regen is absolute mana/sec. Without conversion, an Ars enchantment like Mana Regen III applied to Iron's regen will produce hundreds of mana/sec because the absolute value is misread as a percentage.   EQUAL_EFFECT  - Convert by the target system's current max pool (DEFAULT, recommended).                   Preserves equivalent mana/sec on both sides at any pool size.   REFERENCE_POOL - Convert using a fixed reference pool (see cross_system_regen_reference_pool).                    Predictable but ignores the wearer's actual pool size.   DISABLED      - Do not translate cross-system regen at all. Mana Regen enchantments                   on Ars only affect Ars; Iron's gear regen only affects Iron's.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/bridge/ManaRegenBridge.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Mana Unification.cross_system_regen_multiplier",
+      "field": "CROSS_SYSTEM_REGEN_MULTIPLIER",
+      "default": "1.0",
+      "arguments": [
+        "0.0",
+        "100.0"
+      ],
+      "description": "Global dampener applied to every cross-system regen translation. Use to tone down or boost the strength of cross-mod regen bonuses without disabling them entirely. 1.0 = full strength, 0.5 = half, 2.0 = double.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/bridge/ManaRegenBridge.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Mana Unification.cross_system_regen_reference_pool",
+      "field": "CROSS_SYSTEM_REGEN_REFERENCE_POOL",
+      "default": "100.0",
+      "arguments": [
+        "1.0",
+        "100000.0"
+      ],
+      "description": "Reference pool size used by REFERENCE_POOL conversion mode. Has no effect when cross_system_regen_conversion is EQUAL_EFFECT or DISABLED.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/bridge/ManaRegenBridge.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Resonance System.enable_ars_resonance",
+      "field": "ENABLE_ARS_RESONANCE",
+      "default": "true",
+      "arguments": [],
+      "description": "Enable resonance bonuses for Ars Nouveau spells",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/augmentation/ResonanceManager.java",
+        "src/main/java/com/otectus/arsnspells/util/SpellScalingUtil.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Resonance System.enable_irons_resonance",
+      "field": "ENABLE_IRONS_RESONANCE",
+      "default": "true",
+      "arguments": [],
+      "description": "Enable resonance bonuses for Iron's Spellbooks spells",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/augmentation/ResonanceManager.java",
+        "src/main/java/com/otectus/arsnspells/mixin/irons/MixinIronsSpellPowerResonance.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Resonance System.resonance_strength",
+      "field": "RESONANCE_STRENGTH",
+      "default": "1.0",
+      "arguments": [
+        "0.0",
+        "10.0"
+      ],
+      "description": "Global multiplier for all resonance bonuses",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/augmentation/ResonanceManager.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Resonance System.resonance_threshold",
+      "field": "RESONANCE_THRESHOLD",
+      "default": "0.95",
+      "arguments": [
+        "0.0",
+        "1.0"
+      ],
+      "description": "Mana fraction at or above which resonance applies (0.95 = 95% full). The bonus itself still scales with how full the pool is; this only gates whether it applies at all. The default 0.95 matches the Forge variant. Set 0.0 to leave the gate open. Existing saved values are preserved.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/augmentation/ResonanceManager.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Resonance System.resonance_duration",
+      "field": "RESONANCE_DURATION",
+      "default": "100",
+      "arguments": [
+        "0",
+        "1200"
+      ],
+      "description": "How long resonance keeps applying after the pool drops below resonance_threshold, in ticks (20 = 1 second). This is what makes a raised threshold playable: spending mana to cast necessarily drops you below it, so without a linger the bonus would switch off on the very cast that earned it. Has no effect while resonance_threshold is 0. Resolution is the recompute interval (40 ticks), so the effective linger is this value give or take one interval.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/augmentation/ResonanceManager.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Resonance System.max_damage_multiplier",
+      "field": "MAX_DAMAGE_MULTIPLIER",
+      "default": "5.0",
+      "arguments": [
+        "1.0",
+        "100.0"
+      ],
+      "description": "Maximum damage multiplier from resonance",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/augmentation/ResonanceManager.java"
+      ],
+      "direct_test_references": [
+        "src/test/java/com/otectus/arsnspells/augmentation/ResonanceManagerClampTest.java"
+      ]
+    },
+    {
+      "key": "Cooldown System.enable_unified_cooldowns",
+      "field": "ENABLE_UNIFIED_COOLDOWNS",
+      "default": "false",
+      "arguments": [],
+      "description": "Enable cross-mod cooldown sharing",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/cooldown/UnifiedCooldownManager.java",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ]
+    },
+    {
+      "key": "Cooldown System.enable_cross_mod_cooldowns",
+      "field": "ENABLE_CROSS_MOD_COOLDOWNS",
+      "default": "false",
+      "arguments": [],
+      "description": "CRITICAL: Enable cross-mod cooldown interference (false = each mod has independent cooldowns)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/events/IronsCooldownHandler.java",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ]
+    },
+    {
+      "key": "Cooldown System.cooldown_category_duration",
+      "field": "COOLDOWN_CATEGORY_DURATION",
+      "default": "100",
+      "arguments": [
+        "0",
+        "10000"
+      ],
+      "description": "Base category cooldown duration (ticks, 20 = 1 second)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/cooldown/UnifiedCooldownManager.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Cooldown System.cross_mod_cooldown_multiplier",
+      "field": "CROSS_MOD_COOLDOWN_MULTIPLIER",
+      "default": "0.5",
+      "arguments": [
+        "0.0",
+        "10.0"
+      ],
+      "description": "Multiplier for cross-mod cooldowns (0.5 = 50% of normal)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/cooldown/UnifiedCooldownManager.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Progression System.enable_cross_mod_progression",
+      "field": "ENABLE_CROSS_MOD_PROGRESSION",
+      "default": "true",
+      "arguments": [],
+      "description": "Allow Ars spells to grant ISS XP and vice versa",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/events/IronsProgressionHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/ProgressionHandler.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Progression System.progression_bonus_per_cast",
+      "field": "PROGRESSION_BONUS_PER_CAST",
+      "default": "0.001",
+      "arguments": [
+        "0.0",
+        "0.1"
+      ],
+      "description": "Attribute bonus gained per cast in a school (audit F4 - was hardcoded 0.001). 0.001 = +0.1% per cast. The bonus is transient (derived from the persistent cast count), so changing this immediately rescales every player's bonus.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/commands/AuditDiagnosticsCommands.java",
+        "src/main/java/com/otectus/arsnspells/data/ProgressionData.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Progression System.progression_bonus_cap",
+      "field": "PROGRESSION_BONUS_CAP",
+      "default": "0.25",
+      "arguments": [
+        "0.0",
+        "2.0"
+      ],
+      "description": "Cap on the per-school progression attribute bonus (audit F4 - was hardcoded 0.25). 0.25 = +25% maximum, reached after bonus_cap / bonus_per_cast casts (250 casts at defaults).",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/commands/AuditDiagnosticsCommands.java",
+        "src/main/java/com/otectus/arsnspells/data/ProgressionData.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Affinity System.enable_affinity_decay",
+      "field": "ENABLE_AFFINITY_DECAY",
+      "default": "false",
+      "arguments": [],
+      "description": "Enable affinity decay when not using a school. Default off for fresh installs (1.9.0).",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/events/AffinityDecayHandler.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Affinity System.affinity_decay_rate",
+      "field": "AFFINITY_DECAY_RATE",
+      "default": "0.01",
+      "arguments": [
+        "0.0",
+        "1.0"
+      ],
+      "description": "Rate of affinity decay per day (in-game)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/events/AffinityDecayHandler.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Affinity System.affinity_decay_interval_ticks",
+      "field": "AFFINITY_DECAY_INTERVAL_TICKS",
+      "default": "1200",
+      "arguments": [
+        "20",
+        "24000"
+      ],
+      "description": "Ticks between AffinityDecayHandler runs (20 = 1s, 1200 = 60s). Decay per run is prorated from AFFINITY_DECAY_RATE.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/events/AffinityDecayHandler.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Curio Discount System.enable_curio_discounts",
+      "field": "ENABLE_CURIO_DISCOUNTS",
+      "default": "true",
+      "arguments": [],
+      "description": "Enable mana cost discounts from curios tagged #ars_n_spells:curio_spell_discount.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/compat/curios/IronsCurioDiscountHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/CurioDiscountHandler.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Curio Discount System.virtue_ring_discount",
+      "field": "VIRTUE_RING_DISCOUNT",
+      "default": "0.20",
+      "arguments": [
+        "0.0",
+        "1.0"
+      ],
+      "description": "Per-curio mana cost discount for items in #ars_n_spells:curio_spell_discount (0.20 = each tagged curio multiplies cost by 0.80). Applies to both Ars and Iron's Spellbooks casts.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/compat/curios/IronsCurioDiscountHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/CurioDiscountHandler.java"
+      ],
+      "direct_test_references": [
+        "src/test/java/com/otectus/arsnspells/config/AnsConfigStructureTest.java"
+      ]
+    },
+    {
+      "key": "Curio Discount System.max_total_curio_discount",
+      "field": "MAX_TOTAL_CURIO_DISCOUNT",
+      "default": "0.50",
+      "arguments": [
+        "0.0",
+        "1.0"
+      ],
+      "description": "Hard cap on the COMBINED tagged-curio discount across all worn curios (0.50 = spells never cost less than 50% after curio discounts). Prevents stacked discount curios from trivialising mana cost.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/compat/curios/IronsCurioDiscountHandler.java",
+        "src/main/java/com/otectus/arsnspells/events/CurioDiscountHandler.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Curio Discount System.read_curio_attribute_modifiers",
+      "field": "READ_CURIO_ATTRIBUTE_MODIFIERS",
+      "default": "true",
+      "arguments": [],
+      "description": "Read attribute modifiers from worn Curios for cross-system equipment bonuses. Disable if another integration already mirrors those modifiers.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/equipment/EquipmentIntegration.java",
+        "src/main/java/com/otectus/arsnspells/gametest/EquipmentParityGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/EquipmentParityGameTests.java"
+      ]
+    },
+    {
+      "key": "Scroll Cost System.scroll_cost_mode",
+      "field": "SCROLL_COST_MODE",
+      "default": "\"full\"",
+      "arguments": [],
+      "description": "Cost mode for Iron's Spellbooks scroll usage:   full - Scrolls cost the same as casting the spell normally   lp_only - Scrolls are free of mana cost but still consume LP if Cursed Ring equipped   free - Scrolls have no resource cost (LP from Cursed Ring still applies) Note: wearing the Cursed Ring (with enable_lp_system on) makes LP REPLACE mana, exactly as it does for normal casting - a ring wearer is never charged both. The LP half of this setting is inert on 1.21.1: Covenant of the Seven has no 1.21.1 release, so lp_only behaves as free until that integration returns.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/casting/IronsCastPayments.java",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ]
+    },
+    {
+      "key": "Spell Scaling.spell_power_cap",
+      "field": "SPELL_POWER_CAP",
+      "default": "3.0",
+      "arguments": [
+        "1.0",
+        "10.0"
+      ],
+      "description": "Maximum total spell power multiplier from Iron's attributes. Prevents stacking from exceeding this value. Set higher to allow more scaling.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java",
+        "src/main/java/com/otectus/arsnspells/util/SpellScalingUtil.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Spell Scaling.enable_cross_mod_combat_stats",
+      "field": "ENABLE_CROSS_MOD_COMBAT_STATS",
+      "default": "true",
+      "arguments": [],
+      "description": "Master switch for both directions of cross-mod spell damage scaling: Iron's spell power scaling Ars spell damage, and Ars' Spell Damage Bonus perk adding to Iron's spell damage. This is independent of the mana-unification mode: both directions stay active even when mana unification is DISABLED, because a player who earned the stats on either side should keep them regardless of how mana is pooled.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/combat/ArsDamageBridge.java",
+        "src/main/java/com/otectus/arsnspells/combat/IronsDamageBridge.java",
+        "src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Spell Scaling.enable_irons_power_for_ars_damage",
+      "field": "ENABLE_IRONS_POWER_FOR_ARS_DAMAGE",
+      "default": "true",
+      "arguments": [],
+      "description": "Iron's -> Ars direction: scale Ars Nouveau spell damage by the caster's Iron's spell power attributes (generic + the matching school), affinity and resonance, capped by spell_power_cap. Independent of the mana-unification mode; active even when mana unification is DISABLED.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/combat/ArsDamageBridge.java",
+        "src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Spell Scaling.enable_ars_damage_for_irons_damage",
+      "field": "ENABLE_ARS_DAMAGE_FOR_IRONS_DAMAGE",
+      "default": "true",
+      "arguments": [],
+      "description": "Ars -> Iron's direction: add the caster's Ars Nouveau Spell Damage Bonus perk value to Iron's spell damage as a flat addition, matching how Ars itself applies that attribute. Not affected by spell_power_cap, which is a multiplier cap and must not clamp a flat bonus. Independent of the mana-unification mode; active even when mana unification is DISABLED.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/combat/IronsDamageBridge.java",
+        "src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Spell Scaling.multi_school_power_policy",
+      "field": "MULTI_SCHOOL_POWER_POLICY",
+      "default": "\"primary\"",
+      "arguments": [],
+      "description": "How a spell that resolves to more than one school picks the Iron's elemental spell power attribute it scales with (dual-element and compound-element addon glyphs, and recipes that chain effects from different schools):   primary (default) - only the first-resolved school scales the spell, the same one             affinity and progression credit   max - the single strongest matching elemental attribute (DEFAULT)   average - the mean of all matching elemental attributes There is deliberately no 'sum' option: adding every matching bonus would make a spell stronger purely for carrying more school labels, so an all-element glyph would collect fire, ice, lightning and nature power at once. Unknown values fall back to 'max'.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/util/SpellScalingUtil.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Source Jar Synergy.enable_source_jar_synergy",
+      "field": "ENABLE_SOURCE_JAR_SYNERGY",
+      "default": "true",
+      "arguments": [],
+      "description": "Master kill switch for the Source Jar proximity regen synergy. Set false to disable the periodic block scan entirely (zero per-tick cost). This is the supported way to turn the feature off; source_jar_synergy_multiplier keeps its 0.1 minimum. (ANS-CRIT-005 follow-up)",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java",
+        "src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java"
+      ],
+      "direct_test_references": [
+        "src/test/java/com/otectus/arsnspells/config/AnsConfigStructureTest.java",
+        "src/test/java/com/otectus/arsnspells/events/RegenSynergyHandlerConfigGateTest.java"
+      ]
+    },
+    {
+      "key": "Source Jar Synergy.source_jar_scan_interval_ticks",
+      "field": "SOURCE_JAR_SCAN_INTERVAL_TICKS",
+      "default": "20",
+      "arguments": [
+        "1",
+        "200"
+      ],
+      "description": "Ticks between Source Jar proximity checks per player (20 = once per second). Raise on busy servers to reduce scan cost.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java"
+      ],
+      "direct_test_references": [
+        "src/test/java/com/otectus/arsnspells/config/AnsConfigStructureTest.java",
+        "src/test/java/com/otectus/arsnspells/events/RegenSynergyHandlerConfigGateTest.java"
+      ]
+    },
+    {
+      "key": "Source Jar Synergy.source_jar_scan_radius",
+      "field": "SOURCE_JAR_SCAN_RADIUS",
+      "default": "4",
+      "arguments": [
+        "1",
+        "8"
+      ],
+      "description": "Horizontal scan radius in blocks around the player. Any value up to the hard cap of 8 covers at most a 2x2 chunk area. The scan never loads chunks - cycles near unloaded chunks are skipped and retried.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java"
+      ],
+      "direct_test_references": [
+        "src/test/java/com/otectus/arsnspells/config/AnsConfigStructureTest.java",
+        "src/test/java/com/otectus/arsnspells/events/RegenSynergyHandlerConfigGateTest.java"
+      ]
+    },
+    {
+      "key": "Source Jar Synergy.source_jar_synergy_multiplier",
+      "field": "SOURCE_JAR_SYNERGY_MULTIPLIER",
+      "default": "5.0",
+      "arguments": [
+        "0.01",
+        "2000.0"
+      ],
+      "description": "Multiplier for Source Jar proximity regen bonus. Higher values = stronger regen when standing near Source Jars. Final bonus = CONVERSION_RATE_ARS_TO_IRON * this value per second.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)",
+        "src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Rituals.ritual_mana_infusion_amount",
+      "field": "RITUAL_MANA_INFUSION_AMOUNT",
+      "default": "500.0",
+      "arguments": [
+        "1.0",
+        "10000.0"
+      ],
+      "description": "Amount of mana added by the Ritual of Mana Infusion",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/rituals/ManaInfusionRitual.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Rituals.mana_well_range",
+      "field": "MANA_WELL_RANGE",
+      "default": "8",
+      "arguments": [
+        "1",
+        "64"
+      ],
+      "description": "Radius in blocks for Mana Well ritual effect",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/rituals/ManaWellRitual.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Rituals.mana_well_regen_rate",
+      "field": "MANA_WELL_REGEN_RATE",
+      "default": "2.0",
+      "arguments": [
+        "0.1",
+        "100.0"
+      ],
+      "description": "Mana per tick granted to players within Mana Well range",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/rituals/ManaWellRitual.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Cross-Cast Inscription.conversion_policy",
+      "field": "CONVERSION_POLICY",
+      "default": "\"flat_legacy\"",
+      "arguments": [
+        "value -> value instanceof String text\n                && (\"flat_legacy\".equals(text) || \"equal_percent\".equals(text))"
+      ],
+      "description": "Mana pricing policy: flat_legacy applies directional rates; equal_percent also applies target/source native maximum. Server-owned. A quote captures the selected policy; reloading does not reprice a committed cast.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/config/AnsConfig.java (internal accessor or migration)"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Cross-Cast Inscription.cross_cast_cost_multiplier",
+      "field": "CROSS_CAST_COST_MULTIPLIER",
+      "default": "1.25",
+      "arguments": [
+        "0.5",
+        "5.0"
+      ],
+      "description": "Multiplier applied to the base mana cost of a spell cast from an inscribed item. Represents the overhead of casting through a foreign mod's form. 1.0 = no overhead, 1.25 = 25% extra cost (default). Applied once, after base cost calculation and before mana deduction. Routed through BridgeManager, so it composes with the active mana unification mode and SEPARATE-mode dual-cost splitting.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/casting/QuoteService.java",
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java",
+        "src/main/java/com/otectus/arsnspells/spell/CrossCastingHandler.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/NativeCastPaymentGameTests.java"
+      ]
+    },
+    {
+      "key": "Cross-Cast Inscription.network_request_rate_per_second",
+      "field": "NETWORK_REQUEST_RATE_PER_SECOND",
+      "default": "10",
+      "arguments": [
+        "1",
+        "20"
+      ],
+      "description": "Maximum sustained cross-cast/cycle requests per player per second. Server-owned; live reload. Repeated request IDs are ignored independently for 60 seconds. Does not limit native casts.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/network/NetworkRequestGuard.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Cross-Cast Inscription.network_request_burst",
+      "field": "NETWORK_REQUEST_BURST",
+      "default": "4",
+      "arguments": [
+        "1",
+        "20"
+      ],
+      "description": "Immediate cross-cast/cycle request burst per player. Allows ordinary double clicks and latency bursts.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/network/NetworkRequestGuard.java"
+      ],
+      "direct_test_references": []
+    },
+    {
+      "key": "Cross-Cast Inscription.allow_ars_spells_in_irons_spellbooks",
+      "field": "ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS",
+      "default": "true",
+      "arguments": [],
+      "description": "Allow Ars Nouveau spells to be bound onto Iron's Spellbooks spellbooks, where they appear as their own entries in Iron's native spell wheel and cast through Ars 'n Spells' cross-cast pipeline. Disabling rejects new binds with a clear message; spells already bound keep working. No effect without Iron's installed.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java",
+        "src/main/java/com/otectus/arsnspells/gametest/IronsInscriptionTableGameTests.java",
+        "src/main/java/com/otectus/arsnspells/gametest/RitualLifecycleGameTests.java",
+        "src/main/java/com/otectus/arsnspells/rituals/SpellbookBindingRitual.java",
+        "src/main/java/com/otectus/arsnspells/spell/IronsSpellbookBinder.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/IronsInscriptionTableGameTests.java",
+        "src/main/java/com/otectus/arsnspells/gametest/RitualLifecycleGameTests.java",
+        "src/test/java/com/otectus/arsnspells/config/AnsConfigStructureTest.java"
+      ]
+    },
+    {
+      "key": "Cross-Cast Inscription.max_ars_cross_spells_per_irons_spellbook",
+      "field": "MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK",
+      "default": "-1",
+      "arguments": [
+        "-1",
+        "64"
+      ],
+      "description": "Maximum number of Ars spells that may be bound onto a single Iron's spellbook. -1 = no cap (default). Whatever the value, it is bounded at runtime by the native-wheel proxy pool size ( ): only that many Ars entries can be shown as distinct entries in Iron's spell wheel per book.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/commands/ArsNSpellsCommands.java",
+        "src/main/java/com/otectus/arsnspells/gametest/IronsInscriptionTableGameTests.java",
+        "src/main/java/com/otectus/arsnspells/rituals/SpellbookBindingRitual.java",
+        "src/main/java/com/otectus/arsnspells/spell/IronsSpellbookBinder.java"
+      ],
+      "direct_test_references": [
+        "src/main/java/com/otectus/arsnspells/gametest/IronsInscriptionTableGameTests.java",
+        "src/test/java/com/otectus/arsnspells/config/AnsConfigStructureTest.java"
+      ]
+    },
+    {
+      "key": "Performance.source_jar_cache_move_threshold",
+      "field": "SOURCE_JAR_CACHE_MOVE_THRESHOLD",
+      "default": "4.0",
+      "arguments": [
+        "1.0",
+        "32.0"
+      ],
+      "description": "Distance in blocks a player must move before re-scanning for Source Jars. Higher values = less scanning but slower detection of jar changes.",
+      "runtime_references": [
+        "src/main/java/com/otectus/arsnspells/events/RegenSynergyHandler.java"
+      ],
+      "direct_test_references": []
+    }
+  ]
+}

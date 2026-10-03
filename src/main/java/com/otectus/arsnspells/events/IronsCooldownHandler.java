@@ -54,6 +54,30 @@ public class IronsCooldownHandler {
         }
     }
 
+    /**
+     * A proxy's native cooldown starts only after its delegated Ars cast succeeded.
+     *
+     * <p>Iron's adds the cooldown after {@code onCast} returns whatever happened inside it, so
+     * a missing book, an unreadable payload or an Ars cast refused for mana would otherwise
+     * start {@code inscribed_ars_default_cooldown_ticks} for nothing. Cancelling the native
+     * Pre event skips the timer, its client sync and the Post event together. Cooldowns added
+     * outside a proxy invocation (commands, other mods) are left alone.
+     */
+    @SubscribeEvent
+    public void onProxyCooldown(io.redspace.ironsspellbooks.api.events.SpellCooldownAddedEvent.Pre event) {
+        if (!(event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)
+                || !CrossModSpellComponents.isArsCrossProxyId(event.getSpell().getSpellId())) return;
+        if (com.otectus.arsnspells.casting.IronsCastLifecycle.delegatedCastFailed(player, event.getSpell()))
+            event.setCanceled(true);
+    }
+
+    @SubscribeEvent
+    public void onNativeCooldown(io.redspace.ironsspellbooks.api.events.SpellCooldownAddedEvent.Post event) {
+        if (!(event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)) return;
+        Boolean cross = com.otectus.arsnspells.casting.IronsCastLifecycle.consumeCooldown(player, event.getSpell());
+        if (cross != null) commit(player, event.getSpell(), event.getCastSource(), cross);
+    }
+
     public static void commit(Player player, io.redspace.ironsspellbooks.api.spells.AbstractSpell spell,
                               io.redspace.ironsspellbooks.api.spells.CastSource source, boolean cross) {
         if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)

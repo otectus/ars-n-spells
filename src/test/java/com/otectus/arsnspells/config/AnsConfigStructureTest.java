@@ -238,24 +238,14 @@ class AnsConfigStructureTest {
         }
     }
 
-    /**
-     * The shipped default of {@code resonance_threshold} must be 0.
-     *
-     * <p>This is the whole no-behaviour-change guarantee, not a style preference. The key
-     * gates whether the resonance bonus applies at all; at 0 the gate is permanently open and
-     * the mod behaves exactly as it always has, so adding the knob costs no existing server
-     * anything. Shipping the historical 0.95 default instead would silently turn resonance
-     * from an always-on trickle into a burst window on every world that updates - a balance
-     * change disguised as a bug fix.
-     */
+    /** New installations use the same resonance threshold as Forge; saved values remain explicit. */
     @Test
-    void resonanceThreshold_defaultsToZeroSoTheGateIsOpen() throws IOException {
+    void resonanceThreshold_matchesForgeDefault() throws IOException {
         String config = Files.readString(TestPaths.of(CONFIG_SOURCE));
         Matcher m = Pattern.compile(
             "defineInRange\\(\"resonance_threshold\", *([0-9.]+) *,").matcher(config);
         assertTrue(m.find(), "resonance_threshold must be declared with defineInRange");
-        assertEquals(0.0, Double.parseDouble(m.group(1)), 1.0e-9,
-            "resonance_threshold must default to 0 so the gate is open and existing servers "
-                + "see no behaviour change");
+        assertEquals(0.95, Double.parseDouble(m.group(1)), 1.0e-9,
+            "resonance_threshold must match the Forge default");
     }
 }

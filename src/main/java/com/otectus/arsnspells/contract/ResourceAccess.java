@@ -18,6 +18,28 @@ import java.util.UUID;
  * <p>Implemented per loader, outside this package, against the real native pool API.
  */
 public interface ResourceAccess {
+    /** Reconcile owned invariants before any measurement. Never normalize a pool as payment. */
+    default void prepare(UUID player, ResourceUnit unit) {}
+
+    /** Native representable subtraction; float-backed adapters override this operation. */
+    default double expectedAfterDebit(double before, double amount) { return before - amount; }
+
+    default ResourceMovement observeDebit(UUID player, ResourceUnit unit, double amount) {
+        return ResourceMovement.observe(amount, () -> current(player, unit), () -> debit(player, unit, amount));
+    }
+    default ResourceMovement observeCredit(UUID player, ResourceUnit unit, double amount) {
+        return ResourceMovement.observe(amount, () -> current(player, unit), () -> credit(player, unit, amount));
+    }
+    default double expectedAfterDebit(ResourceUnit unit, double before, double amount) {
+        return expectedAfterDebit(before, amount);
+    }
+    default boolean acceptsDebit(ResourceUnit unit, ResourceMovement move) {
+        double expected = expectedAfterDebit(unit, move.before(), move.requested());
+        return move.error() == null && move.known() && Double.isFinite(move.reported()) && move.reported() >= 0 && move.before() >= move.requested()
+            && (move.requested() == 0 || (move.reported() > 0 && expected < move.before() && move.debited() > 0))
+            && move.after() == expected;
+    }
+
 
     /** The player's current balance in {@code unit}. */
     double current(UUID player, ResourceUnit unit);

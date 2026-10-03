@@ -15,12 +15,11 @@ import java.util.Optional;
  * ({@link com.otectus.arsnspells.events.CurioDiscountHandler}) and Iron's-side
  * ({@link IronsCurioDiscountHandler}) spell-discount handlers.
  *
- * <p>Curios is not pinned on the compile classpath (the target instance ships
- * the runtime jar, but {@code gradle.properties} declares no CurseMaven file id
- * for it), so we reach its API reflectively. Method handles are cached after the
- * first lookup to keep the cast hot path cheap. Every access returns 0 / fails
- * soft when Curios is absent or its API shifts, so callers never need a
- * try/catch.
+ * <p>The Curios API is only compile-time here and its inventory types differ between the
+ * Forge 1.20.1 (Curios 5.x) and NeoForge 1.21.1 (Curios 9.x) builds, so the scan reaches it
+ * reflectively. Method handles are cached after the first lookup to keep the cast hot path
+ * cheap. Every access returns 0 / fails soft when Curios is absent or its API shifts, so
+ * callers never need a try/catch.
  *
  * @since 2.5.0 (extracted from CurioDiscountHandler so both cast paths share it)
  */

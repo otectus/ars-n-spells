@@ -62,6 +62,7 @@ public class StartupValidator {
             return true;
         } catch (IOException e) {
             LOGGER.error("FAILED Config directory not writable: {}", e.getMessage());
+            LOGGER.error("  This will cause config save failures!");
             return false;
         }
     }
@@ -81,6 +82,7 @@ public class StartupValidator {
                     return true;
                 } else {
                     LOGGER.warn("FAILED Config file is locked by another process");
+                LOGGER.warn("  This may cause save failures!");
                     return false;
                 }
             }
@@ -98,6 +100,7 @@ public class StartupValidator {
             LOGGER.info("OK Ars Nouveau detected");
         } else {
             LOGGER.error("FAILED Ars Nouveau not found (REQUIRED)");
+            LOGGER.error("  Ars 'n' Spells requires Ars Nouveau to function!");
             return false;
         }
 
@@ -105,6 +108,7 @@ public class StartupValidator {
             LOGGER.info("OK Iron's Spellbooks detected (optional)");
         } else {
             LOGGER.warn("WARN Iron's Spellbooks not found (optional but recommended)");
+            LOGGER.warn("  Some features will be unavailable");
         }
 
         return arsNouveau;

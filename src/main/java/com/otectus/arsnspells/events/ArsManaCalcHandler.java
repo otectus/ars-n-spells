@@ -53,7 +53,7 @@ public final class ArsManaCalcHandler {
         }
         double absAdd = ManaRegenBridge.convertIronsToArs(ironsRegen, player) * conversionRate();
         if (absAdd != 0.0) {
-            event.setRegen(event.getRegen() + absAdd);
+            event.setRegen(Math.max(0.0, event.getRegen() + absAdd));
         }
     }
 
@@ -72,7 +72,7 @@ public final class ArsManaCalcHandler {
         if (!Double.isFinite(ironsMax) || ironsMax == 0.0) {
             return;
         }
-        event.setMax(event.getMax() + (int) Math.round(ironsMax * conversionRate()));
+        event.setMax((int) Math.max(0, Math.round(event.getMax() + ironsMax * conversionRate())));
     }
 
     /**
@@ -105,13 +105,46 @@ public final class ArsManaCalcHandler {
             return;
         }
 
-        final int finalMax = event.getMax();
-        if (player.getServer() != null) {
-            player.getServer().tell(new TickTask(0,
-                () -> EquipmentIntegration.syncIronsMaxToArs(player, finalMax)));
-        } else {
-            EquipmentIntegration.syncIronsMaxToArs(player, finalMax);
+        // 3.3.5: one deferred sync per player, applying the newest maximum. Ars recalculates
+        // its max several times a tick (both player-tick phases, equipment reconciliation), and
+        // each call used to queue its own task holding the value it saw. A value computed
+        // before an equipment change could then be applied after the newer one.
+        scheduleCeilingSync(player, event.getMax());
+    }
+
+    private static final java.util.Map<java.util.UUID, Integer> PENDING_CEILINGS =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    static void scheduleCeilingSync(Player player, int max) {
+        net.minecraft.server.MinecraftServer server = player.getServer();
+        if (server == null) {
+            EquipmentIntegration.syncIronsMaxToArs(player, max);
+            return;
         }
+        java.util.UUID id = player.getUUID();
+        // A queued task already exists; it will read this newer value when it runs.
+        if (PENDING_CEILINGS.put(id, max) != null) return;
+        server.tell(new TickTask(server.getTickCount(), () -> {
+            Integer latest = PENDING_CEILINGS.remove(id);
+            net.minecraft.server.level.ServerPlayer live = server.getPlayerList().getPlayer(id);
+            // The player may have left, respawned into a new entity, or the mode may have
+            // changed since this was queued; the live entity and routing decide.
+            if (latest == null || live == null || live.isRemoved()) return;
+            ManaUnificationMode mode = BridgeManager.getCurrentMode();
+            if (!BridgeManager.isUnificationEnabled() || mode == null || !mode.isArsPrimary()) return;
+            EquipmentIntegration.syncIronsMaxToArs(live, latest);
+        }));
+    }
+
+    @SubscribeEvent
+    public static void onLogout(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        PENDING_CEILINGS.remove(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {
+        // An unrun task must not leave a mark that suppresses the next world's first sync.
+        PENDING_CEILINGS.clear();
     }
 
     /**
@@ -128,7 +161,7 @@ public final class ArsManaCalcHandler {
     }
 
     private static boolean shouldFoldIron(LivingEntity entity) {
-        if (!(entity instanceof Player)) return false;
+        if (!(entity instanceof Player) || entity.level().isClientSide()) return false;
         if (!IronsCompat.isLoaded()) return false;
         if (!BridgeManager.isUnificationEnabled()) return false;
         // respect_armor_bonuses is the server owner's switch for "gear should not move the

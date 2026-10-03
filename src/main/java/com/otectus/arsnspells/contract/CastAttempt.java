@@ -38,6 +38,61 @@ public final class CastAttempt {
     private List<ResourceAmount> paidLegs = Collections.emptyList();
     private AttemptState state = AttemptState.REQUESTED;
     private boolean released;
+    private final java.util.Map<ResourceUnit, Double> remaining = new java.util.EnumMap<>(ResourceUnit.class);
+    private final java.util.Set<ResourceUnit> unknown = java.util.EnumSet.noneOf(ResourceUnit.class);
+    private final List<ResourceMovement> movements = new ArrayList<>();
+    private boolean paymentAccepted = true;
+    private boolean compensating;
+    private boolean reserving, releaseRequested, failureRequested;
+    boolean reserving() { return reserving; }
+    void beginReservation() { reserving = true; }
+    void endReservation() { reserving = false; }
+    boolean releaseRequested() { return releaseRequested; }
+    boolean failureRequested() { return failureRequested; }
+    void deferRelease(boolean failed) { releaseRequested = true; failureRequested |= failed; paymentAccepted = false; }
+
+
+    public boolean paymentAccepted() { return paymentAccepted; }
+    public List<ResourceMovement> movements() { return List.copyOf(movements); }
+    public java.util.Set<ResourceUnit> unknownUnits() { return java.util.Set.copyOf(unknown); }
+    public List<ResourceAmount> remainingRefunds() {
+        return remaining.entrySet().stream().filter(e -> e.getValue() > 0)
+            .map(e -> new ResourceAmount(e.getKey(), e.getValue())).toList();
+    }
+    public boolean compensationComplete() { return remainingRefunds().isEmpty() && unknown.isEmpty(); }
+    boolean beginCompensation() {
+        if (compensating || released) return false;
+        compensating = true;
+        return true;
+    }
+    void endCompensation() { compensating = false; }
+    private void recordMovement(ResourceMovement move) {
+        // Keep the first receipt and recent retry diagnostics without unbounded growth.
+        if (movements.size() == 64) movements.remove(1);
+        movements.add(move);
+    }
+    void recordDebit(ResourceUnit unit, ResourceMovement move, boolean accepted) {
+        recordMovement(move);
+        List<ResourceAmount> next = new ArrayList<>(reservedLegs);
+        next.add(new ResourceAmount(unit, move.debited()));
+        reservedLegs = List.copyOf(next);
+        remaining.merge(unit, move.debited(), Double::sum);
+        if (move.attempted() && !move.known()) unknown.add(unit);
+        paymentAccepted &= accepted;
+    }
+    void recordCredit(ResourceUnit unit, ResourceMovement move) {
+        recordMovement(move);
+        if (move.attempted() && !move.known()) unknown.add(unit);
+        if (move.known()) remaining.computeIfPresent(unit, (key, amount) -> Math.max(0, amount - move.credited()));
+    }
+    public void restoreObligation(List<ResourceAmount> owed, java.util.Set<ResourceUnit> uncertain) {
+        if (state != AttemptState.REQUESTED) throw new IllegalStateException("Restore only into a new attempt");
+        owed.forEach(leg -> remaining.merge(leg.unit(), leg.amount(), Double::sum));
+        unknown.addAll(uncertain);
+        paymentAccepted = false;
+        fail();
+    }
+
 
     public CastAttempt(UUID attemptId, UUID playerId, String carrierIdentity, int payloadRevision, CostQuote quote) {
         this.attemptId = Objects.requireNonNull(attemptId, "attemptId");
@@ -117,11 +172,14 @@ public final class CastAttempt {
         Objects.requireNonNull(actuallyReserved, "actuallyReserved");
         transitionTo(AttemptState.RESERVED);
         this.reservedLegs = Collections.unmodifiableList(new ArrayList<>(actuallyReserved));
+        actuallyReserved.forEach(leg -> remaining.merge(leg.unit(), leg.amount(), Double::sum));
     }
 
     /** {@link AttemptState#RESERVED} to {@link AttemptState#COMMITTED}; the reservation becomes payment. */
     public void commit() {
+        if (!paymentAccepted) throw new IllegalStateException("Cannot commit a refused debit");
         transitionTo(AttemptState.COMMITTED);
+        remaining.clear();
         this.paidLegs = this.reservedLegs;
     }
 

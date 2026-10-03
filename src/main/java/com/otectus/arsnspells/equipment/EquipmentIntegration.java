@@ -24,24 +24,30 @@ import org.slf4j.LoggerFactory;
  * pool (ISS_PRIMARY / HYBRID), Ars mage armour / mana-boost gear still raises
  * the unified max mana and regen.
  *
- * <h2>Ars Nouveau 5.x migration</h2>
- * The Forge 1.20.1 implementation scanned each equipped {@code ItemStack}'s
- * {@code getAttributeModifiers(slot)} multimap (removed in 1.21) plus an
- * {@code IManaEquipment} fallback (removed in Ars 5.x). Ars 5.x applies all
- * gear / perk / curio mana bonuses as modifiers on the player's
- * {@link PerkAttributes#MAX_MANA} / {@link PerkAttributes#MANA_REGEN_BONUS}
- * attributes, so the aggregate bonus is read directly off the player — this is
- * both simpler and strictly more correct (it captures perk- and curio-applied
- * bonuses the per-item scan missed, which the 1.8.2 changelog called out).
+ * <h2>Gear bonus</h2>
+ * The Ars gear bonus is the contribution of the player's equipped items and (when
+ * {@code read_curio_attribute_modifiers} is on) worn curios to Ars's
+ * {@link PerkAttributes#MAX_MANA} / {@link PerkAttributes#MANA_REGEN_BONUS}, measured with
+ * {@link AttributeContribution#equipmentDelta}. Item attribute modifiers include the Ars perk
+ * threads, which NeoForge's item-attribute hook adds to the stack's modifiers. Potion
+ * modifiers are not gear; {@link PotionContributions} mirrors Ars potions separately, as the
+ * Forge 1.20.1 build does. The Forge build also reads Ars 4's {@code IManaEquipment}
+ * fallback, an interface Ars 5 removed.
  *
- * <h2>Mode handling</h2>
+ * <h2>Mode handling (identical to the Forge 1.20.1 build)</h2>
  * <ul>
- *   <li><b>ISS_PRIMARY / HYBRID</b> — Iron's owns the pool; push the Ars gear
- *       bonus into Iron's {@code MAX_MANA} / {@code MANA_REGEN} attributes.</li>
- *   <li><b>ARS_PRIMARY</b> — Ars owns the pool and counts its own gear natively;
- *       Iron's gear already flows the other way via {@code ArsManaCalcHandler}.
- *       Writing Iron's {@code MAX_MANA} here would feed back through that handler
- *       and runaway, so we only clear.</li>
+ *   <li><b>ISS_PRIMARY</b> — Iron's owns the pool; push the Ars gear bonus, times
+ *       {@code conversion_rate_ars_to_iron}, into Iron's {@code MAX_MANA} /
+ *       {@code MANA_REGEN}.</li>
+ *   <li><b>HYBRID</b> — Iron's {@code MAX_MANA} is raised to cover Ars's real max
+ *       (the shared-pool ceiling), and the Ars gear regen is mirrored. With
+ *       {@code respect_armor_bonuses} off only the regen is dropped: the ceiling is a
+ *       correctness invariant, not a bonus.</li>
+ *   <li><b>ARS_PRIMARY</b> — Ars owns the pool; Iron's {@code MAX_MANA} mirrors Ars's real
+ *       max (the same ceiling {@code ArsManaCalcHandler} writes after each max-mana
+ *       calculation). Iron's gear flows the other way via {@code ArsManaCalcHandler}; the
+ *       ceiling cannot feed back into it because that handler excludes ANS's own
+ *       modifiers.</li>
  *   <li><b>SEPARATE / DISABLED</b> — pools are independent; clear.</li>
  * </ul>
  *
@@ -61,9 +67,10 @@ public final class EquipmentIntegration {
         ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "ars_gear_mana_regen");
 
     /**
-     * Recompute and apply the Ars→Iron's gear-bonus modifiers for the player's
-     * current loadout and the active mana mode. Server-side; safe to call
-     * repeatedly (modifiers are removed and re-added idempotently).
+     * Recompute and apply the Ars→Iron's modifiers for the player's current loadout and the
+     * active mana mode. Server-side; safe to call repeatedly (a modifier is only rewritten
+     * when its value changes). Mirrors {@code EquipmentHandler.updatePlayerMaxMana} in the
+     * Forge 1.20.1 build.
      */
     public static void recomputeFor(Player player) {
         if (player == null || player.level().isClientSide()) {
@@ -73,17 +80,61 @@ public final class EquipmentIntegration {
             return; // every write targets Iron's attributes
         }
         ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        if (!BridgeManager.isUnificationEnabled() || mode == null || !AnsConfig.respectArmorBonuses.get()) {
+        if (!BridgeManager.isUnificationEnabled() || mode == null) {
             clearAll(player);
             return;
         }
-        if (mode.isIssPrimary() || mode.isHybrid()) {
+        if (!AnsConfig.respectArmorBonuses.get() && !mode.isHybrid()) {
+            clearAll(player);
+            return;
+        }
+        if (mode.isArsPrimary() || mode.isHybrid()) {
+            syncIronsMaxToArs(player, arsRealMaxMana(player));
+            if (mode.isHybrid()) {
+                if (AnsConfig.respectArmorBonuses.get()) {
+                    applyArsRegenBonusToIrons(player, AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
+                } else {
+                    clearArsRegenBonusFromIrons(player);
+                }
+            }
+        } else if (mode.isIssPrimary()) {
             applyArsBonusesToIrons(player, AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get());
         } else {
-            // ARS_PRIMARY: handled the other direction by ArsManaCalcHandler.
-            // SEPARATE / DISABLED: pools independent. Either way, clear.
             clearAll(player);
         }
+    }
+
+    /**
+     * The Ars max-mana and regen bonus contributed by equipped items and curios, excluding
+     * ANS's own modifiers and, when {@code respect_enchantments} is off, enchantment modifiers.
+     * {@code double[]{maxMana, manaRegen}}.
+     */
+    public static double[] arsGearBonus(Player player) {
+        if (player == null) {
+            return new double[] {0.0, 0.0};
+        }
+        try {
+            EquipmentSnapshot snapshot = equipment(player);
+            java.util.Set<ResourceLocation> excluded = new java.util.HashSet<>(ownedModifierIds());
+            if (!AnsConfig.respectEnchantments.get()) excluded.addAll(snapshot.enchantmentIds);
+            return new double[] {
+                gearContribution(player, PerkAttributes.MAX_MANA, snapshot, excluded),
+                gearContribution(player, PerkAttributes.MANA_REGEN_BONUS, snapshot, excluded)};
+        } catch (Throwable t) {
+            LOGGER.debug("Could not read Ars gear bonuses for {}", player.getName().getString(), t);
+            return new double[] {0.0, 0.0};
+        }
+    }
+
+    private static double gearContribution(Player player, Holder<Attribute> attribute,
+                                           EquipmentSnapshot snapshot, java.util.Set<ResourceLocation> excluded) {
+        AttributeInstance instance = player.getAttribute(attribute);
+        if (instance == null) {
+            return 0.0;
+        }
+        ResourceLocation key = net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.getKey(attribute.value());
+        return AttributeContribution.equipmentDelta(instance,
+            snapshot.modifiers.getOrDefault(key, java.util.Map.of()).values(), excluded);
     }
 
     /**
@@ -132,29 +183,37 @@ public final class EquipmentIntegration {
             snapshot.modifiers.getOrDefault(key, java.util.Map.of()).values(), excluded);
     }
 
-    /** Remove any Ars-derived modifiers from Iron's attributes. */
+    /**
+     * Remove Ars-derived mana bonuses from Iron's attributes, under their current and legacy
+     * identities.
+     *
+     * <p>V14: no Iron's gate. {@link com.otectus.arsnspells.bridge.AnsFeatureCleanup} resolves
+     * attributes from the registry, so an absent Iron's makes this a no-op instead of a crash,
+     * and a modifier stranded by a feature that is gone can still be taken off.
+     */
     public static void clearAll(Player player) {
-        if (player == null || !IronsCompat.isLoaded()) {
-            return;
-        }
-        removeAttributeModifier(player, AttributeRegistry.MAX_MANA, ARS_TO_IRON_MAX_MANA_ID);
-        removeAttributeModifier(player, AttributeRegistry.MANA_REGEN, ARS_TO_IRON_REGEN_ID);
+        com.otectus.arsnspells.bridge.AnsFeatureCleanup.removeKeys(player,
+            com.otectus.arsnspells.contract.AnsModifierIds.ARS_GEAR_MAX_MANA,
+            com.otectus.arsnspells.contract.AnsModifierIds.ARS_GEAR_MANA_REGEN);
     }
 
+    /** Drop only the Ars-derived regen modifier, leaving the shared-pool ceiling in place. */
+    public static void clearArsRegenBonusFromIrons(Player player) {
+        com.otectus.arsnspells.bridge.AnsFeatureCleanup.removeKeys(player,
+            com.otectus.arsnspells.contract.AnsModifierIds.ARS_GEAR_MANA_REGEN);
+    }
+
+    private static final java.util.Set<ResourceLocation> OWNED_MODIFIER_IDS =
+        java.util.Set.copyOf(com.otectus.arsnspells.bridge.AnsModifierIdentities.allIdentities());
+
     public static java.util.Set<ResourceLocation> ownedModifierIds() {
-        var ids = new java.util.HashSet<ResourceLocation>();
-        for (String key : com.otectus.arsnspells.contract.AnsModifierIds.allKeys()) {
-            for (String candidate : com.otectus.arsnspells.contract.AnsModifierIds.currentAndLegacyKeysFor(key)) {
-                ResourceLocation id = ResourceLocation.tryParse(candidate);
-                if (id != null) ids.add(id);
-            }
-        }
-        return java.util.Set.copyOf(ids);
+        return OWNED_MODIFIER_IDS;
     }
 
     private static final class EquipmentSnapshot {
         final java.util.Map<ResourceLocation, java.util.Map<ResourceLocation, AttributeModifier>> modifiers = new java.util.HashMap<>();
         final java.util.Set<ResourceLocation> enchantmentIds = new java.util.HashSet<>();
+        final java.util.Set<ResourceLocation> curioIds = new java.util.HashSet<>();
         void add(Holder<Attribute> attribute, AttributeModifier modifier) {
             if (ownedModifierIds().contains(modifier.id())) return;
             ResourceLocation key = net.minecraft.core.registries.BuiltInRegistries.ATTRIBUTE.getKey(attribute.value());
@@ -183,28 +242,41 @@ public final class EquipmentIntegration {
                         if (stack.isEmpty()) continue;
                         var context = new top.theillusivec4.curios.api.SlotContext(name, player, index, false, true);
                         top.theillusivec4.curios.api.CuriosApi.getAttributeModifiers(context,
-                            top.theillusivec4.curios.api.CuriosApi.getSlotId(context), stack).forEach(result::add);
+                            top.theillusivec4.curios.api.CuriosApi.getSlotId(context), stack).forEach((attribute, modifier) -> {
+                                result.curioIds.add(modifier.id());
+                                if (AnsConfig.READ_CURIO_ATTRIBUTE_MODIFIERS.get()) result.add(attribute, modifier);
+                            });
                     }
                 }));
         }
         return result;
     }
 
-    private static void applyArsBonusesToIrons(Player player, double conversionRate) {
-        // 3.2.0: the ceiling is Ars's REAL max, not the gear-derived slice of it.
-        //
-        // This used to push `PerkAttributes.MAX_MANA * rate` across - only the bonus from
-        // gear and perks, not the base pool or the book tier. In HYBRID that left Iron's
-        // max_mana far below the pool the player actually had, and because
-        // MagicData.setMana clamps EVERY write down to that attribute, the surplus was not
-        // capped, it was deleted on the next write of any kind. One spell emptied the pool.
-        syncIronsMaxToArs(player, arsRealMaxMana(player));
+    /**
+     * ISS_PRIMARY: Iron's owns the pool, so Ars gear adds to it. The max-mana bonus is the
+     * Ars gear bonus times the conversion rate; the ceiling of the other shared modes does not
+     * apply, because Ars's base pool and book tier are not gear.
+     */
+    public static void applyArsBonusesToIrons(Player player, double conversionRate) {
+        if (player == null || player.level().isClientSide() || !IronsCompat.isLoaded()) {
+            return;
+        }
+        double maxManaBonus = arsGearBonus(player)[0] * conversionRate;
+        // Apply max mana first so the regen conversion sees the post-bonus pool size.
+        // Otherwise EQUAL_EFFECT would underestimate the regen attribute delta needed.
+        applyAttributeModifier(player, AttributeRegistry.MAX_MANA, ARS_TO_IRON_MAX_MANA_ID, maxManaBonus);
+        applyArsRegenBonusToIrons(player, conversionRate);
+    }
 
-        // Ars regen is absolute mana/sec; Iron's MANA_REGEN is a percentage-of-pool
-        // multiplier — go through the bridge to avoid the unit-mismatch bug. Regen keeps
-        // using the gear-derived value: Ars's real max already includes its gear bonus, so
-        // the ceiling above must not be double-counted here.
-        double absRegenPerSec = arsAttribute(player, PerkAttributes.MANA_REGEN_BONUS) * conversionRate;
+    /**
+     * Mirror the Ars gear regen onto Iron's {@code MANA_REGEN}. Ars regen is absolute
+     * mana/sec; Iron's is a percentage-of-pool multiplier, so the bridge converts units.
+     */
+    public static void applyArsRegenBonusToIrons(Player player, double conversionRate) {
+        if (player == null || player.level().isClientSide() || !IronsCompat.isLoaded()) {
+            return;
+        }
+        double absRegenPerSec = arsGearBonus(player)[1] * conversionRate;
         double regenAttr = ManaRegenBridge.convertArsToIrons(absRegenPerSec, player);
         applyAttributeModifier(player, AttributeRegistry.MANA_REGEN, ARS_TO_IRON_REGEN_ID, regenAttr);
     }
@@ -222,12 +294,10 @@ public final class EquipmentIntegration {
             return 0.0f;
         }
         try {
-            double maximum = com.hollingsworth.arsnouveau.api.util.ManaUtil.calcMaxMana(player).getRealMax();
-            if (!AnsConfig.respectEnchantments.get()) {
-                var instance = player.getAttribute(PerkAttributes.MAX_MANA);
-                if (instance != null) maximum -= instance.getValue() - arsAttribute(player, PerkAttributes.MAX_MANA);
-            }
-            return (float) Math.max(0, maximum);
+            // Ars's own max, never reduced by ANS's enchantment or curio toggles: those decide
+            // what ANS transfers between the pools, and a ceiling below the real max would
+            // delete mana on the next write (same rule as the Forge 1.20.1 build).
+            return (float) Math.max(0, com.hollingsworth.arsnouveau.api.util.ManaUtil.calcMaxMana(player).getRealMax());
         } catch (Throwable t) {
             LOGGER.debug("Could not read Ars max mana for {}", player.getName().getString(), t);
             return 0.0f;
@@ -259,7 +329,7 @@ public final class EquipmentIntegration {
         double nativeMaximum = instance.getAttribute().value().sanitizeValue(
             AttributeContribution.evaluate(instance.getBaseValue(), nativeModifiers));
         double amplification = AttributeContribution.additiveAmplification(nativeModifiers);
-        double needed = amplification > 0 ? Math.max(0, arsMax - nativeMaximum) / amplification : 0;
+        double needed = SharedPoolCeiling.modifierAmount(nativeMaximum, arsMax, amplification);
         applyAttributeModifier(player, AttributeRegistry.MAX_MANA, ARS_TO_IRON_MAX_MANA_ID, needed);
     }
     /**
@@ -300,20 +370,6 @@ public final class EquipmentIntegration {
             return;
         }
         syncIronsMaxToArs(player, arsMax);
-    }
-
-    /** Read an aggregate Ars perk-attribute value (gear/perk/curio bonus), 0 on any failure. */
-    private static double arsAttribute(Player player, Holder<Attribute> attribute) {
-        try {
-            AttributeInstance instance = player.getAttribute(attribute);
-            if (instance == null) return 0;
-            var excluded = new java.util.HashSet<>(ownedModifierIds());
-            if (!AnsConfig.respectEnchantments.get()) excluded.addAll(equipment(player).enchantmentIds);
-            var modifiers = instance.getModifiers().stream().filter(modifier -> !excluded.contains(modifier.id())).toList();
-            return attribute.value().sanitizeValue(AttributeContribution.evaluate(instance.getBaseValue(), modifiers));
-        } catch (Throwable t) {
-            return 0.0;
-        }
     }
 
     private static void applyAttributeModifier(Player player, Holder<Attribute> attribute,
