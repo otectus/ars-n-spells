@@ -1,7 +1,11 @@
 package com.otectus.arsnspells.bridge;
 
+import com.otectus.arsnspells.equipment.AttributeContribution;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
 import io.redspace.ironsspellbooks.api.registry.AttributeRegistry;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.player.Player;
 import com.otectus.arsnspells.config.AnsConfig;
 import org.slf4j.Logger;
@@ -14,8 +18,61 @@ public class IronsBridge implements IManaBridge {
     @Override public boolean transactionDebit(Player player, double amount) {
         var data = MagicData.getPlayerMagicData(player);
         if (data.getMana() < amount) return false;
-        data.addMana(-(float) amount);
+        subtractExactly(player, (float) amount);
         return true;
+    }
+
+    /**
+     * The call-scoped modifier that keeps Iron's ceiling clamp off a debit.
+     *
+     * <p>Iron's {@code MagicData.setMana} ends by clamping the pool to the {@code max_mana}
+     * attribute, and {@code addMana} is {@code setMana(mana + delta)}. A pool above that ceiling
+     * at the moment of a debit therefore loses the whole surplus, not the price: 240 mana under a
+     * ceiling of 100 pays 90 and lands on 100. The ceiling can sit under the pool for a few ticks
+     * whenever a max-mana modifier goes away (an equipment swap, a mirrored bonus being
+     * re-applied, another mod's modifier) until Iron's next regeneration tick clamps the pool;
+     * 3.3.4 and 3.3.5 refused every payment in that state, which the 3.3.5 report showed as every
+     * Iron's cast failing with {@code CEILING_INCONSISTENT} at 240 mana. While this modifier is on
+     * the attribute the ceiling is at least the balance being debited, so the write moves exactly
+     * the price and the ceiling is applied, as natively, by the regeneration tick rather than by
+     * the payment. It lives for one write only, is removed however that write exits, and is never
+     * persisted, so the modifier registry and cleanup never see it.
+     */
+    private static final ResourceLocation DEBIT_GUARD_ID = ResourceLocation.fromNamespaceAndPath("ars_n_spells", "debit_guard");
+
+    /** Whether the debit guard is on {@code player}'s ceiling right now; diagnostics and GameTests. */
+    public static boolean debitGuardActive(Player player) {
+        AttributeInstance ceiling = player.getAttribute(AttributeRegistry.MAX_MANA);
+        return ceiling != null && ceiling.getModifier(DEBIT_GUARD_ID) != null;
+    }
+
+    /**
+     * Subtract exactly {@code amount} from the Iron's pool, however the ceiling sits.
+     *
+     * <p>No Iron's type in the signature: unit tests reflect over this class on a classpath
+     * without Iron's, and an unresolvable parameter type fails every method lookup on it.
+     *
+     * <p>An ADD_VALUE modifier is scaled by the attribute's multiplying modifiers, so the guard
+     * is sized in pre-multiplier units from the ceiling's own amplification. A ceiling the
+     * attribute's range cannot reach is left to clamp as it natively would; the callers' checks
+     * report that case.
+     */
+    private static void subtractExactly(Player player, float amount) {
+        MagicData data = MagicData.getPlayerMagicData(player);
+        float before = data.getMana();
+        AttributeInstance ceiling = player.getAttribute(AttributeRegistry.MAX_MANA);
+        if (ceiling == null || !(before > ceiling.getValue()) || ceiling.getModifier(DEBIT_GUARD_ID) != null) {
+            data.addMana(-amount);
+            return;
+        }
+        double guard = SharedPoolCeiling.modifierAmount(ceiling.getValue(), Math.nextUp(before),
+            AttributeContribution.additiveAmplification(ceiling.getModifiers()));
+        ceiling.addTransientModifier(new AttributeModifier(DEBIT_GUARD_ID, guard, AttributeModifier.Operation.ADD_VALUE));
+        try {
+            data.addMana(-amount);
+        } finally {
+            ceiling.removeModifier(DEBIT_GUARD_ID);
+        }
     }
     @Override public void transactionCredit(Player player, double amount) {
         MagicData.getPlayerMagicData(player).addMana((float) amount);
@@ -63,11 +120,13 @@ public class IronsBridge implements IManaBridge {
      * it collapses the pool to the ceiling, however large the surplus and however small the
      * spell. That is the "one spell drained all my mana" report.
      *
-     * <p>Two defences. Before writing, {@code ensureSharedPoolCeiling} re-applies the ceiling
-     * if it has drifted below Ars's real max, which is what makes the collapse impossible.
-     * After writing, the result is compared against the arithmetic one; a mismatch means some
-     * other ceiling source is still wrong, and it is logged once rather than being silently
-     * eaten — the previous code had no way to tell a correct deduction from a wipe.
+     * <p>Three defences. Before writing, {@code ensureSharedPoolCeiling} re-applies the ceiling
+     * if it has drifted below Ars's real max. The write itself runs under the debit guard
+     * ({@link #subtractExactly}), so a ceiling that is still below the pool cannot turn the
+     * price into a wipe. After writing, the result is compared against the arithmetic one; a
+     * mismatch means the guard could not reach the balance (the attribute's range caps it), and
+     * it is logged once rather than being silently eaten — the previous code had no way to tell
+     * a correct deduction from a wipe.
      */
     @Override
     public boolean consumeMana(Player player, float amount) {
@@ -83,7 +142,7 @@ public class IronsBridge implements IManaBridge {
             }
             com.otectus.arsnspells.equipment.EquipmentIntegration.ensureSharedPoolCeiling(player);
             // Remove unsafe synchronization - MagicData handles thread safety internally
-            data.addMana(-amount);
+            subtractExactly(player, amount);
             float expected = before - amount;
             float after = data.getMana();
             if (after < expected - CLAMP_TOLERANCE) {
@@ -118,7 +177,9 @@ public class IronsBridge implements IManaBridge {
             MagicData data = MagicData.getPlayerMagicData(player);
             if (data == null) return;
             // MagicData.addMana is the atomic add; do NOT route through get+set or
-            // we lose concurrent regen between the read and the write.
+            // we lose concurrent regen between the read and the write. A negative add is a
+            // debit (an Ars-side drain routed here) and gets the same ceiling guard as a payment.
+            if (amount < 0.0f) { subtractExactly(player, -amount); return; }
             data.addMana(amount);
         } catch (RuntimeException e) {
             logCriticalError("addMana", e);

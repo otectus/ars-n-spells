@@ -1,6 +1,7 @@
 package com.otectus.arsnspells.casting;
 
 import com.otectus.arsnspells.bridge.BridgeManager;
+import com.otectus.arsnspells.bridge.ManaTrace;
 import com.otectus.arsnspells.contract.AttemptLedger;
 import com.otectus.arsnspells.contract.CastAttempt;
 import com.otectus.arsnspells.contract.CostQuote;
@@ -137,11 +138,60 @@ public final class CastLedger {
             return;
         }
         MinecraftServer server = event.getServer();
+        ResourceAccess access = forServer(server);
         List<CastAttempt> expired = LEDGER.expireOlderThan(
-            server.overworld().getGameTime(), ATTEMPT_TTL_TICKS, forServer(server));
+            server.overworld().getGameTime(), ATTEMPT_TTL_TICKS, access);
         for (CastAttempt attempt : expired) {
+            if (!attempt.isReleased()) releaseIfCapped(LEDGER, attempt, access);
             if (attempt.isReleased()) LOGGER.debug("Released expired attempt {} for {}", attempt.attemptId(), attempt.playerId());
         }
+    }
+
+    /**
+     * Whether an earlier attempt still owes this player a refund that must be settled before
+     * anything new is taken. What can be settled now is settled first.
+     *
+     * <p>A refund lands in a native pool that clamps at its ceiling. Once the pool has refilled
+     * to its ceiling (by regeneration, or because the ceiling fell under the balance), the rest
+     * of the refund has nowhere to go. Left owed, each retry credits nothing, each new cast is
+     * refused as {@code INCOMPLETE_COMPENSATION}, and the recovery journal carries it across
+     * restarts, so the player cannot cast at all. A remainder a full pool cannot hold is released
+     * and logged as capped. A pool that still has room, or a movement whose outcome is unknown,
+     * keeps blocking.
+     */
+    public static boolean blocksPayment(Player player) {
+        return blocksPayment(LEDGER, player.getUUID(), () -> forPlayer(player));
+    }
+
+    /** {@link #blocksPayment(Player)} against any ledger and pool; the unit-test seam. */
+    static boolean blocksPayment(AttemptLedger ledger, UUID player, java.util.function.Supplier<ResourceAccess> pools) {
+        ResourceAccess access = null;
+        for (CastAttempt attempt : ledger.openFor(player)) {
+            if (!attempt.state().isTerminal() || attempt.isReleased()) continue;
+            if (access == null) access = pools.get();
+            ledger.cancel(attempt, access);
+            if (!attempt.isReleased()) releaseIfCapped(ledger, attempt, access);
+        }
+        return ledger.openFor(player).stream().anyMatch(a -> a.state().isTerminal() && !a.isReleased());
+    }
+
+    /** Release a terminal attempt whose known remainder only fails to land because its pool is full. */
+    private static void releaseIfCapped(AttemptLedger ledger, CastAttempt attempt, ResourceAccess access) {
+        if (!attempt.state().isTerminal() || !attempt.unknownUnits().isEmpty()) return;
+        List<ResourceAmount> owed = attempt.remainingRefunds();
+        if (owed.isEmpty()) return;
+        try {
+            for (ResourceAmount leg : owed) {
+                if (access.current(attempt.playerId(), leg.unit()) < access.max(attempt.playerId(), leg.unit())) return;
+            }
+        } catch (RuntimeException unavailable) {
+            // Offline or unreadable: the remainder may still fit later, so it stays owed.
+            return;
+        }
+        if (!attempt.tryMarkReleased()) return;
+        ledger.cancel(attempt, access); // A released attempt is only forgotten.
+        LOGGER.info("[CastPayment] refund for attempt {} capped: {} did not fit under the player's full pool and was released",
+            attempt.attemptId(), owed);
     }
 
     /** A {@link ResourceAccess} bound to one player. */
@@ -203,10 +253,15 @@ public final class CastLedger {
             }
             requirePlayer(p);
             double before = current(player, unit);
-            if (before > max(player, unit)) throw new IllegalStateException("Debit ceiling inconsistent");
+            double ceiling = max(player, unit);
+            // A pool can sit above its ceiling for a few ticks after a max-mana modifier goes
+            // away. The Iron's adapter keeps the ceiling clamp off the write, so exactly the
+            // price moves and Iron's regeneration applies the ceiling afterwards, as it would
+            // without a cast. 3.3.4 and 3.3.5 threw here and refused the cast.
             if (!BridgeManager.getNativeBridge(unit).transactionDebit(p, amount))
                 throw new IllegalStateException("Native debit refused");
             double after = current(player, unit);
+            if (before > ceiling) ManaTrace.paidAboveCeiling(p, unit, before, ceiling, amount, after);
             return Math.max(0.0d, before - after);
         }
 
@@ -218,7 +273,10 @@ public final class CastLedger {
             }
             requirePlayer(p);
             double before = current(player, unit);
-            if (before > max(player, unit)) throw new IllegalStateException("Refund ceiling inconsistent");
+            // A pool at or above its ceiling cannot hold more, and a native write there would
+            // clamp the balance down rather than raise it, so nothing is written and the refund
+            // is reported as not landed instead of failing the attempt.
+            if (before >= max(player, unit)) return 0.0d;
             BridgeManager.getNativeBridge(unit).transactionCredit(p, amount);
             double after = current(player, unit);
             return Math.max(0.0d, after - before);

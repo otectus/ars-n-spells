@@ -120,10 +120,15 @@ class NativePaymentBoundaryTest {
         assertFalse(attempt.isReleased()); assertEquals(1,pool.credits);
     }
     @Test void ceilingAndInvalidBalancesRefuseBeforeAnyMutation() {
-        for (double value : new double[]{Double.NaN,Double.POSITIVE_INFINITY,-1,1500}) {
+        for (double value : new double[]{Double.NaN,Double.POSITIVE_INFINITY,-1}) {
             Pool pool=new Pool(100,value); pool.cap=1000;
             assertFalse(pay(pool,new AttemptLedger(),10,20).paid()); assertEquals(0,pool.debits);
         }
+        // 3.3.6: a balance above the ceiling is paid, and exactly the price moves. 3.3.4 and
+        // 3.3.5 refused it, which a player saw as every Iron's cast failing at full mana.
+        Pool above=new Pool(100,1500); above.cap=1000;
+        assertTrue(pay(above,new AttemptLedger(),10,20).paid(),"a surplus above the ceiling must not refuse the cast");
+        assertEquals(1480d,above.values.get(ResourceUnit.IRONS_MANA),"exactly the price moves");
         assertThrows(IllegalArgumentException.class,()->quote(Double.NaN,0));
         assertThrows(IllegalArgumentException.class,()->quote(-1,0));
         assertThrows(IllegalArgumentException.class,()->quote(Double.POSITIVE_INFINITY,0));

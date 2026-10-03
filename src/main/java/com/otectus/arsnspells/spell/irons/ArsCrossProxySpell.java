@@ -208,11 +208,12 @@ public class ArsCrossProxySpell extends AbstractSpell {
     /**
      * Find the stack that actually carries this proxy's sidecar entry.
      *
-     * <p>{@code MagicData.getPlayerCastingItem()} is the authoritative answer only when Iron's
-     * set it for this cast; it comes back empty for a book held in the Curios spellbook slot,
-     * which made every such cast a silent no-op (3.0.3). The equipped spellbook and both hands
-     * are checked as fallbacks, and each candidate must actually hold an entry for this pool
-     * id - so a player carrying two bound books can never resolve to the wrong one.
+     * <p>{@code MagicData.getPlayerCastingItem()} comes back empty for a hotkey cast of a book
+     * in the Curios spellbook slot, which once made every such cast a silent no-op (3.0.3), and
+     * comes back as the staff for a staff right-click, which 3.3.5 refused as a book without an
+     * entry. {@link ProxyCarrierResolver#casting} reads the carrier from Iron's cast source and
+     * slot instead, and each candidate must actually hold an entry for this pool id, so a player
+     * carrying two bound books can never resolve to the wrong one.
      */
     private Carrier resolveCastingBook(ServerPlayer player, MagicData magicData) {
         ProxyCarrierResolver.Carrier carrier = ProxyCarrierResolver.casting(player, magicData, poolId);

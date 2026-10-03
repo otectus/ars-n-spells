@@ -70,8 +70,7 @@ public final class ArsCastPayments {
     }
 
     public static boolean prepare(Player player, SpellContext context) {
-        if (!PaymentRecovery.available() || CastLedger.ledger().openFor(player.getUUID()).stream()
-                .anyMatch(a -> a.state().isTerminal() && !a.isReleased())) return false;
+        if (!PaymentRecovery.available() || CastLedger.blocksPayment(player)) return false;
         Plan plan = PLANS.get(context);
         if (plan == null || player.isCreative() || plan.prepared) return true;
         if (!BridgeManager.canAffordQuote(player, plan.quote)) return false;

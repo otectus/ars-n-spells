@@ -71,6 +71,53 @@ public final class ManaTrace {
             before.ironsCurrent(), before.ironsMax(), after.ironsCurrent(), after.ironsMax());
     }
 
+    /** Players already reported by {@link #paidAboveCeiling} this server run. */
+    private static final java.util.Set<java.util.UUID> REPORTED_ABOVE_CEILING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * A payment found its pool above that pool's own ceiling.
+     *
+     * <p>The payment still runs and takes only the price (the Iron's adapter keeps the ceiling
+     * clamp off its write), but a ceiling that sits under a full pool at the moment of casting
+     * means some bonus to it was missing then. The first occurrence per player and server run is
+     * always logged, with the Iron's ceiling's modifiers so a pack author can see which one was
+     * absent; debug mode logs every occurrence. WARN when the clamp removed mana beyond the price
+     * anyway, INFO when only the price moved.
+     */
+    public static void paidAboveCeiling(Player player, com.otectus.arsnspells.contract.ResourceUnit unit,
+                                        double before, double ceiling, double price, double after) {
+        if (!REPORTED_ABOVE_CEILING.add(player.getUUID()) && !enabled()) return;
+        if (REPORTED_ABOVE_CEILING.size() > 4096) REPORTED_ABOVE_CEILING.clear();
+        boolean clamped = after < before - price - 1.0e-3;
+        String modifiers = unit == com.otectus.arsnspells.contract.ResourceUnit.IRONS_MANA ? ironsCeilingModifiers(player) : "n/a";
+        String message = "[ManaTrace] player={} tick={} mode={} paid {} {} while the pool ({}) was above its ceiling ({}); "
+            + "balance after the native write: {}{}. max_mana modifiers: {}";
+        Object[] args = {LogPrivacy.token(player.getUUID()), player.level().getGameTime(), BridgeManager.getCurrentMode(),
+            price, unit, before, ceiling, after,
+            clamped ? " (more than the price left the pool: the native ceiling clamp removed the surplus)" : "", modifiers};
+        if (clamped) LOG.warn(message, args); else LOG.info(message, args);
+    }
+
+    private static String ironsCeilingModifiers(Player player) {
+        try {
+            var attribute = BuiltInRegistries.ATTRIBUTE.getHolder(
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("irons_spellbooks", "max_mana")).orElse(null);
+            var instance = attribute == null ? null : player.getAttribute(attribute);
+            if (instance == null) return "unavailable";
+            StringBuilder out = new StringBuilder("base=").append(instance.getBaseValue());
+            for (var modifier : instance.getModifiers())
+                out.append(", ").append(modifier.id()).append('=').append(modifier.amount()).append(' ').append(modifier.operation());
+            return out.toString();
+        } catch (RuntimeException unavailable) {
+            return "unavailable";
+        }
+    }
+
+    /** Server stop: the next world reports its first occurrence again. */
+    public static void clearAll() {
+        REPORTED_ABOVE_CEILING.clear();
+    }
+
     /** Iron's regeneration proposed a lower routed balance than the pool holds; it was refused. */
     public static void regenClampRefused(Player player, double current, double proposed) {
         if (!enabled() || !LogThrottle.allow(player.getUUID(), WINDOW_MS)) return;

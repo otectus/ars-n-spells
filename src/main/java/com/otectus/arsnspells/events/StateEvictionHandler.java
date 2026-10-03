@@ -83,5 +83,6 @@ public final class StateEvictionHandler {
         CrossCastContext.clearAll();
         CombatDebugState.clearAll();
         LogThrottle.clearAll();
+        com.otectus.arsnspells.bridge.ManaTrace.clearAll();
     }
 }

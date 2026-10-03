@@ -21,10 +21,11 @@ public final class NativePayment {
         }
     }
     public static Result settle(Player player, CostQuote quote) {
+        CastLedger.blocksPayment(player); // Settles what it can; the ledger check below decides.
         return settle(player.getUUID(), quote, CastLedger.forPlayer(player), CastLedger.ledger(), player.level().getGameTime());
     }
     public static Result hold(Player player, CostQuote quote) {
-        if (!PaymentRecovery.available() || CastLedger.ledger().openCount() >= 4096)
+        if (!PaymentRecovery.available() || CastLedger.ledger().openCount() >= 4096 || CastLedger.blocksPayment(player))
             return refused(UUID.randomUUID(), TransactionSnapshot.Reason.INCOMPLETE_COMPENSATION, quote.origin().unit());
         return settle(player.getUUID(), quote, CastLedger.forPlayer(player), CastLedger.ledger(), player.level().getGameTime(), false);
     }
@@ -61,9 +62,12 @@ public final class NativePayment {
                 before = access.current(player, leg.unit());
                 double max = access.max(player, leg.unit());
                 TransactionSnapshot.Reason reason = null;
+                // A balance above the ceiling is not refused: the payment is the native write,
+                // and the Iron's adapter keeps the ceiling clamp off it, so exactly the price
+                // moves (see CastLedger's adapter). 3.3.4 and 3.3.5 refused every cast in that
+                // state, which a player saw as every Iron's spell failing while the pool was full.
                 if (!Double.isFinite(before) || !Double.isFinite(max) || before < 0 || max < 0)
                     reason = TransactionSnapshot.Reason.ADAPTER_UNAVAILABLE;
-                else if (before > max) reason = TransactionSnapshot.Reason.CEILING_INCONSISTENT;
                 else if (before < leg.amount()) reason = TransactionSnapshot.Reason.INSUFFICIENT_RESOURCE;
                 else if (leg.amount() > 0 && (!Double.isFinite(access.expectedAfterDebit(leg.unit(), before, leg.amount())) || !(access.expectedAfterDebit(leg.unit(), before, leg.amount()) < before)))
                     reason = TransactionSnapshot.Reason.PRECISION_LIMIT;

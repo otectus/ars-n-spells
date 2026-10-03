@@ -98,8 +98,7 @@ public final class IronsCastPayments {
                                 MagicData data, SpellOnCastEvent event) {
         TransactionSnapshot.Reason boundaryFailure = IronsCastLifecycle.boundaryFailure();
         if (boundaryFailure != null) return Outcome.refused(UUID.randomUUID(), boundaryFailure);
-        if (!PaymentRecovery.available() || CastLedger.ledger().openFor(player.getUUID()).stream()
-                .anyMatch(a -> a.state().isTerminal() && !a.isReleased()))
+        if (!PaymentRecovery.available() || CastLedger.blocksPayment(player))
             return Outcome.refused(UUID.randomUUID(), TransactionSnapshot.Reason.INCOMPLETE_COMPENSATION);
         Plan plan = PLANS.get(data);
         if (plan == null || !plan.spellId.equals(spell.getSpellId())) {
