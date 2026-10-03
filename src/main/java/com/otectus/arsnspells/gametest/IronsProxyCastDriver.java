@@ -12,9 +12,17 @@ import io.redspace.ironsspellbooks.api.spells.SpellSlot;
 import io.redspace.ironsspellbooks.api.util.Utils;
 import io.redspace.ironsspellbooks.compat.Curios;
 import io.redspace.ironsspellbooks.gui.overlays.SpellSelection;
+import io.redspace.ironsspellbooks.item.CastingItem;
 import io.redspace.ironsspellbooks.registries.ItemRegistry;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.registries.ForgeRegistries;
 
 /**
  * Drives real Iron's Spellbooks cast machinery from a GameTest, so the cross-cast
@@ -116,6 +124,123 @@ final class IronsProxyCastDriver {
         MagicData.getPlayerMagicData(player).getSyncedData()
             .setSpellSelection(new SpellSelection(Curios.SPELLBOOK_SLOT, index));
         return Utils.serverSideInitiateCast(player);
+    }
+
+    /**
+     * An Iron's staff, a casting implement: right-clicking it casts the spell selected on the
+     * equipped spellbook, and Iron's hands {@code attemptInitiateCast} the staff itself as the
+     * casting item and the staff's hand as the equipment slot. Any registered staff will do.
+     */
+    static ItemStack staff() {
+        if (!IronsCompat.isLoaded()) {
+            return ItemStack.EMPTY;
+        }
+        for (String id : new String[] {"graybeard_staff", "ice_staff", "blood_staff", "pyrium_staff", "staff_of_the_nines"}) {
+            Item item = ForgeRegistries.ITEMS.getValue(new ResourceLocation("irons_spellbooks", id));
+            if (item instanceof CastingItem) {
+                return new ItemStack(item);
+            }
+        }
+        throw new IllegalStateException("no Iron's staff (casting implement) is registered in this Iron's build");
+    }
+
+    /**
+     * The staff path: equip {@code book}, select wheel slot {@code index}, hold {@code staff} in
+     * the main hand and right-click it the way the server does for a use-item packet, then run
+     * Iron's cast ticker until the cast ends (an INSTANT cast fires on the next tick).
+     *
+     * @return whether Iron's started a cast
+     */
+    static boolean castViaStaffRightClick(ServerPlayer player, ItemStack book, int index, ItemStack staff) {
+        if (!IronsCompat.isLoaded()) {
+            return false;
+        }
+        equipSpellbook(player, book);
+        MagicData.getPlayerMagicData(player).getSyncedData()
+            .setSpellSelection(new SpellSelection(Curios.SPELLBOOK_SLOT, index));
+        return rightClickMainHand(player, staff);
+    }
+
+    /**
+     * Right-click {@code stack} from the main hand exactly as {@code ServerPlayerGameMode.useItem}
+     * does: Iron's {@code ServerPlayerEvents.onUseItem} sees the RightClickItem event first and,
+     * unless it cancelled the use, the item's own {@code use} runs. Then the cast is ticked to its end.
+     */
+    static boolean rightClickMainHand(ServerPlayer player, ItemStack stack) {
+        if (!IronsCompat.isLoaded()) {
+            return false;
+        }
+        player.setItemInHand(InteractionHand.MAIN_HAND, stack);
+        PlayerInteractEvent.RightClickItem event = new PlayerInteractEvent.RightClickItem(player, InteractionHand.MAIN_HAND);
+        MinecraftForge.EVENT_BUS.post(event);
+        if (!event.isCanceled()) {
+            stack.use(player.level(), player, InteractionHand.MAIN_HAND);
+        }
+        boolean started = MagicData.getPlayerMagicData(player).isCasting();
+        tickUntilCastEnds(player);
+        return started;
+    }
+
+    /** The hotkey path followed by the ticker, so a test can compare it with the staff path. */
+    static boolean hotkeyCast(ServerPlayer player, ItemStack book, int index) {
+        if (!IronsCompat.isLoaded()) {
+            return false;
+        }
+        boolean started = initiateViaSpellSelection(player, book, index);
+        tickUntilCastEnds(player);
+        return started;
+    }
+
+    /** Run Iron's own per-player cast ticker ({@code MagicManager.lambda$tick$0}) until no cast is in flight. */
+    static void tickUntilCastEnds(ServerPlayer player) {
+        if (!IronsCompat.isLoaded()) {
+            return;
+        }
+        try {
+            var manager = io.redspace.ironsspellbooks.api.magic.MagicHelper.MAGIC_MANAGER;
+            var tick = manager.getClass().getDeclaredMethod("lambda$tick$0", boolean.class, Player.class);
+            tick.setAccessible(true);
+            int guard = 0;
+            while (MagicData.getPlayerMagicData(player).isCasting() && guard++ < 500) {
+                tick.invoke(manager, false, player);
+            }
+        } catch (ReflectiveOperationException error) {
+            throw new IllegalStateException("Native ticker failed", error);
+        }
+        if (MagicData.getPlayerMagicData(player).isCasting()) {
+            throw new IllegalStateException("Native cast did not terminate");
+        }
+    }
+
+    /** A native book carrying only {@code spell} at level 1 in slot 0. */
+    static ItemStack nativeBook(String spellId) {
+        if (!IronsCompat.isLoaded()) {
+            return ItemStack.EMPTY;
+        }
+        AbstractSpell spell = SpellRegistry.getSpell(spellId);
+        ItemStack book = new ItemStack(CrossCastGameTests.findIronsSpellBook());
+        ISpellContainerMutable container = ISpellContainer.getOrCreate(book).mutableCopy();
+        for (int i = 0; i < container.getMaxSpellCount(); i++) {
+            container.removeSpellAtIndex(i);
+        }
+        container.setMaxSpellCount(1);
+        if (!container.addSpellAtIndex(spell, 1, 0, false)) {
+            throw new IllegalStateException("Cannot prepare native book for " + spellId);
+        }
+        ISpellContainer.set(book, container.toImmutable());
+        return book;
+    }
+
+    /** Whether {@code spellId} is on this player's native Iron's cooldown. */
+    static boolean onNativeCooldown(ServerPlayer player, String spellId) {
+        return IronsCompat.isLoaded()
+            && MagicData.getPlayerMagicData(player).getPlayerCooldowns().isOnCooldown(SpellRegistry.getSpell(spellId));
+    }
+
+    /** The native Iron's pool, read through the ANS adapter. */
+    static float ironsMana(ServerPlayer player) {
+        return IronsCompat.isLoaded()
+            ? com.otectus.arsnspells.bridge.BridgeManager.getNativeIronsBridge().getMana(player) : 0.0f;
     }
 
     /** True when Iron's recorded no casting item for the in-flight cast. */

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.3.6] - 2026-10-03
+
+### Fixed
+
+- An Ars Nouveau spell bound into an Iron's spellbook can now be cast by right-clicking an Iron's staff. The hotkey cast worked, but the staff cast failed with "Cross-cast failed: the book carrying this spell (wheel slot N) could not be found" and the server logged "no carried spellbook holds a sidecar entry". Iron's starts a staff cast with the staff itself as the casting item and the staff's hand as the equipment slot, while the cast source still says the spell came from the equipped spellbook; ANS treated the staff as the only possible carrier and refused. The carrier is now read from the cast source and the slot: a spellbook cast resolves against the equipped book and nothing else, a cast from a held container (an imbued weapon, a scroll) resolves against that item, and a book without the entry is still refused rather than redirected to another book that shares the wheel slot. Verified against Iron's 1.20.1-3.15.0 and 1.20.1-3.16.3.
+- A payment made while the Iron's pool sits above its `max_mana` ceiling now moves exactly the spell's price. Iron's clamps every mana write to the ceiling, so such a cast lost the whole surplus. The 3.3.5 build published on CurseForge went further and refused the cast outright (`CEILING_INCONSISTENT`, "Cast stopped. Check your resources; details are in the server log."), which a player saw as every Iron's spell failing at full mana; the Modrinth 3.3.5 build paid but let the clamp take the surplus. The ceiling can sit below the pool for a few ticks after a max-mana modifier goes away, until Iron's next regeneration tick applies it; that tick, not the payment, now does the clamping. The first such payment per player and server run is logged with the ceiling's modifiers, so a pack author can see which bonus was missing.
+
+### Added
+
+- GameTests for the staff path: a bound Ars spell cast by right-clicking a staff, in creative and funded survival; the hotkey path with a staff held; two bound books sharing a wheel slot; a stale binding next to a valid book; a book that is only held; and a native Iron's spell cast from a staff, with its payment and cooldown.
+
 ## [3.3.5] - 2026-09-27
 
 ### Fixed

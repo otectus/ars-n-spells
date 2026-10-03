@@ -581,20 +581,31 @@ public final class NativeCastPaymentGameTests {
                     helper.assertTrue(data(player).getPlayerCooldowns().isOnCooldown(spell)==!veto,"veto cooldown state");
                 } finally {MinecraftForge.EVENT_BUS.unregister(listener);}
             }
-            // A ceiling below the balance, as a pack can leave Iron's max_mana under a full pool.
-            // The payment is Iron's own write: a surplus smaller than the price costs only the
-            // price, a larger one is clamped as the native cast clamps it, and neither refuses the
-            // cast. 3.3.4 and the first 3.3.5 builds refused every cast in this state.
+            // A ceiling below the balance, as a pack can leave Iron's max_mana under a full pool
+            // for a few ticks. The payment takes exactly the price whatever the surplus: the Iron's
+            // adapter keeps the ceiling clamp off its write, and applying the ceiling stays Iron's
+            // regeneration's job, which still does it on its next tick. 3.3.4 and the first 3.3.5
+            // builds refused every cast in this state (the reported CEILING_INCONSISTENT at 240
+            // mana); the first published 3.3.5 paid but let the clamp take the whole surplus.
             int price=spell.getManaCost(1);
             long failed=failures();
             for(boolean small:new boolean[]{true,false}) {
                 ServerPlayer player=player(helper,"hotfix_ceiling_"+small);
-                player.getAttribute(io.redspace.ironsspellbooks.api.registry.AttributeRegistry.MAX_MANA.get()).setBaseValue(small?9000-price/2.0:1000);
+                double ceiling=small?9000-price/2.0:1000;
+                var max=player.getAttribute(io.redspace.ironsspellbooks.api.registry.AttributeRegistry.MAX_MANA.get());
+                max.setBaseValue(ceiling);
                 helper.assertTrue(IronsProxyCastDriver.initiateViaSpellSelection(player,nativeBook(spell),0),"ceiling admission");
                 drainWindup(player);
                 helper.assertTrue(player.getHealth()>10,"a balance above the ceiling must not refuse the cast");
-                equal(helper,small?9000-price:1000,balance(player,ResourceUnit.IRONS_MANA),"payment above the ceiling");
+                equal(helper,9000-price,balance(player,ResourceUnit.IRONS_MANA),"payment above the ceiling takes exactly the price");
                 helper.assertTrue(data(player).getPlayerCooldowns().isOnCooldown(spell),"cast above the ceiling keeps the native cooldown");
+                helper.assertTrue(!com.otectus.arsnspells.bridge.IronsBridge.debitGuardActive(player),"the debit guard must not outlive the write");
+                equal(helper,ceiling,max.getValue(),"the ceiling must read as before the payment");
+                ((io.redspace.ironsspellbooks.capabilities.magic.MagicManager)io.redspace.ironsspellbooks.api.magic.MagicHelper.MAGIC_MANAGER)
+                    .regenPlayerMana(player,data(player));
+                float regenerated=balance(player,ResourceUnit.IRONS_MANA);
+                helper.assertTrue(regenerated<=Math.floor(ceiling)+.02,"Iron's regeneration, not the payment, applies the ceiling: got "+regenerated);
+                if(!small) equal(helper,1000,regenerated,"a surplus larger than the price is clamped by the next regeneration tick");
             }
             // An Ars spell billed to that Iron's pool in iss_primary, which failed silently.
             ServerPlayer caster=player(helper,"hotfix_ceiling_ars");

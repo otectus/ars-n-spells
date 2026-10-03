@@ -273,10 +273,12 @@ public final class CastLedger {
          * <p>A pool can sit above its ceiling for a while: Iron's {@code max_mana} or Ars's
          * maximum can fall under a full pool when gear, curios, effects or another mod's
          * modifiers change, and each mod clamps the surplus on its own next write. The payment is
-         * such a write and runs exactly as the native cast would: the price is subtracted and
-         * the result clamped. When the surplus is smaller than the price, only the price moves.
-         * 3.3.4 refused to pay in this state, and nothing ever cleared it, so every cast billed to
-         * that pool failed for as long as the ceiling stayed below the balance.
+         * such a write. The Iron's adapter keeps that pool's ceiling clamp off the write
+         * ({@code IronsBridge.subtractExactly}), so exactly the price moves and the ceiling is
+         * applied afterwards by Iron's own regeneration tick, as it would be without a cast.
+         * 3.3.4 and the first 3.3.5 builds refused to pay in this state, and nothing ever
+         * cleared it, so every cast billed to that pool failed for as long as the ceiling stayed
+         * below the balance; the first published 3.3.5 paid but let the clamp take the surplus.
          */
         @Override
         public double debit(UUID player, ResourceUnit unit, double amount) {

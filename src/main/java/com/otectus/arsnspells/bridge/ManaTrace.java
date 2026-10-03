@@ -81,11 +81,12 @@ public final class ManaTrace {
     /**
      * A payment found its pool above that pool's own ceiling.
      *
-     * <p>The payment still runs, as the native write it replaces would, but a ceiling that sits
-     * under a full pool at the moment of casting means some bonus to it was missing then. The
-     * first occurrence per player and server run is always logged, with the Iron's ceiling's
-     * modifiers so a pack author can see which one was absent; debug mode logs every occurrence.
-     * WARN when the clamp removed mana beyond the price, INFO when only the price moved.
+     * <p>The payment still runs and takes only the price (the Iron's adapter keeps the ceiling
+     * clamp off its write), but a ceiling that sits under a full pool at the moment of casting
+     * means some bonus to it was missing then. The first occurrence per player and server run is
+     * always logged, with the Iron's ceiling's modifiers so a pack author can see which one was
+     * absent; debug mode logs every occurrence. WARN when the clamp removed mana beyond the price
+     * anyway, INFO when only the price moved.
      */
     public static void paidAboveCeiling(Player player, com.otectus.arsnspells.contract.ResourceUnit unit,
                                         double before, double ceiling, double price, double after) {
