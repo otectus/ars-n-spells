@@ -1,0 +1,6 @@
+{
+ "parent": "forge:item/default",
+ "loader": "ars_n_spells:imported_glyph",
+ "icon": "irons_spellbooks:gui/spell_icons/wall_of_fire",
+ "level": 3
+}

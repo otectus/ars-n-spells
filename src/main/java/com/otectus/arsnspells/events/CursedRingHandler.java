@@ -19,7 +19,7 @@ public final class CursedRingHandler {
         if (event.context == null || !(event.context.getUnwrappedCaster() instanceof Player player)
                 || player.level().isClientSide() || player.isCreative()
                 || !SanctifiedLegacyCompat.isCursedRingCostPathActive(player) || event.currentCost <= 0) return;
-        var analysis = SpellAnalysis.analyze(event.context.getSpell());
+        var analysis = SpellAnalysis.analyze(event.context.getSpell(), event.context);
         int cost = SanctifiedLegacyCompat.calculateLPCost(event.currentCost, analysis.firstEffect());
         double discount = SanctifiedLegacyCompat.getBlasphemyLPMultiplier(player, analysis.dominantSchool());
         if (discount < 1) cost = (int) Math.max(AnsConfig.ARS_LP_MINIMUM_COST.get(), Math.round(cost * discount));

@@ -79,7 +79,9 @@ class AnsConfigStructureTest {
         // 3.0.0: pack-author knobs for binding Ars spells into Iron's spellbooks.
         for (String name : new String[] {
             "ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS",
-            "MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK"
+            "MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK",
+            // 3.3.7: the server switch for explicit spell schools.
+            "ALLOW_SPELL_SCHOOL_OVERRIDE"
         }) {
             try {
                 assertNotNull(AnsConfig.class.getDeclaredField(name), name + " must exist");

@@ -41,7 +41,9 @@ public final class CrossCastTrace {
         UPSTREAM_CAST_ENTER,
         UPSTREAM_CAST_EXIT,
         EFFECT_APPLIED,
-        CYCLE_APPLIED
+        CYCLE_APPLIED,
+        /** 3.4.0: which resolver entry {@code ArsCastDispatcher} chose, against what, and why. */
+        DISPATCH
     }
 
     private CrossCastTrace() {

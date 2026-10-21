@@ -208,6 +208,7 @@ public class AnsConfig {
     public static final ForgeConfigSpec.IntValue NETWORK_REQUEST_BURST;
     public static final ForgeConfigSpec.BooleanValue ALLOW_ARS_SPELLS_IN_IRONS_SPELLBOOKS;
     public static final ForgeConfigSpec.IntValue MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK;
+    public static final ForgeConfigSpec.BooleanValue ALLOW_SPELL_SCHOOL_OVERRIDE;
     public static final ForgeConfigSpec.IntValue INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS;
     /** The shipped value; a pre-3.3.5 file holding it received it from Forge's correction pass. */
     public static final int INSCRIBED_ARS_COOLDOWN_DEFAULT_TICKS = 40;
@@ -215,6 +216,25 @@ public class AnsConfig {
     // ANS-HIGH-027: ENABLE_PER_CAST_REAGENT removed — was a reserved hook with zero
     // readers; setting it had no effect. If the per-cast reagent feature ever lands,
     // re-add the key alongside the implementation.
+
+    // ========================================
+    // IMPORTED IRON'S GLYPHS AND THE GLYPH PRESS (3.4.0)
+    // ========================================
+    public static final ForgeConfigSpec.BooleanValue ENABLE_IRON_GLYPHS;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_GLYPH_PRESS;
+    public static final ForgeConfigSpec.ConfigValue<String> IRON_GLYPH_MANA_BONUS_POLICY;
+    public static final ForgeConfigSpec.IntValue MAX_IMPORTED_EFFECTS_PER_SPELL;
+    public static final ForgeConfigSpec.IntValue MAX_FOREIGN_EMISSIONS_PER_CAST;
+    public static final ForgeConfigSpec.IntValue MAX_ACTIVE_GLYPH_SESSIONS_PER_PLAYER;
+    public static final ForgeConfigSpec.IntValue GLYPH_PRESS_SOURCE_CAPACITY;
+    public static final ForgeConfigSpec.IntValue GLYPH_PRESS_SOURCE_SCAN_INTERVAL_TICKS;
+    public static final ForgeConfigSpec.IntValue GLYPH_PRESS_SOURCE_RADIUS;
+    /** Tested hard ceilings: a server setting is clamped to its range and can never exceed these. */
+    public static final int MAX_IMPORTED_EFFECTS_CEILING = 8;
+    public static final int MAX_FOREIGN_EMISSIONS_CEILING = 64;
+    public static final int MAX_GLYPH_SESSIONS_CEILING = 32;
+    public static final String MANA_BONUS_PER_SPELL = "per_spell";
+    public static final String MANA_BONUS_NATIVE_PER_VARIANT = "native_per_variant";
 
     // ========================================
     // PERFORMANCE TUNING
@@ -983,6 +1003,19 @@ public class AnsConfig {
             )
             .defineInRange("max_ars_cross_spells_per_irons_spellbook", -1, -1, 64);
 
+        ALLOW_SPELL_SCHOOL_OVERRIDE = BUILDER
+            .comment(
+                "Allow a custom Ars spell to carry an explicit spell school, chosen at the Spell Loom",
+                "(or by an operator with /ans school set). An explicit school replaces the schools the",
+                "glyphs would give for Ars 'n Spells' own mechanics: spell-power scaling, affinity,",
+                "progression and school-matched discounts. Glyph effects and damage types never change.",
+                "false = the Loom's school selector stays on Automatic, explicit requests are refused",
+                "without consuming anything, and spells that already carry a chosen school cast as",
+                "Automatic (from glyphs). The stored choice stays on the item and applies again if this",
+                "is re-enabled. Read on every cast and request."
+            )
+            .define("allow_spell_school_override", true);
+
         INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS = BUILDER
             .comment(
                 "Iron's native cooldown, in game ticks (20 ticks = 1 second at the normal tick rate),",
@@ -1005,6 +1038,78 @@ public class AnsConfig {
 
         // ANS-HIGH-027: ENABLE_PER_CAST_REAGENT registration removed — had no readers,
         // setting it had zero effect. Re-add alongside an implementation if/when shipped.
+
+        BUILDER.pop();
+
+        // ========================================
+        // IMPORTED IRON'S GLYPHS AND THE GLYPH PRESS (3.4.0)
+        // ========================================
+        BUILDER.push("Imported Iron's Glyphs");
+        BUILDER.comment("Iron's spells pressed into learnable Ars glyphs at the Glyph Press.",
+            "Every glyph id stays registered whatever these say: they control availability only,",
+            "so a world never loses a learned glyph or a saved spell because a setting changed.");
+
+        ENABLE_IRON_GLYPHS = BUILDER
+            .comment(
+                "Allow imported Iron's glyphs to be learned and cast, and the Glyph Press to make them.",
+                "false = every imported glyph is dormant: learned glyphs stay known, spells and items",
+                "that contain them are kept, and a cast that contains one is refused with an explanation",
+                "before anything is paid. Turning it back on restores them without relearning.",
+                "Read on every cast and request."
+            )
+            .define("enable_iron_glyphs", true);
+
+        ENABLE_GLYPH_PRESS = BUILDER
+            .comment(
+                "Allow the Glyph Press to start new conversions. false = no new jobs; a job in progress",
+                "is cancelled with its inputs and Source kept, and every item in a Press stays",
+                "recoverable. Existing glyphs are unaffected."
+            )
+            .define("enable_glyph_press", true);
+
+        IRON_GLYPH_MANA_BONUS_POLICY = BUILDER
+            .comment(
+                "How learned imported glyphs count toward Ars Nouveau's per-glyph maximum-mana and",
+                "regeneration bonus. per_spell (default): all levels of one Iron's spell together count",
+                "as one glyph, so learning Firebolt I to X does not give ten glyphs' worth of mana.",
+                "native_per_variant: every learned level counts like any other Ars glyph.",
+                "Applied in the mana calculation each time; learned glyphs are never removed."
+            )
+            .define("iron_glyph_mana_bonus_policy", MANA_BONUS_PER_SPELL,
+                v -> MANA_BONUS_PER_SPELL.equals(v) || MANA_BONUS_NATIVE_PER_VARIANT.equals(v));
+
+        MAX_IMPORTED_EFFECTS_PER_SPELL = BUILDER
+            .comment("Most imported Iron's glyphs one Ars spell may contain. Enforced by the spell editor",
+                "and again at cast time. Hard ceiling " + MAX_IMPORTED_EFFECTS_CEILING + ".")
+            .defineInRange("max_imported_effects_per_spell", 4, 1, MAX_IMPORTED_EFFECTS_CEILING);
+
+        MAX_FOREIGN_EMISSIONS_PER_CAST = BUILDER
+            .comment("Most Iron's spell executions one Ars cast may produce, counting every target of a",
+                "split, burst, linger or repeated delivery. Each execution is priced and paid; once the",
+                "budget is spent further deliveries do nothing. Hard ceiling " + MAX_FOREIGN_EMISSIONS_CEILING + ".")
+            .defineInRange("max_foreign_emissions_per_cast", 16, 1, MAX_FOREIGN_EMISSIONS_CEILING);
+
+        MAX_ACTIVE_GLYPH_SESSIONS_PER_PLAYER = BUILDER
+            .comment("Most Ars casts with imported glyphs still in flight (projectiles, delays, channels)",
+                "one player may have at once. A further cast is refused before anything is paid.",
+                "Hard ceiling " + MAX_GLYPH_SESSIONS_CEILING + ".")
+            .defineInRange("max_active_glyph_sessions_per_player", 8, 1, MAX_GLYPH_SESSIONS_CEILING);
+
+        GLYPH_PRESS_SOURCE_CAPACITY = BUILDER
+            .comment("Source a Glyph Press can hold. Must cover the most expensive enabled conversion;",
+                "a conversion that costs more is reported as unavailable instead of starting.")
+            .defineInRange("glyph_press_source_capacity", 4000, 1000, 100000);
+
+        GLYPH_PRESS_SOURCE_SCAN_INTERVAL_TICKS = BUILDER
+            .comment("Ticks between a working Press's requests for Source from nearby jars. An idle Press",
+                "never looks for Source.")
+            .defineInRange("glyph_press_source_scan_interval_ticks", 20, 5, 200);
+
+        GLYPH_PRESS_SOURCE_RADIUS = BUILDER
+            .comment("How far a working Press looks for Source jars, through Ars's own Source lookup",
+                "(loaded positions only). Ars 4.12.7 relays bind only to Ars's own machines, so a relay",
+                "feeds the jars beside a Press rather than the Press itself.")
+            .defineInRange("glyph_press_source_radius", 4, 1, 8);
 
         BUILDER.pop();
 
@@ -1360,5 +1465,23 @@ public class AnsConfig {
         // ("save scheduled"), which read as "save succeeded" at call sites. The async
         // WARN above is the only source of truth for whether the file write landed;
         // the in-memory config value is already live either way.
+    }
+
+    /** Whether imported glyph mana bonuses count once per Iron's spell (the default) rather than per level. */
+    public static boolean ironGlyphBonusPerSpell() {
+        try {
+            return !MANA_BONUS_NATIVE_PER_VARIANT.equals(IRON_GLYPH_MANA_BONUS_POLICY.get());
+        } catch (IllegalStateException unloaded) {
+            return true;
+        }
+    }
+
+    /** {@link #ENABLE_IRON_GLYPHS}, or its default before the server config has loaded. */
+    public static boolean ironGlyphsEnabled() {
+        try {
+            return ENABLE_IRON_GLYPHS.get();
+        } catch (IllegalStateException unloaded) {
+            return true;
+        }
     }
 }

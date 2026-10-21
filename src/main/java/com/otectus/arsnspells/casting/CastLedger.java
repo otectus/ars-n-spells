@@ -86,6 +86,12 @@ public final class CastLedger {
         return LEDGER.open(playerId, carrierIdentity, payloadRevision, quote, gameTick);
     }
 
+    /** {@link #open(UUID, String, int, CostQuote, long)} with its own lifetime instead of {@link #ATTEMPT_TTL_TICKS}. */
+    public static CastAttempt open(UUID playerId, String carrierIdentity, int payloadRevision,
+                                   CostQuote quote, long gameTick, long ttlTicks) {
+        return LEDGER.open(playerId, carrierIdentity, payloadRevision, quote, gameTick, ttlTicks);
+    }
+
     /** The open attempt for this player and carrier, if any. */
     public static Optional<CastAttempt> findOpen(UUID playerId, String carrierIdentity) {
         return LEDGER.findOpen(playerId, carrierIdentity);

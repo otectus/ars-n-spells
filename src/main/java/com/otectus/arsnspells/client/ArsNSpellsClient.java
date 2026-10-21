@@ -20,6 +20,13 @@ import org.slf4j.LoggerFactory;
 public class ArsNSpellsClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(ArsNSpellsClient.class);
 
+    /** 3.4.0: the shared imported-glyph item geometry ({@code ars_n_spells:imported_glyph}). */
+    @SubscribeEvent
+    public static void registerGeometryLoaders(net.minecraftforge.client.event.ModelEvent.RegisterGeometryLoaders event) {
+        event.register(com.otectus.arsnspells.client.model.ImportedGlyphGeometry.LOADER_NAME,
+            com.otectus.arsnspells.client.model.ImportedGlyphGeometry.LOADER);
+    }
+
     @SubscribeEvent
     public static void registerIconReload(net.minecraftforge.client.event.RegisterClientReloadListenersEvent event) {
         event.registerReloadListener(com.otectus.arsnspells.client.icons.SpellIconRegistry.INSTANCE);
@@ -39,6 +46,10 @@ public class ArsNSpellsClient {
         event.enqueueWork(() -> net.minecraft.client.gui.screens.MenuScreens.register(
             com.otectus.arsnspells.registry.ModMenus.SPELL_LOOM.get(),
             com.otectus.arsnspells.client.screen.SpellLoomScreen::new));
+        // 3.4.0: the Glyph Press.
+        event.enqueueWork(() -> net.minecraft.client.gui.screens.MenuScreens.register(
+            com.otectus.arsnspells.registry.ModMenus.GLYPH_PRESS.get(),
+            com.otectus.arsnspells.client.screen.GlyphPressScreen::new));
 
         // DEBUG_MODE is SERVER-owned and is not available at client setup.
         // Loading/reloading handlers below run after world configuration arrives.

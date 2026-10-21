@@ -77,7 +77,7 @@ public final class CrossSpellTooltipGameTests {
         return event.getToolTip();
     }
 
-    /** A well-formed Ars inscription renders header, entry and cast hint. */
+    /** A well-formed Ars inscription renders header, entry, its school and the cast hint. */
     @GameTest(template = "platform")
     public static void tooltip_onInscribedStack_addsTheAffordanceLines(GameTestHelper helper) {
         Spell heal = new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
@@ -88,8 +88,9 @@ public final class CrossSpellTooltipGameTests {
 
         List<Component> lines = renderTooltip(helper, stack);
 
-        if (lines.size() != 3) {
-            helper.fail("a single-entry inscription must add header + entry + cast hint, got "
+        // 3.3.7: an Ars entry also states its mechanical school (Automatic here).
+        if (lines.size() != 4 || !translationKeys(lines).contains("tooltip.ars_n_spells.cross_spell.school")) {
+            helper.fail("a single-entry inscription must add header + entry + school + cast hint, got "
                 + lines.size() + ": " + lines);
         }
         helper.succeed();
@@ -132,8 +133,9 @@ public final class CrossSpellTooltipGameTests {
             helper.fail("a corrupt Ars payload must not throw out of the tooltip handler: " + t);
             return;
         }
-        if (lines.size() != 3) {
-            helper.fail("a corrupt payload should still render header + generic entry + cast hint, "
+        // The school line survives an unreadable payload too, without its glyph schools.
+        if (lines.size() != 4 || !translationKeys(lines).contains("tooltip.ars_n_spells.cross_spell.school")) {
+            helper.fail("a corrupt payload should still render header + generic entry + school + cast hint, "
                 + "got " + lines.size() + ": " + lines);
         }
         helper.succeed();

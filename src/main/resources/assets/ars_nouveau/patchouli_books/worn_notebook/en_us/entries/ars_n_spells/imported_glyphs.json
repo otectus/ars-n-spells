@@ -1,0 +1,21 @@
+{
+  "category": "ars_nouveau:ars_n_spells",
+  "icon": "ars_n_spells:iron/irons_spellbooks/firebolt/level_1",
+  "name": "ars_n_spells.book.imported_glyphs.name",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.imported_glyphs.1"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.imported_glyphs.2"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.imported_glyphs.3"
+    }
+  ],
+  "flag": "mod:irons_spellbooks"
+}

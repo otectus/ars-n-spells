@@ -91,7 +91,15 @@ public class EquipmentIntegration {
     }
 
     /**
-     * Apply Ars-derived mana bonuses to Iron's attributes.
+     * ISS_PRIMARY: size Iron's pool, which is the only pool, and mirror the Ars gear regen.
+     *
+     * <p>Iron's max becomes {@code max(Ars max x rate, Iron's own max + Ars gear bonus x rate)},
+     * written as one modifier ({@link SharedPoolCeiling#issPrimaryModifierAmount}). The first
+     * term carries Ars's base pool, glyph bonus and book tier, which are not gear; without it a
+     * player whose Ars progression outgrew their Iron's pool lost the difference (the NeoForge
+     * 3.3.5 report: 740 on 3.3.4, 350 on 3.3.5). The larger of the two, not their sum, so Ars gear
+     * is never counted twice. {@code read_curio_attribute_modifiers} and
+     * {@code respect_enchantments} withhold what they cover from both terms.
      */
     public static void applyArsBonusesToIrons(Player player, double conversionRate) {
         if (player == null || player.level().isClientSide()) {
@@ -101,15 +109,49 @@ public class EquipmentIntegration {
             return;
         }
 
-        ManaBonus arsBonus = getArsManaBonuses(player);
-        double maxManaBonus = arsBonus.maxMana * conversionRate;
-
-        // Apply max mana first so the regen conversion sees the post-bonus pool size.
-        // Otherwise EQUAL_EFFECT would underestimate the regen attribute delta needed.
-        applyAttributeModifier(player, AttributeRegistry.MAX_MANA.get(), ARS_TO_IRON_MAX_MANA_ID,
-            "Ars Gear Max Mana", maxManaBonus);
+        AttributeInstance instance = player.getAttribute(AttributeRegistry.MAX_MANA.get());
+        if (instance != null) {
+            // Iron's own max: every modifier but this one, under any identity it was written with.
+            java.util.Set<UUID> own = gearMaxManaIdentities();
+            List<AttributeModifier> nativeModifiers = instance.getModifiers().stream()
+                .filter(modifier -> !own.contains(modifier.getId())).toList();
+            double ironsOwnMax = instance.getAttribute().sanitizeValue(
+                AttributeContribution.evaluate(instance.getBaseValue(), nativeModifiers));
+            double amount = SharedPoolCeiling.issPrimaryModifierAmount(ironsOwnMax,
+                getArsManaBonuses(player).maxMana * conversionRate,
+                arsTransferableMaxMana(player) * conversionRate,
+                AttributeContribution.additiveAmplification(nativeModifiers));
+            // Max mana first so the regen conversion sees the post-bonus pool size.
+            // Otherwise EQUAL_EFFECT would underestimate the regen attribute delta needed.
+            applyAttributeModifier(player, AttributeRegistry.MAX_MANA.get(), ARS_TO_IRON_MAX_MANA_ID,
+                "Ars Gear Max Mana", amount);
+        }
 
         applyArsRegenBonusToIrons(player, conversionRate);
+    }
+
+    /** The current and legacy identities of the Ars gear max-mana modifier. */
+    private static java.util.Set<UUID> gearMaxManaIdentities() {
+        java.util.Set<UUID> ids = new java.util.HashSet<>();
+        for (String identity : AnsModifierIds.currentAndLegacyKeysFor(AnsModifierIds.ARS_GEAR_MAX_MANA)) {
+            UUID id = AnsModifierIdentities.MAPPER.map(identity);
+            if (id != null) ids.add(id);
+        }
+        return ids;
+    }
+
+    /**
+     * Ars's own maximum less what ANS is configured not to carry across: worn curios' max-mana
+     * modifiers with {@code read_curio_attribute_modifiers} off, and Ars enchantment boosts with
+     * {@code respect_enchantments} off. Used only as the ISS_PRIMARY floor; the shared-pool
+     * ceilings of the other modes must hold Ars's whole maximum, see {@link #arsRealMaxMana}.
+     */
+    public static float arsTransferableMaxMana(Player player) {
+        float real = arsRealMaxMana(player);
+        if (real <= 0.0f) {
+            return 0.0f;
+        }
+        return (float) Math.max(0.0, real - calculateBonuses(player).arsWithheldMax);
     }
 
     /**
@@ -260,6 +302,8 @@ public class EquipmentIntegration {
         // modifiers reuse an armor identity. Forge ItemStack emits Ars perks and enchantments
         // through ItemAttributeModifierEvent, so adding manual enchant estimates doubles them.
         Map<Attribute, Map<UUID, AttributeModifier>> contributions = new java.util.HashMap<>();
+        // Ars max-mana modifiers a toggle keeps out of the transfer; arsTransferableMaxMana takes them off Ars's max.
+        Map<UUID, AttributeModifier> withheldArsMax = new java.util.LinkedHashMap<>();
         double fallbackMax = 0;
         double fallbackRegen = 0;
         for (EquipmentSlot slot : EQUIPPED_SLOTS) {
@@ -280,7 +324,13 @@ public class EquipmentIntegration {
                 SlotContext context = result.slotContext();
                 Multimap<Attribute, AttributeModifier> modifiers = CuriosApi.getAttributeModifiers(
                     context, CuriosApi.getSlotUuid(context), item);
-                if (AnsConfig.READ_CURIO_ATTRIBUTE_MODIFIERS.get()) collectModifiers(contributions, modifiers);
+                if (AnsConfig.READ_CURIO_ATTRIBUTE_MODIFIERS.get()) {
+                    collectModifiers(contributions, modifiers);
+                } else {
+                    for (AttributeModifier modifier : modifiers.get(PerkAttributes.MAX_MANA.get())) {
+                        if (Double.isFinite(modifier.getAmount())) withheldArsMax.put(modifier.getId(), modifier);
+                    }
+                }
                 if (item.getItem() instanceof IManaEquipment equipment) {
                     if (!modifiers.containsKey(PerkAttributes.MAX_MANA.get())) fallbackMax += equipment.getMaxManaBoost(item);
                     if (!modifiers.containsKey(PerkAttributes.MANA_REGEN_BONUS.get())) fallbackRegen += equipment.getManaRegenBonus(item);
@@ -296,10 +346,13 @@ public class EquipmentIntegration {
                 if (id != null) excluded.add(id);
             }
         }
+        java.util.Set<UUID> ansOwned = new java.util.HashSet<>(excluded);
         if (!AnsConfig.respectEnchantments.get()) {
             for (EquipmentSlot slot : EQUIPPED_SLOTS) {
                 UUID id = com.hollingsworth.arsnouveau.common.event.ArsEvents.getEnchantBoostBySlot(slot);
                 excluded.add(id);
+                AttributeModifier boost = contributions.getOrDefault(PerkAttributes.MAX_MANA.get(), Collections.emptyMap()).get(id);
+                if (boost != null) withheldArsMax.put(id, boost);
                 for (Map<UUID, AttributeModifier> values : contributions.values()) values.remove(id);
             }
         }
@@ -308,7 +361,10 @@ public class EquipmentIntegration {
         ManaBonus irons = IronsCompat.isLoaded() ? new ManaBonus(
             contribution(player, AttributeRegistry.MAX_MANA.get(), contributions, excluded),
             contribution(player, AttributeRegistry.MANA_REGEN.get(), contributions, excluded)) : ManaBonus.ZERO;
-        CachedEquipmentData computed = new CachedEquipmentData(ars, irons, calculateCurioDiscountsInternal(player), now);
+        double withheld = withheldArsMax.isEmpty() ? 0.0 : AttributeContribution.equipmentDelta(
+            player.getAttribute(PerkAttributes.MAX_MANA.get()), withheldArsMax.values(), ansOwned);
+        CachedEquipmentData computed = new CachedEquipmentData(ars, irons, calculateCurioDiscountsInternal(player),
+            withheld, now);
         equipmentCache.put(player.getUUID(), computed);
         return computed;
     }
@@ -359,17 +415,21 @@ public class EquipmentIntegration {
      */
     private static class CachedEquipmentData {
         static final CachedEquipmentData EMPTY = new CachedEquipmentData(
-            ManaBonus.ZERO, ManaBonus.ZERO, CurioDiscountData.NONE, 0L);
+            ManaBonus.ZERO, ManaBonus.ZERO, CurioDiscountData.NONE, 0.0, 0L);
 
         final ManaBonus arsBonus;
         final ManaBonus ironBonus;
         final CurioDiscountData curioDiscounts;
+        /** How much of Ars's max the transfer toggles withhold (see arsTransferableMaxMana). */
+        final double arsWithheldMax;
         final long timestamp;
-        
-        CachedEquipmentData(ManaBonus arsBonus, ManaBonus ironBonus, CurioDiscountData curioDiscounts, long timestamp) {
+
+        CachedEquipmentData(ManaBonus arsBonus, ManaBonus ironBonus, CurioDiscountData curioDiscounts,
+                            double arsWithheldMax, long timestamp) {
             this.arsBonus = arsBonus;
             this.ironBonus = ironBonus;
             this.curioDiscounts = curioDiscounts;
+            this.arsWithheldMax = arsWithheldMax;
             this.timestamp = timestamp;
         }
     }
@@ -454,6 +514,12 @@ public class EquipmentIntegration {
             return;
         }
         AttributeModifier existing = instance.getModifier(id);
+        // Leave an unchanged modifier alone: every rewrite marks the attribute dirty and sends the
+        // client an attribute packet, and this runs at every reconciliation (once a second).
+        if (existing != null && existing.getAmount() == amount
+                && existing.getOperation() == AttributeModifier.Operation.ADDITION) {
+            return;
+        }
         if (existing != null) {
             instance.removeModifier(id);
         }

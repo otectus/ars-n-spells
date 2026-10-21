@@ -136,8 +136,8 @@ public final class IronsSpellbookBinder {
                 return BindResult.NOT_A_CARRIER;
         }
         // The WHOLE entry, not just the ars_spell sub-tag: the Spell Loom's chosen name,
-        // nature and icon are its siblings and must ride onto the book, or the bound wheel
-        // entry loses the identity the player gave it at the loom.
+        // nature, icon and school are its siblings and must ride onto the book, or the bound
+        // wheel entry loses the identity and the school the player gave it at the loom.
         Optional<CompoundTag> entryOpt = IronsBookBindingUtil.extractSingleEntry(scroll);
         if (entryOpt.isEmpty()) {
             return BindResult.INVALID_CARRIER;
@@ -147,12 +147,21 @@ public final class IronsSpellbookBinder {
         if (!IronsBookBindingUtil.isCastableArsPayload(arsTag)) {
             return BindResult.UNCASTABLE;
         }
+        // The chosen school rides onto the book exactly as stored. It is not re-judged here:
+        // a school that is uninstalled or disallowed today is ignored at each cast and kept on
+        // the item, so binding never silently drops a choice. Only a value that cannot be a
+        // school id at all, which no ANS route writes, marks the carrier as broken.
+        String school = SpellSchoolChoice.normalize(CrossCastNbt.storedSchool(entry));
+        if (!school.isEmpty() && !SpellSchoolChoice.isWellFormed(school)) {
+            return BindResult.INVALID_CARRIER;
+        }
         int maxCap = AnsConfig.MAX_ARS_CROSS_SPELLS_PER_IRONS_SPELLBOOK.get();
         IronsBookBindingUtil.AppendResult append = IronsBookBindingUtil.appendArsSpellToBook(
             book, arsTag,
             entry.getString(CrossCastNbt.TAG_CUSTOM_NAME),
             entry.getString(CrossCastNbt.TAG_NATURE),
             entry.getString(CrossCastNbt.TAG_ICON_SYMBOL),
+            school,
             maxCap);
         switch (append) {
             case ADDED:

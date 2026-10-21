@@ -74,6 +74,22 @@ public final class CreativeTabGameTests {
         helper.succeed();
     }
 
+    /**
+     * 3.4.0: imported Iron's glyphs are real Ars glyphs, listed in Ars's glyph tab beside every
+     * other glyph while Iron's is installed; without Iron's they are dormant and not listed.
+     */
+    @GameTest(template = "platform")
+    public static void importedGlyphs_areInArsGlyphTabOnlyWithIrons(GameTestHelper helper) {
+        CreativeModeTab glyphs = com.hollingsworth.arsnouveau.setup.registry.CreativeTabRegistry.GLYPHS.get();
+        glyphs.buildContents(params(helper));
+        net.minecraft.world.item.Item firebolt = ForgeRegistries.ITEMS.getValue(
+            new com.otectus.arsnspells.glyph.ImportedGlyphKey(new ResourceLocation("irons_spellbooks", "firebolt"), 1).glyphId());
+        boolean listed = glyphs.getDisplayItems().stream().anyMatch(stack -> stack.is(firebolt));
+        helper.assertTrue(listed == IronsCompat.isLoaded(), "Firebolt I listed in Ars's glyph tab: " + listed
+            + ", expected " + IronsCompat.isLoaded());
+        helper.succeed();
+    }
+
     /** Every item the mod publishes is in the tab, and nothing of ours is missing from it. */
     @GameTest(template = "platform")
     public static void ansTab_holdsEveryAnsItem(GameTestHelper helper) {
@@ -199,6 +215,10 @@ public final class CreativeTabGameTests {
         // substrate, and stock Iron's ships no recipe for a bare scroll), so it is expected in
         // the tab on both profiles.
         paths.add(ModItemsRegistry.blankScroll().getId().getPath());
+        // 3.4.0: the Glyph Press and its plate are registered everywhere (saved blocks and
+        // stacks never become unknown); only the Press's recipe needs Iron's.
+        paths.add(ModBlocksRegistry.GLYPH_PRESS_ITEM.getId().getPath());
+        paths.add(ModItemsRegistry.blankGlyphPlate().getId().getPath());
         if (IronsCompat.isLoaded()) {
             paths.add(SpellTranscriptionRitual.REGISTRY_PATH);
             paths.add(SpellbookBindingRitual.REGISTRY_PATH);

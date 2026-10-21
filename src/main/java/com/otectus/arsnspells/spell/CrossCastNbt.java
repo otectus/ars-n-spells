@@ -38,8 +38,17 @@ public final class CrossCastNbt {
     public static final String TAG_PROXY_POOL_ID = "proxy_pool_id";
     /** Player-authored display name shown in Iron's wheel for this entry. */
     public static final String TAG_CUSTOM_NAME = "custom_name";
-    /** Cosmetic background only. It never changes the spell's mechanical school. */
+    /**
+     * Cosmetic background only. It never changes the spell's mechanical school, and it is never
+     * read as one: an entry with a nature and no {@link #TAG_SCHOOL} is Automatic.
+     */
     public static final String TAG_NATURE = "nature";
+    /**
+     * Explicit mechanical school of an Ars entry: a namespaced Iron's school id such as
+     * {@code irons_spellbooks:ice}. Absent means Automatic, where the glyphs decide. Written only
+     * through validated routes and checked again at every cast by {@link SpellSchoolChoice}.
+     */
+    public static final String TAG_SCHOOL = "school";
     /** Rudimentary icon: a shipped symbol key; must be one of {@link #ICON_SYMBOLS}. */
     public static final String TAG_ICON_SYMBOL = "icon_symbol";
     // TAG_ICON_COLOR removed pre-release: getSpellIconResource returns a plain
@@ -181,6 +190,25 @@ public final class CrossCastNbt {
                                                String customName,
                                                String nature,
                                                String iconSymbol) {
+        return addArsEntryWithMetaToTag(stackTag, spellId, spellLevel, arsSpellTag, proxyPoolId,
+            customName, nature, iconSymbol, null);
+    }
+
+    /**
+     * {@link #addArsEntryWithMetaToTag(CompoundTag, ResourceLocation, int, CompoundTag, int,
+     * String, String, String)} plus an explicit mechanical school. A null or empty
+     * {@code school} writes no {@link #TAG_SCHOOL}, so the entry is Automatic and byte-identical
+     * to one written before the field existed. The value is stored as given: callers validate it.
+     */
+    public static int addArsEntryWithMetaToTag(CompoundTag stackTag,
+                                               ResourceLocation spellId,
+                                               int spellLevel,
+                                               CompoundTag arsSpellTag,
+                                               int proxyPoolId,
+                                               String customName,
+                                               String nature,
+                                               String iconSymbol,
+                                               String school) {
         if (schemaVersion(stackTag) > SCHEMA_VERSION) return -1;
         ListTag spellList;
         if (stackTag.contains(TAG_CROSS_MOD_SPELLS, Tag.TAG_LIST)) {
@@ -210,6 +238,9 @@ public final class CrossCastNbt {
         if (iconSymbol != null && !iconSymbol.isEmpty()) {
             spellData.putString(TAG_ICON_SYMBOL, iconSymbol);
         }
+        if (school != null && !school.isEmpty()) {
+            spellData.putString(TAG_SCHOOL, school);
+        }
 
         spellList.add(spellData);
         stackTag.put(TAG_CROSS_MOD_SPELLS, spellList);
@@ -217,6 +248,30 @@ public final class CrossCastNbt {
         // migration can branch on.
         stampSchemaVersion(stackTag);
         return spellList.size() - 1;
+    }
+
+    /**
+     * The school stored on {@code entry}, exactly as written, or {@code ""} when the entry is
+     * Automatic. Raw: whether the value may be used is {@link SpellSchoolChoice}'s decision.
+     */
+    public static String storedSchool(CompoundTag entry) {
+        return entry == null || !entry.contains(TAG_SCHOOL, Tag.TAG_STRING) ? "" : entry.getString(TAG_SCHOOL);
+    }
+
+    /**
+     * Set the explicit school on one entry, or clear it (null or empty) to make the entry
+     * Automatic. Touches no other key, so the spell, its name, background, icon and wheel slot
+     * are untouched.
+     */
+    public static void setStoredSchool(CompoundTag entry, String school) {
+        if (entry == null) {
+            return;
+        }
+        if (school == null || school.isEmpty()) {
+            entry.remove(TAG_SCHOOL);
+        } else {
+            entry.putString(TAG_SCHOOL, school);
+        }
     }
 
     /**

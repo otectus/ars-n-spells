@@ -204,6 +204,9 @@ public final class IronsCastLifecycle {
                 && (!player.isCreative() || io.redspace.ironsspellbooks.config.ServerConfigs.CREATIVE_COOLDOWN.get()))
             io.redspace.ironsspellbooks.api.magic.MagicHelper.MAGIC_MANAGER.addCooldown(player, spell, source);
         if (source == CastSource.SCROLL) io.redspace.ironsspellbooks.item.Scroll.attemptRemoveScrollAfterCast(player);
+        com.otectus.arsnspells.glyph.GlyphChildren.Child glyphChild =
+            com.otectus.arsnspells.glyph.GlyphChildren.running(player.getUUID(), spell.getSpellResource());
+        if (glyphChild != null) glyphChild.completed = true;
         spell.onServerCastComplete(player.level(), level, player, data, false);
         exhaustedChannels++;
         if (AnsConfig.DEBUG_MODE.get())

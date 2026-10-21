@@ -27,6 +27,24 @@ public final class IronsSchoolAttributes {
             return null;
         }
     }
+    /**
+     * Iron's own display name for a registered school, without its colour, or null when no
+     * school with this id is registered. Used only for labels; never for identity.
+     */
+    @Nullable public static net.minecraft.network.chat.MutableComponent displayName(String key) {
+        String normalized = SchoolKeys.normalize(key);
+        if (!SchoolKeys.isNamespaced(normalized)) return null;
+        try {
+            var registry = SchoolRegistry.REGISTRY.get();
+            ResourceLocation id = ResourceLocation.tryParse(normalized);
+            if (registry == null || id == null || !registry.containsKey(id)) return null;
+            SchoolType school = registry.getValue(id);
+            return school == null || school.getDisplayName() == null ? null
+                : school.getDisplayName().copy().setStyle(net.minecraft.network.chat.Style.EMPTY);
+        } catch (RuntimeException unavailable) {
+            return null;
+        }
+    }
     @Nullable public static Attribute power(String key) { return attribute(key, POWER); }
     @Nullable public static Attribute resistance(String key) { return attribute(key, RESISTANCE); }
     @Nullable private static Attribute attribute(String key, @Nullable Field binding) {

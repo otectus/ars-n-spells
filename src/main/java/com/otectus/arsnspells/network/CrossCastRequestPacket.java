@@ -2,6 +2,7 @@ package com.otectus.arsnspells.network;
 
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.contract.RequestAdmission;
+import com.otectus.arsnspells.spell.target.TargetHint;
 import com.otectus.arsnspells.util.CrossCastTrace;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -33,6 +34,8 @@ public class CrossCastRequestPacket {
     private final int clientSelectedIndex;
     private final UUID clientAttemptId;
     private final String carrierFingerprint;
+    /** 3.4.0: the client's aim when it clicked. Compared with the server's pick; never authority. */
+    private final TargetHint hint;
 
     public CrossCastRequestPacket(InteractionHand hand, Action action, int clientSelectedIndex,
         UUID clientAttemptId) {
@@ -41,11 +44,17 @@ public class CrossCastRequestPacket {
 
     public CrossCastRequestPacket(InteractionHand hand, Action action, int clientSelectedIndex,
         UUID clientAttemptId, String carrierFingerprint) {
+        this(hand, action, clientSelectedIndex, clientAttemptId, carrierFingerprint, TargetHint.NONE);
+    }
+
+    public CrossCastRequestPacket(InteractionHand hand, Action action, int clientSelectedIndex,
+        UUID clientAttemptId, String carrierFingerprint, TargetHint hint) {
         this.hand = hand;
         this.action = action;
         this.clientSelectedIndex = clientSelectedIndex;
         this.clientAttemptId = clientAttemptId != null ? clientAttemptId : new UUID(0L, 0L);
         this.carrierFingerprint = carrierFingerprint == null ? "" : carrierFingerprint;
+        this.hint = hint == null ? TargetHint.NONE : hint;
     }
 
     public CrossCastRequestPacket(FriendlyByteBuf buf) {
@@ -54,6 +63,7 @@ public class CrossCastRequestPacket {
         this.clientSelectedIndex = buf.readVarInt();
         this.clientAttemptId = buf.readUUID();
         this.carrierFingerprint = buf.readUtf(64);
+        this.hint = TargetHint.read(buf);
     }
 
     public void toBytes(FriendlyByteBuf buf) {
@@ -62,7 +72,10 @@ public class CrossCastRequestPacket {
         buf.writeVarInt(clientSelectedIndex);
         buf.writeUUID(clientAttemptId);
         buf.writeUtf(carrierFingerprint, 64);
+        hint.write(buf);
     }
+
+    public TargetHint hint() { return hint; }
 
     public InteractionHand hand() {
         return hand;
@@ -87,33 +100,43 @@ public class CrossCastRequestPacket {
         if (ctx == null) {
             return;
         }
-        ctx.enqueueWork(() -> {
-            ServerPlayer sender = ctx.getSender();
-            if (sender == null || hand != InteractionHand.MAIN_HAND || action == null
-                || !sender.isAlive() || sender.isSpectator() || sender.isSleeping()
-                || sender.containerMenu != sender.inventoryMenu) {
-                return;
-            }
-            RequestAdmission.Result admission = NetworkRequestGuard.admit(sender, clientAttemptId);
-            if (admission != RequestAdmission.Result.ACCEPTED) return;
-            ItemStack stack = sender.getItemInHand(hand);
-            if (carrierFingerprint.isEmpty() || !carrierFingerprint.equals(CarrierFingerprint.of(stack))) {
-                sender.displayClientMessage(Component.translatable("arsnspells.crosscast.stale_carrier"), true);
-                sender.inventoryMenu.broadcastChanges();
-                return;
-            }
-            UUID serverAttemptId = UUID.randomUUID();
-
-            CrossCastTrace.log(serverAttemptId, sender, CrossCastTrace.Side.S,
-                CrossCastTrace.Stage.REQUEST_RECEIVED,
-                "hand", hand,
-                "action", action,
-                "clientIndex", clientSelectedIndex,
-                "clientAttempt", clientAttemptId,
-                "item", stack.getItem());
-
-            CrossCastingHandler.serverHandleCast(sender, stack, hand, action, serverAttemptId);
-        });
+        ctx.enqueueWork(() -> process(ctx.getSender(), this));
         ctx.setPacketHandled(true);
+    }
+
+    /**
+     * The server half of a request, on the server thread: admission, the carrier fingerprint,
+     * then {@link CrossCastingHandler#serverHandleCast}. Public so GameTests drive the exact
+     * path a received packet takes.
+     *
+     * @return whether the request reached the cast handler and it reported success
+     */
+    public static boolean process(ServerPlayer sender, CrossCastRequestPacket request) {
+        if (sender == null || request.hand != InteractionHand.MAIN_HAND || request.action == null
+            || !sender.isAlive() || sender.isSpectator() || sender.isSleeping()
+            || sender.containerMenu != sender.inventoryMenu) {
+            return false;
+        }
+        RequestAdmission.Result admission = NetworkRequestGuard.admit(sender, request.clientAttemptId);
+        if (admission != RequestAdmission.Result.ACCEPTED) return false;
+        ItemStack stack = sender.getItemInHand(request.hand);
+        if (request.carrierFingerprint.isEmpty() || !request.carrierFingerprint.equals(CarrierFingerprint.of(stack))) {
+            sender.displayClientMessage(Component.translatable("arsnspells.crosscast.stale_carrier"), true);
+            sender.inventoryMenu.broadcastChanges();
+            return false;
+        }
+        UUID serverAttemptId = UUID.randomUUID();
+
+        CrossCastTrace.log(serverAttemptId, sender, CrossCastTrace.Side.S,
+            CrossCastTrace.Stage.REQUEST_RECEIVED,
+            "hand", request.hand,
+            "action", request.action,
+            "clientIndex", request.clientSelectedIndex,
+            "clientAttempt", request.clientAttemptId,
+            "item", stack.getItem(),
+            "hint", request.hint.kind());
+
+        return CrossCastingHandler.serverHandleCast(sender, stack, request.hand, request.action, serverAttemptId,
+            request.hint);
     }
 }

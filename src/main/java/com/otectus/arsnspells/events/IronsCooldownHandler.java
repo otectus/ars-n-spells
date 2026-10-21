@@ -26,6 +26,10 @@ public class IronsCooldownHandler {
         if (CrossCastNbt.isArsCrossProxyId(event.getSpellId())) {
             return;
         }
+        // 3.4.0: an imported glyph's Iron's spell; the root Ars cast applied the category cooldown.
+        if (com.otectus.arsnspells.compat.irons.glyph.IronTargetingScope.importedExecution(event.getEntity(), event.getSpellId())) {
+            return;
+        }
 
         // CRITICAL FIX: Do NOT apply unified cooldowns to Iron's Spellbooks
         // Iron's has its own internal cooldown system that should not be interfered with

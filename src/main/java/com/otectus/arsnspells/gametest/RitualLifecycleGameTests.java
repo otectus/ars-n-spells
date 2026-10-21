@@ -74,7 +74,7 @@ public final class RitualLifecycleGameTests {
      * {@code setRitual} is the same call {@code RitualTablet.useOn} makes, and it is what assigns
      * {@code ritual.tile}, without which the ritual cannot see the world.
      */
-    private static RitualBrazierTile lightAnsBrazier(GameTestHelper helper, BlockPos local, String path) {
+    static RitualBrazierTile lightAnsBrazier(GameTestHelper helper, BlockPos local, String path) {
         Block brazier = ForgeRegistries.BLOCKS.getValue(new ResourceLocation("ars_nouveau", "ritual_brazier"));
         if (brazier == null) {
             helper.fail("ars_nouveau:ritual_brazier is not registered");
@@ -92,7 +92,7 @@ public final class RitualLifecycleGameTests {
     }
 
     /** Drop a stack with zero motion and no pickup, so the ritual's 3-block scan is deterministic. */
-    private static ItemEntity dropNear(GameTestHelper helper, Vec3 local, ItemStack stack) {
+    static ItemEntity dropNear(GameTestHelper helper, Vec3 local, ItemStack stack) {
         Vec3 abs = helper.absoluteVec(local);
         ItemEntity entity = new ItemEntity(helper.getLevel(), abs.x, abs.y, abs.z, stack, 0.0, 0.0, 0.0);
         entity.setNeverPickUp();

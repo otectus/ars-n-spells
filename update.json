@@ -1,7 +1,8 @@
 {
   "homepage": "https://github.com/otectus/ars-n-spells",
   "1.20.1": {
-    "3.3.2": "Fixes the contextual Iron's mana bar staying visible at full displayed mana when the maximum is fractional. Preserves held casting items, Always/Never settings, and XP-bar restoration. Matching fix on Forge 1.20.1 and NeoForge 1.21.1. No config, network protocol, or save-format changes from 3.3.1.",
+    "3.4.0": "Touch spells cast from exported Iron's scrolls, inscribed items and bound Iron's books now hit the block or creature you aim at, exactly as from an Ars spell book; a Touch cast with nothing in reach is refused without spending mana, training a school or starting a cooldown. With Iron's Spells 'n Spellbooks installed, every Iron's player spell becomes a learnable Ars glyph for each of its levels (111 spells, 777 glyphs), made in the new Glyph Press from a filled Iron's scroll. Also ships the never-published 3.3.7 changes: in iss_primary, the default mode, Iron's max mana now holds Ars's own maximum, and the Spell Loom can give a custom Ars spell a chosen spell school. Network protocol 8: client and server both need 3.4.0.",
+    "3.3.2":"Fixes the contextual Iron's mana bar staying visible at full displayed mana when the maximum is fractional. Preserves held casting items, Always/Never settings, and XP-bar restoration. Matching fix on Forge 1.20.1 and NeoForge 1.21.1. No config, network protocol, or save-format changes from 3.3.1.",
     "3.2.4": "Server performance release. The Mana Well ritual no longer scans every entity section in range on every tick while lit; per-tick handlers stop querying Forge's ModList each player tick; the shared-pool mana ceiling no longer rewrites Iron's MAX_MANA modifier (and broadcasts an attribute packet) every regen interval when nothing changed; resonance is synced to the client only when it changes. No gameplay, config, packet or save-format changes.",
     "3.2.3": "Fixes Ars 'n' Spells rituals doing nothing at all. Placing a Spellbook Binding, Spell Transcription, Spell Uninscription or Mana Infusion tablet on a ritual brazier and lighting it consumed nothing, produced nothing and reported nothing - the brazier just stayed lit. These rituals never told Ars they had finished, so their payload never ran; they have been inert since 3.0.0. They now burn for about three seconds and complete. Ritual messages also reach the player who lit the brazier instead of being dropped if they walked away, /ans bind_scroll_to_irons_book now honours allow_ars_spells_in_irons_spellbooks, and the binding instructions have been corrected in game and in the docs.",
     "3.2.2": "Fixes fake \"Ars 'n' Spells\" spell scrolls turning up in Iron's Spellbooks loot - exploration chests, Mystery Scroll Pouches, magic-mob drops and wandering traders. These were the mod's internal ars_cross_* proxy spells, which do nothing outside a spellbook that carries the matching Ars spell. Ars 'n' Spells does not modify any loot table; the proxies simply never opted out of Iron's random-spell pool, and now do. A stray scroll already in your world becomes a blank Iron's scroll the first time you right-click it, and the eight missing spell-description translations have been added.",
@@ -14,7 +15,7 @@
     "3.0.0": "Cross-cast inscription: export Ars spells onto Iron's scrolls and bind them into Iron's spellbooks via the Spell Loom."
   },
   "promos": {
-    "1.20.1-latest": "3.3.2",
-    "1.20.1-recommended": "3.3.2"
+    "1.20.1-latest": "3.4.0",
+    "1.20.1-recommended": "3.4.0"
   }
 }

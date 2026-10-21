@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "type": "ars_n_spells:press_tiers",
+  "tiers": {
+    "1": { "source_cost": 500, "duration_ticks": 100, "catalyst": { "tag": "ars_n_spells:glyph_press_catalysts", "count": 1 } },
+    "2": { "source_cost": 1500, "duration_ticks": 140, "catalyst": { "tag": "ars_n_spells:glyph_press_catalysts", "count": 2 } },
+    "3": { "source_cost": 3000, "duration_ticks": 200, "catalyst": { "tag": "ars_n_spells:glyph_press_catalysts", "count": 4 } }
+  }
+}

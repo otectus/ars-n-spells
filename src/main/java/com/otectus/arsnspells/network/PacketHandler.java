@@ -20,7 +20,12 @@ public class PacketHandler {
     // 3.3.0: school snapshots, complete namespaced affinity replacement, and carrier fingerprints.
     // Bumped 5 -> 6: TransactionSyncPacket was removed with the transaction receipt HUD,
     // which shifts JournalSnapshotPacket down one id slot — an old client would misdecode.
-    private static final String PROTOCOL_VERSION = "6";
+    // Bumped 6 -> 7: SpellLoomExportPacket gained the requested spell school and the
+    // set-school action, so its payload shape changed — an old client must be refused at
+    // connect rather than misdecode.
+    // Bumped 7 -> 8 in 3.4.0: cross-cast requests carry the client's aim hint, and the Glyph
+    // Press action/result packets and the imported-glyph handshake and mapping view were added.
+    private static final String PROTOCOL_VERSION = "8";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ArsNSpells.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -70,6 +75,19 @@ public class PacketHandler {
         // slot, so PROTOCOL_VERSION was bumped to hard-fail old clients at connect.
         INSTANCE.registerMessage(id++, JournalSnapshotPacket.class,
             JournalSnapshotPacket::toBytes, JournalSnapshotPacket::new, JournalSnapshotPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        // 3.4.0: the Glyph Press and imported glyphs.
+        INSTANCE.registerMessage(id++, GlyphPressActionPacket.class,
+            GlyphPressActionPacket::toBytes, GlyphPressActionPacket::new, GlyphPressActionPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        INSTANCE.registerMessage(id++, GlyphPressResultPacket.class,
+            GlyphPressResultPacket::toBytes, GlyphPressResultPacket::new, GlyphPressResultPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        INSTANCE.registerMessage(id++, GlyphCatalogHandshakePacket.class,
+            GlyphCatalogHandshakePacket::toBytes, GlyphCatalogHandshakePacket::new, GlyphCatalogHandshakePacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        INSTANCE.registerMessage(id++, GlyphMappingSyncPacket.class,
+            GlyphMappingSyncPacket::toBytes, GlyphMappingSyncPacket::new, GlyphMappingSyncPacket::handle,
             java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 

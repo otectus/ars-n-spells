@@ -92,6 +92,48 @@ public final class SharedPoolCeiling {
     }
 
     /**
+     * The ISS_PRIMARY modifier amount: the one ANS modifier that makes Iron's max
+     * {@code max(arsFloor, ironsOwnMax + amplification * gearBonus)}.
+     *
+     * <p>In ISS_PRIMARY Iron's pool is the only pool, so it has to hold both what Iron's grants
+     * and what Ars grants. Ars's whole maximum (base pool, glyphs, book tier, perks, gear) is a
+     * floor; the Ars gear bonus is added on top of Iron's own maximum, as the gear of either mod
+     * would be. Taking the larger rather than the sum is what keeps Ars gear, which is inside
+     * both terms, from counting twice. The NeoForge 3.3.5 parity change kept only the second term
+     * and cut every pool whose Ars side was the larger one.
+     *
+     * <p>Both arguments that come from Ars are already converted into Iron's units by the caller
+     * ({@code conversion_rate_ars_to_iron}). An unusable floor (not positive, or not finite)
+     * leaves just the gear bonus; an unmeasurable amplification degrades to 1, as in
+     * {@link #modifierAmount(double, double, double)}. The result may be negative only when the
+     * gear bonus itself is.
+     *
+     * @param ironsOwnMax   Iron's max mana without this modifier
+     * @param gearBonus     the Ars gear bonus, times the conversion rate
+     * @param arsFloor      Ars's transferable maximum, times the conversion rate
+     * @param amplification final value gained per additive point on Iron's max mana
+     */
+    public static double issPrimaryModifierAmount(double ironsOwnMax, double gearBonus, double arsFloor,
+                                                  double amplification) {
+        double gear = Double.isFinite(gearBonus) ? gearBonus : 0.0;
+        if (!Double.isFinite(arsFloor) || arsFloor <= 0.0) {
+            return gear;
+        }
+        double own = Double.isNaN(ironsOwnMax) ? 0.0 : ironsOwnMax;
+        double factor = (Double.isNaN(amplification) || Double.isInfinite(amplification)
+            || amplification <= 0.0) ? 1.0 : amplification;
+        return Math.max(gear, (arsFloor - own) / factor);
+    }
+
+    /** The Iron's max that {@link #issPrimaryModifierAmount} produces. */
+    public static double issPrimaryCeiling(double ironsOwnMax, double gearBonus, double arsFloor,
+                                           double amplification) {
+        double factor = (Double.isNaN(amplification) || Double.isInfinite(amplification)
+            || amplification <= 0.0) ? 1.0 : amplification;
+        return ironsOwnMax + factor * issPrimaryModifierAmount(ironsOwnMax, gearBonus, arsFloor, amplification);
+    }
+
+    /**
      * True when writing to a pool of {@code pool} under {@code ceiling} would lose mana to
      * Iron's down-clamp rather than merely spending it.
      */

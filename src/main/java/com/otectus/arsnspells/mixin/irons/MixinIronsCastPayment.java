@@ -29,6 +29,8 @@ public abstract class MixinIronsCastPayment {
     private void arsnspells$invocation(Level level, int spellLevel, ServerPlayer player, CastSource source,
                                       boolean cooldown, Operation<Void> original) {
         var frame = IronsCastLifecycle.enter(player, (AbstractSpell)(Object)this, spellLevel, source, cooldown);
+        // 3.4.0: a charged or channelled imported glyph runs in this slot; its invocation sees the Ars target.
+        var glyphScope = com.otectus.arsnspells.compat.irons.glyph.IronsGlyphChildHooks.enter(player, (AbstractSpell)(Object)this);
         try {
             if (frame.outcome != null && !frame.outcome.allowed()) { IronsCastLifecycle.abort(frame, null); return; }
             IronsCastPayments.ensurePlan(player, (AbstractSpell)(Object)this, spellLevel, source);
@@ -37,7 +39,10 @@ public abstract class MixinIronsCastPayment {
             else IronsCastLifecycle.afterEffect(frame);
         } catch (IronsCastLifecycle.PaymentRefused refused) { IronsCastLifecycle.abort(frame, null); }
         catch (RuntimeException error) { IronsCastLifecycle.abort(frame, error); }
-        finally { IronsCastLifecycle.exit(frame); }
+        finally {
+            com.otectus.arsnspells.compat.irons.glyph.IronsGlyphChildHooks.exit(glyphScope, frame.started && !frame.aborted, cooldown);
+            IronsCastLifecycle.exit(frame);
+        }
     }
     @Inject(method = "castSpell", at = @At(value = "INVOKE",
         target = "Lnet/minecraftforge/eventbus/api/IEventBus;post(Lnet/minecraftforge/eventbus/api/Event;)Z",

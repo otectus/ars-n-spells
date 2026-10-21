@@ -125,10 +125,14 @@ public final class ModCreativeTabs {
             return;
         }
         // Collected before removal: the backing map must not be mutated mid-iteration.
+        // 3.4.0: imported Iron's glyphs are real Ars glyphs and stay in Ars's glyph tab while
+        // Iron's is installed; without Iron's they are dormant and are hidden like the rest.
+        boolean keepImportedGlyphs = com.otectus.arsnspells.compat.IronsCompat.isLoaded();
         List<ItemStack> ours = new ArrayList<>();
         for (var entry : event.getEntries()) {
-            if (isOurs(entry.getKey())) {
-                ours.add(entry.getKey());
+            ItemStack stack = entry.getKey();
+            if (isOurs(stack) && !(keepImportedGlyphs && stack.getItem() instanceof com.otectus.arsnspells.glyph.ImportedGlyphItem)) {
+                ours.add(stack);
             }
         }
         for (ItemStack stack : ours) {

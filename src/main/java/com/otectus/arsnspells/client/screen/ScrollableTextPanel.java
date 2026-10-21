@@ -16,11 +16,21 @@ final class ScrollableTextPanel extends AbstractWidget {
     private List<Component> paragraphs = List.of();
     private int scroll;
     private boolean draggingScrollbar;
+    private boolean paragraphGaps = true;
 
     ScrollableTextPanel(Font font, int x, int y, int width, int height, List<Component> paragraphs) {
         super(x, y, width, height, Component.empty());
         this.font = font;
         setParagraphs(paragraphs);
+    }
+
+    /** Pack paragraphs without a blank line between them, for small status panels. */
+    ScrollableTextPanel compact() {
+        paragraphGaps = false;
+        List<Component> current = paragraphs;
+        paragraphs = List.of();
+        setParagraphs(current);
+        return this;
     }
 
     void setParagraphs(List<Component> paragraphs) {
@@ -31,11 +41,13 @@ final class ScrollableTextPanel extends AbstractWidget {
         for (Component paragraph : paragraphs) {
             narration.append(paragraph).append(". ");
             lines.addAll(font.split(paragraph, width - 20));
-            lines.add(FormattedCharSequence.EMPTY);
+            if (paragraphGaps) lines.add(FormattedCharSequence.EMPTY);
         }
         setMessage(narration);
         scrollTo(scroll);
     }
+
+    void scrollToTop() { scrollTo(0); }
 
     private int lineHeight() { return font.lineHeight + 2; }
     private int maxScroll() { return Math.max(0, lines.size() * lineHeight() - (height - 8)); }

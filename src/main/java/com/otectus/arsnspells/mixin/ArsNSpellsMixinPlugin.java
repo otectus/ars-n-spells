@@ -16,6 +16,8 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
     static final String CAST_PROBE_PROPERTY = "ans.gametest.castProbe";
     private boolean ironsPresent;
     private boolean sanctifiedPresent;
+    /** 3.4.0: Iron's 3.16.x has RaycastBuilder; 3.15.0 does not. */
+    private boolean raycastBuilderPresent;
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -38,6 +40,7 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // classpath-only probe as the Iron's-class checks above — must not
         // classload.
         sanctifiedPresent = resourceExists("net/llenzzz/covenant_of_the_seven/CovenantOfTheSeven.class");
+        raycastBuilderPresent = resourceExists("io/redspace/ironsspellbooks/api/util/RaycastBuilder.class");
     }
 
     @Override
@@ -85,7 +88,11 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // ANS-CRIT-001: MixinIronsCastValidation and MagicDataAccessor were missing
         // from this gated list — both directly target Iron's classes, so on an
         // Iron's-less server the mixin loader was crashing with NoClassDefFoundError.
-        if (mixinClassName.endsWith("MixinIronsSpellDamage")
+        if (mixinClassName.endsWith("MixinIronsRaycastBuilder")) {
+            return ironsPresent && raycastBuilderPresent;
+        }
+        if (mixinClassName.endsWith("MixinIronsAimHelpers")
+            || mixinClassName.endsWith("MixinIronsSpellDamage")
             || mixinClassName.endsWith("MixinIronsMagicDataMana")
             || mixinClassName.endsWith("MixinIronsManaBarVisibility")
             || mixinClassName.endsWith("MixinIronsCastValidation")

@@ -41,6 +41,7 @@ public final class ModItemsRegistry {
     private static RegistryObject<RitualTablet> manaInfusionTablet;
     private static RegistryObject<RitualTablet> manaWellTablet;
     private static RegistryObject<Item> blankScroll;
+    private static RegistryObject<Item> blankGlyphPlate;
 
     private ModItemsRegistry() {}
 
@@ -93,6 +94,9 @@ public final class ModItemsRegistry {
             () -> new RitualTablet(new SpellUninscriptionRitual())
         );
         blankScroll = ITEMS.register("blank_scroll", () -> new Item(new Item.Properties()));
+        // 3.4.0: the Glyph Press's substrate. Registered everywhere, like the press itself, so a
+        // saved stack never turns into an unknown item when Iron's is removed.
+        blankGlyphPlate = ITEMS.register("blank_glyph_plate", () -> new Item(new Item.Properties()));
     }
 
     public static void register(IEventBus modBus) {
@@ -117,6 +121,10 @@ public final class ModItemsRegistry {
 
     public static RegistryObject<RitualTablet> manaWellTablet() {
         return manaWellTablet;
+    }
+
+    public static RegistryObject<Item> blankGlyphPlate() {
+        return blankGlyphPlate;
     }
 
     public static RegistryObject<Item> blankScroll() {

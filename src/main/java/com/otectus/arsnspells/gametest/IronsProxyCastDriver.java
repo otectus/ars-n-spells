@@ -231,6 +231,32 @@ final class IronsProxyCastDriver {
         return book;
     }
 
+    /**
+     * Run {@code action} and report every {@code SpellOnCastEvent} Iron's posted for
+     * {@code player} meanwhile, as {@code spell@school} strings, so a test can tell a cast that
+     * never reached Iron's event from one whose listeners ignored it.
+     */
+    static java.util.List<String> onCastEvents(ServerPlayer player, Runnable action) {
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        if (!IronsCompat.isLoaded()) {
+            action.run();
+            return seen;
+        }
+        java.util.function.Consumer<io.redspace.ironsspellbooks.api.events.SpellOnCastEvent> listener = event -> {
+            if (event.getEntity() == player) {
+                seen.add(event.getSpellId() + "@" + (event.getSchoolType() == null ? "null" : event.getSchoolType().getId()));
+            }
+        };
+        MinecraftForge.EVENT_BUS.addListener(net.minecraftforge.eventbus.api.EventPriority.HIGHEST, true,
+            io.redspace.ironsspellbooks.api.events.SpellOnCastEvent.class, listener);
+        try {
+            action.run();
+        } finally {
+            MinecraftForge.EVENT_BUS.unregister(listener);
+        }
+        return seen;
+    }
+
     /** Whether {@code spellId} is on this player's native Iron's cooldown. */
     static boolean onNativeCooldown(ServerPlayer player, String spellId) {
         return IronsCompat.isLoaded()

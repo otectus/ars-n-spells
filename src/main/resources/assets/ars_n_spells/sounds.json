@@ -1,0 +1,17 @@
+{
+  "block.glyph_press.engrave": {
+    "subtitle": "subtitles.ars_n_spells.block.glyph_press.engrave",
+    "sounds": [
+      { "name": "minecraft:ui/cartography_table/drawmap1", "volume": 0.8, "pitch": 0.9 },
+      { "name": "minecraft:ui/cartography_table/drawmap2", "volume": 0.8, "pitch": 0.9 },
+      { "name": "minecraft:ui/cartography_table/drawmap3", "volume": 0.8, "pitch": 0.9 }
+    ]
+  },
+  "block.glyph_press.complete": {
+    "subtitle": "subtitles.ars_n_spells.block.glyph_press.complete",
+    "sounds": [
+      { "name": "minecraft:block/amethyst/resonate1", "pitch": 1.3 },
+      { "name": "minecraft:block/amethyst/resonate3", "pitch": 1.3 }
+    ]
+  }
+}

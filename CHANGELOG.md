@@ -2,6 +2,107 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.4.0] - 2026-10-21
+
+3.3.7 was never published; 3.4.0 also ships everything listed under 3.3.7 below.
+
+**Client and server both need 3.4.0.** The network protocol changed (version 8), and a client whose imported-glyph catalog differs from the server's is disconnected with a message saying which versions each side has.
+
+### Fixed
+
+- **Touch casting from Ars 'n' Spells carriers.** A Touch spell on an exported Iron's scroll, an inscribed item, or a bound Iron's book (wheel, hotkey or staff) now hits the block or creature you aim at exactly as the same spell does from an Ars spell book. Old scrolls and books are fixed in place; nothing needs rebuilding.
+  - A Touch cast that hit a block was reported as a failure, and on the Iron's wheel that cancelled its cooldown. It is now reported as cast.
+  - A Touch spell with nothing in reach is refused cleanly: nothing is spent, trained or put on cooldown. Before, a miss trained the spell's school.
+  - Self and Projectile spells aimed at a block, and Sensitive spells aimed at water, resolve as they do from a spell book.
+  - The server decides the target. What your client was aiming at is only compared, so a stale or forged aim can never redirect a cast.
+  - Details and evidence: `docs/3.4.0/touch-regression.md`.
+
+### Added
+
+- **Iron's spells as Ars glyphs.** With Iron's Spells 'n Spellbooks installed, every Iron's player spell has a real Ars glyph for each of its levels: 111 spells, 777 glyphs, in both tested Iron's builds. Learn a glyph the normal Ars way and add it to spells like any other glyph.
+  - The form decides the target: Self on you, Touch on what you touch, Projectile where it lands, Underfoot below you. Spells that only affect their caster work only with Self, and the spell book explains a refused combination.
+  - Amplify and Dampen raise or lower the cast level within the spell's range.
+  - The Iron's spell's own mana cost is added to the Ars spell's cost under your mana mode and paid once (the cross-cast multiplier applies once). A cast that cannot pay is refused before anything happens.
+  - Iron's own learning requirements apply, and its cooldowns apply per spell, shared by all levels. Charged and channelled spells charge or channel in Iron's cast slot while the rest of the Ars spell waits, and they never cancel a native Iron's cast you already have in progress.
+  - Each level is its own glyph and carries its own Ars tier, from Iron's rarity for that level: Common is tier I, Uncommon and Rare tier II, Epic and Legendary tier III.
+  - Spells cast by turrets, runes and other non-player casters do not run imported glyphs.
+  - If Iron's is removed or the server disables a spell, its glyphs stay in your books and inventory as dormant glyphs that do nothing and say why. They work again when restored; no glyph turns into another effect.
+- **The Glyph Press** turns a filled Iron's scroll into the glyph for that spell at that level.
+  - Recipes: gold ingot, Source gem, gold ingot / archwood planks, lectern, archwood planks / three obsidian (needs Iron's); two blank glyph plates from smooth stone, a gold nugget and an amethyst shard.
+  - One conversion uses the scroll, one plate, the tier's Source gems and Source: tier I 1 gem and 500 Source (5 s), tier II 2 and 1,500 (7 s), tier III 4 and 3,000 (10 s). Servers can change these. There is no failure chance.
+  - It holds 4,000 Source and draws from nearby Source jars while a job needs it; an idle Press never does.
+  - Nothing is consumed until the glyph is finished. A running job locks its inputs; Cancel returns them and the Source. Breaking a Press drops its contents once, and an unfinished job gives back its inputs, not a glyph.
+  - Blank, multi-spell, invalid-level, exported-Ars and proxy scrolls are refused, each with its own message, and spells Iron's makes you learn must be learned there first.
+  - Hoppers can supply scrolls from above and plates and gems from the sides, and take glyphs from below. Only a player starts a job.
+  - The screen shows the spell, the glyph and its tier, whether you know it, its forms, augments and restrictions, the costs, progress and a help page. JEI lists every available conversion. The worn notebook has a Glyph Press chapter with a worked example.
+- New commands: `/ans glyph inspect`, and for operators `/ans glyph catalog`, `coverage`, `mappings` and `press <pos>`.
+- New server settings in `ars_n_spells-server.toml` (section `Imported Iron's Glyphs`): `enable_iron_glyphs`, `enable_glyph_press`, `iron_glyph_mana_bonus_policy` (`per_spell` by default, so learning all ten levels of one spell does not give ten glyphs' worth of maximum mana), `max_imported_effects_per_spell`, `max_foreign_emissions_per_cast`, `max_active_glyph_sessions_per_player`, `glyph_press_source_capacity`, `glyph_press_source_scan_interval_ticks`, `glyph_press_source_radius`. All apply without a restart.
+- For pack makers: `data/<namespace>/ans_iron_glyphs/` controls per-spell availability, tiers and Press costs, plus spell and school allow and deny lists, reloadable with `/reload`. An invalid reload is rejected as a whole and the previous behaviour kept. New item tag `ars_n_spells:glyph_press_catalysts`.
+- Documentation: `docs/3.4.0/` (`glyph-press.md`, `iron-glyph-coverage.md`, `adapter-authoring.md`, `config-reference.md`, `touch-regression.md`, `testing.md`).
+
+### Tests
+
+- `TouchRegressionGameTests`: the Touch, Self, Projectile and Sensitive cases above, plus request authority (stale and forged aims, duplicate requests, overlapping item use, dead and off-hand senders), checked by world effects.
+- `ImportedGlyphGameTests`: registration of all 777 glyphs, catalog coverage against the loaded Iron's registry, learning, dormancy, and one or more world-effect casts per adapter family (Heal, Slow, Chain Lightning, Lightning Bolt, Firebolt, Fireball, Ray of Siphoning, Teleport, Summon Vex). Also family level boundaries, the augment matrix, shared spells, native-cast-slot safety, exported-scroll nesting, training and the knowledge bonus.
+- `ImportedGlyphPaymentGameTests`: exact charges on each pool in all five mana modes with unequal conversion rates, atomic refusal on shortage, and a refund when a charge is cancelled.
+- `GlyphPressGameTests`: conversion, every refusal, prerequisites and upstream disables, two viewers and guarded requests, menu and hopper locks, persistence without replay, break and explosion drops, Source draw from jars, behaviour reloads, and 100 idle Presses doing no work.
+- Unit tests for glyph ids, the catalog, the behaviour layer and its client sync, and the knowledge bonus.
+
+## [3.3.7] - Unreleased
+
+### Fixed
+
+- `iss_primary`, the default mode: Iron's max mana now holds Ars's own maximum. A player reported their max mana falling from 740 on 3.3.4 to 350 on 3.3.5, and staying at 350 on 3.3.6; their loader and mode were not given. Among the published builds, only NeoForge 1.21.1 changes `iss_primary` capacity between 3.3.4 and 3.3.5: its 3.3.5 parity change sized the pool as Iron's own maximum plus the Ars gear bonus, so Ars's base pool, glyph bonus and book tier no longer counted. That build had counted them since 3.2.x. Every published Forge build from 3.3.4 to 3.3.6 gives the same capacity in every mode. Both builds now size the pool as the larger of two amounts: Ars's own maximum, and Iron's own maximum plus the Ars gear bonus. Each Ars amount is multiplied by `conversion_rate_ars_to_iron`. Ars gear sits inside both amounts, so the larger is taken rather than the sum, and gear is not counted twice. The result is never below what NeoForge 3.3.4 or 3.3.5 gave at the default rate.
+- **This changes capacity on this Forge build**, which had used only the gear bonus since before 3.0. An `iss_primary` player whose Ars maximum, multiplied by the rate, exceeds Iron's own maximum plus the Ars gear bonus now gets the Ars maximum, multiplied by the rate. For example, a player with 16 glyphs, a tier 3 book, a 250-mana Ars helmet and no Iron's gear goes from 350 to 740 at rate 1.0. At other rates the Ars maximum is converted like every other Ars amount, so it is 370 at 0.5 and 1480 at 2.0. With `respect_armor_bonuses` off, `iss_primary` still adds nothing. `read_curio_attribute_modifiers` and `respect_enchantments` keep what they cover out of the Ars maximum as well as the gear bonus. `hybrid`, `ars_primary`, `separate` and `disabled` are unchanged.
+- Existing worlds recover at the next reconciliation, within a second of login, with no config edit, re-equip or progression change. Mana already removed by the lower maximum is not refunded; it regenerates.
+- The `iss_primary` max-mana modifier is rewritten only when its value changes. Before, every reconciliation (once a second) re-sent Iron's maximum to the client.
+
+### Added
+
+- **A spell school for custom Ars spells.** The Spell Loom has a **School** button, separate from the cosmetic icon and background, that opens a **Spell school** picker.
+  - The default is **Automatic (from glyphs)**, which keeps the previous behaviour, multi-school scaling included.
+  - The picker also offers every installed Iron's school that has a spell-power attribute, addon schools included.
+  - A chosen school is stored on the spell entry (`school` in `arsnspells:cross_spells`). It is the only school used for spell-power scaling, affinity, progression and the Blasphemy matching-school mana and LP discounts; nothing accumulates from the glyph schools.
+  - Effects, damage types and cooldown categories still come from the glyphs.
+  - The old `nature` field stays a cosmetic background. Entries made before 3.3.7 have no school and stay Automatic.
+- The cast itself carries the school, in the Ars `SpellContext` tag `ars_n_spells:mechanical_school`. Delayed effects and projectiles in flight keep the school of the cast that launched it, not the caster's later casts or held item.
+  - It applies to direct scroll casts and Iron's spell-wheel casts.
+  - It survives export, copying, save and reload, inventory moves, and all three binding routes.
+- The Loom's **Apply** button changes the school of a finished carrier scroll in the target slot, in place. Nothing is rebuilt or consumed.
+- New commands: `/ans school list`, `/ans school show`, and, for ops, `/ans school set <school>|auto [entry]`. `/ans export_to_irons_scroll` takes an optional school.
+- `allow_spell_school_override` (server, default `true`). `false` allows only Automatic; spells that already carry a chosen school keep it stored but cast as Automatic.
+- Tooltips list the school of each Ars entry, for example `School: Ice (chosen)` or `School: Automatic (from glyphs: Holy)`, and say when a chosen school is not installed or not allowed. The guide's Spell Loom entry gains a page.
+- `SpellSchoolGameTests`, with 18 scenarios on real players, menus, rituals and entities. They cover:
+  - Loom inscription, refusal and Apply, through the real request handler, including replayed and stale requests;
+  - scroll and wheel casts that train only the chosen school;
+  - legacy entries, removed addon schools, and unchanged native casts;
+  - measured damage for a chosen school, and Automatic multi-school scaling;
+  - a delayed hit that keeps its school;
+  - Inscription Table, command and ritual binding;
+  - dedup, plus export, copy, save and commands;
+  - a server with overrides disabled.
+- Unit tests cover the choice rules, storage and legacy decoding, the explicit analysis and the packet.
+- `ManaCapacityGameTests`, with ten scenarios on real players driven through the player tick. They cover:
+  - the Ars floor at rates 0.5, 1.0 and 2.0, and the gear bonus when Iron's own pool is the larger;
+  - fractional gear with Iron's multiplicative modifiers, and stable repeated reconciliation;
+  - hotbar switching and removal of a held bonus;
+  - Curios with `read_curio_attribute_modifiers` on and off;
+  - relog, respawn, dimension change and a save/load restart;
+  - a world upgraded from 3.3.6;
+  - Iron's and Ars casts, and regeneration, above the old ceiling;
+  - the other four modes;
+  - the client attribute sync.
+- `SharedPoolCeilingIssPrimaryTest` covers the arithmetic.
+- Tested: Minecraft 1.20.1, Forge 47.4.10, Ars Nouveau 4.12.7, and Iron's Spellbooks 1.20.1-3.15.0 and 1.20.1-3.16.3.
+
+### Changed
+
+- Binding dedup compares what a spell does: the Ars payload without its cosmetic keys (name, colour, sound, particle timeline), plus the school.
+  - A cosmetic-only copy of a bound spell is now refused as a duplicate. Before, a renamed or recoloured copy bound again.
+  - The same glyphs with a different school bind as a separate wheel entry.
+- The Loom labels its background `Background: … (cosmetic)`, and the icon picker says backgrounds do not change the school. The Loom screen is 16 px taller to fit the School row.
+- The network protocol version is now 7 (was 6), because Loom requests carry the school. Client and server must both run this build.
+
 ## [3.3.6] - 2026-10-03
 
 ### Fixed

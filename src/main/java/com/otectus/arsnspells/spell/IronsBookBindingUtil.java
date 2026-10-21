@@ -149,30 +149,71 @@ public final class IronsBookBindingUtil {
     }
 
     /**
-     * True when {@code book} already carries an Ars entry whose {@code ars_spell}
-     * payload equals {@code arsTag}. Dedup keys off the serialized payload, not
-     * the shared placeholder id.
+     * Keys of the serialized Ars spell that only change how it looks or sounds: its name,
+     * particle colour (Ars 4.x writes {@code spellColor}, 5.x {@code color}), cast sound and
+     * particle timeline. Duplicate detection ignores them, so a copy that differs only in these
+     * is still the same spell.
+     */
+    private static final java.util.Set<String> COSMETIC_PAYLOAD_KEYS =
+        java.util.Set.of("name", "spellColor", "color", "sound", "particleTimeline");
+
+    /**
+     * The part of a serialized Ars spell that decides what it does: the payload without its
+     * cosmetic keys. Two payloads with equal mechanical forms cast the same glyphs.
+     */
+    public static CompoundTag mechanicalPayload(CompoundTag arsTag) {
+        CompoundTag copy = arsTag == null ? new CompoundTag() : arsTag.copy();
+        COSMETIC_PAYLOAD_KEYS.forEach(copy::remove);
+        return copy;
+    }
+
+    /**
+     * True when {@code book} already carries an Automatic Ars entry that casts the same spell as
+     * {@code arsTag}. Dedup keys off the serialized payload, not the shared placeholder id.
      */
     public static boolean containsEquivalentArsSpell(ItemStack book, CompoundTag arsTag) {
+        return containsEquivalentArsSpell(book, arsTag, null);
+    }
+
+    /**
+     * True when {@code book} already carries an entry with the same mechanical identity: the
+     * same spell payload, ignoring its cosmetic keys, and the same school selection.
+     *
+     * <p>The rules are deliberate. Names, backgrounds, icons, colours and sounds are cosmetic, so
+     * a copy differing only in those is a duplicate and is refused. The school selection is
+     * mechanical, so the same glyphs with a different selection (Automatic, or another school)
+     * are a different spell and may be bound alongside, each in its own wheel slot.
+     *
+     * @param school the stored selection of the spell being bound; null or empty is Automatic
+     */
+    public static boolean containsEquivalentArsSpell(ItemStack book, CompoundTag arsTag, String school) {
         if (book == null || !book.hasTag() || arsTag == null) {
             return false;
         }
-        return tagContainsEquivalentArsSpell(book.getTag(), arsTag);
+        return tagContainsEquivalentArsSpell(book.getTag(), arsTag, school);
     }
 
     /** CompoundTag-level companion to {@link #containsEquivalentArsSpell(ItemStack, CompoundTag)}. */
     public static boolean tagContainsEquivalentArsSpell(CompoundTag bookTag, CompoundTag arsTag) {
+        return tagContainsEquivalentArsSpell(bookTag, arsTag, null);
+    }
+
+    /** CompoundTag-level companion to {@link #containsEquivalentArsSpell(ItemStack, CompoundTag, String)}. */
+    public static boolean tagContainsEquivalentArsSpell(CompoundTag bookTag, CompoundTag arsTag, String school) {
         if (bookTag == null || arsTag == null) {
             return false;
         }
         if (!bookTag.contains(CrossCastNbt.TAG_CROSS_MOD_SPELLS, Tag.TAG_LIST)) {
             return false;
         }
+        CompoundTag wanted = mechanicalPayload(arsTag);
+        String selection = SpellSchoolChoice.normalize(school);
         ListTag list = bookTag.getList(CrossCastNbt.TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
             if (entry.contains(CrossCastNbt.TAG_ARS_SPELL, Tag.TAG_COMPOUND)
-                && arsTag.equals(entry.getCompound(CrossCastNbt.TAG_ARS_SPELL))) {
+                && wanted.equals(mechanicalPayload(entry.getCompound(CrossCastNbt.TAG_ARS_SPELL)))
+                && selection.equals(SpellSchoolChoice.normalize(CrossCastNbt.storedSchool(entry)))) {
                 return true;
             }
         }
@@ -210,16 +251,27 @@ public final class IronsBookBindingUtil {
     public static AppendResult appendArsSpellToBook(ItemStack book, CompoundTag arsTag,
                                                     String customName, String nature,
                                                     String iconSymbol, int maxCap) {
+        return appendArsSpellToBook(book, arsTag, customName, nature, iconSymbol, null, maxCap);
+    }
+
+    /**
+     * {@link #appendArsSpellToBook(ItemStack, CompoundTag, String, String, String, int)} that
+     * also carries the scroll's stored school onto the new entry, unchanged. Null or empty is
+     * Automatic. The value is copied, not judged: whether it applies is decided at each cast.
+     */
+    public static AppendResult appendArsSpellToBook(ItemStack book, CompoundTag arsTag,
+                                                    String customName, String nature,
+                                                    String iconSymbol, String school, int maxCap) {
         if (book == null || book.isEmpty()) return AppendResult.FAILED;
         ItemStack working = book.copy();
-        AppendResult result = appendToWorkingCopy(working, arsTag, customName, nature, iconSymbol, maxCap);
+        AppendResult result = appendToWorkingCopy(working, arsTag, customName, nature, iconSymbol, school, maxCap);
         if (result.wasAdded()) book.setTag(working.getTag() == null ? null : working.getTag().copy());
         return result;
     }
 
     private static AppendResult appendToWorkingCopy(ItemStack book, CompoundTag arsTag,
                                                     String customName, String nature,
-                                                    String iconSymbol, int maxCap) {
+                                                    String iconSymbol, String school, int maxCap) {
         if (book == null || book.isEmpty() || arsTag == null || arsTag.isEmpty()
             || CrossCastNbt.schemaVersion(book.getTag()) > CrossCastNbt.SCHEMA_VERSION) {
             return AppendResult.FAILED;
@@ -230,7 +282,8 @@ public final class IronsBookBindingUtil {
         if (IronsCompat.isLoaded() && isIronsSpellBook(book)) {
             com.otectus.arsnspells.spell.irons.CarrierReconciler.reconcile(book);
         }
-        if (containsEquivalentArsSpell(book, arsTag)) {
+        String storedSchool = SpellSchoolChoice.normalize(school);
+        if (containsEquivalentArsSpell(book, arsTag, storedSchool)) {
             return AppendResult.DUPLICATE;
         }
         CompoundTag bookTag = book.getOrCreateTag();
@@ -240,7 +293,7 @@ public final class IronsBookBindingUtil {
             return AppendResult.BOOK_FULL;
         }
         CrossCastNbt.addArsEntryWithMetaToTag(bookTag, ARS_PLACEHOLDER_ID, 1, arsTag.copy(),
-            poolId, customName, nature, iconSymbol);
+            poolId, customName, nature, iconSymbol, storedSchool);
         // Mirror into Iron's native container so the entry shows in the wheel.
         // Gated + referenced by FQN so IronsProxySlotWriter (which imports Iron's
         // API) only classloads when Iron's is present.

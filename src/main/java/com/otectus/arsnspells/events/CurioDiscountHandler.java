@@ -173,7 +173,9 @@ public class CurioDiscountHandler {
         if (spell == null) {
             return "generic";
         }
-        return SpellAnalysis.analyze(spell).dominantSchool();
+        // An explicit school stamped on the cast decides the matching Blasphemy, as it decides
+        // every other school-keyed bonus; the glyphs decide otherwise.
+        return SpellAnalysis.analyze(spell, event.context).dominantSchool();
     }
     
     /**

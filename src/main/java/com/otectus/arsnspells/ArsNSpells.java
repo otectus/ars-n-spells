@@ -67,6 +67,12 @@ public class ArsNSpells {
         // Iron's is present. Both must be registered before
         // ITEMS.register(modEventBus) so the DeferredRegister carries the
         // entries when the item RegisterEvent fires.
+        // 3.4.0: every catalogued imported Iron's glyph becomes an Ars part now, before Ars's item
+        // registry event, so Ars registers its glyph item under the same id. Unconditional: a
+        // glyph must stay registered (dormant) without Iron's, or a saved spell containing it
+        // would decode to Ars's unknown-part fallback. No Iron's class is touched here.
+        com.otectus.arsnspells.glyph.ImportedGlyphRegistrar.registerAll();
+
         ModItemsRegistry.registerCommonItems();
         if (ModList.get().isLoaded("irons_spellbooks")) {
             ModItemsRegistry.registerIronsDependentItems();
@@ -84,6 +90,7 @@ public class ArsNSpells {
         ModBlocksRegistry.register(modEventBus);
         ModBlockEntities.register(modEventBus);
         ModMenus.register(modEventBus);
+        com.otectus.arsnspells.registry.ModSounds.register(modEventBus);
 
         // 3.2.0: the mod's own creative tab. Not Iron's-gated — the Spell Loom and the
         // uninscribe tablet are registered unconditionally, so the tab always has content.
@@ -140,6 +147,8 @@ public class ArsNSpells {
             MinecraftForge.EVENT_BUS.register(new com.otectus.arsnspells.casting.IronsCastPayments());
             MinecraftForge.EVENT_BUS.register(new IronsLPHandler());
             MinecraftForge.EVENT_BUS.register(new com.otectus.arsnspells.compat.curios.IronsCurioDiscountHandler());
+            // 3.4.0: charged and channelled imported glyphs in Iron's native cast slot.
+            MinecraftForge.EVENT_BUS.register(new com.otectus.arsnspells.compat.irons.glyph.IronsGlyphChildHooks());
             // IronsAuraHandler deleted: Covenant of the Seven's own Iron's integration
             // deducts aura natively for Iron's spells. We were double-paying.
         }
@@ -154,6 +163,8 @@ public class ArsNSpells {
     @net.minecraftforge.eventbus.api.SubscribeEvent
     public void onAddReloadListeners(net.minecraftforge.event.AddReloadListenerEvent event) {
         event.addListener(new com.otectus.arsnspells.data.GlyphSchoolReloadListener());
+        // 3.4.0: the reloadable imported-glyph behaviour layer (availability, tiers, Press terms).
+        event.addListener(new com.otectus.arsnspells.data.ImportedGlyphReloadListener());
     }
 
     /**
@@ -163,6 +174,7 @@ public class ArsNSpells {
     @net.minecraftforge.eventbus.api.SubscribeEvent
     public void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
         com.otectus.arsnspells.util.SchoolMappings.reset();
+        com.otectus.arsnspells.data.ImportedGlyphReloadListener.reset();
     }
 
     private void registerCaps(RegisterCapabilitiesEvent event) {

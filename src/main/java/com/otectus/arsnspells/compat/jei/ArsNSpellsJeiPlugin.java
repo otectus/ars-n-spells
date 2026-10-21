@@ -10,8 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Optional, client-only JEI integration whose sole job is to keep ANS's internal
- * {@code ars_cross_*} proxy spells out of the recipe viewer.
+ * Optional, client-only JEI integration. It keeps ANS's internal {@code ars_cross_*} proxy
+ * spells out of the recipe viewer and, since 3.4.0, lists Glyph Press conversions.
  *
  * <p><b>Why a plugin is needed at all.</b> Most of the pollution is handled upstream and
  * without JEI: the proxies declare {@code allowCrafting = false} (so Iron's Scroll Forge and
@@ -42,6 +42,26 @@ public class ArsNSpellsJeiPlugin implements IModPlugin {
     @Override
     public ResourceLocation getPluginUid() {
         return UID;
+    }
+
+    /** 3.4.0: the Glyph Press category. Registered always; it simply has no recipes without Iron's. */
+    @Override
+    public void registerCategories(mezz.jei.api.registration.IRecipeCategoryRegistration registration) {
+        registration.addRecipeCategories(new com.otectus.arsnspells.client.jei.GlyphPressCategory(registration.getJeiHelpers().getGuiHelper()));
+    }
+
+    @Override
+    public void registerRecipes(mezz.jei.api.registration.IRecipeRegistration registration) {
+        try {
+            registration.addRecipes(com.otectus.arsnspells.client.jei.GlyphPressCategory.TYPE, GlyphPressJeiRecipe.build());
+        } catch (Throwable t) {
+            LOGGER.warn("Could not list Glyph Press conversions in JEI; the Press itself is unaffected.", t);
+        }
+    }
+
+    @Override
+    public void registerRecipeCatalysts(mezz.jei.api.registration.IRecipeCatalystRegistration registration) {
+        registration.addRecipeCatalyst(com.otectus.arsnspells.registry.ModBlocksRegistry.GLYPH_PRESS_ITEM.get(), com.otectus.arsnspells.client.jei.GlyphPressCategory.TYPE);
     }
 
     @Override

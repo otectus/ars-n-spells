@@ -1,0 +1,32 @@
+{
+  "category": "ars_nouveau:ars_n_spells",
+  "icon": "ars_n_spells:glyph_press",
+  "name": "ars_n_spells.book.glyph_press.name",
+  "sortnum": 5,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.glyph_press.1"
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "ars_n_spells:glyph_press",
+      "recipe2": "ars_n_spells:blank_glyph_plate"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.glyph_press.2"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.book.glyph_press.3"
+    },
+    {
+      "type": "patchouli:spotlight",
+      "item": "ars_n_spells:iron/irons_spellbooks/firebolt/level_1",
+      "title": "ars_n_spells.book.glyph_press.example.title",
+      "text": "ars_n_spells.book.glyph_press.example"
+    }
+  ],
+  "flag": "mod:irons_spellbooks"
+}

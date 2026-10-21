@@ -35,6 +35,10 @@ public class IronsAffinityHandler {
         if (CrossCastNbt.isArsCrossProxyId(event.getSpellId())) {
             return;
         }
+        // 3.4.0: an imported glyph's Iron's spell; its root Ars cast already credited training once.
+        if (com.otectus.arsnspells.compat.irons.glyph.IronTargetingScope.importedExecution(event.getEntity(), event.getSpellId())) {
+            return;
+        }
         if (!AnsConfig.ENABLE_AFFINITY_SYSTEM.get()) {
             return;
         }

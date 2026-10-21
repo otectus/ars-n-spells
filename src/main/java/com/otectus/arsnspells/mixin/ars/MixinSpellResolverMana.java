@@ -17,6 +17,10 @@ public abstract class MixinSpellResolverMana {
     private void arsnspells$expendMana(CallbackInfo ci) {
         if (spellContext != null && spellContext.getUnwrappedCaster() instanceof net.minecraft.server.level.ServerPlayer player) {
             com.otectus.arsnspells.events.CooldownHandler.commit(player, spellContext);
+            // 3.4.0: the root cast's school training is credited here, with the payment and the
+            // category cooldown, and no longer on the pre-form SpellCastEvent.
+            com.otectus.arsnspells.events.AffinityHandler.credit(player, spellContext.getSpell(), spellContext);
+            com.otectus.arsnspells.events.ProgressionHandler.credit(player, spellContext.getSpell(), spellContext);
             if (ArsCastPayments.commit(player, spellContext)) ci.cancel();
         }
     }

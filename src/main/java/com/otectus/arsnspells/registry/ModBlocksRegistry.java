@@ -33,6 +33,21 @@ public final class ModBlocksRegistry {
     public static final RegistryObject<Item> SPELL_LOOM_ITEM = BLOCK_ITEMS.register("spell_loom",
         () -> new BlockItem(SPELL_LOOM.get(), new Item.Properties()));
 
+    /**
+     * 3.4.0: the Glyph Press. Registered unconditionally, like the Loom: a placed press and its
+     * contents must survive Iron's being removed, and its recipe is what is gated on Iron's.
+     */
+    public static final RegistryObject<Block> GLYPH_PRESS = BLOCKS.register("glyph_press",
+        () -> new com.otectus.arsnspells.block.GlyphPressBlock(BlockBehaviour.Properties.of()
+            .mapColor(MapColor.DEEPSLATE)
+            .noOcclusion()
+            .requiresCorrectToolForDrops()
+            .strength(3.0f, 6.0f)
+            .sound(SoundType.DEEPSLATE_BRICKS)));
+
+    public static final RegistryObject<Item> GLYPH_PRESS_ITEM = BLOCK_ITEMS.register("glyph_press",
+        () -> new BlockItem(GLYPH_PRESS.get(), new Item.Properties()));
+
     private ModBlocksRegistry() {}
 
     public static void register(IEventBus modBus) {

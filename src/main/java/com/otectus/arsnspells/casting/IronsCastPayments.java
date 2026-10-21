@@ -43,8 +43,11 @@ public final class IronsCastPayments {
 
     private static Plan quote(Player player, AbstractSpell spell, int level, CastSource source, MagicData data) {
         var context = CrossCastContext.peek(player);
-        var carrier = context != null && context.type == CrossSpellType.IRONS_SPELLBOOKS
-            && spell.getSpellId().equals(context.spellId) ? CarrierPolicy.REUSABLE_BOOK_SEMANTICS : CarrierPolicy.NATIVE_ONLY;
+        boolean glyphChild = com.otectus.arsnspells.glyph.GlyphChildren.running(player.getUUID(), spell.getSpellResource()) != null;
+        // 3.4.0: a charged or channelled imported glyph is an Iron's spell cast for an Ars cast,
+        // priced like an Iron's spell cast from an ANS carrier: the cross-cast multiplier once.
+        var carrier = glyphChild || (context != null && context.type == CrossSpellType.IRONS_SPELLBOOKS
+            && spell.getSpellId().equals(context.spellId)) ? CarrierPolicy.REUSABLE_BOOK_SEMANTICS : CarrierPolicy.NATIVE_ONLY;
         var rules = QuoteService.currentRules();
         int cost = spell.getManaCost(level);
         double arsMax = BridgeManager.getNativeArsBridge().transactionMax(player);
@@ -105,6 +108,9 @@ public final class IronsCastPayments {
     public void onPreCast(SpellPreCastEvent event) {
         Player player = event.getEntity();
         if (player == null || player.level().isClientSide() || event.isCanceled()) return;
+        // 3.4.0: an instant imported glyph is priced and paced by the glyph runtime; it must not
+        // replace the native plan or lifecycle session of a cast that may be in this slot.
+        if (com.otectus.arsnspells.compat.irons.glyph.IronTargetingScope.instantDelegated(player)) return;
         AbstractSpell spell = SpellRegistry.getSpell(event.getSpellId());
         MagicData data = MagicData.getPlayerMagicData(player);
         Plan plan = quote(player, spell, event.getSpellLevel(), event.getCastSource(), data);

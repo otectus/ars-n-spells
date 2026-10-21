@@ -31,7 +31,7 @@ If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars b
 
 ¹ Covenant 2.2.6 has a bytecode-surface check; its complete dependency graph and graphical HUD have not been runtime-certified by this release review. Other admitted versions are unverified.
 ² No hard dependency — mana stats on curios are read generically through the Curios API (see [Gear perks and enchantments](#gear-perks-and-enchantments)).
-³ The pinned Forge runtime is Iron's `1.20.1-3.15.0` (CurseForge file 7402504). 3.3.5 also passed the loaded GameTest suite against `1.20.1-3.16.3` (file 8680180, with irons_lib `1.20.1-2.1.0`) using `-PwithIrons316RuntimeGameTests`. The rest of the admitted 3.x range is not a runtime verification claim; test another version with the loaded profile before deployment.
+³ The pinned Forge runtime is Iron's `1.20.1-3.15.0` (CurseForge file 7402504). 3.4.0 passed the loaded GameTest suite against both `1.20.1-3.15.0` and `1.20.1-3.16.3` (file 8680180, with irons_lib `1.20.1-2.1.0`, `-PwithIrons316RuntimeGameTests`); see [docs/3.4.0/testing.md](docs/3.4.0/testing.md). The imported-glyph catalog covers the spells of those two builds. The rest of the admitted 3.x range is not a runtime verification claim; test another version with the loaded profile before deployment.
 ⁴ Every published Ars Affinity file targets NeoForge 1.21.1. The NeoForge build of Ars 'n' Spells is tested with Ars Affinity 1.1.1; this Forge build makes no Ars Affinity claim.
 
 ## Features
@@ -68,7 +68,7 @@ Bonuses come from attribute modifiers, `IManaEquipment` implementations, mana-re
 
 Worn **curios** (rings, amulets, belts) have their attribute modifiers read the same way armor and weapons do, so mana stats applied by **Apotheosis / Apothic Curios** affixes and sockets — and by other curio mana gear like Magical Jewelry and Jewelcraft — feed the unified pool too. No hard dependency on Apotheosis is required; the read is generic and gated by the `read_curio_attribute_modifiers` config (default on). Apothic Attributes' combat stats (crit, armor pierce, fire/cold damage) are not mana or spell-power and are not bridged.
 
-In `iss_primary`, the Ars gear bonus (the max-mana and regen contribution of worn equipment and, with `read_curio_attribute_modifiers` on, curios), times `conversion_rate_ars_to_iron`, is added to Iron's `MAX_MANA` and `MANA_REGEN`. In `hybrid` and `ars_primary`, Iron's `MAX_MANA` is instead raised to cover Ars's real maximum (the shared-pool ceiling), because Iron's clamps every mana write to that attribute; `hybrid` also mirrors the Ars gear regen. With `respect_armor_bonuses` off the gear bonuses are dropped but the `hybrid` ceiling stays. The enchantment and curio toggles decide what is transferred, never Ars's own maximum. Both loaders apply exactly these rules.
+In `iss_primary`, Iron's pool is the only pool, so Iron's `MAX_MANA` is sized to hold what either mod grants: the larger of Ars's own maximum (base pool, glyph bonus, book tier, perks and gear) and Iron's own maximum plus the Ars gear bonus (the max-mana contribution of worn equipment and, with `read_curio_attribute_modifiers` on, curios), each Ars amount times `conversion_rate_ars_to_iron`. The larger, not the sum, so Ars gear is never counted twice. The Ars gear regen, times the same rate, is added to Iron's `MANA_REGEN`. In `hybrid` and `ars_primary`, Iron's `MAX_MANA` is instead raised to cover Ars's real maximum (the shared-pool ceiling), because Iron's clamps every mana write to that attribute; `hybrid` also mirrors the Ars gear regen. With `respect_armor_bonuses` off the `iss_primary` additions and the gear bonuses are dropped, but the `hybrid` ceiling stays. The enchantment and curio toggles decide what is transferred: in `iss_primary` they keep what they cover out of the Ars maximum as well as the gear bonus, and they never lower the shared-pool ceiling of the other modes. Both loaders apply exactly these rules.
 
 ### Mana potions
 
@@ -147,7 +147,7 @@ Build it with Ars Nouveau's normal tools (Scribe's Table / spellbook).
 As of 3.3.3, `ars_n_spells:blank_scroll` is a shapeless recipe of an Ars Nouveau blank parchment and a source gem ([recipe](src/main/resources/data/ars_n_spells/recipes/blank_scroll.json)); it exists because stock Iron's ships no recipe for a bare `irons_spellbooks:scroll`. It can also drop from chest loot when Iron's is installed — stronghold libraries, ancient city and woodland mansion chests, common dungeon/mineshaft/stronghold chests, and a range of Iron's own structure chests, at rates set in `data/ars_n_spells/loot_modifiers/`. A blank Iron's scroll works too, if you already have one.
 
 **3. Weave the spell onto the scroll at the Spell Loom.**
-Craft a **Spell Loom** (`G` gold / `L` lapis / `B` book / `O` obsidian on a crafting table). Right-click it, drop the Ars source (spell parchment, focus, or Ars spellbook) into the source slot and the Blank Scroll (or blank Iron's scroll) into the scroll slot, type a **name**, pick a **nature**, choose a rudimentary **icon**, and press **Inscribe** — the inscribed carrier scroll appears in the output slot. (The op-only `/ans export_to_irons_scroll` still works for a quick, metadata-free export.)
+Craft a **Spell Loom** (`G` gold / `L` lapis / `B` book / `O` obsidian on a crafting table). Right-click it, drop the Ars source (spell parchment, focus, or Ars spellbook) into the source slot and the Blank Scroll (or blank Iron's scroll) into the scroll slot, type a **name**, and set the spell's **school** with the **School** button — leave it on **Automatic** to let the glyphs decide, as before, or pick one school (see [Choosing a spell school](#choosing-a-spell-school-337)). **Choose icon…** picks the rudimentary **icon** and **background** frame shown in Iron's wheel; both are purely cosmetic and never change the school. Press **Inscribe** — the inscribed carrier scroll appears in the output slot. (The op-only `/ans export_to_irons_scroll [school]` still works for a quick export with no name, background or icon; its optional `school` argument sets the school.)
 
 **4. Take the scroll to an Iron's Inscription Table, or bind it another way.**
 As of 3.3.3, dropping the carrier scroll into an Iron's Inscription Table and pressing Inscribe binds the Ars spell directly into the spellbook in the table — no ritual needed. This is now one of three equivalent bind routes:
@@ -160,12 +160,58 @@ All three go through the same checks and the same append logic, so the result �
 
 **Spellbook Binding ritual, in detail.** Its tablet is crafted on the Enchanting Apparatus for 2500 source and only registers when Iron's is loaded; recipe at [data/ars_n_spells/recipes/apparatus/spellbook_binding.json](src/main/resources/data/ars_n_spells/recipes/apparatus/spellbook_binding.json). The ritual reads **dropped item entities, not inventories**. Place the tablet on a Ritual Brazier, throw (`Q`) the carrier scroll and the spellbook on the ground within **three blocks** of the brazier, then light it by right-clicking the brazier with an **empty main hand** — right-clicking while holding something tries to feed that item to the brazier instead of starting the ritual. It burns for about three seconds. Anything else lying inside that three-block radius aborts the run with `unexpected item(s) in range` rather than risk binding the wrong stack, mirroring the uninscribe ritual's philosophy.
 
-Whichever route you use, on success one scroll is consumed and the Ars entry is appended to the book — including any name/nature/icon chosen at the Spell Loom. Binding deduplicates by the serialized spell payload, so re-binding the same spell is rejected. Set `allow_ars_spells_in_irons_spellbooks=false` to disable binding — all three routes refuse — or `max_ars_cross_spells_per_irons_spellbook` to cap how many Ars spells a book may hold (`-1` = no cap, bounded by the native-wheel pool size of 8).
+Whichever route you use, on success one scroll is consumed and the Ars entry is appended to the book — including the name, background, icon and school chosen at the Spell Loom. Binding deduplicates by what the spell does: a spell the book already holds with the same glyphs **and the same school** is refused as a duplicate, even when its name, colour, sound, background or icon differ, while the same glyphs with a different school (or Automatic next to a chosen school) bind as a separate entry with its own wheel slot. Set `allow_ars_spells_in_irons_spellbooks=false` to disable binding — all three routes refuse — or `max_ars_cross_spells_per_irons_spellbook` to cap how many Ars spells a book may hold (`-1` = no cap, bounded by the native-wheel pool size of 8).
 
 > **This is not Ars Nouveau's "Binding" ritual.** Ars ships `ars_nouveau:ritual_binding`, whose display name is exactly **Binding**; it converts nearby mobs into Bound Scripts for familiars and ignores dropped scrolls entirely. The tablet you want is **Spellbook Binding** (`ars_n_spells:spellbook_binding`, shown as *Ritual of Spellbook Binding* on the brazier). Lighting the wrong one looks identical to the feature being broken, because neither ritual says anything about the other.
 
 **5. Cast from the spellbook — through Iron's native spell wheel.**
 Each bound Ars spell appears as its **own entry in Iron's native spell-selection wheel**, with the name and icon you chose. Select it like any Iron's spell and right-click the spellbook to cast — it runs the real Ars spell through Ars 'n' Spells' server-authoritative cross-cast pipeline (mana, the `cross_cast_cost_multiplier`, scaling, cooldown). Your book's native Iron's spells are untouched and cast exactly as before. Under the hood, each entry occupies one of a small pool of registered proxy spells (`ars_cross_1..8`); the real Ars data lives in the book's `arsnspells:cross_spells` sidecar, since Iron's own per-slot data has no room for it. Up to **8** Ars spells per book show in the wheel. Selecting a bound Ars entry in the Inscription Table's own spell list does not offer it in the extraction slot; use the Spell Uninscription ritual to remove one. (Generic inscribed items that aren't Iron's spellbooks still cast via right-click / sneak-cycle as before.)
+
+### Choosing a spell school (3.3.7)
+
+A custom spell's **school** is the school Ars 'n' Spells uses for that spell's mechanics. It is separate from the **background** frame picked under **Choose icon…**: the background (stored as the entry's `nature`) has always been cosmetic, and still is.
+
+- **Automatic (from glyphs)** — the default, and what every scroll made before 3.3.7 uses. The glyphs decide the school or schools exactly as described in [Spell schools](#spell-schools), and a spell with several glyph schools keeps its `multi_school_power_policy` scaling.
+- **A chosen school** — exactly one school replaces the glyph schools for spell-power scaling (that school's Iron's spell-power attribute), affinity, progression, and the Blasphemy matching-school mana and LP discounts. The glyph schools add nothing on top. The glyphs themselves never change: same effects, same damage types, same cooldown category.
+
+The picker offers every installed Iron's school that has a spell-power attribute — the nine built-in schools plus any addon schools, which the server checks against Iron's school registry. Native Ars Nouveau casts and ordinary Iron's scrolls are unaffected.
+
+**Inscribe a scroll with a chosen school**
+
+1. Open the Spell Loom. Put the Ars source in the source slot and a Blank Scroll (or blank Iron's scroll) in the target slot.
+2. Press the **School** button. While it is Automatic it reads `School: Auto (…)`, listing the glyph schools Automatic would use.
+3. In the **Spell school** picker, choose a school (**Next**/**Back** page through them) or **Automatic (from glyphs)**, then press **Done**. The button now reads, for example, `School: Ice`; hover it, or open **Details**, to preview what the choice does.
+4. Type a name, optionally use **Choose icon…**, and press **Inscribe**. The scroll's tooltip reads `School: Ice (chosen)`.
+
+**Change the school of a finished scroll** without rebuilding its spell:
+
+1. Put the carrier scroll in the Loom's target slot. The source slot can stay empty.
+2. Use the **School** button to pick the new school, or Automatic.
+3. Press **Apply**. Only the school changes: the spell, name, background and icon stay, nothing is consumed, and the scroll stays in the target slot.
+
+Operators can do the same to a held item with `/ans school set <school>` or `/ans school set auto`, adding an entry number for a spellbook that holds several Ars spells. `/ans school list` lists the schools the server accepts, and `/ans school show` lists each Ars entry on the held item with its school.
+
+**Where the school goes.** The choice is stored on the spell entry (`school` in the `arsnspells:cross_spells` sidecar), so it survives saving and reloading, copying, inventory moves and every binding route (Inscription Table, Spellbook Binding ritual, `/ans bind_scroll_to_irons_book`). It applies to casts from the scroll itself and from Iron's spell wheel. A delayed effect or a projectile still in flight keeps the school of the cast that launched it, whatever its caster casts or holds afterwards.
+
+**Server rules.** The server checks every request. A school that is unknown, malformed or not installed is refused, and the refused operation moves and consumes nothing. Setting `allow_spell_school_override = false` limits the Loom and the commands to Automatic; scrolls that already carry a chosen school keep it stored but cast as Automatic until the setting is turned back on. If the addon that supplied a chosen school is removed, the spell casts as Automatic and its tooltip says so; the choice returns if the addon does.
+
+---
+
+## Iron's glyphs and the Glyph Press (3.4.0)
+
+With Iron's Spells 'n Spellbooks installed, every Iron's player spell can become a real **Ars Nouveau glyph**, one per spell level (*Firebolt I* to *Firebolt X*). Glyphs are knowledge: use the glyph item to learn it the normal Ars way, then add it to spells in your spell book beside any other glyph. 111 spells (777 glyphs) are covered in both tested Iron's builds; see [the coverage table](docs/3.4.0/iron-glyph-coverage.md).
+
+**The Glyph Press** makes them. Craft it (gold ingot, Source gem, gold ingot / archwood planks, lectern, archwood planks / three obsidian; requires Iron's) and blank glyph plates (smooth stone + gold nugget + amethyst shard, makes two). Put a filled Iron's scroll in the cradle slot, a plate below it and Source gems beside the plate, keep Source jars within a few blocks, and press **Inscribe Glyph**. Nothing is consumed until the glyph is finished, and **Cancel** returns everything. The glyph's Ars tier follows Iron's rarity for that level and sets the price: tier I takes 1 gem and 500 Source (5 s), tier II 2 and 1,500 (7 s), tier III 4 and 3,000 (10 s); servers can change these. Spells Iron's makes you learn must be learned there first. Hoppers can supply scrolls from above and plates and gems from the sides, and take glyphs from below; only a player can start a job. Full guide: [docs/3.4.0/glyph-press.md](docs/3.4.0/glyph-press.md), and the worn notebook's *Ars 'n' Spells* chapter.
+
+**Casting.** An Iron's glyph casts its Iron's spell inside your Ars spell, at the glyph's level:
+
+- The **form** decides the target. Self casts on you; Touch on the block or creature you touch; Projectile where it lands; Underfoot below you. Spells that only affect their caster (Heal, buffs) work only with Self, and the spell book says so.
+- **Amplify** and **Dampen** raise or lower the cast level within the spell's range.
+- **Mana:** the Iron's spell's own cost joins the Ars spell's cost under your server's mana mode, with the cross-cast multiplier applied once, and is paid once. A cast that cannot pay is refused before anything happens.
+- Iron's **cooldowns** apply per spell and are shared by all its levels. Charged and channelled spells charge or channel in Iron's own cast slot, and the rest of the Ars spell waits for them.
+- Turret, rune and other non-player casters do not run imported glyphs.
+
+If Iron's is removed or the server disables a spell, its glyphs stay in your books and inventory as **dormant** glyphs that do nothing and say why; they work again when restored. Both client and server need Ars 'n' Spells 3.4.0.
 
 ---
 
@@ -230,8 +276,16 @@ Root command: `/ans`. Mutating subcommands require permission level 2; read-only
 | `/ans debug` | Op 2 | Toggle debug logging at runtime |
 | `/ans debug combat` | Op 2 | Cross-mod combat diagnostics: settings, spell-damage attributes and the last scaled hit in each direction |
 | `/ans aura` | -- | Show your own current Covenant aura |
-| `/ans export_to_irons_scroll` | Op 2 | Export the held Ars spell onto a real Iron's scroll (requires Iron's; the Spell Loom is the survival path) |
+| `/ans export_to_irons_scroll [school]` | Op 2 | Export the held Ars spell onto a real Iron's scroll (requires Iron's; the Spell Loom is the survival path). The optional school is checked like a Loom choice; omit it for Automatic |
+| `/ans school list` | -- | List the spell schools this server accepts for custom spells |
+| `/ans school show` | -- | Show the school of each Ars spell on the held item |
+| `/ans school set <school>\|auto [entry]` | Op 2 | Change the school of an Ars spell on the held item without rebuilding it; the entry number is needed when the item holds several |
 | `/ans bind_scroll_to_irons_book` | Op 2 | Bind a held exported scroll into a held Iron's spellbook (requires Iron's) |
+| `/ans glyph inspect` | -- | Describe the held imported glyph, the imported glyphs in the held spell, or what the Glyph Press would make of the held scroll |
+| `/ans glyph catalog` | Op 2 | Imported-glyph catalog identity, behaviour generation and availability counts |
+| `/ans glyph coverage [spell]` | Op 2 | Coverage per adapter family, or one spell level by level (tier, Press terms, status) |
+| `/ans glyph mappings` | Op 2 | The winning datapack file and pack for each imported-glyph override, and the errors of the last rejected reload |
+| `/ans glyph press <pos>` | Op 2 | One Glyph Press's state, job and Source |
 
 ---
 
@@ -375,7 +429,24 @@ The aura pool (max, regen, persistence, HUD) belongs to Covenant of the Seven; t
 | `cross_cast_cost_multiplier` | `1.25` | 0.5–5 | Overhead multiplier on spells cast from inscribed items, applied once per cast in every mode. |
 | `allow_ars_spells_in_irons_spellbooks` | `true` | -- | Allow binding exported Ars spells into Iron's spellbooks. |
 | `max_ars_cross_spells_per_irons_spellbook` | `-1` | -1–64 | Cap on Ars spells per Iron's spellbook (`-1` = no cap; hard-bounded by the proxy pool size of 8). |
+| `allow_spell_school_override` | `true` | -- | Allow a chosen school on custom Ars spells (Spell Loom **School** button, `/ans school set`, `/ans export_to_irons_scroll <school>`). `false` limits all three to Automatic; spells that already carry a chosen school keep it stored but cast as Automatic. See [Choosing a spell school](#choosing-a-spell-school-337). |
 | `inscribed_ars_default_cooldown_ticks` | `40` (new configs), `0` (migrated from ≤3.3.4) | 0–12000 | Iron's cooldown, in ticks, started on an Iron's-wheel slot after its bound Ars spell casts successfully. `0` = none. Applies from the next cast after a config reload, and Iron's cooldown reduction applies. It is the only source of these slots' cooldown: Iron's per-spell config files are not read for the `ars_cross_N` proxies. Also on the in-game settings screen. |
+
+### Imported Iron's glyphs and the Glyph Press (3.4.0)
+
+| Option | Default | Range | Description |
+| --- | --- | --- | --- |
+| `enable_iron_glyphs` | `true` | -- | Imported glyphs can be learned, cast and pressed. `false` makes them dormant; nothing is lost and turning it back on restores them. |
+| `enable_glyph_press` | `true` | -- | The Press may start new jobs. `false` cancels running jobs with inputs and Source kept. |
+| `iron_glyph_mana_bonus_policy` | `per_spell` | `per_spell`, `native_per_variant` | How learned imported glyphs count toward Ars's per-glyph mana bonus: all levels of one spell count once, or every level counts. |
+| `max_imported_effects_per_spell` | `4` | 1–8 | Imported glyphs one Ars spell may contain. |
+| `max_foreign_emissions_per_cast` | `16` | 1–64 | Iron's executions one Ars cast may produce, counting split and repeated deliveries; each is priced and paid. |
+| `max_active_glyph_sessions_per_player` | `8` | 1–32 | Casts with imported glyphs still in flight per player. |
+| `glyph_press_source_capacity` | `4000` | 1000–100000 | A Press's Source buffer. |
+| `glyph_press_source_scan_interval_ticks` | `20` | 5–200 | Ticks between a working Press's requests to nearby jars; an idle Press never asks. |
+| `glyph_press_source_radius` | `4` | 1–8 | How far a working Press looks for Source jars (loaded positions only). |
+
+All apply without a restart. Per-spell behaviour (availability, tiers, Press costs, allow/deny lists) is datapack data, below. Reference: [docs/3.4.0/config-reference.md](docs/3.4.0/config-reference.md).
 
 ### Rituals
 
@@ -404,6 +475,11 @@ All cross-mod item/block detection is tag-driven and datapack-extensible. Shippe
 | `ars_n_spells:source_jars` | block | Ars `source_jar`, `creative_source_jar` | Which blocks count for Source Jar regen synergy. |
 | `ars_n_spells:curio_spell_discount` | item | `#irons_spellbooks:school_focus` | Worn curios that grant the per-curio mana discount (`virtue_ring_discount`, capped by `max_total_curio_discount`). |
 | `ars_n_spells:cross_cast_blacklist` | item | Ars Zero's temporal context form and anchor/select/sustain/discard effects | Glyphs that only work in their own caster: refused by the Spell Loom, `/ans export_to_irons_scroll`, Spell Transcription and every cross-cast. |
+| `ars_n_spells:glyph_press_catalysts` | item | Ars `source_gem` | What the Glyph Press accepts as catalyst (the default tier terms name this tag). |
+
+### Imported glyph behaviour (`ans_iron_glyphs`, 3.4.0)
+
+`data/<namespace>/ans_iron_glyphs/**.json` controls, per spell and level, whether an imported glyph is available, its Ars tier and what the Glyph Press charges; `ars_n_spells:press_tiers` files set the per-tier Source, catalyst and time, and `ars_n_spells:policy` files hold spell and school allow and deny lists. Iron's own disables always win and an explicit deny beats any allow. A reload is validated as a whole: an invalid one is rejected and the previous behaviour kept, and running Press jobs whose price or availability changed are cancelled cleanly. Datapacks cannot create glyphs or change a spell's adapter; those belong to the startup catalog. Rules and examples: [docs/3.4.0/config-reference.md](docs/3.4.0/config-reference.md) and [docs/3.4.0/adapter-authoring.md](docs/3.4.0/adapter-authoring.md).
 
 ### Spell schools
 
@@ -433,7 +509,11 @@ Override any of it from a datapack — no Java, no mod update — with `data/<yo
 
 `glyphs` keys are full glyph registry ids and override one glyph. `ars_schools` keys are Ars school ids and re-aim an entire school at once. Files are merged over the shipped defaults, reload with `/reload`, and a bad entry is skipped with a warning in the log rather than failing the datapack.
 
+A custom spell inscribed at the Spell Loom with a **chosen school** uses that one school for scaling, affinity, progression and the Blasphemy school discounts instead of this classification; its glyphs still classify as above for everything else. See [Choosing a spell school](#choosing-a-spell-school-337).
+
 ### Recipe viewers
+
+JEI shows a **Glyph Press** category: every available conversion with the real filled scroll as input and the exact level's glyph as output, at the price the Press would charge (it follows the server's datapacks and is empty without Iron's).
 
 The internal `ars_cross_1..8` proxy spells that make bound Ars spells appear in Iron's wheel are hidden from JEI, EMI and the creative menu. They remain registered and castable — disabling them would break every already-bound spellbook — they simply do not appear as items or recipes. No configuration needed, and JEI is never required.
 
@@ -454,6 +534,7 @@ While a Cursed or Virtue Ring is equipped, both mana bars are hidden (`hide_mana
 
 Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 
+- **3.4.0 — Touch casting repaired; Iron's spells become Ars glyphs.** Touch spells cast from exported scrolls, inscribed items and bound Iron's books now hit the block or creature you aim at exactly as a spell book does, report success correctly, and a miss no longer trains the school or starts a wheel cooldown. The new Glyph Press turns a filled Iron's scroll into a learnable Ars glyph for that spell at that level, which then casts its Iron's spell inside your Ars spells with Iron's own targeting, mana cost, cooldown and charge or channel. Client and server both need 3.4.0. See [CHANGELOG.md](CHANGELOG.md) and [docs/3.4.0](docs/3.4.0/).
 - **3.3.5 — Channels end cleanly, `ars_primary` keeps its mana, and inscribed Ars spells get a cooldown.** Channelled Iron's spells such as BielGG's Crystal Barrage no longer stop with a payment error when mana runs low. Each paid pulse is checked at its final price, and the channel finishes the way Iron's itself would, with cooldown and scroll use. In `ars_primary`, Iron's regeneration can no longer lower the Ars pool to Iron's rounded-down `max_mana`, the most likely cause of mana dipping while scrolling (the report itself was not reproduced). Shortages now say what was needed and what you had. New setting: `inscribed_ars_default_cooldown_ticks`. See [CHANGELOG.md](CHANGELOG.md) and [docs/3.3.5](docs/3.3.5/).
 
 - **3.2.1 — A mixin conflict that stopped an entire modpack from loading; scrolls have been free this whole time.** Installing ANS alongside One Mana Bar made the game fail to start and took twelve mods down with it, Iron's Spellbooks included. The cause was ours: we adjusted Iron's mana check with a `@Redirect` aimed at one instruction inside `AbstractSpell.canBeCastedBy`, and One Mana Bar replaces that whole method, which Mixin treats as fatal rather than skippable — `require = 0` does not help, because the check runs before the requirement count is consulted. The adjustment now uses only `HEAD` and `RETURN` injection points, which Mixin permits into a replaced method by design. Separately, mixins targeting the *optional* Iron's and Covenant integrations moved to a non-required config, so a future conflict skips one mixin instead of aborting startup for every mod in the chain. And `MixinScrollItem` never applied in **any** released build — it targeted `use`, which is renamed to `m_7203_` in a shipped jar — so Iron's scrolls have been casting with no mana, no LP and no aura cost since the feature shipped. That is fixed, which means scrolls now cost what `scroll_cost_mode` says; set it to `free` if you prefer the old behaviour. See [CHANGELOG.md](CHANGELOG.md).
@@ -503,9 +584,9 @@ Output jar: `build/libs/ars_n_spells-<mod_version>.jar`, where `<mod_version>` c
 
 ### Test profiles
 
-**Tested versions (this release):** Ars Nouveau 4.12.7, Iron's Spellbooks 1.20.1-3.15.0 and 1.20.1-3.16.3, Ars Elemental 0.6.8.0, Ars Zero 2.0.2 (Forge). See [docs/3.3.5/testing.md](docs/3.3.5/testing.md) for the 3.3.5 commands and results.
+**Tested versions (this release):** Ars Nouveau 4.12.7, Iron's Spellbooks 1.20.1-3.15.0 and 1.20.1-3.16.3, Ars Elemental 0.6.8.0, Ars Zero 2.0.2, Too Many Glyphs 2.3.2 (Forge). See [docs/3.4.0/testing.md](docs/3.4.0/testing.md) for the 3.4.0 commands and results (267 GameTests in every profile).
 
-`./gradlew test` runs the JUnit suite (272 tests). GameTests run on a real server via `runGameTestServer`, with opt-in profiles:
+`./gradlew test` runs the JUnit suite (966 tests). GameTests run on a real server via `runGameTestServer`, with opt-in profiles:
 
 | Command | Covers |
 | --- | --- |
@@ -518,7 +599,9 @@ Output jar: `build/libs/ars_n_spells-<mod_version>.jar`, where `<mod_version>` c
 
 *(Covenant of the Seven has no dedicated runtime profile; surface compatibility is verified by `CovenantJarSurfaceTest`, which reads the jar bytecode and skips when absent.)*
 
-**What is not tested this cycle:** No graphical client session, no real multiplayer session, no full Covenant dependency stack, no JEI/EMI client matrix, no performance load test, no cross-Minecraft-version world conversion.
+The `runClient` task with `-PwithWorldUiSmoke -PwithIrons316RuntimeGameTests -PgametestRunDir=<dir>` drives a scripted single-player client through the Spell Loom, Iron's wheel and the Glyph Press against a copied disposable save named `ANS Icon QA`, saving screenshots to `<dir>/world-ui-review/`.
+
+**What is not tested this cycle:** No manual survival playthrough, no real multiplayer or dedicated-server session with a remote client, no full Covenant dependency stack, no JEI/EMI client matrix, no cross-Minecraft-version world conversion. The only load measurement is the idle-Press check in `GlyphPressGameTests`.
 
 Gradle reports `BUILD SUCCESSFUL` even when a GameTest world fails to load, so assert on the log line instead: `All N required tests passed`. The profiles share the `run/` directory, and an Iron's-loaded run leaves an `irons_spellbooks:pocket_dimension` reference in `run/world` that a later Iron's-absent run cannot load — delete `run/world` between profile switches.
 

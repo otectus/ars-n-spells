@@ -1,0 +1,21 @@
+{
+  "conditions": [
+    { "type": "forge:mod_loaded", "modid": "irons_spellbooks" }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "GSG",
+    "PLP",
+    "OOO"
+  ],
+  "key": {
+    "G": { "item": "minecraft:gold_ingot" },
+    "S": { "item": "ars_nouveau:source_gem" },
+    "P": { "item": "ars_nouveau:archwood_planks" },
+    "L": { "item": "minecraft:lectern" },
+    "O": { "item": "minecraft:obsidian" }
+  },
+  "result": {
+    "item": "ars_n_spells:glyph_press"
+  }
+}

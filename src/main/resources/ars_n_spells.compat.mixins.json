@@ -11,6 +11,8 @@
     "irons.MixinIronsCastValidation",
     "irons.MixinIronsCastPayment",
     "irons.MixinIronsCastTicker",
+    "irons.MixinIronsAimHelpers",
+    "irons.MixinIronsRaycastBuilder",
     "irons.MixinIronsManaRegen",
     "irons.MixinIronsSpellDamage",
     "irons.MixinIronsMagicDataMana",

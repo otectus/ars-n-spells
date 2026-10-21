@@ -183,6 +183,12 @@ public final class SchoolResolver {
         if (mapped != null) {
             return toSchoolSet(mapped);
         }
+        // 3.4.0: an imported Iron's glyph belongs to its Iron's spell's school.
+        String imported = importedGlyphSchool(registryId);
+        if (imported != null) {
+            SpellSchoolId school = SchoolKeys.builtin(imported);
+            return school.isGeneric() ? Collections.emptySet() : toSchoolSet(List.of(school));
+        }
 
         Set<SpellSchoolId> fromMetadata = fromArsSchools(arsSchoolIds);
         if (!fromMetadata.isEmpty()) {
@@ -213,6 +219,8 @@ public final class SchoolResolver {
         SchoolMappings snapshot = SchoolMappings.get();
         List<String> mapped = snapshot.glyphSchoolKeys(registryId);
         if (mapped != null) return mapped;
+        String imported = importedGlyphSchool(registryId);
+        if (imported != null) return List.of(SchoolKeys.normalize(imported));
         java.util.LinkedHashSet<String> result = new java.util.LinkedHashSet<>();
         if (declared != null) for (String raw : declared) {
             if (raw == null) continue;
@@ -225,6 +233,17 @@ public final class SchoolResolver {
             }
         }
         return result.isEmpty() ? List.of(SchoolKeys.normalize(heuristic(path).id())) : List.copyOf(result);
+    }
+
+    /** The Iron's school of an imported glyph id, from the startup catalog; null for any other id. */
+    @Nullable
+    private static String importedGlyphSchool(String registryId) {
+        if (!registryId.startsWith(com.otectus.arsnspells.glyph.ImportedGlyphKey.NAMESPACE + ":"
+                + com.otectus.arsnspells.glyph.ImportedGlyphKey.PREFIX)) return null;
+        net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(registryId);
+        if (id == null) return null;
+        return com.otectus.arsnspells.glyph.ImportedGlyphCatalog.get().byGlyphId(id)
+            .map(definition -> definition.school().toString()).orElse(null);
     }
 
     /** Full registry id of a glyph, or null when it has none. */

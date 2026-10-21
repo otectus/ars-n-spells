@@ -23,67 +23,101 @@ Machine-generated map of this mod. Read this first when picking the project up.
 ```
 com.otectus.arsnspells                               1 file
 com.otectus.arsnspells.affinity                      3 files
-com.otectus.arsnspells.augmentation                  1 file
-com.otectus.arsnspells.block                         2 files
-com.otectus.arsnspells.bridge                        6 files
-com.otectus.arsnspells.casting                       1 file
-com.otectus.arsnspells.client                        6 files
-com.otectus.arsnspells.client.screen                 2 files
-com.otectus.arsnspells.commands                      1 file
-com.otectus.arsnspells.compat                        3 files
-com.otectus.arsnspells.compat.jei                    2 files
-com.otectus.arsnspells.config                        2 files
+com.otectus.arsnspells.augmentation                  2 files
+com.otectus.arsnspells.block                         4 files
+com.otectus.arsnspells.bridge                        16 files
+com.otectus.arsnspells.casting                       12 files
+com.otectus.arsnspells.client                        13 files
+com.otectus.arsnspells.client.icons                  4 files
+com.otectus.arsnspells.client.jei                    1 file
+com.otectus.arsnspells.client.model                  1 file
+com.otectus.arsnspells.client.screen                 12 files
+com.otectus.arsnspells.combat                        4 files
+com.otectus.arsnspells.commands                      5 files
+com.otectus.arsnspells.compat                        9 files
+com.otectus.arsnspells.compat.curios                 2 files
+com.otectus.arsnspells.compat.irons.glyph            7 files
+com.otectus.arsnspells.compat.irons_spells           1 file
+com.otectus.arsnspells.compat.jei                    3 files
+com.otectus.arsnspells.config                        4 files
+com.otectus.arsnspells.contract                      28 files
 com.otectus.arsnspells.cooldown                      4 files
-com.otectus.arsnspells.data                          6 files
-com.otectus.arsnspells.equipment                     1 file
-com.otectus.arsnspells.events                        19 files
-com.otectus.arsnspells.gametest                      9 files
-com.otectus.arsnspells.menu                          1 file
+com.otectus.arsnspells.data                          8 files
+com.otectus.arsnspells.equipment                     3 files
+com.otectus.arsnspells.events                        21 files
+com.otectus.arsnspells.gametest                      44 files
+com.otectus.arsnspells.glyph                         22 files
+com.otectus.arsnspells.glyph.recipe                  3 files
+com.otectus.arsnspells.icons                         1 file
+com.otectus.arsnspells.inscription                   4 files
+com.otectus.arsnspells.loot                          1 file
+com.otectus.arsnspells.menu                          2 files
 com.otectus.arsnspells.mixin                         1 file
-com.otectus.arsnspells.mixin.ars                     4 files
+com.otectus.arsnspells.mixin.ars                     8 files
 com.otectus.arsnspells.mixin.covenant                1 file
-com.otectus.arsnspells.mixin.irons                   8 files
-com.otectus.arsnspells.mixin.sanctified              1 file
-com.otectus.arsnspells.network                       6 files
+com.otectus.arsnspells.mixin.gametest                1 file
+com.otectus.arsnspells.mixin.irons                   15 files
+com.otectus.arsnspells.mixin.sanctified              2 files
+com.otectus.arsnspells.network                       21 files
 com.otectus.arsnspells.progression                   1 file
-com.otectus.arsnspells.registry                      6 files
+com.otectus.arsnspells.registry                      8 files
 com.otectus.arsnspells.rituals                       12 files
-com.otectus.arsnspells.spell                         12 files
-com.otectus.arsnspells.spell.irons                   7 files
-com.otectus.arsnspells.util                          12 files
+com.otectus.arsnspells.spell                         17 files
+com.otectus.arsnspells.spell.irons                   9 files
+com.otectus.arsnspells.spell.target                  4 files
+com.otectus.arsnspells.util                          16 files
 ```
 
-## Registered content (5 entries)
+## Registered content (14 entries)
 
-### Blocks (1)
-
-| id | field | type | declared in |
-|---|---|---|---|
-| `spell_loom` | `SPELL_LOOM` | `Block` | src\main\java\com\otectus\arsnspells\registry\ModBlocksRegistry.java |
-
-### Items (1)
+### Blocks (2)
 
 | id | field | type | declared in |
 |---|---|---|---|
-| `spell_loom` | `SPELL_LOOM_ITEM` | `Item` | src\main\java\com\otectus\arsnspells\registry\ModBlocksRegistry.java |
+| `glyph_press` | `GLYPH_PRESS` | `Block` | src/main/java/com/otectus/arsnspells/registry/ModBlocksRegistry.java |
+| `spell_loom` | `SPELL_LOOM` | `Block` | src/main/java/com/otectus/arsnspells/registry/ModBlocksRegistry.java |
 
-### Block entities (1)
-
-| id | field | type | declared in |
-|---|---|---|---|
-| `spell_loom` | `SPELL_LOOM` | `BlockEntityType<SpellLoomBlockEntity>` | src\main\java\com\otectus\arsnspells\registry\ModBlockEntities.java |
-
-### Menus / GUIs (1)
+### Items (4)
 
 | id | field | type | declared in |
 |---|---|---|---|
-| `spell_loom` | `SPELL_LOOM` | `MenuType<SpellLoomMenu>` | src\main\java\com\otectus\arsnspells\registry\ModMenus.java |
+| `blank_glyph_plate` | `—` | `—` | src/main/java/com/otectus/arsnspells/registry/ModItemsRegistry.java |
+| `blank_scroll` | `—` | `—` | src/main/java/com/otectus/arsnspells/registry/ModItemsRegistry.java |
+| `glyph_press` | `GLYPH_PRESS_ITEM` | `Item` | src/main/java/com/otectus/arsnspells/registry/ModBlocksRegistry.java |
+| `spell_loom` | `SPELL_LOOM_ITEM` | `Item` | src/main/java/com/otectus/arsnspells/registry/ModBlocksRegistry.java |
+
+### Block entities (2)
+
+| id | field | type | declared in |
+|---|---|---|---|
+| `glyph_press` | `GLYPH_PRESS` | `BlockEntityType<com.otectus.arsnspells.bl...` | src/main/java/com/otectus/arsnspells/registry/ModBlockEntities.java |
+| `spell_loom` | `SPELL_LOOM` | `BlockEntityType<SpellLoomBlockEntity>` | src/main/java/com/otectus/arsnspells/registry/ModBlockEntities.java |
+
+### Menus / GUIs (2)
+
+| id | field | type | declared in |
+|---|---|---|---|
+| `glyph_press` | `GLYPH_PRESS` | `MenuType<com.otectus.arsnspells.menu.Glyp...` | src/main/java/com/otectus/arsnspells/registry/ModMenus.java |
+| `spell_loom` | `SPELL_LOOM` | `MenuType<SpellLoomMenu>` | src/main/java/com/otectus/arsnspells/registry/ModMenus.java |
 
 ### Creative tabs (1)
 
 | id | field | type | declared in |
 |---|---|---|---|
-| `general` | `MAIN` | `CreativeModeTab` | src\main\java\com\otectus\arsnspells\registry\ModCreativeTabs.java |
+| `general` | `MAIN` | `CreativeModeTab` | src/main/java/com/otectus/arsnspells/registry/ModCreativeTabs.java |
+
+### Sounds (2)
+
+| id | field | type | declared in |
+|---|---|---|---|
+| `block.glyph_press.complete` | `GLYPH_PRESS_COMPLETE` | `SoundEvent` | src/main/java/com/otectus/arsnspells/registry/ModSounds.java |
+| `block.glyph_press.engrave` | `GLYPH_PRESS_ENGRAVE` | `SoundEvent` | src/main/java/com/otectus/arsnspells/registry/ModSounds.java |
+
+### Global loot modifiers (1)
+
+| id | field | type | declared in |
+|---|---|---|---|
+| `blank_scroll` | `BLANK_SCROLL` | `Codec<BlankScrollLootModifier>` | src/main/java/com/otectus/arsnspells/registry/ModLootModifiersRegistry.java |
 
 ## Data generation
 
@@ -93,17 +127,19 @@ _No datagen providers detected — assets and data JSON are hand-written._
 
 | kind | count |
 |---|---|
-| blockstates | 1 |
-| block models | 1 |
-| item models | 6 |
-| block textures | 3 |
-| item textures | 5 |
-| recipes | 1 |
-| block loot tables | 1 |
+| blockstates | 2 |
+| block models | 3 |
+| item models | 9 |
+| block textures | 10 |
+| item textures | 7 |
+| recipes | 4 |
+| block loot tables | 2 |
 | block tags | 1 |
-| item tags | 4 |
+| item tags | 7 |
 | biome modifiers | 0 |
 | lang files | en_us.json |
+
+Also: `sounds.json` present.
 
 Run `check_mod.py` for a full consistency check (missing models, lang keys, textures).
 
@@ -111,17 +147,24 @@ Run `check_mod.py` for a full consistency check (missing models, lang keys, text
 
 ## Current focus
 
-_What you are working on right now. One or two lines._
+3.4.0 (Forge 1.20.1): Touch casting repair, imported Iron's glyphs and the Glyph Press. Release docs in `docs/3.4.0/`; nothing published.
 
 ## Roadmap
 
-- [ ] …
+- [ ] Manual survival playthrough and a dedicated-server session with a remote client (see `docs/3.4.0/testing.md`, open gaps).
+- [ ] Iron's addon spells in a later catalog (`docs/3.4.0/adapter-authoring.md`).
 
 ## Decisions
 
-_Choices that should not be re-litigated every session (why a system was built a
-certain way, APIs deliberately avoided, balance rules, naming rules)._
+- Imported glyph ids are `ars_n_spells:iron/<ns>/<path>/level_<n>`, generated from the loaded-registry inventories by `tools/generate_iron_glyph_catalog.py` and fixed at startup. Never reuse an id; a retired spell stays as a dormant glyph.
+- Five adapter families (caster, aimed, projectile, movement, summon) instead of per-spell code; datapacks may confirm but never change an adapter.
+- Iron's types stay in `compat/irons/glyph/`; common code uses `IronGlyphBridge` only.
+- The Glyph Press reads only `irons_spellbooks:scroll`, strictly; only players start jobs. It draws Source from nearby jars: Ars 4.12.7 relays bind only to `AbstractSourceMachine`, which the Press deliberately does not extend.
+- The Press menu always builds its four slots on the client (placeholder handler) and predicts locks from the synced state; the server's block entity is the only authority.
+- Glyph item visuals use the `ars_n_spells:imported_glyph` geometry with Iron's icons stitched by a block-atlas directory source (palette textures filtered out to keep mipmaps).
+- `iron_glyph_mana_bonus_policy` defaults to `per_spell`.
 
 ## Known issues
 
-_Bugs you know about but have not fixed, with the symptom and any lead._
+- GameTests that write the SERVER config (`ans_mana_config`, `ans_school_disabled`, `ans_glyph_modes`) and the ritual stray-item test fail intermittently under Forge's asynchronous config reload or timing; each passed on rerun. Recorded per run in `docs/3.4.0/testing.md`.
+- Imported glyphs with Iron's recast stages are handled by Iron's own recast bookkeeping but not exercised by an imported-glyph GameTest.

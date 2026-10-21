@@ -1,6 +1,5 @@
 package com.otectus.arsnspells.events;
 
-import com.hollingsworth.arsnouveau.api.event.SpellCastEvent;
 import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.data.ProgressionData;
 import com.otectus.arsnspells.progression.ProgressionAttributes;
@@ -18,13 +17,24 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
  */
 public class ProgressionHandler {
 
-    @SubscribeEvent
-    public void onArsSpellCast(SpellCastEvent event) {
-        if (!AnsConfig.ENABLE_PROGRESSION_SYSTEM.get() || !AnsConfig.ENABLE_CROSS_MOD_PROGRESSION.get()) {
+    /**
+     * One root cast's progression credit, at the cast's success boundary.
+     *
+     * <p>3.4.0: was a {@code SpellCastEvent} listener, which is posted before the form runs, so
+     * a Touch miss or a cast refused later still counted (see {@link AffinityHandler#credit}).
+     * Cross-mod progression feeds Iron's spell power, so it only counts with Iron's loaded, as
+     * when this handler was registered only in that case.
+     */
+    public static void credit(ServerPlayer player, com.hollingsworth.arsnouveau.api.spell.Spell spell,
+                              com.hollingsworth.arsnouveau.api.spell.SpellContext context) {
+        if (!AnsConfig.ENABLE_PROGRESSION_SYSTEM.get() || !AnsConfig.ENABLE_CROSS_MOD_PROGRESSION.get()
+            || !com.otectus.arsnspells.compat.IronsCompat.isLoaded()) {
             return;
         }
-        if (event.getEntity() instanceof ServerPlayer player) {
-            String school = SpellAnalysis.analyze(event.spell).schoolKey();
+        {
+            // Same school the affinity handler credits: the cast's explicit school when it
+            // carries one, otherwise the glyphs'.
+            String school = SpellAnalysis.analyze(spell, context).schoolKey();
             if (!com.otectus.arsnspells.util.SchoolKeys.GENERIC.equals(school)) {
                 player.getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(data -> {
                     data.incrementCastCount(school);

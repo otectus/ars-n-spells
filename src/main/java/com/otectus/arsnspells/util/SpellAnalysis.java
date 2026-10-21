@@ -39,6 +39,10 @@ public final class SpellAnalysis {
         private final List<String> schoolKeys;
         private final String mappingDigest;
         private final List<String> allSchoolKeys;
+        /** The explicit school this profile was narrowed to, or null when the glyphs decide. */
+        private final @Nullable String explicitSchool;
+        /** The glyph-derived profile; {@code this} unless an explicit school replaced it. */
+        private final Result glyphProfile;
 
         Result(@Nullable AbstractSpellPart firstEffect,
                @Nullable AbstractSpellPart castMethod,
@@ -59,7 +63,52 @@ public final class SpellAnalysis {
             // schoolKey(), the primary school only.
             this.allSchoolKeys = allEffects.stream().flatMap(effect -> SchoolResolver.resolveKeys(effect).stream())
                 .filter(key -> !SchoolKeys.GENERIC.equals(key)).distinct().toList();
+            this.explicitSchool = null;
+            this.glyphProfile = this;
         }
+
+        /**
+         * {@code glyphs} narrowed to one explicit school. Every school-keyed answer becomes that
+         * school alone, so neither the primary nor the secondary glyph schools add anything; the
+         * parts, the effects and the cooldown category still describe the actual recipe.
+         */
+        private Result(Result glyphs, String explicit) {
+            this.firstEffect = glyphs.firstEffect;
+            this.castMethod = glyphs.castMethod;
+            this.allEffects = glyphs.allEffects;
+            this.category = glyphs.category;
+            this.mappingDigest = glyphs.mappingDigest;
+            SpellSchoolId builtin = SchoolKeys.builtin(explicit);
+            // An addon school has no built-in projection, which is what "generic" already means
+            // to every consumer of dominantSchool(): no built-in school-matched bonus.
+            this.dominantSchool = builtin.id();
+            this.schools = builtin.isGeneric() ? Collections.emptySet() : Set.of(builtin.id());
+            this.schoolKeys = List.of(explicit);
+            this.allSchoolKeys = List.of(explicit);
+            this.explicitSchool = explicit;
+            this.glyphProfile = glyphs;
+        }
+
+        /**
+         * This profile narrowed to one explicit school, or this profile unchanged when
+         * {@code explicit} is not a well-formed school id.
+         */
+        public Result withExplicitSchool(@Nullable String explicit) {
+            if (explicit == null || !SchoolKeys.isNamespaced(explicit) || SchoolKeys.GENERIC.equals(explicit)) {
+                return this;
+            }
+            return new Result(glyphProfile, explicit);
+        }
+
+        /** Whether an explicit school, rather than the glyphs, decides this profile's school. */
+        public boolean isExplicit() { return explicitSchool != null; }
+
+        /** The explicit school, or null when the glyphs decide. */
+        @Nullable
+        public String explicitSchool() { return explicitSchool; }
+
+        /** What the glyphs alone resolve to, whether or not an explicit school replaced it. */
+        public Result glyphProfile() { return glyphProfile; }
 
         /** The first AbstractEffect glyph in the recipe, or null if none found. */
         @Nullable
@@ -108,6 +157,18 @@ public final class SpellAnalysis {
             return EMPTY;
         }
         return analyzeRecipe(spell.recipe);
+    }
+
+    /**
+     * Analyze {@code spell} as cast in {@code context}: the glyph profile, narrowed to the
+     * explicit school the cast carries when it carries one. Only an ANS cross-cast of an entry
+     * with a usable chosen school stamps one, so a native cast, or any cast with no context,
+     * resolves exactly as {@link #analyze(Spell)} does.
+     */
+    public static Result analyze(@Nullable Spell spell,
+                                 @Nullable com.hollingsworth.arsnouveau.api.spell.SpellContext context) {
+        return analyze(spell).withExplicitSchool(
+            com.otectus.arsnspells.spell.SpellSchoolChoice.fromContext(context));
     }
 
     /**

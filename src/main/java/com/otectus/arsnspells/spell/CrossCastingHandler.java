@@ -17,6 +17,8 @@ import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.network.CrossCastRequestPacket;
 import com.otectus.arsnspells.network.PacketHandler;
+import com.otectus.arsnspells.spell.target.InteractionOrigin;
+import com.otectus.arsnspells.spell.target.TargetHint;
 import com.otectus.arsnspells.util.CrossCastTrace;
 import net.minecraft.network.chat.Component;
 import net.minecraft.nbt.CompoundTag;
@@ -108,11 +110,17 @@ public class CrossCastingHandler {
                 ? CrossCastRequestPacket.Action.CYCLE
                 : CrossCastRequestPacket.Action.CAST;
             int clientIndex = peekSelectedIndex(stack);
+            // The client's own crosshair pick at the moment of the click. Only a hint: the
+            // server picks for itself with Ars's reach rules and records disagreement.
+            TargetHint hint = action == CrossCastRequestPacket.Action.CAST
+                ? net.minecraftforge.fml.DistExecutor.unsafeCallWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,
+                    () -> com.otectus.arsnspells.client.CrossCastClientHints::current)
+                : TargetHint.NONE;
             PacketHandler.sendToServer(new CrossCastRequestPacket(hand, action, clientIndex, clientAttempt,
-                com.otectus.arsnspells.network.CarrierFingerprint.of(stack)));
+                com.otectus.arsnspells.network.CarrierFingerprint.of(stack), hint));
             CrossCastTrace.log(clientAttempt, player, CrossCastTrace.Side.C,
                 CrossCastTrace.Stage.REQUEST_SENT,
-                "hand", hand, "action", action, "index", clientIndex);
+                "hand", hand, "action", action, "index", clientIndex, "hint", hint == null ? "none" : hint.kind());
             event.setCanceled(true);
             return;
         }
@@ -137,6 +145,16 @@ public class CrossCastingHandler {
      */
     public static boolean serverHandleCast(ServerPlayer player, ItemStack item, InteractionHand hand,
         CrossCastRequestPacket.Action action, UUID attemptId) {
+        return serverHandleCast(player, item, hand, action, attemptId, TargetHint.NONE);
+    }
+
+    /**
+     * {@link #serverHandleCast(ServerPlayer, ItemStack, InteractionHand, CrossCastRequestPacket.Action, UUID)}
+     * with the client's aim at the moment of the click. The hint is only compared with the
+     * server's own pick (see {@link ArsCastDispatcher}); it never chooses the target.
+     */
+    public static boolean serverHandleCast(ServerPlayer player, ItemStack item, InteractionHand hand,
+        CrossCastRequestPacket.Action action, UUID attemptId, TargetHint hint) {
         if (player == null || item == null || item.isEmpty()) {
             return false;
         }
@@ -193,7 +211,9 @@ public class CrossCastingHandler {
         boolean castOk;
         switch (type) {
             case ARS_NOUVEAU:
-                castOk = castArsSpell(player, item, hand, spellData, attemptId);
+                // A generic carrier is held, so it is both the sidecar owner and the casting tool.
+                castOk = castArsSpell(player, item, item, hand, spellData, attemptId,
+                    InteractionOrigin.ITEM_USE, hint).resolved();
                 break;
             case IRONS_SPELLBOOKS:
                 castOk = castIronsSpell(player, item, spellData, attemptId);
@@ -228,20 +248,45 @@ public class CrossCastingHandler {
      */
     public static boolean castArsSpell(Player player, ItemStack item, InteractionHand hand,
         CompoundTag spellData, UUID attemptId) {
+        return castArsSpell(player, item, item, hand, spellData, attemptId, InteractionOrigin.SERVER, TargetHint.NONE)
+            .resolved();
+    }
+
+    /**
+     * Cast the Ars entry {@code spellData}, which belongs to {@code carrier}, through
+     * {@link ArsCastDispatcher}.
+     *
+     * <p>{@code carrier} is the stack whose sidecar holds the entry and only names the spell;
+     * {@code tool} is what the caster physically used (the held carrier, an Iron's staff or
+     * scroll, or the book itself for a hotkey cast) and becomes the Ars context's caster tool.
+     * The two differ for an Iron's book cast from the Curios slot or with a staff, and keeping
+     * them apart is what stops a staff's or an empty hand's state standing in for the book.
+     *
+     * @return the dispatcher's result; {@link ArsCastDispatcher.Result#resolved()} is the success
+     *         every caller grants advancements and native cooldowns on
+     */
+    public static ArsCastDispatcher.Result castArsSpell(Player player, ItemStack carrier, ItemStack tool,
+        InteractionHand hand, CompoundTag spellData, UUID attemptId, InteractionOrigin origin, TargetHint hint) {
+        ArsCastDispatcher.Result refused = new ArsCastDispatcher.Result(ArsCastDispatcher.Outcome.INVALID_SPELL,
+            ArsCastDispatcher.Entry.NONE, null, true);
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return refused;
+        }
+        ItemStack item = carrier;
         if (item == null || CrossCastNbt.schemaVersion(item.getTag()) > CrossCastNbt.SCHEMA_VERSION) {
             player.displayClientMessage(Component.translatable("arsnspells.crosscast.invalid.future_schema"), true);
-            return false;
+            return refused;
         }
         if (!com.otectus.arsnspells.util.PayloadBudget.tag(spellData)
             || !com.otectus.arsnspells.util.PayloadBudget.name(spellData.getString(CrossCastNbt.TAG_CUSTOM_NAME))
             || !com.otectus.arsnspells.util.PayloadBudget.arsSpell(spellData.getCompound(TAG_ARS_SPELL))) {
             player.displayClientMessage(Component.translatable("arsnspells.crosscast.invalid.payload_budget"), true);
-            return false;
+            return refused;
         }
         CompoundTag arsSpellTag = spellData.getCompound(TAG_ARS_SPELL);
         if (arsSpellTag.isEmpty()) {
             LOGGER.warn("Cross-mod Ars spell missing ars_spell tag: {}", spellData);
-            return false;
+            return refused;
         }
 
         // Checked BEFORE deserializing, because deserialization is where the evidence is lost:
@@ -258,7 +303,7 @@ public class CrossCastingHandler {
                     com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(missingGlyphs))
                     .withStyle(net.minecraft.ChatFormatting.RED),
                 true);
-            return false;
+            return refused;
         }
         // Same pre-decode discipline for glyphs that exist but must not leave their own caster
         // (see ModTags.CROSS_CAST_BLACKLIST). CrossCastValidator already refuses these on the
@@ -273,7 +318,7 @@ public class CrossCastingHandler {
                     com.otectus.arsnspells.util.ArsSpellIntegrity.describeMissing(blacklistedGlyphs))
                     .withStyle(net.minecraft.ChatFormatting.RED),
                 true);
-            return false;
+            return refused;
         }
 
         Spell spell = Spell.fromTag(arsSpellTag);
@@ -283,9 +328,24 @@ public class CrossCastingHandler {
             LOGGER.warn("Cross-mod Ars spell deserialized to an invalid/empty recipe: {}", spellData);
             player.displayClientMessage(
                 Component.translatable("arsnspells.crosscast.invalid.ars_spell_unreadable"), true);
-            return false;
+            return refused;
         }
-        ISpellCaster caster = new SpellCaster(item);
+        // The entry's chosen school, validated now against the installed schools and the server
+        // setting; null means Automatic. Both the right-click route and the native-wheel proxy
+        // reach Ars only through this method, so this is the one place it is applied. It is
+        // written onto the cast's own SpellContext before the resolver exists, so the cost
+        // events, SpellCastEvent and every hit see it, and Ars copies it into each child
+        // context, projectile and delayed event the cast spawns.
+        String explicitSchool = SpellSchoolChoice.effective(CrossCastNbt.storedSchool(spellData));
+        ISpellCaster caster = explicitSchool == null ? new SpellCaster(item) : new SpellCaster(item) {
+            @Override
+            public com.hollingsworth.arsnouveau.api.spell.SpellResolver getSpellResolver(
+                    com.hollingsworth.arsnouveau.api.spell.SpellContext context,
+                    net.minecraft.world.level.Level level, LivingEntity entity, InteractionHand castHand) {
+                SpellSchoolChoice.stamp(context, explicitSchool);
+                return super.getSpellResolver(context, level, entity, castHand);
+            }
+        };
 
         // Always mark the cast so onArsSpellCost can apply the cross-cast cost
         // multiplier (and, in SEPARATE mode, the dual-cost split). The
@@ -294,23 +354,23 @@ public class CrossCastingHandler {
             player.level().getGameTime(), attemptId);
 
         // ANS-MED-002: wrap upstream cast in try/finally so the CrossCastContext entry
-        // is cleared even if caster.castSpell throws. Without this, an exception in
-        // any link of the Ars cast chain left a stale entry in ACTIVE_CASTS for up to
-        // the TTL window, contaminating the next cost-calc fire.
-        boolean success = false;
+        // is cleared even if the cast throws. Without this, an exception in any link of
+        // the Ars cast chain left a stale entry in ACTIVE_CASTS for up to the TTL window,
+        // contaminating the next cost-calc fire.
+        ArsCastDispatcher.Result result = refused;
         CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-            CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "runtime", "ARS");
+            CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "runtime", "ARS", "origin", origin);
         try {
-            InteractionResultHolder<ItemStack> result = caster.castSpell(player.level(), player, hand, null, spell);
-            // Ars's caster answers CONSUME even when its resolver refused the cast (no mana, a
-            // vetoed SpellCastEvent, a failed validator), so the resolver's own result decides.
-            CrossCastContext.Entry context = CrossCastContext.peek(player);
-            success = result.getResult().consumesAction()
-                && context != null && Boolean.TRUE.equals(context.resolved);
-            return success;
+            // 3.4.0: the dispatcher replaces Ars's castSpell here so the casting tool, the
+            // validated target and the typed outcome are ANS's own; its target rules and
+            // resolver entries are Ars's, unchanged. The resolver's own boolean decides success:
+            // Ars's caster answers CONSUME even when the resolver refused the cast.
+            result = ArsCastDispatcher.dispatch(new ArsCastDispatcher.Request(serverPlayer, caster,
+                tool == null ? ItemStack.EMPTY : tool, hand, spell, origin, hint, attemptId));
+            return result;
         } finally {
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "ARS", "success", success);
+                CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "runtime", "ARS", "outcome", result.outcome());
             CrossCastContext.clear(player);
         }
     }

@@ -11,7 +11,7 @@ Works with **Minecraft 1.20.1** on **Forge**.
 | Mod | Required? |
 |-----|-----------|
 | **Ars Nouveau** (4.12.7+) | Yes |
-| **Iron's Spells 'n Spellbooks** (3.15.0 – 3.x) | No — falls back to native Ars behavior if absent. Tested against both 3.15.0 and 3.16.2. |
+| **Iron's Spells 'n Spellbooks** (3.15.0 – 3.x) | No — falls back to native Ars behavior if absent. Tested against both 3.15.0 and 3.16.3; the Glyph Press and Iron's glyphs need it. |
 | **Ars Elemental** (0.6.8.0+) | No — glyphs resolve their schools from Ars metadata; filters resolve as generic and do not decide the spell's school. |
 | **Ars Zero** (2.0.2+) | No — named effects resolve their schools from Ars metadata; control-flow glyphs resolve as generic and do not decide the spell's school. Requires Forge 47.4.10+. |
 | **Covenant of the Seven** (Sanctified Legacy, 2.2.6+) | No — enables LP and aura ring systems; aura is sampled server-side to block casts correctly on dedicated servers. |
@@ -105,15 +105,48 @@ Design a spell with Ars Nouveau's tools, weave it onto a **real Iron's scroll** 
 
 1. **Design** an Ars Nouveau spell with the normal tools.
 2. **Get a Blank Scroll.** Craft `ars_n_spells:blank_scroll` from an Ars Nouveau blank parchment and a source gem, or find one in chest loot (stronghold, ancient city, woodland mansion, common dungeons, and a range of Iron's own structure chests — Iron's must be installed). A blank Iron's scroll works too.
-3. **Weave.** Craft the **Spell Loom** (gold ingot, 2× lapis, a book, and 3× obsidian on a crafting table) and right-click it. Drop your Ars spell source (parchment, focus, or spellbook) and the Blank Scroll into the slots, then give your spell a **name**, pick a **nature**, choose an **icon**, and press **Inscribe**. Out comes a real Iron's scroll carrying your spell. *(Ops can also use `/ans export_to_irons_scroll` for a quick, metadata-free export.)*
-4. **Bind — three equivalent routes.** As of 3.3.3, drop the carrier scroll and a spellbook into an **Iron's Inscription Table** and press Inscribe to bind directly, no ritual required. Or run the **Spellbook Binding** ritual (its apparatus tablet appears only when Iron's is installed — 2500 source): throw the scroll and an Iron's spellbook on the ground within **three blocks** of a brazier holding the tablet, then right-click the brazier with an **empty hand** to light it — nothing else may be lying in that radius. Or hold both and run `/ans bind_scroll_to_irons_book`. All three consume one scroll, append the spell with your chosen name/nature/icon, and reject re-binding the same spell (dedup by spell payload).
+3. **Weave.** Craft the **Spell Loom** (gold ingot, 2× lapis, a book, and 3× obsidian on a crafting table) and right-click it. Drop your Ars spell source (parchment, focus, or spellbook) and the Blank Scroll into the slots, then give your spell a **name**, set its **School** (below), optionally **Choose icon…** for the cosmetic icon and background, and press **Inscribe**. Out comes a real Iron's scroll carrying your spell. *(Ops can also use `/ans export_to_irons_scroll [school]` for a quick export with no name, background or icon.)*
+4. **Bind — three equivalent routes.** As of 3.3.3, drop the carrier scroll and a spellbook into an **Iron's Inscription Table** and press Inscribe to bind directly, no ritual required. Or run the **Spellbook Binding** ritual (its apparatus tablet appears only when Iron's is installed — 2500 source): throw the scroll and an Iron's spellbook on the ground within **three blocks** of a brazier holding the tablet, then right-click the brazier with an **empty hand** to light it — nothing else may be lying in that radius. Or hold both and run `/ans bind_scroll_to_irons_book`. All three consume one scroll and append the spell with your chosen name, background, icon and school. A spell the book already holds with the same glyphs and the same school is refused as a duplicate, even with a different name, colour, background or icon; the same glyphs with a different school bind as a separate wheel entry.
 
    > ⚠️ **Not Ars Nouveau's own "Binding" ritual.** Ars ships a ritual named literally **Binding**, which makes Bound Scripts for familiars and ignores scrolls. You want **Spellbook Binding**.
 5. **Cast.** Your Ars spell shows up as its **own entry in Iron's native spell-selection wheel**. Select it and right-click like any Iron's spell — it casts the real Ars spell through the full cross-cast pipeline (mana mode, cost multiplier, scaling, cooldowns). Up to **8** Ars spells per book, and your native Iron's spells cast exactly as before. Selecting a bound Ars entry in the table does not offer it back for extraction; use Spell Uninscription to remove one.
 
-Pack authors: gate the whole feature with `allow_ars_spells_in_irons_spellbooks`, or cap spells per book with `max_ars_cross_spells_per_irons_spellbook`.
+### Choosing a spell school *(3.3.7)*
+
+The Loom's **School** button sets the school Ars 'n' Spells uses for the spell. The background under **Choose icon…** is only cosmetic.
+
+- **Automatic (from glyphs)** is the default and works exactly as before: the glyphs decide the school or schools, and multi-school spells keep their usual scaling. Every scroll made before 3.3.7 is Automatic.
+- **A chosen school** is the only school used for spell-power scaling, affinity, progression and the Blasphemy matching-school discounts. The glyph schools add nothing on top. The glyphs' effects, damage types and cooldown category never change.
+- The picker lists every installed Iron's school with a spell-power attribute, addon schools included.
+
+**To inscribe with a school:** press **School**, pick a school (or Automatic), press **Done**, then **Inscribe**. The tooltip shows, for example, `School: Ice (chosen)`.
+
+**To change a finished scroll:** put it in the Loom's target slot, pick a school, and press **Apply**. Only the school changes, and nothing is consumed. Ops can use `/ans school set <school>|auto [entry]` on a held scroll or spellbook.
+
+The school travels with the spell through export, copying, saving and all three binding routes. It applies to scroll casts and wheel casts, and a delayed effect or projectile keeps the school of the cast that launched it. The server validates every choice; refused requests move and consume nothing. If an addon school is removed, the spell falls back to Automatic.
+
+Pack authors: gate the whole feature with `allow_ars_spells_in_irons_spellbooks`, cap spells per book with `max_ars_cross_spells_per_irons_spellbook`, or set `allow_spell_school_override = false` to allow only Automatic schools (spells that already carry a chosen school then cast as Automatic).
 
 *(Generic inscribed items that aren't Iron's spellbooks still cast via right-click, with sneak-right-click to cycle.)*
+
+---
+
+## Iron's Glyphs & the Glyph Press *(3.4.0)*
+
+Every Iron's player spell can now become a real **Ars Nouveau glyph**, one per level: *Firebolt I* through *Firebolt X*, 111 spells and 777 glyphs in all. Learn a glyph the normal Ars way and add it to your spells like any other glyph.
+
+- **The Glyph Press** makes them. Put a filled Iron's scroll, a blank glyph plate and Source gems in it, keep Source jars nearby, and press **Inscribe Glyph**. Nothing is consumed until the glyph is finished, and Cancel gives everything back.
+- **Price by tier:** the glyph's Ars tier follows Iron's rarity for that level. Tier I costs 1 gem and 500 Source, tier II 2 gems and 1,500, tier III 4 gems and 3,000. Servers can retune it with datapacks.
+- **Your form aims it:** Self casts on you, Touch on what you touch, Projectile where it lands, Underfoot below you. Caster-only spells such as Heal stay Self-only.
+- **Amplify and Dampen** change the cast level within the spell's range.
+- **Iron's own rules hold:** its mana cost joins your Ars spell's cost and is paid once, under your mana mode. Learning requirements and per-spell cooldowns apply, and charged and channelled spells charge in Iron's own slot.
+- **Safe to remove:** without Iron's, or if the server disables a spell, glyphs go dormant instead of disappearing, and come back when restored.
+
+JEI shows every conversion, and the worn notebook has a Glyph Press chapter.
+
+**Also in 3.4.0:** Touch spells cast from exported scrolls, inscribed items and bound Iron's books now hit what you aim at exactly like a spell book. A miss no longer trains your school or starts a cooldown.
+
+Client and server both need 3.4.0.
 
 ---
 
@@ -201,8 +234,14 @@ All options ship with balanced defaults — install and play, or fine-tune to yo
 | `/ans info <player>` | Op 2 | Show mana, aura, resonance, and ring status |
 | `/ans debug` | Op 2 | Toggle debug mode at runtime |
 | `/ans aura` | -- | Show your own current aura |
-| `/ans export_to_irons_scroll` | Op 2 | Export the held Ars spell onto a real Iron's scroll — the **Spell Loom** is the survival route |
+| `/ans export_to_irons_scroll [school]` | Op 2 | Export the held Ars spell onto a real Iron's scroll — the **Spell Loom** is the survival route |
+| `/ans school list` | -- | List the spell schools the server accepts |
+| `/ans school show` | -- | Show the school of each Ars spell on the held item |
+| `/ans school set <school>\|auto [entry]` | Op 2 | Change a held item's Ars spell school without rebuilding it |
 | `/ans bind_scroll_to_irons_book` | Op 2 | Bind a held exported scroll into a held Iron's spellbook |
+| `/ans glyph inspect` | -- | What the Glyph Press would make of your held scroll, or what a held glyph does |
+| `/ans glyph catalog\|coverage\|mappings` | Op 2 | Imported-glyph catalog, per-spell coverage and the datapack overrides in force |
+| `/ans glyph press <pos>` | Op 2 | One Glyph Press's state and job |
 
 ---
 

@@ -2,8 +2,20 @@ package com.otectus.arsnspells.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.otectus.arsnspells.spell.CrossCastNbt;
+import com.otectus.arsnspells.spell.SpellSchoolChoice;
+import com.otectus.arsnspells.spell.SpellSchoolNames;
+import com.otectus.arsnspells.util.SpellAnalysis;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import com.hollingsworth.arsnouveau.api.perk.PerkAttributes;
 import com.otectus.arsnspells.augmentation.ResonanceManager;
 import com.otectus.arsnspells.bridge.BridgeManager;
@@ -88,12 +100,35 @@ public class ArsNSpellsCommands {
                 )
                 .then(Commands.literal("export_to_irons_scroll")
                     .requires(source -> source.hasPermission(2))
-                    .executes(ArsNSpellsCommands::exportToIronsScroll)
+                    .executes(ctx -> exportToIronsScroll(ctx, ""))
+                    .then(Commands.argument("school", ResourceLocationArgument.id())
+                        .suggests(SCHOOL_SUGGESTIONS)
+                        .executes(ctx -> exportToIronsScroll(ctx, ResourceLocationArgument.getId(ctx, "school").toString())))
+                )
+                .then(Commands.literal("school")
+                    .then(Commands.literal("list")
+                        .executes(ArsNSpellsCommands::listSchools))
+                    .then(Commands.literal("show")
+                        .executes(ArsNSpellsCommands::showHeldSchools))
+                    .then(Commands.literal("set")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.literal("auto")
+                            .executes(ctx -> setHeldSchool(ctx, "", 0))
+                            .then(Commands.argument("entry", IntegerArgumentType.integer(1, 64))
+                                .executes(ctx -> setHeldSchool(ctx, "", IntegerArgumentType.getInteger(ctx, "entry")))))
+                        .then(Commands.argument("school", ResourceLocationArgument.id())
+                            .suggests(SCHOOL_SUGGESTIONS)
+                            .executes(ctx -> setHeldSchool(ctx, ResourceLocationArgument.getId(ctx, "school").toString(), 0))
+                            .then(Commands.argument("entry", IntegerArgumentType.integer(1, 64))
+                                .executes(ctx -> setHeldSchool(ctx, ResourceLocationArgument.getId(ctx, "school").toString(),
+                                    IntegerArgumentType.getInteger(ctx, "entry"))))))
                 )
                 .then(Commands.literal("bind_scroll_to_irons_book")
                     .requires(source -> source.hasPermission(2))
                     .executes(ArsNSpellsCommands::bindScrollToIronsBook)
                 )
+                // 3.4.0: imported Iron's glyph diagnostics.
+                .then(GlyphDiagnosticsCommands.build())
         );
 
         LOGGER.debug("Ars 'n' Spells commands registered");
@@ -407,7 +442,7 @@ public class ArsNSpellsCommands {
      * the transcription ritual. Routes through ANS util classes so this file
      * stays free of Iron's imports (it loads on Iron's-less servers too).
      */
-    private static int exportToIronsScroll(CommandContext<CommandSourceStack> context) {
+    private static int exportToIronsScroll(CommandContext<CommandSourceStack> context, String school) {
         ServerPlayer player;
         try {
             player = context.getSource().getPlayerOrException();
@@ -435,8 +470,15 @@ public class ArsNSpellsCommands {
             return 0;
         }
 
-        ItemStack carrier =
-            com.otectus.arsnspells.spell.ArsSpellExportUtil.createIronsScrollCarrier(spell.get());
+        // Same rules as the Spell Loom: Automatic always, a chosen school only if installed and
+        // allowed. Refused before anything is created.
+        SpellSchoolChoice.Verdict verdict = SpellSchoolChoice.check(school);
+        if (!verdict.usable()) {
+            context.getSource().sendFailure(schoolRefusal(verdict, school));
+            return 0;
+        }
+        ItemStack carrier = com.otectus.arsnspells.spell.ArsSpellExportUtil.createIronsScrollCarrier(
+            spell.get(), null, null, null, SpellSchoolChoice.normalize(school));
         if (carrier.isEmpty()) {
             context.getSource().sendFailure(Component.translatable("commands.ans.export.scroll_unavailable"));
             return 0;
@@ -539,6 +581,139 @@ public class ArsNSpellsCommands {
         context.getSource().sendSuccess(
             () -> Component.translatable("commands.ans.bind.success").withStyle(ChatFormatting.GREEN),
             true);
+        return 1;
+    }
+
+    /** Every school id a player may choose, for tab completion. Computed per request. */
+    private static final SuggestionProvider<CommandSourceStack> SCHOOL_SUGGESTIONS =
+        (context, builder) -> SharedSuggestionProvider.suggest(SpellSchoolChoice.supportedSchools(), builder);
+
+    private static Component schoolRefusal(SpellSchoolChoice.Verdict verdict, String school) {
+        return verdict == SpellSchoolChoice.Verdict.DISABLED
+            ? Component.translatable("commands.ans.school.disabled")
+            : Component.translatable("commands.ans.school.unknown", school);
+    }
+
+    /** {@code /ans school list}: the schools a spell can be given here, and whether choices apply. */
+    private static int listSchools(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        if (!SpellSchoolChoice.overridesAllowed()) {
+            source.sendSuccess(() -> Component.translatable("commands.ans.school.list.disabled")
+                .withStyle(ChatFormatting.YELLOW), false);
+        }
+        java.util.List<String> schools = SpellSchoolChoice.supportedSchools();
+        if (schools.isEmpty()) {
+            source.sendFailure(Component.translatable("commands.ans.school.list.none"));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.translatable("commands.ans.school.list.header"), false);
+        for (String key : schools) {
+            source.sendSuccess(() -> Component.translatable("commands.ans.school.list.entry",
+                SpellSchoolNames.name(key), key), false);
+        }
+        return schools.size();
+    }
+
+    /** The held item's inscribed Ars entries, as 1-based entry numbers. Empty when there are none. */
+    private static java.util.List<Integer> arsEntries(ItemStack held) {
+        java.util.List<Integer> entries = new java.util.ArrayList<>();
+        CompoundTag tag = held.getTag();
+        if (tag == null || !CrossCastNbt.hasCrossModSpells(tag)) {
+            return entries;
+        }
+        ListTag list = tag.getList(CrossCastNbt.TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); i++) {
+            if (list.getCompound(i).contains(CrossCastNbt.TAG_ARS_SPELL, Tag.TAG_COMPOUND)) {
+                entries.add(i + 1);
+            }
+        }
+        return entries;
+    }
+
+    private static SpellAnalysis.Result glyphsOf(CompoundTag entry) {
+        try {
+            return SpellAnalysis.analyze(Spell.fromTag(entry.getCompound(CrossCastNbt.TAG_ARS_SPELL)));
+        } catch (RuntimeException unreadable) {
+            return SpellAnalysis.analyze((Spell) null);
+        }
+    }
+
+    /** {@code /ans school show}: what each inscribed Ars entry on the held item casts as. */
+    private static int showHeldSchools(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        ItemStack held = player.getMainHandItem();
+        java.util.List<Integer> entries = arsEntries(held);
+        if (entries.isEmpty()) {
+            context.getSource().sendFailure(Component.translatable("commands.ans.school.no_entries"));
+            return 0;
+        }
+        ListTag list = held.getTag().getList(CrossCastNbt.TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND);
+        for (int number : entries) {
+            CompoundTag entry = list.getCompound(number - 1);
+            SpellAnalysis.Result glyphs = glyphsOf(entry);
+            Component label = Component.literal(
+                com.otectus.arsnspells.spell.ArsSpellExportUtil.buildDisplayLabel(safeSpell(entry)));
+            context.getSource().sendSuccess(() -> Component.translatable("commands.ans.school.show.entry",
+                number, label, SpellSchoolNames.describe(CrossCastNbt.storedSchool(entry), glyphs)), false);
+        }
+        return entries.size();
+    }
+
+    private static Spell safeSpell(CompoundTag entry) {
+        try {
+            return Spell.fromTag(entry.getCompound(CrossCastNbt.TAG_ARS_SPELL));
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+    }
+
+    /**
+     * {@code /ans school set <school|auto> [entry]}: change the school of one inscribed Ars entry
+     * on the held item in place. The spell, its name, background, icon and any wheel slot are
+     * untouched. Every check runs first; a refusal changes nothing.
+     */
+    private static int setHeldSchool(CommandContext<CommandSourceStack> context, String school, int entryNumber)
+            throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayerOrException();
+        ItemStack held = player.getMainHandItem();
+        if (CrossCastNbt.schemaVersion(held.getTag()) > CrossCastNbt.SCHEMA_VERSION) {
+            source.sendFailure(Component.translatable("arsnspells.crosscast.invalid.future_schema"));
+            return 0;
+        }
+        java.util.List<Integer> entries = arsEntries(held);
+        if (entries.isEmpty()) {
+            source.sendFailure(Component.translatable("commands.ans.school.no_entries"));
+            return 0;
+        }
+        int number = entryNumber;
+        if (number == 0) {
+            if (entries.size() != 1) {
+                source.sendFailure(Component.translatable("commands.ans.school.choose_entry",
+                    entries.size(), held.getTag().getList(CrossCastNbt.TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND).size()));
+                return 0;
+            }
+            number = entries.get(0);
+        } else if (!entries.contains(number)) {
+            source.sendFailure(Component.translatable("commands.ans.school.bad_entry", number));
+            return 0;
+        }
+        SpellSchoolChoice.Verdict verdict = SpellSchoolChoice.check(school);
+        if (!verdict.usable()) {
+            source.sendFailure(schoolRefusal(verdict, school));
+            return 0;
+        }
+        CompoundTag entry = held.getTag().getList(CrossCastNbt.TAG_CROSS_MOD_SPELLS, Tag.TAG_COMPOUND)
+            .getCompound(number - 1);
+        String key = SpellSchoolChoice.normalize(school);
+        if (key.equals(SpellSchoolChoice.normalize(CrossCastNbt.storedSchool(entry)))) {
+            source.sendFailure(Component.translatable("commands.ans.school.unchanged", number));
+            return 0;
+        }
+        CrossCastNbt.setStoredSchool(entry, key);
+        int shown = number;
+        source.sendSuccess(() -> Component.translatable("commands.ans.school.set", shown,
+            SpellSchoolNames.describe(key, glyphsOf(entry))).withStyle(ChatFormatting.GREEN), true);
         return 1;
     }
 

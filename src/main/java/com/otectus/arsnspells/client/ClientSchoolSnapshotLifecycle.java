@@ -6,11 +6,12 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-/** Clear the previous server semantic snapshot before another world is joined. */
+/** Clear the previous server's semantic snapshots (school mappings, imported-glyph view) before another world is joined. */
 @Mod.EventBusSubscriber(modid = "ars_n_spells", value = Dist.CLIENT)
 public final class ClientSchoolSnapshotLifecycle {
     private ClientSchoolSnapshotLifecycle() {}
     @SubscribeEvent public static void disconnect(ClientPlayerNetworkEvent.LoggingOut event) {
         SchoolMappings.reset();
+        GlyphClientSync.onLoggingOut();
     }
 }

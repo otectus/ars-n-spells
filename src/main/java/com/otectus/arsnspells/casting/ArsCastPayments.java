@@ -53,7 +53,10 @@ public final class ArsCastPayments {
                 || player.level().isClientSide()) return;
         var crossContext = CrossCastContext.peek(player);
         boolean cross = crossContext != null && crossContext.type == CrossSpellType.ARS_NOUVEAU;
-        if (!cross && !BridgeManager.isUnificationEnabled() && !ALTERNATIVES.containsKey(event.context)) return;
+        // 3.4.0: a spell with imported Iron's glyphs always gets a plan, in every mode including
+        // disabled, because its Iron's legs are reserved alongside the Ars leg in prepare().
+        boolean imported = com.otectus.arsnspells.glyph.GlyphAdmission.containsImported(event.context.getSpell());
+        if (!cross && !imported && !BridgeManager.isUnificationEnabled() && !ALTERNATIVES.containsKey(event.context)) return;
         Plan plan = PLANS.get(event.context);
         if (plan == null) {
             var carrier = cross ? CarrierPolicy.REUSABLE_BOOK_SEMANTICS : CarrierPolicy.NATIVE_ONLY;
@@ -98,13 +101,21 @@ public final class ArsCastPayments {
     public static boolean prepare(Player player, SpellContext context) {
         if (!PaymentRecovery.available() || AlternativePayment.pending(player.getUUID()) || CastLedger.blocksPayment(player)) return false;
         Plan plan = PLANS.get(context);
-        if (plan == null || player.isCreative() || plan.prepared) return true;
+        if (plan == null || player.isCreative() || plan.prepared) {
+            // 3.4.0: imported glyphs are admitted and funded even when the Ars leg is not ANS's to take.
+            return plan != null && plan.prepared || com.otectus.arsnspells.glyph.GlyphAdmission.admit(player, context);
+        }
         if (plan.alternative != null) {
             CompatibilityStatus status = plan.compatibility;
             var result = AlternativePayment.reserve(plan.id, player.getUUID(), plan.alternative.unit(),
                 plan.alternative.amount(), plan.access, status, plan.policy);
             plan.prepared = result.allowsCast();
             if (plan.prepared) {
+                if (!com.otectus.arsnspells.glyph.GlyphAdmission.admit(player, context)) {
+                    AlternativePayment.release(plan.id, plan.access);
+                    plan.prepared = false;
+                    return false;
+                }
                 plan.alternativeReserved = true;
                 plan.reserved = amounts(plan.alternative.unit(), result.leg() == null ? 0 : result.leg().reserved());
                 RESERVED.put(context, player);
@@ -112,6 +123,7 @@ public final class ArsCastPayments {
             }
             if (result.leg() != null) return false; // Incomplete alternative compensation cannot authorize a fallback.
             if (status.isUsable() && plan.deathOnInsufficientLP && plan.alternative.unit() == ResourceUnit.LP) {
+                if (!com.otectus.arsnspells.glyph.GlyphAdmission.admit(player, context)) return false;
                 plan.prepared = true;
                 plan.deathPenalty = true;
                 RESERVED.put(context, player);
@@ -128,6 +140,12 @@ public final class ArsCastPayments {
             CastLedger.fail(plan.attempt, plan.access);
             return false;
         }
+        // 3.4.0: the imported glyphs' first executions are reserved with the Ars leg, or the
+        // cast takes nothing: a shortage in either pool refuses it before any world effect.
+        if (!com.otectus.arsnspells.glyph.GlyphAdmission.admit(player, context)) {
+            CastLedger.fail(plan.attempt, plan.access);
+            return false;
+        }
         plan.prepared = true;
         plan.reserved = reserved;
         RESERVED.put(context, player);
@@ -136,6 +154,7 @@ public final class ArsCastPayments {
 
     /** True means ANS owns this exact expenditure, so only this native subtraction is suppressed. */
     public static boolean commit(Player player, SpellContext context) {
+        com.otectus.arsnspells.glyph.GlyphSessions.rootCommitted(context);
         Plan plan = PLANS.get(context);
         if (plan == null) return false;
         if (player.isCreative() || plan.committed) return true;

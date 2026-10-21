@@ -171,9 +171,24 @@ public class SpellScalingUtil {
      * gate.
      */
     public static SpellPowerBreakdown getMultiplierForCaster(Player player, Spell spell) {
+        return getMultiplierForCaster(player, spell, null);
+    }
+
+    /**
+     * {@link #getMultiplierForCaster(Player, Spell)} for a spell as cast in {@code context}.
+     *
+     * <p>When the cast carries an explicit school (see
+     * {@link com.otectus.arsnspells.spell.SpellSchoolChoice}), that one school is the only
+     * candidate: its power attribute and its affinity track scale the spell, and the glyphs'
+     * own schools contribute nothing, under every {@code multi_school_power_policy}. A cast
+     * without one scales exactly as before.
+     */
+    public static SpellPowerBreakdown getMultiplierForCaster(Player player, Spell spell,
+                                                             @javax.annotation.Nullable
+                                                             com.hollingsworth.arsnouveau.api.spell.SpellContext context) {
         float globalPower = (float) player.getAttributeValue(AttributeRegistry.SPELL_POWER.get());
 
-        SpellAnalysis.Result analysis = SpellAnalysis.analyze(spell);
+        SpellAnalysis.Result analysis = SpellAnalysis.analyze(spell, context);
         String school = analysis.schoolKey();
 
         // Additive scaling: base power + (elemental bonus - 1.0) prevents exponential stacking.

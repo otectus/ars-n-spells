@@ -67,8 +67,12 @@ public class ArsDamageBridge {
         // spellbook goes through CrossCastingHandler.castArsSpell, which builds a real
         // SpellContext and runs SpellResolver.onCast - by the time this event is posted it is
         // an ordinary Ars resolve, and it is required to scale exactly like a native cast.
+        //
+        // The school comes from this hit's own context, never from the caster's latest cast or
+        // held item: a chosen school stamped at cast time rides along in every context Ars
+        // clones from it, so a projectile or delayed effect landing later keeps its own school.
         SpellScalingUtil.SpellPowerBreakdown breakdown =
-            SpellScalingUtil.getMultiplierForCaster(player, spell);
+            SpellScalingUtil.getMultiplierForCaster(player, spell, event.context);
 
         // Only the multiplier. Ars folds PerkAttributes.SPELL_DAMAGE_BONUS into event.damage
         // before posting this event, so adding it again here would double-count the perk.
@@ -78,6 +82,6 @@ public class ArsDamageBridge {
         // Diagnostics only, and a no-op unless debug mode is on: CombatDebugState tests the
         // flag as its first statement, so an ordinary hit pays one boolean and allocates
         // nothing. The breakdown is handed over as-is rather than recomputed.
-        CombatDebugState.recordArs(player, spell, breakdown, raw, event.damage);
+        CombatDebugState.recordArs(player, spell, event.context, breakdown, raw, event.damage);
     }
 }

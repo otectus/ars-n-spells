@@ -199,12 +199,19 @@ public class ArsCrossProxySpell extends AbstractSpell {
                 Component.translatable("arsnspells.crosscast.proxy.entry_missing", poolId), true);
             return;
         }
-        InteractionHand hand = player.getOffhandItem() == book
+        // The book owns the entry; the tool is what the caster physically used. Iron's records a
+        // staff, scroll or imbued weapon as its casting item, and leaves it empty for a hotkey
+        // cast of the equipped book, in which case the book itself is the tool.
+        ItemStack castingItem = playerMagicData.getPlayerCastingItem();
+        ItemStack tool = castingItem == null || castingItem.isEmpty() ? book : castingItem;
+        InteractionHand hand = player.getOffhandItem() == tool || player.getOffhandItem() == book
             ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
         UUID attemptId = UUID.randomUUID();
         CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "runtime", "ARS_PROXY", "pool", poolId);
-        boolean success = CrossCastingHandler.castArsSpell(player, book, hand, entry, attemptId);
+        boolean success = CrossCastingHandler.castArsSpell(player, book, tool, hand, entry, attemptId,
+            com.otectus.arsnspells.spell.target.InteractionOrigin.NATIVE_WHEEL,
+            com.otectus.arsnspells.spell.target.TargetHint.NONE).resolved();
         // Only a delegated cast that actually resolved may start this proxy's native cooldown.
         com.otectus.arsnspells.casting.IronsCastLifecycle.recordDelegatedResult(player, this, success);
         if (success) {

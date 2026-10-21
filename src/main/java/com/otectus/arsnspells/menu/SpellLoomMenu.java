@@ -24,10 +24,12 @@ import net.minecraftforge.items.SlotItemHandler;
 public class SpellLoomMenu extends AbstractContainerMenu {
     // ---- Layout constants (single source of truth for slot geometry; the
     // screen derives every dependent coordinate from these). The GUI is
-    // 176x224: taller than a vanilla chest so the name field, recipe row, and
-    // two button rows fit above the player inventory without overlap.
+    // 176x240: taller than a vanilla chest so the name field, recipe row, the
+    // school row, two button rows and two status lines fit above the player
+    // inventory without overlap, while still fitting Minecraft's minimum
+    // 320x240 scaled viewport.
     public static final int GUI_WIDTH = 176;
-    public static final int GUI_HEIGHT = 224;
+    public static final int GUI_HEIGHT = 240;
     public static final int SLOT_SIZE = 18;
     /** Working-slot columns (16px inner boxes at these x positions). */
     public static final int SLOT_SOURCE_X = 26;

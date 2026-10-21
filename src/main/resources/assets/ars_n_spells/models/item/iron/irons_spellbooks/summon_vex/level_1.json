@@ -1,0 +1,6 @@
+{
+ "parent": "forge:item/default",
+ "loader": "ars_n_spells:imported_glyph",
+ "icon": "irons_spellbooks:gui/spell_icons/summon_vex",
+ "level": 1
+}
