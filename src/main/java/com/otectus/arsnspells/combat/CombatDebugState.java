@@ -88,11 +88,24 @@ public final class CombatDebugState {
         if (!AnsConfig.debugEnabled()) {
             return;
         }
+        recordArs(player, spell, null, breakdown, rawDamage, finalDamage);
+    }
+
+    /** {@link #recordArs(Player, Spell, SpellScalingUtil.SpellPowerBreakdown, float, float)} for a hit's own cast context. */
+    public static void recordArs(Player player, Spell spell,
+                                 com.hollingsworth.arsnouveau.api.spell.SpellContext context,
+                                 SpellScalingUtil.SpellPowerBreakdown breakdown,
+                                 float rawDamage, float finalDamage) {
+        if (!AnsConfig.debugEnabled()) {
+            return;
+        }
         if (player == null || spell == null || breakdown == null) {
             return;
         }
 
-        SpellAnalysis.Result analysis = SpellAnalysis.analyze(spell);
+        // The schools reported are the ones that scaled the hit: an explicit school when the
+        // cast carried one, otherwise the glyphs'.
+        SpellAnalysis.Result analysis = SpellAnalysis.analyze(spell, context);
         AbstractSpellPart firstEffect = analysis.firstEffect();
         String spellId = firstEffect == null || firstEffect.getRegistryName() == null
             ? "?" : firstEffect.getRegistryName().toString();

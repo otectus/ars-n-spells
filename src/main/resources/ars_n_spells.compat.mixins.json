@@ -14,6 +14,8 @@
     "irons.MixinInscriptionTableMenu",
     "irons.MixinIronsCastTicker",
     "irons.MixinIronsManaRegen",
+    "irons.MixinRaycastBuilderGlyph",
+    "irons.MixinUtilsTargetBlockGlyph",
     "gametest.MixinCastProbe"
   ],
   "client": [

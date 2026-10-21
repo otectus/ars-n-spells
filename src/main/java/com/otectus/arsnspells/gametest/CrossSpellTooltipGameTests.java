@@ -80,9 +80,10 @@ public final class CrossSpellTooltipGameTests {
     @GameTest(template = "platform")
     public static void tooltip_onInscribedStack_addsTheAffordanceLines(GameTestHelper helper) {
         List<Component> lines = renderTooltip(helper, inscribed(arsPayload("glyph_heal")));
-        if (lines.size() < 3) {
-            helper.fail("a single-entry inscription must add a header, an entry line and a cast "
-                + "hint, got " + lines.size() + ": " + lines);
+        // 3.3.7: an Ars entry also states its mechanical school (Automatic here).
+        if (lines.size() < 4 || !translationKeys(lines).contains("tooltip.ars_n_spells.cross_spell.school")) {
+            helper.fail("a single-entry inscription must add a header, an entry line, its school and a "
+                + "cast hint, got " + lines.size() + ": " + lines);
             return;
         }
         helper.succeed();
@@ -112,8 +113,9 @@ public final class CrossSpellTooltipGameTests {
             helper.fail("a corrupt Ars payload must not throw out of the tooltip handler: " + t);
             return;
         }
-        if (lines.size() < 3) {
-            helper.fail("a corrupt payload should still render a header, a generic entry and a "
+        // The school line survives an unreadable payload too, without its glyph schools.
+        if (lines.size() < 4 || !translationKeys(lines).contains("tooltip.ars_n_spells.cross_spell.school")) {
+            helper.fail("a corrupt payload should still render a header, a generic entry, its school and a "
                 + "cast hint, got " + lines.size() + ": " + lines);
             return;
         }

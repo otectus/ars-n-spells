@@ -41,7 +41,7 @@ class PacketHandlerDirectionGuardsTest {
 
     /** Payloads that must only ever travel client to server. */
     private static final List<String> C2S = List.of(
-        "SpellLoomExportPayload", "CrossCastRequestPayload");
+        "SpellLoomExportPayload", "CrossCastRequestPayload", "GlyphPressActionPayload");
 
     @Test
     void everyPayloadIsRegisteredInExactlyOneDirection() throws IOException {

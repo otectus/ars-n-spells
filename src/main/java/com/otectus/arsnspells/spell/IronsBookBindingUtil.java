@@ -115,11 +115,20 @@ public final class IronsBookBindingUtil {
      * placeholder id.
      */
     public static boolean containsEquivalentArsSpell(ItemStack book, CompoundTag arsTag) {
+        return containsEquivalentArsSpell(book, arsTag, null);
+    }
+
+    /**
+     * True when {@code book} already carries an entry with the same mechanical identity: the
+     * same payload, ignoring its cosmetic keys, and the same school selection. See
+     * {@link CrossModSpellComponents#containsEquivalentArsSpell(CrossModSpellList, CompoundTag, String)}.
+     */
+    public static boolean containsEquivalentArsSpell(ItemStack book, CompoundTag arsTag, String school) {
         if (book == null || book.isEmpty() || arsTag == null) {
             return false;
         }
         return CrossModSpellComponents.containsEquivalentArsSpell(
-            CrossModSpellComponents.get(book), arsTag);
+            CrossModSpellComponents.get(book), arsTag, school);
     }
 
     /** Outcome of a bind attempt, so callers can surface a precise message. */
@@ -153,27 +162,39 @@ public final class IronsBookBindingUtil {
     public static AppendResult appendArsSpellToBook(ItemStack book, CompoundTag arsTag,
                                                     String customName, String nature,
                                                     String iconSymbol, int maxCap) {
+        return appendArsSpellToBook(book, arsTag, customName, nature, iconSymbol, null, maxCap);
+    }
+
+    /**
+     * {@link #appendArsSpellToBook(ItemStack, CompoundTag, String, String, String, int)} that
+     * also carries the scroll's stored school onto the new entry, unchanged. Null or empty is
+     * Automatic. The value is copied, not judged: whether it applies is decided at each cast.
+     */
+    public static AppendResult appendArsSpellToBook(ItemStack book, CompoundTag arsTag,
+                                                    String customName, String nature,
+                                                    String iconSymbol, String school, int maxCap) {
         if (book == null || book.isEmpty()) return AppendResult.FAILED;
         ItemStack working = book.copy();
-        AppendResult result = appendToWorkingCopy(working, arsTag, customName, nature, iconSymbol, maxCap);
+        AppendResult result = appendToWorkingCopy(working, arsTag, customName, nature, iconSymbol, school, maxCap);
         if (result.wasAdded()) book.applyComponents(working.getComponentsPatch());
         return result;
     }
 
     private static AppendResult appendToWorkingCopy(ItemStack book, CompoundTag arsTag,
                                                     String customName, String nature,
-                                                    String iconSymbol, int maxCap) {
+                                                    String iconSymbol, String school, int maxCap) {
         if (book == null || book.isEmpty()) {
             return AppendResult.FAILED;
         }
         CrossModSpellList list = CrossModSpellComponents.get(book);
-        PlannedAppend plan = planAppend(list, arsTag, maxCap);
+        String storedSchool = SpellSchoolChoice.normalize(school);
+        PlannedAppend plan = planAppend(list, arsTag, storedSchool, maxCap);
         if (plan.result() != AppendResult.ADDED) {
             return plan.result();
         }
         CrossModSpellComponents.addArsEntryWithMeta(book,
             CrossModSpellComponents.ARS_PLACEHOLDER_ID, 1, arsTag.copy(),
-            plan.poolId(), customName, nature, iconSymbol);
+            plan.poolId(), customName, nature, iconSymbol, storedSchool);
         // Mirror into Iron's native container so the entry shows in the wheel.
         // Gated + referenced by FQN so IronsProxySlotWriter (which imports Iron's
         // API) only classloads when Iron's is present.
@@ -195,10 +216,19 @@ public final class IronsBookBindingUtil {
      * {@code ItemStack} or any registry.
      */
     public static PlannedAppend planAppend(CrossModSpellList list, CompoundTag arsTag, int maxCap) {
+        return planAppend(list, arsTag, null, maxCap);
+    }
+
+    /**
+     * {@link #planAppend(CrossModSpellList, CompoundTag, int)} for a spell with a school
+     * selection: the same glyphs with another selection are a different spell, while a copy
+     * differing only in cosmetics is a duplicate.
+     */
+    public static PlannedAppend planAppend(CrossModSpellList list, CompoundTag arsTag, String school, int maxCap) {
         if (arsTag == null || arsTag.isEmpty()) {
             return new PlannedAppend(AppendResult.FAILED, CrossModSpellComponents.NO_PROXY_POOL_ID);
         }
-        if (CrossModSpellComponents.containsEquivalentArsSpell(list, arsTag)) {
+        if (CrossModSpellComponents.containsEquivalentArsSpell(list, arsTag, school)) {
             return new PlannedAppend(AppendResult.DUPLICATE, CrossModSpellComponents.NO_PROXY_POOL_ID);
         }
         int ceiling = effectiveProxyCeiling(maxCap);

@@ -1,0 +1,16 @@
+{
+  "block.glyph_press.engrave": {
+    "subtitle": "subtitles.ars_n_spells.block.glyph_press.engrave",
+    "sounds": [
+      { "name": "minecraft:ui/stonecutter/cut1", "volume": 0.6, "pitch": 1.2 },
+      { "name": "minecraft:ui/stonecutter/cut2", "volume": 0.6, "pitch": 1.2 }
+    ]
+  },
+  "block.glyph_press.complete": {
+    "subtitle": "subtitles.ars_n_spells.block.glyph_press.complete",
+    "sounds": [
+      { "name": "minecraft:block/amethyst/shimmer", "volume": 1.0, "pitch": 1.3 },
+      { "name": "minecraft:block/bell/bell_use01", "volume": 0.35, "pitch": 1.8 }
+    ]
+  }
+}

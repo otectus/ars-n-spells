@@ -29,7 +29,9 @@ public class ProgressionHandler {
             return;
         }
         if (event.getEntity() instanceof ServerPlayer player) {
-            String school = SpellAnalysis.analyze(event.spell).schoolKey();
+            // Same school the affinity handler credits: the cast's explicit school when it
+            // carries one, otherwise the glyphs'.
+            String school = SpellAnalysis.analyze(event.spell, event.context).schoolKey();
             if (!com.otectus.arsnspells.util.SchoolKeys.GENERIC.equals(school)) {
                 ProgressionData data = player.getData(AttachmentTypes.PROGRESSION.get());
                 data.incrementCastCount(school);

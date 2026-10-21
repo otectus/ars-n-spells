@@ -159,6 +159,50 @@ public final class ArsAffinityInteropGameTests {
         return new Spell(MethodSelf.INSTANCE, EffectHeal.INSTANCE);
     }
 
+    /**
+     * Ars Affinity weighs each resolved effect glyph by its Ars casting cost, shared across its
+     * schools. An imported glyph's Ars cost is zero (its price is the Iron's leg), so, as with a
+     * native Iron's cast, it adds no Affinity progress of its own. The Ars effects of the same cast
+     * progress exactly as they do without it, and nothing is emitted for Affinity's benefit.
+     */
+    @GameTest(template = "platform", batch = "ans_affinity")
+    public static void affinityAndIronsLoaded_importedGlyphAddsNoAffinityProgressOfItsOwn(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, AFFINITY)) return;
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        var self = com.hollingsworth.arsnouveau.common.spell.method.MethodSelf.INSTANCE;
+        var oakskin = ImportedGlyphGameTests.glyph("oakskin", 1);
+        ServerPlayer glyphOnly = realPlayer(helper);
+        ServerPlayer nativeHeal = realPlayer(helper);
+        ServerPlayer mixed = realPlayer(helper);
+        try {
+            for (ServerPlayer player : new ServerPlayer[]{glyphOnly, nativeHeal, mixed}) {
+                IronsProxyCastDriver.setMaxIronsMana(player, 10000.0);
+                IronsProxyCastDriver.setIronsMana(player, 10000.0f);
+            }
+            double before = Probe.totalProgress(glyphOnly);
+            ImportedGlyphGameTests.cast(glyphOnly, ImportedGlyphGameTests.spell(self, oakskin));
+            helper.assertTrue(ImportedGlyphGameTests.hasEffect(glyphOnly, "irons_spellbooks:oakskin"), "the imported Oakskin ran");
+            helper.assertTrue(Probe.totalProgress(glyphOnly) == before,
+                "an imported glyph alone adds no Affinity progress, as a native Iron's cast adds none; " + Probe.describe(glyphOnly));
+
+            double nativeBefore = Probe.totalProgress(nativeHeal);
+            ImportedGlyphGameTests.cast(nativeHeal, ImportedGlyphGameTests.spell(self, EffectHeal.INSTANCE));
+            double nativeDelta = Probe.totalProgress(nativeHeal) - nativeBefore;
+            double mixedBefore = Probe.totalProgress(mixed);
+            ImportedGlyphGameTests.cast(mixed, ImportedGlyphGameTests.spell(self, oakskin, EffectHeal.INSTANCE));
+            double mixedDelta = Probe.totalProgress(mixed) - mixedBefore;
+            helper.assertTrue(ImportedGlyphGameTests.hasEffect(mixed, "irons_spellbooks:oakskin"), "the imported Oakskin ran in the mixed spell");
+            helper.assertTrue(nativeDelta > 0, "an Ars Heal progresses Affinity; " + Probe.describe(nativeHeal));
+            helper.assertTrue(Math.abs(mixedDelta - nativeDelta) < 1e-9,
+                "the Ars Heal beside an imported glyph progresses exactly as it does alone: " + mixedDelta + " vs " + nativeDelta);
+        } finally {
+            release(glyphOnly);
+            release(nativeHeal);
+            release(mixed);
+        }
+        helper.succeed();
+    }
+
     private static void castNativeHeal(ServerPlayer player) {
         ItemStack stick = new ItemStack(Items.STICK);
         new SpellResolver(SpellContext.fromEntity(heal(), player, stick)).onCast(stick, player.level());

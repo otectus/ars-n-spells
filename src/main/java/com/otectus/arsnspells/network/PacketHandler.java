@@ -32,7 +32,13 @@ public final class PacketHandler {
      * "6" = transaction_sync removed along with the transaction receipt HUD.
      */
     // 7: carrier revisions cover all native item components, matching Forge's full-NBT check.
-    public static final String PROTOCOL_VERSION = "7";
+    // 8: spell_loom_export carries the requested spell school and the set-school action, and the
+    //    cross_spells component's stream codec gained the entry's school; an old client would
+    //    misdecode both, so it must be refused at negotiation.
+    // 9: 3.4.0. cross_cast_request carries the client's aim and claimed target (CastTargetHint),
+    //    and the imported-glyph catalog/behaviour payloads and the Glyph Press payloads were added.
+    //    An 8 client would misdecode the request, so negotiation must refuse it.
+    public static final String PROTOCOL_VERSION = "9";
 
     private PacketHandler() {}
 
@@ -54,6 +60,11 @@ public final class PacketHandler {
             CrossCastRequestPayload::handleOnServer);
 
         reg.playToClient(JournalSnapshotPayload.TYPE, JournalSnapshotPayload.STREAM_CODEC, JournalSnapshotPayload::handleOnClient);
+        // 3.4.0: imported Iron's glyphs and the Glyph Press.
+        reg.playToClient(ImportedGlyphSyncPayload.TYPE, ImportedGlyphSyncPayload.STREAM_CODEC, ImportedGlyphSyncPayload::handleOnClient);
+        // 3.4.0: the Glyph Press's two buttons and their outcome.
+        reg.playToServer(GlyphPressActionPayload.TYPE, GlyphPressActionPayload.STREAM_CODEC, GlyphPressActionPayload::handleOnServer);
+        reg.playToClient(GlyphPressResultPayload.TYPE, GlyphPressResultPayload.STREAM_CODEC, GlyphPressResultPayload::handleOnClient);
 
         ArsNSpells.LOGGER.info("Registered payload handlers (protocol={})", PROTOCOL_VERSION);
     }

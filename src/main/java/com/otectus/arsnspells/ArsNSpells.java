@@ -64,6 +64,9 @@ public class ArsNSpells {
         // the DeferredRegister carries the entries when the item RegisterEvent
         // fires.
         ModItemsRegistry.registerCommonItems();
+        // 3.4.0: imported Iron's glyphs. Registered with Ars before any registry event, with or
+        // without Iron's installed: their ids never depend on the optional mod (dormant without it).
+        com.otectus.arsnspells.glyph.ImportedGlyphRegistration.register();
         if (ModList.get().isLoaded("irons_spellbooks")) {
             ModItemsRegistry.registerIronsDependentItems();
             // Native-wheel proxy spells (ars_cross_1..8). FQN-only reference:
@@ -79,6 +82,7 @@ public class ArsNSpells {
         ModBlocksRegistry.register(modBus);
         ModBlockEntities.register(modBus);
         ModMenus.register(modBus);
+        com.otectus.arsnspells.registry.ModSounds.register(modBus);
         // 3.2.0: the mod's own creative tab. Registered AFTER the item registers so its
         // displayItems callback enumerates a populated DeferredRegister; the Iron's gate above
         // is what decides whether the four Iron's-only tablets are in it.
@@ -141,6 +145,12 @@ public class ArsNSpells {
         // ForgeCapabilities.ITEM_HANDLER exposure).
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK,
             ModBlockEntities.SPELL_LOOM.get(), (be, side) -> be.automation(side));
+        // 3.4.0: the Glyph Press. Its slots on the same sided pattern as the Loom's, and its Source
+        // buffer through Ars's own source capability, which relays and other Ars machines use.
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK,
+            ModBlockEntities.GLYPH_PRESS.get(), (be, side) -> be.automation(side));
+        event.registerBlockEntity(com.hollingsworth.arsnouveau.setup.registry.CapabilityRegistry.SOURCE_CAPABILITY,
+            ModBlockEntities.GLYPH_PRESS.get(), (be, side) -> be.source());
     }
 
     /**
@@ -204,6 +214,8 @@ public class ArsNSpells {
         // the config screen) without a restart.
         BridgeManager.refreshMode();
         syncClientDiagnostics();
+        // 3.4.0: imported-glyph availability follows enable_iron_glyphs etc. at once.
+        com.otectus.arsnspells.glyph.behavior.GlyphBehavior.onConfigChanged();
     }
 
     /**

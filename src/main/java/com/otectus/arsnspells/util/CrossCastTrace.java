@@ -41,7 +41,13 @@ public final class CrossCastTrace {
         UPSTREAM_CAST_ENTER,
         UPSTREAM_CAST_EXIT,
         EFFECT_APPLIED,
-        CYCLE_APPLIED
+        CYCLE_APPLIED,
+        /** The server-side target of an Ars cast: kind, position, and how it was established. */
+        TARGET_RESOLVED,
+        /** The resolver entry point an Ars cast used (onCast, onCastOnBlock, onCastOnEntity) or its refusal. */
+        DISPATCH,
+        /** An imported Iron's glyph invocation changed state (admitted, paid, applied, released). */
+        GLYPH_INVOCATION
     }
 
     private CrossCastTrace() {

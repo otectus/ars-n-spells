@@ -17,6 +17,7 @@ public abstract class MixinSpellResolverMana {
     private void arsnspells$expendMana(CallbackInfo ci) {
         if (spellContext != null && spellContext.getUnwrappedCaster() instanceof net.minecraft.server.level.ServerPlayer player) {
             com.otectus.arsnspells.events.CooldownHandler.commit(player, spellContext);
+            com.otectus.arsnspells.glyph.runtime.GlyphSessions.rootLaunched(spellContext);
             if (ArsCastPayments.commit(player, spellContext)) ci.cancel();
         }
     }

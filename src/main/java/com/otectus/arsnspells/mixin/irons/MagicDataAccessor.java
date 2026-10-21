@@ -20,4 +20,17 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface MagicDataAccessor {
     @Accessor("serverPlayer")
     ServerPlayer arsnspells$getServerPlayer();
+
+    /**
+     * 3.4.0: an imported glyph runs Iron's code against a detached casting slot that shares the
+     * player's real recast store, so native recast stages and limits carry over. Iron's own
+     * setter is client-only.
+     */
+    @Accessor("playerRecasts")
+    void arsnspells$setPlayerRecasts(io.redspace.ironsspellbooks.capabilities.magic.PlayerRecasts recasts);
+
+    /** The detached slot also shares the real cooldowns, which some spells read while casting. */
+    @org.spongepowered.asm.mixin.Mutable
+    @Accessor("playerCooldowns")
+    void arsnspells$setPlayerCooldowns(io.redspace.ironsspellbooks.capabilities.magic.PlayerCooldowns cooldowns);
 }

@@ -19,7 +19,7 @@ The previous Forge 1.20.1 testing guide also referenced Covenant of the Seven (S
 
 Drop `build/libs/ars_n_spells-3.2.2.jar` into the instance's `mods/` folder alongside the dependencies. The Gradle dev environment exposes `runClient`, `runServer`, `runGameTestServer`, and `runData` tasks.
 
-To enable verbose log output during testing, set in `config/ars_n_spells-common.toml`:
+To enable verbose log output during testing, set in the world's `serverconfig/ars_n_spells-server.toml`:
 
 ```toml
 debug_mode = true
@@ -127,7 +127,7 @@ Pass: attribute modifier and affinity level are preserved. Probes `AttachmentTyp
 
 ### V9 — Config hot-reload — should pass now
 
-1. Toggle `enable_cross_mod_cooldowns` in `config/ars_n_spells-common.toml`.
+1. Toggle `enable_cross_mod_cooldowns` in `serverconfig/ars_n_spells-server.toml`.
 2. `/reload`.
 
 Pass: no server crash; the new config value takes effect without restart.
@@ -425,7 +425,7 @@ Include in the bug report:
 
 1. NeoForge version (must be 1.21.1 / 21.1.84+), Minecraft 1.21.1.
 2. Ars Nouveau and Iron's Spells 'n Spellbooks versions.
-3. The relevant `config/ars_n_spells-common.toml` keys.
+3. The relevant `serverconfig/ars_n_spells-server.toml` keys.
 4. `logs/latest.log` excerpts. With `debug_mode = true` enabled, look for log lines prefixed `[Cooldown]`, `[Affinity]`, or messages from the mixin / payload register lifecycle.
 5. The exact reproduction steps tied to one of the scenarios above where possible.
 6. If the issue may be Phase 3-related, mention which `TODO(Phase 11)` marker (if any) is in the suspected code path.

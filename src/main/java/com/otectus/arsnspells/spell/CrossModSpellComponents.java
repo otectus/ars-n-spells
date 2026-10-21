@@ -185,6 +185,24 @@ public final class CrossModSpellComponents {
                                                  @Nullable String customName,
                                                  @Nullable String nature,
                                                  @Nullable String iconSymbol) {
+        return withArsEntry(list, spellId, spellLevel, arsSpellTag, proxyPoolId, customName, nature, iconSymbol, null);
+    }
+
+    /**
+     * {@link #withArsEntry(CrossModSpellList, ResourceLocation, int, CompoundTag, int, String,
+     * String, String)} plus an explicit mechanical school. Null or empty is Automatic and leaves
+     * the field absent, so the entry equals one written before schools existed. The value is
+     * stored as given: callers validate it.
+     */
+    public static CrossModSpellList withArsEntry(CrossModSpellList list,
+                                                 @Nullable ResourceLocation spellId,
+                                                 int spellLevel,
+                                                 @Nullable CompoundTag arsSpellTag,
+                                                 int proxyPoolId,
+                                                 @Nullable String customName,
+                                                 @Nullable String nature,
+                                                 @Nullable String iconSymbol,
+                                                 @Nullable String school) {
         CrossModSpell entry = new CrossModSpell(
             spellId != null ? spellId : ARS_PLACEHOLDER_ID,
             spellLevel,
@@ -194,7 +212,9 @@ public final class CrossModSpellComponents {
             proxyPoolId,
             optionalOfNonEmpty(customName),
             optionalOfNonEmpty(nature),
-            optionalOfNonEmpty(iconSymbol)
+            optionalOfNonEmpty(iconSymbol),
+            optionalOfNonEmpty(school),
+            new CompoundTag()
         );
         List<CrossModSpell> next = new ArrayList<>(list.spells());
         next.add(entry);
@@ -213,9 +233,23 @@ public final class CrossModSpellComponents {
                                           @Nullable String customName,
                                           @Nullable String nature,
                                           @Nullable String iconSymbol) {
+        return addArsEntryWithMeta(stack, spellId, spellLevel, arsSpellTag, proxyPoolId,
+            customName, nature, iconSymbol, null);
+    }
+
+    /** {@link #addArsEntryWithMeta(ItemStack, ResourceLocation, int, CompoundTag, int, String, String, String)} with a school. */
+    public static int addArsEntryWithMeta(ItemStack stack,
+                                          @Nullable ResourceLocation spellId,
+                                          int spellLevel,
+                                          @Nullable CompoundTag arsSpellTag,
+                                          int proxyPoolId,
+                                          @Nullable String customName,
+                                          @Nullable String nature,
+                                          @Nullable String iconSymbol,
+                                          @Nullable String school) {
         if (schemaVersion(stack) > SCHEMA_VERSION) return -1;
         CrossModSpellList next = withArsEntry(get(stack), spellId, spellLevel, arsSpellTag,
-            proxyPoolId, customName, nature, iconSymbol);
+            proxyPoolId, customName, nature, iconSymbol, school);
         stack.set(ModDataComponents.CROSS_SPELLS.get(), next);
         stampSchemaVersion(stack);
         return next.size() - 1;
@@ -334,15 +368,62 @@ public final class CrossModSpellComponents {
     }
 
     /**
-     * True when the list already carries an Ars entry with the same serialized
-     * spell payload. Dedup keys on the {@code arsSpellTag} blob â€” never on the
-     * shared {@link #ARS_PLACEHOLDER_ID} â€” so two different Ars spells on one
-     * book are never treated as duplicates.
+     * The entry at {@code index} with {@code school} as its explicit school (null or empty for
+     * Automatic), every other entry and field kept as it was. Returns the input unchanged for an
+     * index that is out of range.
+     */
+    public static CrossModSpellList withEntrySchool(CrossModSpellList list, int index, @Nullable String school) {
+        if (index < 0 || index >= list.size()) {
+            return list;
+        }
+        List<CrossModSpell> next = new ArrayList<>(list.spells());
+        next.set(index, next.get(index).withSchool(school));
+        return new CrossModSpellList(List.copyOf(next), list.selectedIndex(), list.unknownFields());
+    }
+
+    /**
+     * Keys of the serialized Ars spell that only change how it looks or sounds: its name,
+     * particle colour (Ars 5.x writes {@code color}, 4.x {@code spellColor}), cast sound and
+     * particle timeline. Duplicate detection ignores them.
+     */
+    private static final Set<String> COSMETIC_PAYLOAD_KEYS =
+        Set.of("name", "spellColor", "color", "sound", "particleTimeline");
+
+    /** The part of a serialized Ars spell that decides what it does: the payload minus cosmetics. */
+    public static CompoundTag mechanicalPayload(@Nullable CompoundTag arsSpellTag) {
+        CompoundTag copy = arsSpellTag == null ? new CompoundTag() : arsSpellTag.copy();
+        COSMETIC_PAYLOAD_KEYS.forEach(copy::remove);
+        return copy;
+    }
+
+    /**
+     * True when the list already carries an Automatic Ars entry that casts the same spell.
+     * Dedup keys on the payload — never on the shared {@link #ARS_PLACEHOLDER_ID} — so two
+     * different Ars spells on one book are never treated as duplicates.
      */
     public static boolean containsEquivalentArsSpell(CrossModSpellList list, @Nullable CompoundTag arsSpellTag) {
+        return containsEquivalentArsSpell(list, arsSpellTag, null);
+    }
+
+    /**
+     * True when the list already carries an entry with the same mechanical identity: the same
+     * payload, ignoring its cosmetic keys, and the same school selection.
+     *
+     * <p>Deliberate rules: names, backgrounds, icons, colours and sounds are cosmetic, so a copy
+     * differing only in those is a duplicate. The school selection is mechanical, so the same
+     * glyphs with another selection (Automatic or another school) are a different spell.
+     *
+     * @param school the stored selection being bound; null or empty is Automatic
+     */
+    public static boolean containsEquivalentArsSpell(CrossModSpellList list, @Nullable CompoundTag arsSpellTag,
+                                                     @Nullable String school) {
         if (arsSpellTag == null) return false;
+        CompoundTag wanted = mechanicalPayload(arsSpellTag);
+        String selection = SpellSchoolChoice.normalize(school);
         for (CrossModSpell entry : list.spells()) {
-            if (entry.arsSpellTag().isPresent() && arsSpellTag.equals(entry.arsSpellTag().get())) {
+            if (entry.arsSpellTag().isPresent()
+                && wanted.equals(mechanicalPayload(entry.arsSpellTag().get()))
+                && selection.equals(SpellSchoolChoice.normalize(entry.school().orElse("")))) {
                 return true;
             }
         }

@@ -100,7 +100,14 @@ neoForge {
             // copied QA save, or -PcastingSmokeAddress=<host:port> a disposable QA server.
             systemProperty 'ans.castingSmoke.client', project.hasProperty('withCastingClientSmoke').toString()
             systemProperty 'ans.castingSmoke.address', (project.findProperty('castingSmokeAddress') ?: '').toString()
-            programArguments.addAll '--username', 'Dev'
+            // 3.4.0 glyph QA: -PwithGlyphQaClient -PglyphQaAddress=<host:port> drives a disposable QA
+            // server running -PwithGlyphQaServer (see GlyphQaClient / GlyphQaServer).
+            systemProperty 'ans.glyphQa.client', project.hasProperty('withGlyphQaClient').toString()
+            systemProperty 'ans.glyphQa.address', (project.findProperty('glyphQaAddress') ?: '').toString()
+            systemProperty 'ans.glyphQa.clientPhase', (project.findProperty('glyphQaClientPhase') ?: '1').toString()
+            systemProperty 'ans.glyphQa.role', (project.findProperty('glyphQaRole') ?: '').toString()
+            // -PclientUser names a second dev client (two-client QA); offline servers key players by name.
+            programArguments.addAll '--username', (project.findProperty('clientUser') ?: 'Dev').toString()
         }
         server {
             server()
@@ -108,6 +115,8 @@ neoForge {
             gameDirectory = project.file(project.findProperty('gametestRunDir') ?: 'run-server')
             programArgument '--nogui'
             systemProperty 'ans.castingSmoke.server', project.hasProperty('withCastingServerSmoke').toString()
+            systemProperty 'ans.glyphQa.server', project.hasProperty('withGlyphQaServer').toString()
+            systemProperty 'ans.glyphQa.phase', (project.findProperty('glyphQaPhase') ?: '1').toString()
         }
         // Headless gameplay tests. Namespace-gated so other mods' GameTests do not run.
         gameTestServer {
@@ -121,6 +130,9 @@ neoForge {
             systemProperty 'ans.gametest.expected.ars_affinity', project.hasProperty('withArsAffinity').toString()
             systemProperty 'ans.gametest.expected.ars_zero', project.hasProperty('withArsZero').toString()
             systemProperty 'ans.gametest.expected.ars_elemancy', project.hasProperty('withArsElemancy').toString()
+            // -PglyphCatalogDump=<file>: write the loaded Iron's spell inventory, the input of
+            // tools/generate_iron_glyph_catalog.py, which regenerates the shipped glyph catalog.
+            systemProperty 'ans.glyphCatalogDump', (project.findProperty('glyphCatalogDump') ?: '').toString()
         }
         data {
             data()

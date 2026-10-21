@@ -1,0 +1,31 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:mod_loaded",
+      "modid": "irons_spellbooks"
+    }
+  ],
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_source_gem": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          { "items": "#c:gems/source" }
+        ]
+      }
+    },
+    "has_the_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": {
+        "recipe": "ars_n_spells:glyph_press"
+      }
+    }
+  },
+  "requirements": [
+    [ "has_source_gem", "has_the_recipe" ]
+  ],
+  "rewards": {
+    "recipes": [ "ars_n_spells:glyph_press" ]
+  }
+}

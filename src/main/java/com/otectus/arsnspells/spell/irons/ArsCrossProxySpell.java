@@ -195,7 +195,10 @@ public class ArsCrossProxySpell extends AbstractSpell {
         UUID attemptId = UUID.randomUUID();
         CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
             CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "runtime", "ARS_PROXY", "pool", poolId);
-        boolean success = CrossCastingHandler.castArsSpell(player, carrier.book(), carrier.entry(), attemptId);
+        // A wheel, hotkey or staff cast carries no client claim: the server picks the target
+        // along the player's current rotation, by the same Ars rules a scroll cast uses.
+        boolean success = CrossCastingHandler.castArsSpell(player, carrier.book(), carrier.entry(), attemptId,
+            castingHand(playerMagicData), null);
         // Only a delegated cast that actually resolved may start this proxy's native cooldown.
         com.otectus.arsnspells.casting.IronsCastLifecycle.recordDelegatedResult(player, this, success);
         if (success) {
@@ -203,6 +206,17 @@ public class ArsCrossProxySpell extends AbstractSpell {
             // granted here too (grant() is idempotent).
             AdvancementUtil.grant(player, "first_cross_cast");
         }
+    }
+
+    /**
+     * The hand Iron's attributes this cast to: the hand holding the casting item for a held book
+     * or staff, the main hand for a book cast from its Curios slot (Ars needs some hand for a
+     * block cast's use context; the book itself stays the casting tool).
+     */
+    private static net.minecraft.world.InteractionHand castingHand(MagicData magicData) {
+        String slot = magicData.getCastingEquipmentSlot();
+        return io.redspace.ironsspellbooks.api.magic.SpellSelectionManager.OFFHAND.equals(slot)
+            ? net.minecraft.world.InteractionHand.OFF_HAND : net.minecraft.world.InteractionHand.MAIN_HAND;
     }
 
     /**

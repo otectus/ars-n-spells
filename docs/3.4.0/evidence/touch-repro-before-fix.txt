@@ -1,0 +1,42 @@
+123:[20Oct2026 17:38:41.157] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=bind_tbl_cast form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+153:[20Oct2026 17:38:41.606] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=icd_reduction form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+187:[20Oct2026 17:38:41.617] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=icd_success form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+221:[20Oct2026 17:38:41.634] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=icd_shared form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+256:[20Oct2026 17:38:41.648] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=icd_category form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+290:[20Oct2026 17:38:41.658] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=icd_zero form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+347:[20Oct2026 17:38:42.063] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_multi form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+352:[20Oct2026 17:38:42.068] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_multi form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+357:[20Oct2026 17:38:42.071] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_multi form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+363:[20Oct2026 17:38:42.605] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=staff_two_books_ form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+364:[20Oct2026 17:38:42.608] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=staff_two_books_ form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+366:[20Oct2026 17:38:42.671] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=staff_survival form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+367:[20Oct2026 17:38:42.697] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=ans_gametest form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+395:[20Oct2026 17:38:42.742] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=staff_hotkey form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+424:[20Oct2026 17:38:43.096] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=ans_gametest form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+425:[20Oct2026 17:38:43.105] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=staff_equipped form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+427:[20Oct2026 17:38:43.232] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=funded_ars_proxy form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+461:[20Oct2026 17:38:43.530] [Server thread/INFO] [net.minecraft.gametest.framework.GameTestRunner/]: Running test batch 'ans_touch:0' (3 tests)...
+466:[20Oct2026 17:38:43.572] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=touch_harm form=ars_nouveau:glyph_touch resolverEntry=onCast accepted=false
+467:[20Oct2026 17:38:43.584] [Server thread/ERROR] [net.minecraft.gametest.framework.LogTestReporter/]: genericcarrier_touchharm_hurtsthelivingtarget failed at 8606253, -60, 2078504! Touch -> Harm cast from a carrier must hurt the living target in front of the caster; health 10.0 -> 10.0
+471:[20Oct2026 17:38:43.591] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=touch_generic form=ars_nouveau:glyph_touch resolverEntry=onCast accepted=false
+472:[20Oct2026 17:38:43.597] [Server thread/ERROR] [net.minecraft.gametest.framework.LogTestReporter/]: genericcarrier_touchbreak_breakstheblockinfront failed at 8606263, -60, 2078504! Expected Air, got Dirt at 8606266,-58,2078506 (relative: 3,2,2) (t=0)
+476:[20Oct2026 17:38:43.608] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=touch_scroll form=ars_nouveau:glyph_touch resolverEntry=onCast accepted=false
+477:[20Oct2026 17:38:43.610] [Server thread/ERROR] [net.minecraft.gametest.framework.LogTestReporter/]: ironsloaded_exportedscroll_touchbreak_breakstheblockinfront failed at 8606273, -60, 2078504! Expected Air, got Dirt at 8606276,-58,2078506 (relative: 3,2,2) (t=0)
+3156:[20Oct2026 17:38:46.781] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_wheel_cas form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+3157:[20Oct2026 17:38:46.789] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_scroll_ca form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+3158:[20Oct2026 17:38:46.801] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_native form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+3159:[20Oct2026 17:38:46.819] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_removed form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+3160:[20Oct2026 17:38:46.835] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_legacy form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+3161:[20Oct2026 17:38:46.861] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_delay form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+3162:[20Oct2026 17:38:46.864] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_delay form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+3163:[20Oct2026 17:38:46.866] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_delay form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+3164:[20Oct2026 17:38:46.869] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_delay form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+3165:[20Oct2026 17:38:46.881] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_bind_rout form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+3166:[20Oct2026 17:38:46.973] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_damage form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+3167:[20Oct2026 17:38:46.980] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_damage form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+3168:[20Oct2026 17:38:46.984] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_damage form=ars_nouveau:glyph_projectile resolverEntry=onCast accepted=true
+3173:[20Oct2026 17:38:47.256] [Server thread/INFO] [ANS-TouchRepro/]: castArsSpell player=school_disabled form=ars_nouveau:glyph_self resolverEntry=onCast accepted=true
+3182:[20Oct2026 17:38:47.311] [Server thread/INFO] [net.minecraft.gametest.framework.GameTestServer/]: 3 required tests failed :(
+[20Oct2026 17:38:13.734] [main/INFO] [cpw.mods.modlauncher.Launcher/MODLAUNCHER]: ModLauncher running: args [--launchTarget, forgeserverdev, --gameDir, ., --fml.fmlVersion, 4.0.43, --fml.mcVersion, 1.
+[20Oct2026 17:38:13.737] [main/INFO] [cpw.mods.modlauncher.Launcher/MODLAUNCHER]: JVM identified as Eclipse Adoptium OpenJDK 64-Bit Server VM 21.0.12.1+1-LTS
+[20Oct2026 17:38:13.740] [main/INFO] [cpw.mods.modlauncher.Launcher/MODLAUNCHER]: ModLauncher 11.0.5+main.901c6ea8 starting: java version 21.0.12.1 by Eclipse Adoptium; OS Linux arch amd64 version 7.2

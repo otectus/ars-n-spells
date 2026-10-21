@@ -30,7 +30,12 @@ import java.util.Optional;
  * player-authored wheel display name; {@code nature}/{@code iconSymbol} pick
  * the wheel icon (whitelisted keys — see
  * {@link CrossModSpellComponents#NATURE_KEYS} /
- * {@link CrossModSpellComponents#ICON_SYMBOLS}).
+ * {@link CrossModSpellComponents#ICON_SYMBOLS}). The nature is a cosmetic background only.
+ *
+ * {@code school} (3.3.7, additive) is the entry's explicit mechanical school, a namespaced
+ * Iron's school id such as {@code irons_spellbooks:ice}. Absent means Automatic: the glyphs
+ * decide, exactly as for an entry written before the field existed. It is never derived from the
+ * nature, and whether it applies is decided at each cast by {@link SpellSchoolChoice}.
  */
 public record CrossModSpell(
     ResourceLocation spellId,
@@ -42,11 +47,28 @@ public record CrossModSpell(
     Optional<String> customName,
     Optional<String> nature,
     Optional<String> iconSymbol,
+    Optional<String> school,
     CompoundTag unknownFields
 ) {
     public CrossModSpell {
         unknownFields = unknownFields == null ? new CompoundTag() : unknownFields.copy();
         arsSpellTag = arsSpellTag == null ? Optional.empty() : arsSpellTag.map(CompoundTag::copy);
+        school = school == null ? Optional.empty() : school.filter(value -> !value.isEmpty());
+    }
+
+    /** Pre-3.3.7 shape plus preserved extension fields: Automatic. */
+    public CrossModSpell(ResourceLocation spellId, int level, String typeName,
+                         Optional<CompoundTag> arsSpellTag, Optional<String> castSource,
+                         int proxyPoolId, Optional<String> customName, Optional<String> nature,
+                         Optional<String> iconSymbol, CompoundTag unknownFields) {
+        this(spellId, level, typeName, arsSpellTag, castSource, proxyPoolId,
+            customName, nature, iconSymbol, Optional.empty(), unknownFields);
+    }
+
+    /** This entry with {@code school} as its explicit school; null or empty makes it Automatic. */
+    public CrossModSpell withSchool(String school) {
+        return new CrossModSpell(spellId, level, typeName, arsSpellTag, castSource, proxyPoolId,
+            customName, nature, iconSymbol, Optional.ofNullable(school), unknownFields);
     }
 
     /** Mutable NBT cannot leak through an otherwise immutable component record. */
@@ -66,7 +88,7 @@ public record CrossModSpell(
                          int proxyPoolId, Optional<String> customName, Optional<String> nature,
                          Optional<String> iconSymbol) {
         this(spellId, level, typeName, arsSpellTag, castSource, proxyPoolId,
-            customName, nature, iconSymbol, new CompoundTag());
+            customName, nature, iconSymbol, Optional.empty(), new CompoundTag());
     }
 
     /** Legacy shape (pre-3.0.x): no proxy metadata. Kept so existing callers compile untouched. */
@@ -90,15 +112,18 @@ public record CrossModSpell(
             .forGetter(CrossModSpell::proxyPoolId),
         Codec.STRING.optionalFieldOf("custom_name").forGetter(CrossModSpell::customName),
         Codec.STRING.optionalFieldOf("nature").forGetter(CrossModSpell::nature),
-        Codec.STRING.optionalFieldOf("icon_symbol").forGetter(CrossModSpell::iconSymbol)
-    ).apply(i, CrossModSpell::new));
+        Codec.STRING.optionalFieldOf("icon_symbol").forGetter(CrossModSpell::iconSymbol),
+        Codec.STRING.optionalFieldOf("school").forGetter(CrossModSpell::school)
+    ).apply(i, (spellId, level, typeName, arsSpellTag, castSource, proxyPoolId, customName, nature, iconSymbol, school)
+        -> new CrossModSpell(spellId, level, typeName, arsSpellTag, castSource, proxyPoolId,
+            customName, nature, iconSymbol, school, new CompoundTag())));
 
     public static final Codec<CrossModSpell> CODEC = PreservingRecordCodec.wrap(KNOWN_CODEC,
         java.util.Set.of("spell_id", "spell_level", "spell_type", "ars_spell", "cast_source",
-            "proxy_pool_id", "custom_name", "nature", "icon_symbol"), CrossModSpell::unknownFields,
+            "proxy_pool_id", "custom_name", "nature", "icon_symbol", "school"), CrossModSpell::unknownFields,
         (value, extras) -> new CrossModSpell(value.spellId(), value.level(), value.typeName(),
             value.arsSpellTag(), value.castSource(), value.proxyPoolId(), value.customName(),
-            value.nature(), value.iconSymbol(), extras));
+            value.nature(), value.iconSymbol(), value.school(), extras));
 
     // Hand-written: StreamCodec.composite maxes out at 6 fields on 1.21.1.
     public static final StreamCodec<RegistryFriendlyByteBuf, CrossModSpell> STREAM_CODEC =
@@ -113,6 +138,7 @@ public record CrossModSpell(
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).encode(buf, value.customName());
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).encode(buf, value.nature());
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).encode(buf, value.iconSymbol());
+                ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).encode(buf, value.school());
                 ByteBufCodecs.COMPOUND_TAG.encode(buf, value.unknownFields());
             },
             buf -> new CrossModSpell(
@@ -122,6 +148,7 @@ public record CrossModSpell(
                 ByteBufCodecs.optional(ByteBufCodecs.COMPOUND_TAG).decode(buf),
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buf),
                 ByteBufCodecs.VAR_INT.decode(buf),
+                ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buf),
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buf),
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buf),
                 ByteBufCodecs.optional(ByteBufCodecs.STRING_UTF8).decode(buf),

@@ -46,7 +46,8 @@ class ItemAssetCompletenessTest {
         com.otectus.arsnspells.rituals.SpellUninscriptionRitual.REGISTRY_PATH,
         com.otectus.arsnspells.rituals.ManaInfusionRitual.REGISTRY_PATH,
         com.otectus.arsnspells.rituals.ManaWellRitual.REGISTRY_PATH,
-        "blank_scroll"
+        "blank_scroll",
+        "blank_glyph_plate"
     );
 
     @Test

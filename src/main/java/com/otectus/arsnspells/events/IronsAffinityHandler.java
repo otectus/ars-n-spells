@@ -30,6 +30,10 @@ public class IronsAffinityHandler {
 
     @SubscribeEvent
     public void onIronsSpellCast(SpellOnCastEvent event) {
+        // One root-cast credit: an imported glyph is credited through the Ars cast that carries it.
+        if (com.otectus.arsnspells.glyph.runtime.GlyphInvocationScope.active()) {
+            return;
+        }
         // ANS cross-cast proxies are zero-cost ENDER-school placeholders; the delegated
         // Ars cast owns affinity for its real school. Crediting the placeholder would
         // grant Ender affinity for every Ars spell cast through the native wheel.

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "spell": "irons_spellbooks:firebolt",
+  "adapter": "ars_n_spells:projectile",
+  "enabled": true,
+  "defaults": { "source_cost": 800 },
+  "levels": {
+    "3": {
+      "ars_tier": 2,
+      "source_cost": 1500,
+      "duration_ticks": 140,
+      "catalyst": { "tag": "ars_n_spells:glyph_press_catalysts", "count": 2 }
+    },
+    "10": { "enabled": false }
+  }
+}

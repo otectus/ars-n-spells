@@ -110,6 +110,20 @@ public final class SchoolResolver {
     }
 
     /**
+     * The Ars school id that translates to {@code school}, the inverse of the table above, so an
+     * imported Iron's glyph declares the Ars school an Ars focus, Ars Affinity or the school
+     * tooltip expects. Empty for Iron's schools with no Ars counterpart (Blood) and for addon
+     * schools.
+     */
+    public static java.util.Optional<String> arsSchoolFor(SpellSchoolId school) {
+        return ARS_SCHOOL_TO_CANONICAL.entrySet().stream()
+            .filter(e -> e.getValue() == school)
+            .map(Map.Entry::getKey)
+            .sorted()
+            .findFirst();
+    }
+
+    /**
      * Resolve the canonical school of a single glyph. Never null; {@link SpellSchoolId#GENERIC}
      * when unknown.
      *
@@ -118,6 +132,10 @@ public final class SchoolResolver {
      * lets the whole resolution chain be unit-tested without an Ars runtime.
      */
     public static SpellSchoolId resolve(@Nullable AbstractSpellPart part) {
+        if (part instanceof com.otectus.arsnspells.glyph.ImportedIronEffect imported) {
+            // An imported Iron's glyph is exactly its spell's school; no translation applies.
+            return SpellSchoolId.fromId(imported.ironsSchool().getPath());
+        }
         if (part != null && isNonPayloadPart(part)) return SpellSchoolId.GENERIC;
         return resolve(registryIdOf(part), declaredArsSchoolsOf(part));
     }
@@ -159,6 +177,10 @@ public final class SchoolResolver {
      * an empty set. Empty is therefore a normal, meaningful result.
      */
     public static Set<SpellSchoolId> resolveAll(@Nullable AbstractSpellPart part) {
+        if (part instanceof com.otectus.arsnspells.glyph.ImportedIronEffect imported) {
+            SpellSchoolId school = SpellSchoolId.fromId(imported.ironsSchool().getPath());
+            return school.isGeneric() ? Collections.emptySet() : Set.of(school);
+        }
         if (part != null && isNonPayloadPart(part)) return Collections.emptySet();
         return resolveAll(registryIdOf(part), declaredArsSchoolsOf(part));
     }
@@ -196,6 +218,9 @@ public final class SchoolResolver {
 
     /** Namespaced ordered memberships; cosmetic metadata is never consulted. */
     public static List<String> resolveKeys(@Nullable AbstractSpellPart part) {
+        if (part instanceof com.otectus.arsnspells.glyph.ImportedIronEffect imported) {
+            return List.of(SchoolKeys.normalize(imported.ironsSchool().toString()));
+        }
         if (part == null || part.getRegistryName() == null || isNonPayloadPart(part))
             return List.of(SchoolKeys.GENERIC);
         List<String> declared = new ArrayList<>();

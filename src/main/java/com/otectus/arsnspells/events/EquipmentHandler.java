@@ -56,10 +56,18 @@ public final class EquipmentHandler {
         DIRTY.add(player.getUUID());
     }
 
+    /** Players whose login clamp waits for their first tick end. */
+    private static final java.util.Set<java.util.UUID> LOGIN_CLAMP_PENDING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            com.otectus.arsnspells.bridge.ModeChangeCleanup.reconcile(player);
+            // Rebuild now, so the pool is never left under a bare ceiling, but clamp at the first
+            // tick end. Vanilla applies equipment attribute modifiers in that tick, so a maximum
+            // read at login lacks every gear contribution; clamping to it cut the saved balance
+            // down to the gearless maximum on every login (3.3.0 to 3.3.6).
+            com.otectus.arsnspells.bridge.ModeChangeCleanup.rebuild(player);
+            LOGIN_CLAMP_PENDING.add(player.getUUID());
         }
     }
 
@@ -67,6 +75,11 @@ public final class EquipmentHandler {
     public static void onPlayerTickPost(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
+        }
+        if (LOGIN_CLAMP_PENDING.remove(player.getUUID())) {
+            // The login's clamp and client sync, now that the gear is in force.
+            com.otectus.arsnspells.bridge.ModeChangeCleanup.reconcile(player);
+            DIRTY.remove(player.getUUID());
         }
         // Once per second — picks up dynamic Ars perk/potion mana sources. The
         // recompute is cheap and only churns Iron's attributes when a value changed.
@@ -90,7 +103,13 @@ public final class EquipmentHandler {
         if (event.getEntity() instanceof ServerPlayer player) DIRTY.add(player.getUUID());
     }
     @SubscribeEvent
-    public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) { DIRTY.remove(event.getEntity().getUUID()); }
+    public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        DIRTY.remove(event.getEntity().getUUID());
+        LOGIN_CLAMP_PENDING.remove(event.getEntity().getUUID());
+    }
     @SubscribeEvent
-    public static void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) { DIRTY.clear(); }
+    public static void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {
+        DIRTY.clear();
+        LOGIN_CLAMP_PENDING.clear();
+    }
 }

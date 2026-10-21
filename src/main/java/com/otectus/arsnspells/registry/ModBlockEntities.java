@@ -17,6 +17,11 @@ public final class ModBlockEntities {
             () -> BlockEntityType.Builder.of(SpellLoomBlockEntity::new,
                 ModBlocksRegistry.SPELL_LOOM.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.otectus.arsnspells.block.GlyphPressBlockEntity>> GLYPH_PRESS =
+        BLOCK_ENTITIES.register("glyph_press",
+            () -> BlockEntityType.Builder.of(com.otectus.arsnspells.block.GlyphPressBlockEntity::new,
+                ModBlocksRegistry.GLYPH_PRESS.get()).build(null));
+
     private ModBlockEntities() {}
 
     public static void register(IEventBus modBus) {

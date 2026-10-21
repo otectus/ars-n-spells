@@ -60,7 +60,9 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.endsWith("MixinInscriptionTableMenu")
             || mixinClassName.endsWith("MixinInscriptionTableScreen")
             || mixinClassName.endsWith("MixinAbstractSpellArsIcon")
-            || mixinClassName.endsWith("MixinItemStackIconContext")) {
+            || mixinClassName.endsWith("MixinItemStackIconContext")
+            || mixinClassName.endsWith("MixinRaycastBuilderGlyph")
+            || mixinClassName.endsWith("MixinUtilsTargetBlockGlyph")) {
             return ironsPresent;
         }
         if (mixinClassName.endsWith("MixinManaCapability")) {
@@ -68,6 +70,12 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         }
         if (mixinClassName.endsWith("MixinSpellResolverMana")
             || mixinClassName.endsWith("MixinSpellResolverPreCast")) {
+            return arsSpellResolverPresent;
+        }
+        // 3.4.0 imported-glyph hooks: Ars is required, so these apply wherever Ars's classes are.
+        if (mixinClassName.endsWith("MixinStandardSpellValidator")
+            || mixinClassName.endsWith("MixinImportedAugmentCost")
+            || mixinClassName.endsWith("MixinManaCapGlyphBonus")) {
             return arsSpellResolverPresent;
         }
         return true;

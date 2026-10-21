@@ -23,13 +23,14 @@ public class SpellLoomMenu extends AbstractContainerMenu {
     // ---- Layout constants ----
     // Single source of truth for slot geometry; the screen derives every dependent coordinate
     // from these. The GUI is 176x240, taller than a vanilla chest, so the name field, recipe
-    // row and two button rows fit ABOVE the player inventory. At the vanilla 166 height the
+    // row, the school row, two button rows and two status lines fit ABOVE the player inventory,
+    // while still fitting Minecraft's minimum 320x240 scaled viewport. At the vanilla 166 height the
     // Inscribe button (y+74..92) overlapped the inventory's top row (y+84..100), and
     // AbstractContainerScreen draws widgets before slot items and the hover highlight - so
     // items and a pale highlight square painted over the button, and the top 9 pixels of nine
     // inventory slots could not be clicked.
     public static final int GUI_WIDTH = 176;
-    public static final int GUI_HEIGHT = 224;
+    public static final int GUI_HEIGHT = 240;
     public static final int SLOT_SIZE = 18;
     /** Working-slot columns (16px inner boxes at these x positions). */
     public static final int SLOT_SOURCE_X = 26;
@@ -37,7 +38,7 @@ public class SpellLoomMenu extends AbstractContainerMenu {
     public static final int SLOT_OUTPUT_X = 120;
     /** Working-slot row. */
     public static final int RECIPE_ROW_Y = 40;
-    /** Player inventory: vanilla formulas for a 224-tall container. */
+    /** Player inventory: vanilla formulas for a 240-tall container. */
     public static final int INV_LEFT = 8;
     public static final int INV_TOP = GUI_HEIGHT - 82;
     public static final int HOTBAR_Y = GUI_HEIGHT - 24;

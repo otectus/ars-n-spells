@@ -35,11 +35,19 @@ public final class VanillaGui {
 
     /** Same 22-pixel empty recipe arrow silhouette as vanilla crafting. */
     public static void arrow(GuiGraphics g, int x, int y) {
-        for (int row = 0; row < 15; row++) {
-            int half = 7 - Math.abs(7 - row);
-            g.fill(x + 14, y + row, x + 15 + half, y + row + 1, 0xFF8B8B8B);
+        progressArrow(g, x, y, 0, 1);
+    }
+
+    /** Fill exactly the silhouette's row spans, without a rectangular overlay or GL scissor state. */
+    public static void progressArrow(GuiGraphics g, int x, int y, int progress, int duration) {
+        int columns = ArrowProgress.columns(progress, duration);
+        for (int row = 0; row < ArrowProgress.HEIGHT; row++) {
+            int start = ArrowProgress.start(row), end = ArrowProgress.end(row);
+            g.fill(x + start, y + row, x + end, y + row + 1, 0xFF8B8B8B);
+            int filledEnd = Math.min(end, columns);
+            if (filledEnd > start)
+                g.fill(x + start, y + row, x + filledEnd, y + row + 1, 0xFF8B5CF6);
         }
-        g.fill(x, y + 4, x + 15, y + 11, 0xFF8B8B8B);
     }
 
     public static String ellipsize(Font font, String text, int width) {

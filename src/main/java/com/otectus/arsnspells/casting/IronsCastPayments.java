@@ -70,6 +70,9 @@ public final class IronsCastPayments {
     public void onPreCast(SpellPreCastEvent event) {
         Player player = event.getEntity();
         if (player == null || player.level().isClientSide() || event.isCanceled()) return;
+        // An imported glyph's native call runs on a detached casting slot and is priced by the glyph
+        // runtime; planning it here would bind a plan and session to the player's real slot.
+        if (com.otectus.arsnspells.glyph.runtime.GlyphInvocationScope.active()) return;
         AbstractSpell spell = SpellRegistry.getSpell(event.getSpellId());
         MagicData data = MagicData.getPlayerMagicData(player);
         Plan plan = quote(player, spell, event.getSpellLevel(), event.getCastSource(), data);

@@ -64,14 +64,25 @@ public final class ModeChangeCleanup {
 
     /** removeAll, recompute, clamp, synchronize - for one player. */
     public static void reconcile(ServerPlayer player) {
+        clampAndSynchronize(player, rebuild(player));
+        NativeManaSync.send(player);
+    }
+
+    /**
+     * removeAll and recompute, without the clamp: steps 1 and 2 only. A login runs this, and the
+     * full {@link #reconcile} at the player's first tick end, because vanilla applies equipment
+     * attribute modifiers in that tick; a maximum read at login lacks every gear contribution.
+     *
+     * @return the number of stale ANS modifiers removed
+     */
+    public static int rebuild(ServerPlayer player) {
         int removed = AnsFeatureCleanup.removeAll(player);
         // Replays live equipment, progression and the client snapshots.
         CapabilityResyncHandler.resync(player);
         if (com.otectus.arsnspells.compat.IronsCompat.isLoaded()) {
             com.otectus.arsnspells.equipment.PotionContributions.reconcile(player);
         }
-        clampAndSynchronize(player, removed);
-        NativeManaSync.send(player);
+        return removed;
     }
 
     private static void clampAndSynchronize(ServerPlayer player, int removedModifiers) {

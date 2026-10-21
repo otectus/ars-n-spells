@@ -32,9 +32,17 @@ public class ArsNSpellsClient {
         event.registerReloadListener(com.otectus.arsnspells.client.icons.SpellIconRegistry.INSTANCE);
     }
 
+    /** 3.4.0: imported-glyph icons, each Iron's own spell icon or ANS's fallback (see {@link com.otectus.arsnspells.client.icons.IronGlyphIconSource}). */
+    @SubscribeEvent
+    public static void onRegisterSpriteSources(net.neoforged.neoforge.client.event.RegisterSpriteSourceTypesEvent event) {
+        com.otectus.arsnspells.client.icons.IronGlyphIconSource.setType(event.register(
+            com.otectus.arsnspells.client.icons.IronGlyphIconSource.ID, com.otectus.arsnspells.client.icons.IronGlyphIconSource.CODEC));
+    }
+
     @SubscribeEvent
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.SPELL_LOOM.get(), SpellLoomScreen::new);
+        event.register(ModMenus.GLYPH_PRESS.get(), com.otectus.arsnspells.client.screen.GlyphPressScreen::new);
     }
 
     @SubscribeEvent
@@ -58,6 +66,9 @@ public class ArsNSpellsClient {
             container.registerExtensionPoint(IConfigScreenFactory.class,
                 (IConfigScreenFactory) (mc, modListScreen) ->
                     ConfigScreenFactory.createConfigScreen(modListScreen)));
+
+        // 3.4.0: imported glyph items show fallback art while dormant.
+        event.enqueueWork(ClientGlyphEvents::registerItemProperties);
 
         LOGGER.info("Client-side initialization complete");
     }

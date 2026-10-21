@@ -76,6 +76,17 @@ public final class ArsSpellExportUtil {
      */
     public static ItemStack createIronsScrollCarrier(Spell arsSpell, String customName,
                                                      String nature, String iconSymbol) {
+        return createIronsScrollCarrier(arsSpell, customName, nature, iconSymbol, null);
+    }
+
+    /**
+     * {@link #createIronsScrollCarrier(Spell, String, String, String)} that also records an
+     * explicit mechanical school on the entry. Null or empty means Automatic and writes nothing,
+     * so the carrier is identical to one made before schools could be chosen. The caller is
+     * responsible for having validated {@code school}; nothing here interprets the nature.
+     */
+    public static ItemStack createIronsScrollCarrier(Spell arsSpell, String customName,
+                                                     String nature, String iconSymbol, String school) {
         if (arsSpell == null || !IronsCompat.isLoaded()) {
             return ItemStack.EMPTY;
         }
@@ -106,7 +117,7 @@ public final class ArsSpellExportUtil {
         // Same schema every inscribed item uses -- keeps storage and casting aligned.
         CrossModSpellComponents.addArsEntryWithMeta(out,
             CrossModSpellComponents.ARS_PLACEHOLDER_ID, 1, arsTag,
-            CrossModSpellComponents.NO_PROXY_POOL_ID, customName, nature, iconSymbol);
+            CrossModSpellComponents.NO_PROXY_POOL_ID, customName, nature, iconSymbol, school);
 
         // Cosmetic only; casting still keys off the cross-cast component.
         String label = (customName != null && !customName.isEmpty())

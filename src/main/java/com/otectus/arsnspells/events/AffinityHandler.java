@@ -32,7 +32,9 @@ public class AffinityHandler {
             return;
         }
         if (event.getEntity() instanceof ServerPlayer player) {
-            String key = SpellAnalysis.analyze(event.spell).schoolKey();
+            // The cast's own context decides: an explicit school stamped by the cross-cast
+            // replaces the glyph school, and a native cast carries none.
+            String key = SpellAnalysis.analyze(event.spell, event.context).schoolKey();
             if (!com.otectus.arsnspells.util.SchoolKeys.GENERIC.equals(key)) {
                 AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
                 data.addLevel(key, 1);

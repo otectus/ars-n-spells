@@ -8,7 +8,10 @@
     "ars.MixinManaCapability",
     "ars.MixinManaRegenTick",
     "ars.MixinSpellResolverMana",
-    "ars.MixinSpellResolverPreCast"
+    "ars.MixinSpellResolverPreCast",
+    "ars.MixinStandardSpellValidator",
+    "ars.MixinImportedAugmentCost",
+    "ars.MixinManaCapGlyphBonus"
   ],
   "injectors": {
     "defaultRequire": 1

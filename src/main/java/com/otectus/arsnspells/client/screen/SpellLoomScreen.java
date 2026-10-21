@@ -21,11 +21,24 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import com.otectus.arsnspells.icons.IconCatalog;
 import com.otectus.arsnspells.client.icons.SpellIconRegistry;
+import com.hollingsworth.arsnouveau.api.spell.Spell;
+import com.otectus.arsnspells.rituals.InscriptionInputs;
+import com.otectus.arsnspells.spell.CrossCastingHandler;
+import com.otectus.arsnspells.spell.CrossModSpell;
+import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+import com.otectus.arsnspells.spell.ScrollKind;
+import com.otectus.arsnspells.spell.SpellSchoolNames;
+import com.otectus.arsnspells.util.SpellAnalysis;
 
 /**
  * Vanilla-style 3.3.0 workstation. The menu owns the slot coordinates; the screen
  * adds native widgets, a compact status hint and access to full inspection text.
- * The 176x224 panel fits Minecraft's minimum 320x240 scaled viewport.
+ * The 176x240 panel fits Minecraft's minimum 320x240 scaled viewport.
+ *
+ * <p>The School row is the spell's mechanical school and sits apart from the cosmetic
+ * controls below it: the icon library's background is a frame, the school is what the spell
+ * scales with and trains. Apply changes the school of a carrier scroll already in the target
+ * slot, in place.
  */
 public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
     // Canonical nature keys live in CrossCastNbt (the export packet whitelists
@@ -42,10 +55,16 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
     private static final int CONTENT_W = SpellLoomMenu.GUI_WIDTH - 2 * MARGIN; // 160
     private static final int NAME_Y = 18;
     private static final int NAME_H = 16;
-    private static final int OPTIONS_Y = 62;
+    /** The mechanical school row, directly under the recipe; cosmetics follow below it. */
+    private static final int SCHOOL_Y = 59;
+    private static final int SCHOOL_APPLY_W = 48;
+    private static final int SCHOOL_BTN_W = CONTENT_W - SCHOOL_APPLY_W - 4;
+    private static final int OPTIONS_Y = 82;
     private static final int BTN_H = 20;
     private static final int OPTION_BTN_W = 78;
-    private static final int ACTION_Y = 86;
+    private static final int ACTION_Y = 105;
+    /** Two reserved status lines between the action row and the inventory label. */
+    private static final int STATUS_Y = 128;
     /** The action row carries Inscribe plus the separate, explicit Convert action. */
     private static final int INSCRIBE_BTN_W = 100;
     private static final int CONVERT_BTN_W = CONTENT_W - INSCRIBE_BTN_W - 4;
@@ -56,12 +75,16 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
     private static final int GLYPH_Y = SpellLoomMenu.RECIPE_ROW_Y + 4;
 
     private EditBox nameField;
+    private Button schoolButton;
+    private Button applySchoolButton;
     private Button natureButton;
     private Button iconButton;
     private Button inscribeButton;
     private Button convertButton;
     private int natureIndex = 0;
     private int iconIndex = 0;
+    /** The requested mechanical school: {@code ""} is Automatic. Never derived from the background. */
+    private String schoolChoice = "";
     private boolean pickerOpen;
     /**
      * The last reason code the server sent back (audit V18). The client mirrors the plan
@@ -96,6 +119,24 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         nameField.setValue(typedName);
         nameField.setHint(Component.translatable("ars_n_spells.spell_loom.name_hint"));
         addRenderableWidget(nameField);
+
+        schoolButton = Button.builder(schoolButtonLabel(), b -> {
+                pickerOpen = true;
+                Minecraft.getInstance().setScreen(new SpellSchoolPickerScreen(this, schoolChoice,
+                    automaticLabel(), chosen -> schoolChoice = chosen));
+            })
+            .bounds(x + MARGIN, y + SCHOOL_Y, SCHOOL_BTN_W, BTN_H)
+            .build();
+        addRenderableWidget(schoolButton);
+
+        // Apply never touches the source or output: it rewrites the school of the carrier
+        // scroll in the target slot, keeping its spell, name, background and icon.
+        applySchoolButton = Button.builder(
+                Component.translatable("ars_n_spells.spell_loom.school.apply"),
+                b -> sendAction(SpellLoomExportPayload.ACTION_SET_SCHOOL))
+            .bounds(x + MARGIN + SCHOOL_BTN_W + 4, y + SCHOOL_Y, SCHOOL_APPLY_W, BTN_H)
+            .build();
+        addRenderableWidget(applySchoolButton);
 
         natureButton = Button.builder(Component.translatable("ars_n_spells.spell_loom.details.open"), b -> {
                 pickerOpen = true;
@@ -164,11 +205,17 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         return Component.translatable(occupied ? "ars_n_spells.spell_loom.details.output_full" : "ars_n_spells.spell_loom.details.output_free");
     }
     private Component statusLine() {
+        if (reschoolMode()) {
+            String reason = schoolChangeReason();
+            return InscriptionPlan.REASON_OK.equals(reason)
+                ? Component.translatable("ars_n_spells.spell_loom.details.reschool_ready", SpellSchoolNames.name(schoolChoice))
+                : reasonMessage(reason);
+        }
         String reason = currentReasonCode();
         return InscriptionPlan.REASON_OK.equals(reason) ? Component.translatable("ars_n_spells.spell_loom.details.ready") : reasonMessage(reason);
     }
     private Component compactStatus() {
-        String reason = currentReasonCode();
+        String reason = reschoolMode() ? schoolChangeReason() : currentReasonCode();
         if (InscriptionPlan.REASON_OK.equals(reason)) return statusLine();
         Component full = reasonMessage(reason);
         if (full.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents text)
@@ -179,15 +226,82 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         java.util.List<Component> result = new java.util.ArrayList<>();
         result.add(Component.translatable("ars_n_spells.spell_loom.details.synced"));
         result.add(consumptionLine()); result.add(capacityLine()); result.add(statusLine());
-        String school = com.otectus.arsnspells.util.SchoolKeys.GENERIC;
-        if (menu.getBlockEntity() != null && menu.slots.size() >= 3) {
-            var source = com.otectus.arsnspells.rituals.InscriptionInputs.readSource(menu.getSlot(0).getItem());
-            if (source != null && source.arsSpell != null) school = com.otectus.arsnspells.util.SpellAnalysis.analyze(source.arsSpell).schoolKey();
+        SpellAnalysis.Result glyphs = subjectAnalysis();
+        result.add(Component.translatable("ars_n_spells.spell_loom.details.school_choice",
+            SpellSchoolNames.describe(schoolChoice, glyphs)));
+        result.add(Component.translatable("ars_n_spells.spell_loom.details.school", SpellSchoolNames.glyphSchools(glyphs)));
+        CrossModSpell carrierEntry = targetCarrierEntry();
+        if (carrierEntry != null) {
+            result.add(Component.translatable("ars_n_spells.spell_loom.details.target_school",
+                SpellSchoolNames.describe(carrierEntry.school().orElse(""), carrierAnalysis(carrierEntry))));
         }
-        result.add(Component.translatable("ars_n_spells.spell_loom.details.school", school));
+        result.add(Component.translatable("ars_n_spells.spell_loom.details.school_effect"));
         result.add(Component.translatable("ars_n_spells.spell_loom.details.mapping", com.otectus.arsnspells.util.SchoolMappings.get().digest()));
         result.add(Component.translatable("ars_n_spells.spell_loom.details.server_cost"));
         return result;
+    }
+
+    // ---- Mechanical school ----
+
+    /** The single Ars entry of a carrier scroll in the target slot, or null. Read-only. */
+    private CrossModSpell targetCarrierEntry() {
+        if (menu.getBlockEntity() == null || menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) return null;
+        ItemStack target = menu.getSlot(SpellLoomBlockEntity.SLOT_SCROLL).getItem();
+        if (ScrollKind.classify(target) != ScrollKind.ANS_CARRIER) return null;
+        return IronsBookBindingUtil.extractSingleEntry(target).orElse(null);
+    }
+
+    private static SpellAnalysis.Result carrierAnalysis(CrossModSpell entry) {
+        try {
+            return SpellAnalysis.analyze(CrossCastingHandler.decodeArsSpell(entry.arsSpellTag().orElse(null)));
+        } catch (RuntimeException unreadable) {
+            return SpellAnalysis.analyze((Spell) null);
+        }
+    }
+
+    /**
+     * The spell a school choice would apply to, as its glyphs resolve it: the source spell when
+     * there is one, otherwise the carrier waiting in the target slot for Apply.
+     */
+    private SpellAnalysis.Result subjectAnalysis() {
+        if (menu.getBlockEntity() != null && menu.slots.size() >= SpellLoomBlockEntity.SLOT_COUNT) {
+            var source = InscriptionInputs.readSource(menu.getSlot(SpellLoomBlockEntity.SLOT_SOURCE).getItem());
+            if (source != null && source.arsSpell != null) return SpellAnalysis.analyze(source.arsSpell);
+            CrossModSpell carrier = targetCarrierEntry();
+            if (carrier != null) return carrierAnalysis(carrier);
+        }
+        return SpellAnalysis.analyze((Spell) null);
+    }
+
+    /** "Automatic (from glyphs: ...)" for the current subject. */
+    private Component automaticLabel() {
+        return Component.translatable("ars_n_spells.school.describe.automatic",
+            SpellSchoolNames.glyphSchools(subjectAnalysis()));
+    }
+
+    /** The School button's label: the selection, then what it resolves to, shortened to fit. */
+    private Component schoolButtonLabel() {
+        Component value = schoolChoice.isEmpty()
+            ? Component.translatable("ars_n_spells.spell_loom.school.auto_short", SpellSchoolNames.glyphSchools(subjectAnalysis()))
+            : SpellSchoolNames.name(schoolChoice);
+        Component full = Component.translatable("ars_n_spells.spell_loom.school.button", value);
+        return Component.literal(VanillaGui.ellipsize(this.font, full.getString(), SCHOOL_BTN_W - 8));
+    }
+
+    /**
+     * Apply mode: a carrier scroll waits in the target slot and nothing is in the source slot,
+     * so the only thing the Loom can do with it is change its school.
+     */
+    private boolean reschoolMode() {
+        return targetCarrierEntry() != null
+            && menu.getSlot(SpellLoomBlockEntity.SLOT_SOURCE).getItem().isEmpty();
+    }
+
+    /** Client mirror of the server's set-school decision; the server answer is authoritative. */
+    private String schoolChangeReason() {
+        SpellLoomBlockEntity be = menu.getBlockEntity();
+        if (be == null || menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) return LoomInscription.REASON_NOT_A_CARRIER;
+        return LoomInscription.planSchoolChange(be, schoolChoice);
     }
 
     private Component natureLabel() {
@@ -219,7 +333,7 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         latestRequest = new com.otectus.arsnspells.network.LoomRequestContext(menu.containerId, menu.sessionId(),
             java.util.UUID.randomUUID(), revision, com.otectus.arsnspells.util.SchoolMappings.get().digest());
         PacketHandler.sendToServer(new SpellLoomExportPayload(
-            name, NATURES[natureIndex], ICONS[iconIndex], action, latestRequest));
+            name, NATURES[natureIndex], ICONS[iconIndex], schoolChoice, action, latestRequest));
     }
 
     /**
@@ -261,8 +375,9 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         if (this.menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) {
             return;
         }
+        // The requested school is part of what the server judges, so a new choice asks again.
         String fingerprint = com.otectus.arsnspells.network.LoomInventoryRevision.of(menu)
-            + ":" + com.otectus.arsnspells.util.SchoolMappings.get().digest();
+            + ":" + com.otectus.arsnspells.util.SchoolMappings.get().digest() + ":" + schoolChoice;
         if (fingerprint.equals(previewedInputs)) {
             return;
         }
@@ -299,6 +414,17 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         // only route by which a filled scroll is ever overwritten.
         convertButton.active = InscriptionPlan.REASON_NOT_BLANK.equals(reasonCode)
             || InscriptionPlan.REASON_TARGET_NOT_EMPTY.equals(reasonCode);
+        if (schoolButton != null && applySchoolButton != null) {
+            schoolButton.setMessage(schoolButtonLabel());
+            schoolButton.setTooltip(Tooltip.create(Component.translatable("ars_n_spells.spell_loom.school.tooltip",
+                SpellSchoolNames.describe(schoolChoice, subjectAnalysis()))));
+            String schoolReason = schoolChangeReason();
+            boolean applicable = InscriptionPlan.REASON_OK.equals(schoolReason);
+            applySchoolButton.active = applicable;
+            applySchoolButton.setTooltip(Tooltip.create(applicable
+                ? Component.translatable("ars_n_spells.spell_loom.tooltip.apply_school", SpellSchoolNames.name(schoolChoice))
+                : reasonMessage(schoolReason)));
+        }
     }
 
     /**
@@ -322,7 +448,14 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         if (this.menu.getSlot(SpellLoomBlockEntity.SLOT_SOURCE).getItem().isEmpty()) {
             return LoomInscription.REASON_NO_ARS_SPELL;
         }
-        return LoomInscription.plan(be).reasonCode();
+        String plan = LoomInscription.plan(be).reasonCode();
+        // A school this server cannot use stops Inscribe and Convert alike, as the server will.
+        if (InscriptionPlan.REASON_OK.equals(plan) || InscriptionPlan.REASON_NOT_BLANK.equals(plan)
+                || InscriptionPlan.REASON_TARGET_NOT_EMPTY.equals(plan)) {
+            String schoolReason = LoomInscription.schoolReason(schoolChoice);
+            if (schoolReason != null) return schoolReason;
+        }
+        return plan;
     }
 
     /** Reason code to player-facing text. Codes are stable strings; the keys are shipped lang. */
@@ -341,6 +474,10 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
                 "ars_n_spells.spell_loom.error.irons_missing";
             case LoomInscription.REASON_NO_ARS_SPELL -> "ars_n_spells.spell_loom.error.no_source";
             case LoomInscription.REASON_INVALID_TARGET -> "ars_n_spells.spell_loom.error.invalid_target";
+            case LoomInscription.REASON_SCHOOL_UNKNOWN -> "ars_n_spells.spell_loom.error.school_unknown";
+            case LoomInscription.REASON_SCHOOL_DISABLED -> "ars_n_spells.spell_loom.error.school_disabled";
+            case LoomInscription.REASON_NOT_A_CARRIER -> "ars_n_spells.spell_loom.error.not_a_carrier";
+            case LoomInscription.REASON_SCHOOL_UNCHANGED -> "ars_n_spells.spell_loom.error.school_unchanged";
             default -> "ars_n_spells.spell_loom.error.failed";
         };
         return Component.translatable(key);
@@ -382,7 +519,7 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
             this.inventoryLabelX, this.inventoryLabelY, VanillaGui.TEXT, false);
         var lines = font.split(compactStatus(), CONTENT_W);
         for (int i = 0; i < Math.min(2, lines.size()); i++)
-            g.drawString(font, lines.get(i), MARGIN, 110 + i * font.lineHeight, VanillaGui.MUTED, false);
+            g.drawString(font, lines.get(i), MARGIN, STATUS_Y + i * font.lineHeight, VanillaGui.MUTED, false);
     }
 
     @Override
@@ -397,7 +534,7 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
     private void renderRegionTooltips(GuiGraphics g, int mouseX, int mouseY) {
         int x = this.leftPos;
         int y = this.topPos;
-        if (mouseX >= x + MARGIN && mouseX < x + MARGIN + CONTENT_W && mouseY >= y + 110 && mouseY < y + 128) {
+        if (mouseX >= x + MARGIN && mouseX < x + MARGIN + CONTENT_W && mouseY >= y + STATUS_Y && mouseY < y + STATUS_Y + 18) {
             Component line = statusLine().copy().append("\n").append(consumptionLine()).append("\n").append(capacityLine());
             g.renderTooltip(font, font.split(line, 280), mouseX, mouseY);
             return;

@@ -30,15 +30,27 @@ public abstract class MixinSpellResolverPreCast {
                 || player.level().isClientSide()) return;
         if (cir.getReturnValue().isCanceled()) {
             ArsCastPayments.finish(spellContext);
+            com.otectus.arsnspells.glyph.runtime.GlyphSessions.rootFinished(spellContext, true);
         } else if (!ArsCastPayments.prepare(player, spellContext)) {
             ArsCastPayments.finish(spellContext);
+            // Imported-glyph reservations made at this cast's admission go with the Ars leg.
+            com.otectus.arsnspells.glyph.runtime.GlyphSessions.rootFinished(spellContext, true);
             cir.getReturnValue().setCanceled(true); // Ars inspects this event before invoking the cast method.
         }
     }
 
-    @Inject(method = {"onCast", "onCastOnEntity", "onCastOnBlock"}, at = @At("RETURN"))
+    // Full descriptors: a bare "onCastOnBlock" binds only one of its two overloads, and the
+    // UseOnContext one is the overload Ars's own player casting and ANS's dispatcher use.
+    @Inject(method = {
+        "onCast(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/level/Level;)Z",
+        "onCastOnEntity(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/InteractionHand;)Z",
+        "onCastOnBlock(Lnet/minecraft/world/phys/BlockHitResult;)Z",
+        "onCastOnBlock(Lnet/minecraft/world/item/context/UseOnContext;)Z"
+    }, at = @At("RETURN"), require = 4)
     private void arsnspells$finishCast(CallbackInfoReturnable<?> cir) {
         // Includes native failure, downstream event veto, and SUCCESS_NO_EXPEND.
         ArsCastPayments.finish(spellContext);
+        // Projectiles and delays carrying imported glyphs keep their session open past this point.
+        com.otectus.arsnspells.glyph.runtime.GlyphSessions.rootFinished(spellContext, false);
     }
 }

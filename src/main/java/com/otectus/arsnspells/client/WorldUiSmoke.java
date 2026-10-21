@@ -98,25 +98,117 @@ public final class WorldUiSmoke {
                 screenshot(mc, "05-loom-cosmetic-return");
                 String name = mc.screen.children().stream().filter(EditBox.class::isInstance).map(EditBox.class::cast).findFirst().orElseThrow().getValue();
                 if (!"Aurora Mend".equals(name)) throw new IllegalStateException("Loom name lost across child screens");
-                press(mc, "ars_n_spells.spell_loom.export");
+                pressPrefix(mc, Component.translatable("ars_n_spells.spell_loom.school.button", "").getString());
             }
             case 9 -> {
+                if (!(mc.screen instanceof com.otectus.arsnspells.client.screen.SpellSchoolPickerScreen))
+                    throw new IllegalStateException("The School button did not open the school picker: " + mc.screen);
+                screenshot(mc, "05b-school-picker");
+                pressExact(mc, com.otectus.arsnspells.spell.SpellSchoolNames.name(ICE).getString());
+                press(mc, "gui.done");
+            }
+            case 10 -> {
+                screenshot(mc, "05c-loom-school-chosen");
+                requireButton(mc, Component.translatable("ars_n_spells.spell_loom.school.button",
+                    com.otectus.arsnspells.spell.SpellSchoolNames.name(ICE)).getString());
+                press(mc, "ars_n_spells.spell_loom.export");
+            }
+            case 11 -> {
                 if (!(mc.screen instanceof SpellLoomScreen loom) || loom.getMenu().getSlot(SpellLoomBlockEntity.SLOT_OUTPUT).getItem().isEmpty())
                     throw new IllegalStateException("Native Loom packet did not produce an inscribed scroll");
+                ItemStack output = loom.getMenu().getSlot(SpellLoomBlockEntity.SLOT_OUTPUT).getItem();
+                if (!ICE.equals(schoolOf(output)))
+                    throw new IllegalStateException("The inscribed scroll did not keep the chosen school: " + schoolOf(output));
+                requireTooltip(mc, output, "ice");
                 screenshot(mc, "06-loom-inscribed");
+                var server = mc.getSingleplayerServer();
+                preparation = CompletableFuture.runAsync(() -> moveOutputToTarget(server), server);
+            }
+            case 12 -> {
+                if (!preparation.isDone()) return;
+                preparation.join();
+                if (!(mc.screen instanceof SpellLoomScreen loom) || schoolOf(loom.getMenu().getSlot(SpellLoomBlockEntity.SLOT_SCROLL).getItem()).isEmpty())
+                    return; // wait for the server to sync the moved carrier
+                pressPrefix(mc, Component.translatable("ars_n_spells.spell_loom.school.button", "").getString());
+            }
+            case 13 -> {
+                screenshot(mc, "06b-school-picker-reschool");
+                pressExact(mc, com.otectus.arsnspells.spell.SpellSchoolNames.name(FIRE).getString());
+                press(mc, "gui.done");
+            }
+            case 14 -> {
+                screenshot(mc, "06c-loom-apply-ready");
+                press(mc, "ars_n_spells.spell_loom.school.apply");
+            }
+            case 15 -> {
+                if (!(mc.screen instanceof SpellLoomScreen loom)) throw new IllegalStateException("Loom closed during Apply");
+                ItemStack target = loom.getMenu().getSlot(SpellLoomBlockEntity.SLOT_SCROLL).getItem();
+                if (!FIRE.equals(schoolOf(target)))
+                    throw new IllegalStateException("Apply did not change the carrier's school in place: " + schoolOf(target));
+                if (!loom.getMenu().getSlot(SpellLoomBlockEntity.SLOT_OUTPUT).getItem().isEmpty())
+                    throw new IllegalStateException("Apply moved something into the output slot");
+                requireTooltip(mc, target, "fire");
+                screenshot(mc, "06d-loom-school-applied");
                 mc.player.closeContainer();
             }
-            case 10 -> Wheel.open();
-            case 11 -> screenshot(mc, "07-native-wheel");
-            case 12 -> {
+            case 16 -> Wheel.open();
+            case 17 -> screenshot(mc, "07-native-wheel");
+            case 18 -> {
                 Wheel.close();
-                org.slf4j.LoggerFactory.getLogger(WorldUiSmoke.class).info("ANS_WORLD_UI_REVIEW_COMPLETE stages=7 real_server_menu=true native_wheel=true");
+                org.slf4j.LoggerFactory.getLogger(WorldUiSmoke.class).info("ANS_WORLD_UI_REVIEW_COMPLETE stages=12 real_server_menu=true native_wheel=true school_choice=true school_apply=true");
                 mc.stop();
             }
             default -> throw new IllegalStateException("Unknown world UI smoke stage " + stage);
         }
         stage++;
     }
+    private static final String ICE = "irons_spellbooks:ice";
+    private static final String FIRE = "irons_spellbooks:fire";
+    private static final BlockPos LOOM_POS = new BlockPos(0, 129, 0);
+
+    /** Press the active button whose visible label starts with {@code prefix}. */
+    private static void pressPrefix(Minecraft mc, String prefix) {
+        pressWhere(mc, label -> label.startsWith(prefix), "starting with '" + prefix + "'");
+    }
+
+    /** Press the active button whose visible label is exactly {@code text}. */
+    private static void pressExact(Minecraft mc, String text) {
+        pressWhere(mc, text::equals, "'" + text + "'");
+    }
+
+    private static void pressWhere(Minecraft mc, java.util.function.Predicate<String> label, String what) {
+        Button button = mc.screen.children().stream().filter(Button.class::isInstance).map(Button.class::cast)
+            .filter(candidate -> label.test(candidate.getMessage().getString()))
+            .findFirst().orElseThrow(() -> new IllegalStateException("Missing button " + what + " in " + mc.screen));
+        if (!button.active) throw new IllegalStateException("Inactive button " + what);
+        button.onPress();
+    }
+
+    private static void requireButton(Minecraft mc, String text) {
+        if (mc.screen.children().stream().filter(Button.class::isInstance).map(Button.class::cast)
+                .noneMatch(button -> button.getMessage().getString().equals(text)))
+            throw new IllegalStateException("Expected a button labelled '" + text + "' in " + mc.screen);
+    }
+
+    /** The real client tooltip must state the chosen school; it is logged for the review record. */
+    private static void requireTooltip(Minecraft mc, ItemStack stack, String school) {
+        String expected = Component.translatable("tooltip.ars_n_spells.cross_spell.school",
+            Component.translatable("ars_n_spells.school.describe.explicit",
+                com.otectus.arsnspells.spell.SpellSchoolNames.name("irons_spellbooks:" + school))).getString();
+        var lines = net.minecraft.client.gui.screens.Screen.getTooltipFromItem(mc, stack).stream().map(Component::getString).toList();
+        org.slf4j.LoggerFactory.getLogger(WorldUiSmoke.class).info("ANS_WORLD_TOOLTIP school={} lines={}", school, lines);
+        if (!lines.contains(expected)) throw new IllegalStateException("Tooltip lacks '" + expected + "': " + lines);
+    }
+
+    /** Server side: put the finished carrier back in the target slot with the source empty, ready for Apply. */
+    private static void moveOutputToTarget(net.minecraft.server.MinecraftServer server) {
+        SpellLoomBlockEntity loom = (SpellLoomBlockEntity) server.overworld().getBlockEntity(LOOM_POS);
+        ItemStack carrier = loom.getItems().getStackInSlot(SpellLoomBlockEntity.SLOT_OUTPUT).copy();
+        loom.getItems().setStackInSlot(SpellLoomBlockEntity.SLOT_OUTPUT, ItemStack.EMPTY);
+        loom.getItems().setStackInSlot(SpellLoomBlockEntity.SLOT_SOURCE, ItemStack.EMPTY);
+        loom.getItems().setStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL, carrier);
+    }
+
     private static void press(Minecraft mc, String key) {
         Button button = mc.screen.children().stream().filter(Button.class::isInstance).map(Button.class::cast)
             .filter(candidate -> candidate.getMessage().getContents() instanceof TranslatableContents text && text.getKey().equals(key))
@@ -136,6 +228,11 @@ public final class WorldUiSmoke {
             try (var image = Screenshot.takeScreenshot(mc.getMainRenderTarget())) { image.writeToFile(directory.resolve(name + ".png")); }
         } catch (java.io.IOException e) { throw new IllegalStateException(e); }
     }
+    private static String schoolOf(ItemStack stack) {
+        var list = com.otectus.arsnspells.spell.CrossModSpellComponents.get(stack);
+        return list.isEmpty() ? "" : list.spells().get(0).school().orElse("");
+    }
+
     private static ItemStack item(String id) {
         var value = BuiltInRegistries.ITEM.get(ResourceLocation.parse(id));
         if (value == null || value == net.minecraft.world.item.Items.AIR) throw new IllegalStateException("Missing review item " + id);
@@ -145,7 +242,7 @@ public final class WorldUiSmoke {
         if (player == null) throw new IllegalStateException("Review player has not joined the integrated server");
         player.setGameMode(GameType.CREATIVE);
         var level = player.serverLevel();
-        BlockPos pos = new BlockPos(0, 129, 0);
+        BlockPos pos = LOOM_POS;
         for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++) {
             level.setBlockAndUpdate(new BlockPos(x, 128, z), Blocks.STONE.defaultBlockState());
             for (int y = 129; y <= 132; y++) level.setBlockAndUpdate(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState());

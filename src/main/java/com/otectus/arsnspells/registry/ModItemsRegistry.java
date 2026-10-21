@@ -41,6 +41,7 @@ public final class ModItemsRegistry {
     private static DeferredHolder<Item, RitualTablet> manaInfusionTablet;
     private static DeferredHolder<Item, RitualTablet> manaWellTablet;
     private static DeferredHolder<Item, Item> blankScroll;
+    private static DeferredHolder<Item, Item> blankGlyphPlate;
 
     private ModItemsRegistry() {}
 
@@ -93,6 +94,9 @@ public final class ModItemsRegistry {
             () -> new RitualTablet(new SpellUninscriptionRitual())
         );
         blankScroll = ITEMS.register("blank_scroll", () -> new Item(new Item.Properties()));
+        // The Glyph Press's substrate. Registered with or without Iron's so saved stacks and Press
+        // inventories always deserialize; only the Press recipe is Iron's-gated.
+        blankGlyphPlate = ITEMS.register("blank_glyph_plate", () -> new Item(new Item.Properties()));
     }
 
     public static void register(IEventBus modBus) {
@@ -121,5 +125,9 @@ public final class ModItemsRegistry {
 
     public static DeferredHolder<Item, Item> blankScroll() {
         return blankScroll;
+    }
+
+    public static DeferredHolder<Item, Item> blankGlyphPlate() {
+        return blankGlyphPlate;
     }
 }

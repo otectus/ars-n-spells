@@ -30,6 +30,25 @@ public final class LoomInventoryRevision {
         } catch (IllegalArgumentException invalid) { return ""; }
         catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }
+    /**
+     * The same content digest over any list of stacks (the Glyph Press uses it for its request
+     * revision and its job fingerprint). Empty when a stack exceeds the payload budget.
+     */
+    public static String digest(java.util.List<ItemStack> stacks, net.minecraft.core.HolderLookup.Provider registries) {
+        try {
+            CompoundTag inventory = new CompoundTag();
+            for (int slot = 0; slot < stacks.size(); slot++) {
+                Tag saved = stacks.get(slot).saveOptional(registries);
+                if (!PayloadBudget.tag(saved)) return "";
+                inventory.put(Integer.toString(slot), saved);
+            }
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            appendTag(digest, inventory);
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (IllegalArgumentException invalid) { return ""; }
+        catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+    }
+
     private static void appendTag(MessageDigest digest, Tag tag) {
         append(digest, Byte.toString(tag.getId()));
         if (tag instanceof CompoundTag compound) {

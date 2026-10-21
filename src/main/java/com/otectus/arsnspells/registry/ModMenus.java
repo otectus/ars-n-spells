@@ -17,6 +17,10 @@ public final class ModMenus {
         MENUS.register("spell_loom",
             () -> IMenuTypeExtension.create(SpellLoomMenu::new));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<com.otectus.arsnspells.menu.GlyphPressMenu>> GLYPH_PRESS =
+        MENUS.register("glyph_press",
+            () -> IMenuTypeExtension.create(com.otectus.arsnspells.menu.GlyphPressMenu::new));
+
     private ModMenus() {}
 
     public static void register(IEventBus modBus) {

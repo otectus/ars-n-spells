@@ -86,6 +86,12 @@ public final class CastLedger {
         return LEDGER.open(playerId, carrierIdentity, payloadRevision, quote, gameTick);
     }
 
+    /** {@link #open} with the attempt's own TTL; see {@link AttemptLedger#open(UUID, String, int, CostQuote, long, long)}. */
+    public static CastAttempt open(UUID playerId, String carrierIdentity, int payloadRevision,
+                                   CostQuote quote, long gameTick, long ttlTicks) {
+        return LEDGER.open(playerId, carrierIdentity, payloadRevision, quote, gameTick, ttlTicks);
+    }
+
     /** The open attempt for this player and carrier, if any. */
     public static Optional<CastAttempt> findOpen(UUID playerId, String carrierIdentity) {
         return LEDGER.findOpen(playerId, carrierIdentity);

@@ -14,8 +14,10 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * <ul>
  *   <li>Source Jar regen synergy reaches the shared pool through the event bus (it was never
  *       registered on NeoForge before 3.3.5).</li>
- *   <li>ISS_PRIMARY adds the Ars gear bonus times the conversion rate to Iron's max mana; it does
- *       not raise Iron's max to Ars's real max (the NeoForge build did before 3.3.5).</li>
+ *   <li>ISS_PRIMARY adds the Ars gear bonus times the conversion rate to Iron's own max mana.
+ *       Ars's whole maximum times the rate is a floor under it (3.3.7, see
+ *       {@code ManaCapacityGameTests}); this scenario keeps Iron's own pool above that floor so
+ *       the gear term is what it measures.</li>
  *   <li>HYBRID keeps the shared-pool ceiling with {@code respect_armor_bonuses} off.</li>
  *   <li>An Ars Mana Regen potion is mirrored onto Iron's regen in ISS_PRIMARY, once, and taken
  *       off when the mode changes.</li>
@@ -181,9 +183,9 @@ public final class ParityBehaviourGameTests {
             var player = player(helper, "gear_iss");
             try {
                 inMode(helper, "iss_primary", 2.0, () -> {
-                    // A large Ars pool: the pre-3.3.5 NeoForge ceiling would have lifted Iron's max
-                    // to it, which this bonus is not.
-                    com.hollingsworth.arsnouveau.setup.registry.CapabilityRegistry.getMana(player).setGlyphBonus(400);
+                    // Iron's own pool (1000) above Ars's whole maximum times the rate (150 x 2), so
+                    // the Ars floor is not what decides the modifier.
+                    player.getAttribute(io.redspace.ironsspellbooks.api.registry.AttributeRegistry.MAX_MANA).setBaseValue(1000);
                     wearGear(player);
                     com.otectus.arsnspells.equipment.EquipmentIntegration.recomputeFor(player);
                     double modifier = gearModifier(player);

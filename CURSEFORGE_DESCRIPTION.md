@@ -8,6 +8,20 @@ Works with **Minecraft 1.21.1** on **NeoForge**.
 
 ---
 
+## What's new in 3.4.0
+
+**Touch spells on scrolls work.** An Ars spell with Touch on a Spell Loom scroll, an inscribed item or a bound Iron's spell book now strikes the block or creature you aim at, exactly as from an Ars spell book. If nothing is in reach, it costs nothing. Existing scrolls work without being remade.
+
+**The Glyph Press.** This new workstation turns a filled Iron's scroll into a **learnable Ars glyph** for that spell at the scroll's level: a Firebolt III scroll becomes a Glyph of Firebolt III. Each glyph uses a Blank Glyph Plate, Source Gems, and Source from nearby Source Jars or a Source Relay. Learn the glyph by using it, then build it into your own Ars spells:
+
+- **Self** for buffs;
+- **Touch** or **Projectile** for creatures, blocks and places;
+- **augments** such as Amplify or Accelerate change the level, the charge time or a channel's length.
+
+The Iron's spell keeps its own cast time, cooldown, recasts and learning rules, and each imported effect is charged once in your mana mode. All 111 ordinary Iron's spells have glyphs. JEI shows every conversion. Client and server both need 3.4.0.
+
+---
+
 ## What's new in 3.2.4
 
 **If you were using the rituals and nothing was happening, they work now.** The Spellbook Binding, Spell Transcription, Spell Uninscription, and Mana Infusion rituals were completely broken since version 3.0.0 — you could light the brazier, but it would stay lit forever and never consume the items or produce a result. The rituals now complete properly after burning for about three seconds. Ritual tablets are consumed but not returned, matching how Ars Nouveau's own rituals work.
@@ -45,7 +59,7 @@ Also in this release: mixins targeting Iron's Spellbooks — an optional depende
 | **Minecraft (NeoForge)** 1.21.1 / 21.1.84+ | Yes |
 | **Java 21** | Yes |
 | **Ars Nouveau** 5.13+ (built against 5.13.1.1400) | Yes |
-| **Iron's Spells 'n Spellbooks** 1.21.1-3.16.3+ | No — falls back to native Ars behavior if absent |
+| **Iron's Spells 'n Spellbooks** 1.21.1-3.16.3 up to, not including, 4.0.0 | No — falls back to native Ars behavior if absent |
 
 The mod will not load on Forge or on Minecraft versions other than 1.21.1.
 
@@ -139,6 +153,20 @@ A two-step ceremony to turn an Ars Nouveau spell into an Iron's native spell: fi
 
 **Caution:** Ars Nouveau ships its own ritual also named **Binding** — a different ritual that makes Bound Scripts for familiars and ignores scrolls. It is easy to reach for by mistake if you are not looking closely. This ritual uses a three-block radius around the brazier and reads only dropped items.
 
+### Choosing a spell school *(3.3.7)*
+
+The Spell Loom's **School** button sets the school Ars 'n' Spells uses for the spell. The background under **Choose icon…** is only cosmetic.
+
+- **Automatic (from glyphs)** is the default and works exactly as before: the glyphs decide the school or schools, and multi-school spells keep their usual scaling. Every scroll made before 3.3.7 is Automatic.
+- **A chosen school** is the only school used for spell-power scaling, affinity and progression. The glyph schools add nothing on top. The glyphs' effects, damage types and cooldown category never change.
+- The picker lists every installed Iron's school with a spell-power attribute, addon schools included.
+
+**To inscribe with a school:** at the Loom, press **School**, pick a school (or Automatic), press **Done**, then **Inscribe**. The tooltip shows, for example, `School: Ice (chosen)`.
+
+**To change a finished scroll:** put it in the Loom's target slot, pick a school, and press **Apply**. Only the school changes, and nothing is consumed. Ops can use `/ans school set <school>|auto [entry]` on a held scroll or spellbook.
+
+The school travels with the spell through export, copying, saving and every binding route. It applies to scroll casts and wheel casts, and a delayed effect or projectile keeps the school of the cast that launched it. Binding refuses a spell the book already holds with the same glyphs and school, even if its name, colour, background or icon differ; the same glyphs with a different school bind as a separate wheel entry. The server validates every choice, and refused requests move and consume nothing. If an addon school is removed, the spell falls back to Automatic. Server owners can set `allow_spell_school_override = false` to allow only Automatic; spells that already carry a chosen school then cast as Automatic.
+
 ---
 
 ## Unified Cooldowns
@@ -149,7 +177,7 @@ An optional system that groups similar spells across both mods into shared coold
 
 ## Configuration
 
-An **in-game config screen** is available from the mod list (**Mods → Ars 'n' Spells → Config**) for the master toggles, the mana mode (click to cycle), and the gear/debug switches — Save/Reset apply in singleplayer; on a server, edit the `.toml` or use `/ans`. Everything is also configurable via `config/ars_n_spells-common.toml`. Major options include:
+An **in-game config screen** is available from the mod list (**Mods → Ars 'n' Spells → Config**) for the master toggles, the mana mode (click to cycle), and the gear/debug switches — Save/Reset apply in singleplayer; on a server, edit the `.toml` or use `/ans`. Everything is also configurable in the world's `serverconfig/ars_n_spells-server.toml` (`defaultconfigs/` for new worlds). Major options include:
 
 - **Master toggles** for mana unification, resonance, cooldowns, progression, and affinity
 - **Mana conversion rates** and dual-cost split percentages
@@ -172,6 +200,9 @@ All options ship with balanced defaults — install and play, or fine-tune to yo
 | `/ans debug` | Op 2 | Toggle debug mode at runtime |
 | `/ans info <player>` | Op 2 | Show mana and resonance |
 | `/ans mode` | — | Show current mana unification mode |
+| `/ans school list` | — | List the spell schools the server accepts |
+| `/ans school show` | — | Show the school of each Ars spell on the held item |
+| `/ans school set <school>\|auto [entry]` | Op 2 | Change a held item's Ars spell school without rebuilding it |
 
 ---
 

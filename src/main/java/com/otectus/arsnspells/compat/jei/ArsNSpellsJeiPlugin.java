@@ -44,8 +44,48 @@ public class ArsNSpellsJeiPlugin implements IModPlugin {
         return UID;
     }
 
+    // ---- 3.4.0: Glyph Press conversions ----
+
+    @Override
+    public void registerCategories(mezz.jei.api.registration.IRecipeCategoryRegistration registration) {
+        registration.addRecipeCategories(new GlyphPressRecipeCategory(registration.getJeiHelpers().getGuiHelper()));
+    }
+
+    @Override
+    public void registerRecipes(mezz.jei.api.registration.IRecipeRegistration registration) {
+        shown = com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.entries();
+        registration.addRecipes(GlyphPressRecipeCategory.TYPE, shown);
+    }
+
+    @Override
+    public void registerRecipeCatalysts(mezz.jei.api.registration.IRecipeCatalystRegistration registration) {
+        registration.addRecipeCatalyst(com.otectus.arsnspells.registry.ModBlocksRegistry.GLYPH_PRESS_ITEM.get(), GlyphPressRecipeCategory.TYPE);
+    }
+
+    @Override
+    public void onRuntimeUnavailable() {
+        com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.setViewerRefresh(null);
+        com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.setViewerOpen(null);
+    }
+
+    /** The conversions currently shown; replaced whole when the server's glyph behaviour changes. */
+    private static java.util.List<com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.Entry> shown = java.util.List.of();
+
+    private static void refresh(IJeiRuntime runtime) {
+        var manager = runtime.getRecipeManager();
+        if (!shown.isEmpty()) manager.hideRecipes(GlyphPressRecipeCategory.TYPE, shown);
+        shown = com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.entries();
+        if (!shown.isEmpty()) manager.addRecipes(GlyphPressRecipeCategory.TYPE, shown);
+    }
+
     @Override
     public void onRuntimeAvailable(IJeiRuntime runtime) {
+        // Recipe viewing follows the same effective definitions as the Press: refresh when they change.
+        com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.setViewerRefresh(
+            () -> net.minecraft.client.Minecraft.getInstance().execute(() -> refresh(runtime)));
+        com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.setViewerOpen(
+            () -> runtime.getRecipesGui().showTypes(java.util.List.of(GlyphPressRecipeCategory.TYPE)));
+        refresh(runtime);
         if (!IronsCompat.isLoaded()) {
             // No Iron's means no proxy spells and no Iron's recipe categories to filter.
             return;

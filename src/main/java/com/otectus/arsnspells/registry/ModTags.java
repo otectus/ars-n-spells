@@ -47,6 +47,10 @@ public final class ModTags {
     public static final TagKey<Item> CROSS_CAST_BLACKLIST =
         ItemTags.create(ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "cross_cast_blacklist"));
 
+    /** The Glyph Press's default catalyst ingredient (Source gems); a mapping may name another tag. */
+    public static final TagKey<Item> GLYPH_PRESS_CATALYSTS =
+        ItemTags.create(ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "glyph_press_catalysts"));
+
     /** Blocks that count as Source Jars for the regen synergy scan. */
     public static final TagKey<Block> SOURCE_JARS =
         BlockTags.create(ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID, "source_jars"));

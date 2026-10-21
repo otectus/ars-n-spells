@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "type": "policy",
+  "deny_spells": ["irons_spellbooks:black_hole"],
+  "deny_schools": ["irons_spellbooks:eldritch"]
+}

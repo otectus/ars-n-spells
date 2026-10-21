@@ -231,6 +231,32 @@ final class IronsProxyCastDriver {
         return book;
     }
 
+    /**
+     * Run {@code action} and report every {@code SpellOnCastEvent} Iron's posted for
+     * {@code player} meanwhile, as {@code spell@school} strings, so a test can tell a cast that
+     * never reached Iron's event from one whose listeners ignored it.
+     */
+    static java.util.List<String> onCastEvents(ServerPlayer player, Runnable action) {
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        if (!IronsCompat.isLoaded()) {
+            action.run();
+            return seen;
+        }
+        java.util.function.Consumer<io.redspace.ironsspellbooks.api.events.SpellOnCastEvent> listener = event -> {
+            if (event.getEntity() == player) {
+                seen.add(event.getSpellId() + "@" + (event.getSchoolType() == null ? "null" : event.getSchoolType().getId()));
+            }
+        };
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.HIGHEST, true,
+            io.redspace.ironsspellbooks.api.events.SpellOnCastEvent.class, listener);
+        try {
+            action.run();
+        } finally {
+            NeoForge.EVENT_BUS.unregister(listener);
+        }
+        return seen;
+    }
+
     /** Whether {@code spellId} is on this player's native Iron's cooldown. */
     static boolean onNativeCooldown(ServerPlayer player, String spellId) {
         return IronsCompat.isLoaded()
@@ -238,6 +264,87 @@ final class IronsProxyCastDriver {
     }
 
     /** The native Iron's pool, read through the ANS adapter. */
+    private static final java.util.Map<java.util.UUID, net.minecraft.world.phys.Vec3> TELEPORTS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static volatile boolean teleportsRecorded;
+
+    /**
+     * Record every Iron's spell teleport from now on. A FakePlayer's network handler drops
+     * teleports, so a GameTest caster never moves; the teleport Iron's itself requested (its own
+     * {@code SpellTeleportEvent}, posted just before it moves the entity) is the observable effect.
+     */
+    static synchronized void recordTeleports() {
+        if (teleportsRecorded) return;
+        teleportsRecorded = true;
+        NeoForge.EVENT_BUS.addListener(io.redspace.ironsspellbooks.api.events.SpellTeleportEvent.class,
+            event -> TELEPORTS.put(event.getEntity().getUUID(),
+                new net.minecraft.world.phys.Vec3(event.getTargetX(), event.getTargetY(), event.getTargetZ())));
+    }
+
+    @org.jetbrains.annotations.Nullable
+    static net.minecraft.world.phys.Vec3 lastTeleport(java.util.UUID entity) {
+        return TELEPORTS.get(entity);
+    }
+
+    static void forgetTeleport(java.util.UUID entity) {
+        TELEPORTS.remove(entity);
+    }
+
+    /**
+     * A native Iron's cost hook, as another mod would install it: halve {@code spellId}'s mana
+     * cost in its own {@code SpellOnCastEvent}. Returns the handle that removes it.
+     */
+    static Runnable halveManaCostOf(String spellId) {
+        java.util.function.Consumer<io.redspace.ironsspellbooks.api.events.SpellOnCastEvent> hook = event -> {
+            if (spellId.equals(event.getSpellId())) event.setManaCost(event.getManaCost() / 2);
+        };
+        NeoForge.EVENT_BUS.addListener(io.redspace.ironsspellbooks.api.events.SpellOnCastEvent.class, hook);
+        return () -> NeoForge.EVENT_BUS.unregister(hook);
+    }
+
+    /** Another mod vetoing {@code spellId} for {@code player} in Iron's own pre-cast event. Returns the handle that removes it. */
+    static Runnable vetoPreCast(ServerPlayer player, String spellId) {
+        java.util.function.Consumer<io.redspace.ironsspellbooks.api.events.SpellPreCastEvent> veto = event -> {
+            if (event.getEntity() == player && spellId.equals(event.getSpellId())) event.setCanceled(true);
+        };
+        NeoForge.EVENT_BUS.addListener(io.redspace.ironsspellbooks.api.events.SpellPreCastEvent.class, veto);
+        return () -> NeoForge.EVENT_BUS.unregister(veto);
+    }
+
+    // ---- Glyph Press fixtures: genuine Iron's scroll stacks, valid and deliberately invalid ----
+
+    /** A native Iron's scroll with no spell container at all. */
+    static ItemStack blankIronsScroll() {
+        return new ItemStack(ItemRegistry.SCROLL.get());
+    }
+
+    /** A native scroll whose container holds {@code spellId} at a raw {@code level}, valid or not. */
+    static ItemStack rawScroll(String spellId, int level) {
+        ItemStack stack = new ItemStack(ItemRegistry.SCROLL.get());
+        ISpellContainerMutable container = ISpellContainer.create(1, false, false).mutableCopy();
+        container.addSpellAtIndex(SpellRegistry.getSpell(spellId), level, 0, true);
+        ISpellContainer.set(stack, container.toImmutable());
+        return stack;
+    }
+
+    /** A native scroll carrying two spells, which no Iron's scroll does. */
+    static ItemStack twoSpellScroll() {
+        ItemStack stack = new ItemStack(ItemRegistry.SCROLL.get());
+        ISpellContainerMutable container = ISpellContainer.create(2, false, false).mutableCopy();
+        container.addSpellAtIndex(SpellRegistry.getSpell("irons_spellbooks:firebolt"), 1, 0, true);
+        container.addSpellAtIndex(SpellRegistry.getSpell("irons_spellbooks:heal"), 1, 1, true);
+        ISpellContainer.set(stack, container.toImmutable());
+        return stack;
+    }
+
+    /** Iron's own server setting that decides whether creative casters pay mana. */
+    static boolean creativeManaCost() {
+        return io.redspace.ironsspellbooks.config.ServerConfigs.CREATIVE_MANA_COST.get();
+    }
+
+    static void setCreativeManaCost(boolean charged) {
+        TestConfig.set(io.redspace.ironsspellbooks.config.ServerConfigs.CREATIVE_MANA_COST, charged);
+    }
+
     static float ironsMana(ServerPlayer player) {
         return IronsCompat.isLoaded()
             ? com.otectus.arsnspells.bridge.BridgeManager.getNativeIronsBridge().getMana(player) : 0.0f;
@@ -378,6 +485,63 @@ final class IronsProxyCastDriver {
             return;
         }
         MagicData.getPlayerMagicData(player).setMana(mana);
+    }
+
+    /** Raise {@code player}'s Iron's maximum mana attribute so a funded pool is not clamped back down. */
+    static void setMaxIronsMana(ServerPlayer player, double max) {
+        if (!IronsCompat.isLoaded()) {
+            return;
+        }
+        var attribute = player.getAttribute(io.redspace.ironsspellbooks.api.registry.AttributeRegistry.MAX_MANA);
+        if (attribute != null) attribute.setBaseValue(max);
+    }
+
+    /** Learn {@code spellId} in Iron's for {@code player} (Eldritch spells require it). */
+    static void learnSpell(ServerPlayer player, String spellId) {
+        if (!IronsCompat.isLoaded()) {
+            return;
+        }
+        AbstractSpell spell = io.redspace.ironsspellbooks.api.registry.SpellRegistry.getSpell(spellId);
+        MagicData.getPlayerMagicData(player).getSyncedData().learnSpell(spell, false);
+    }
+
+    /** A summoned zombie owned by {@code owner}, standing at {@code pos}; the target Sacrifice needs. */
+    static net.minecraft.world.entity.Entity ownedSummon(ServerPlayer owner, net.minecraft.world.phys.Vec3 pos) {
+        if (!IronsCompat.isLoaded()) {
+            return null;
+        }
+        var zombie = new io.redspace.ironsspellbooks.entity.mobs.SummonedZombie(owner.level(), owner, false);
+        zombie.moveTo(pos.x, pos.y, pos.z);
+        zombie.setNoAi(true);
+        owner.level().addFreshEntity(zombie);
+        return zombie;
+    }
+
+    /** Recasts of {@code spellId} the player still has (0 when none is pending). */
+    static int remainingRecasts(ServerPlayer player, String spellId) {
+        if (!IronsCompat.isLoaded()) {
+            return 0;
+        }
+        return MagicData.getPlayerMagicData(player).getPlayerRecasts().getRemainingRecastsForSpell(spellId);
+    }
+
+    /** Whether {@code player}'s real Iron's casting slot is casting {@code spellId}. */
+    static boolean castingSpell(ServerPlayer player, String spellId) {
+        if (!IronsCompat.isLoaded()) {
+            return false;
+        }
+        MagicData data = MagicData.getPlayerMagicData(player);
+        return data.isCasting() && spellId.equals(data.getCastingSpellId());
+    }
+
+    /** Clear every native Iron's cooldown and recast of {@code player}. */
+    static void clearCooldowns(ServerPlayer player) {
+        if (!IronsCompat.isLoaded()) {
+            return;
+        }
+        MagicData data = MagicData.getPlayerMagicData(player);
+        data.getPlayerCooldowns().clearCooldowns();
+        data.getPlayerRecasts().removeAll(io.redspace.ironsspellbooks.capabilities.magic.RecastResult.COMMAND);
     }
 
     static void resetCastingState(ServerPlayer player) {

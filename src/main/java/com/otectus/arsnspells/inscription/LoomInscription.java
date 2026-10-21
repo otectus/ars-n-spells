@@ -7,7 +7,13 @@ import com.otectus.arsnspells.contract.InscriptionPlan;
 import com.otectus.arsnspells.contract.InscriptionPlanner;
 import com.otectus.arsnspells.registry.ModItemsRegistry;
 import com.otectus.arsnspells.spell.ArsSpellExportUtil;
+import com.otectus.arsnspells.spell.CrossModSpell;
+import com.otectus.arsnspells.spell.CrossModSpellComponents;
+import com.otectus.arsnspells.spell.CrossModSpellList;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
+import com.otectus.arsnspells.spell.ModDataComponents;
+import com.otectus.arsnspells.spell.ScrollKind;
+import com.otectus.arsnspells.spell.SpellSchoolChoice;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.ItemStackHandler;
@@ -56,6 +62,14 @@ public final class LoomInscription {
     /** Building the carrier scroll failed; nothing was moved. */
     public static final String REASON_CARRIER_FAILED = "carrier failed";
     public static final String REASON_INVALID_TARGET = "invalid target";
+    /** The requested school is not a school id, or no installed Iron's school has it. */
+    public static final String REASON_SCHOOL_UNKNOWN = "school unknown";
+    /** {@code allow_spell_school_override} is off, so only Automatic may be requested. */
+    public static final String REASON_SCHOOL_DISABLED = "school disabled";
+    /** Changing a school needs a Spell Loom carrier scroll in the target slot. */
+    public static final String REASON_NOT_A_CARRIER = "not a carrier";
+    /** The carrier already uses the requested school; nothing would change. */
+    public static final String REASON_SCHOOL_UNCHANGED = "school unchanged";
 
     private LoomInscription() {
     }
@@ -143,6 +157,73 @@ public final class LoomInscription {
     }
 
     /**
+     * The refusal a requested school earns, or {@code null} when it may be used. Automatic
+     * (empty or {@code auto}) is always usable. Pure, so the screen can mirror it.
+     */
+    public static String schoolReason(String school) {
+        return switch (SpellSchoolChoice.check(school)) {
+            case AUTOMATIC, ACCEPTED -> null;
+            case DISABLED -> REASON_SCHOOL_DISABLED;
+            case MALFORMED, NOT_INSTALLED -> REASON_SCHOOL_UNKNOWN;
+        };
+    }
+
+    /**
+     * What {@link #applySchoolChange} would do with the loom as it stands: {@link
+     * InscriptionPlan#REASON_OK}, or the reason it would refuse. Pure; moves nothing.
+     *
+     * <p>Only a Spell Loom carrier scroll in the target slot can be changed: exactly one intact
+     * Ars entry, which {@link ScrollKind#ANS_CARRIER} already guarantees. The source and output
+     * slots play no part, because the change happens in place.
+     */
+    public static String planSchoolChange(SpellLoomBlockEntity loom, String school) {
+        if (!IronsCompat.isLoaded()) {
+            return REASON_IRONS_MISSING;
+        }
+        ItemStack target = loom.getItems().getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL);
+        if (ScrollKind.classify(target) != ScrollKind.ANS_CARRIER) {
+            return REASON_NOT_A_CARRIER;
+        }
+        String refusal = schoolReason(school);
+        if (refusal != null) {
+            return refusal;
+        }
+        CrossModSpell entry = IronsBookBindingUtil.extractSingleEntry(target).orElse(null);
+        if (entry == null) {
+            return REASON_NOT_A_CARRIER;
+        }
+        if (SpellSchoolChoice.normalize(school).equals(SpellSchoolChoice.normalize(entry.school().orElse("")))) {
+            return REASON_SCHOOL_UNCHANGED;
+        }
+        return InscriptionPlan.REASON_OK;
+    }
+
+    /**
+     * Give the carrier scroll in the target slot a new school, or make it Automatic, without
+     * rebuilding it. Only the entry's school field changes: the spell, its name, background,
+     * icon, the native container and the stack size are untouched, and nothing is consumed.
+     * Every check runs first against the live stack; the slot is then replaced in one write, so
+     * a refusal leaves all three slots exactly as they were.
+     */
+    public static String applySchoolChange(SpellLoomBlockEntity loom, String school) {
+        String reason = planSchoolChange(loom, school);
+        if (!InscriptionPlan.REASON_OK.equals(reason)) {
+            return reason;
+        }
+        ItemStackHandler items = loom.getItems();
+        ItemStack updated = items.getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL).copy();
+        CrossModSpellList list = CrossModSpellComponents.get(updated);
+        if (list.isEmpty()) {
+            return REASON_NOT_A_CARRIER;
+        }
+        updated.set(ModDataComponents.CROSS_SPELLS.get(),
+            CrossModSpellComponents.withEntrySchool(list, 0, SpellSchoolChoice.normalize(school)));
+        items.setStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL, updated);
+        loom.setChanged();
+        return InscriptionPlan.REASON_OK;
+    }
+
+    /**
      * Run one inscription. Returns {@link InscriptionPlan#REASON_OK} on success, or the reason
      * code that refused it -- in which case nothing at all has moved.
      *
@@ -152,6 +233,16 @@ public final class LoomInscription {
      */
     public static String apply(SpellLoomBlockEntity loom, boolean convert,
                                String name, String nature, String iconSymbol) {
+        return apply(loom, convert, name, nature, iconSymbol, "");
+    }
+
+    /**
+     * {@link #apply(SpellLoomBlockEntity, boolean, String, String, String)} that also gives the
+     * new carrier a mechanical school. Empty or {@code auto} is Automatic. A school this server
+     * cannot use is refused before anything moves, like every other refusal here.
+     */
+    public static String apply(SpellLoomBlockEntity loom, boolean convert,
+                               String name, String nature, String iconSymbol, String school) {
         ItemStackHandler items = loom.getItems();
         ItemStack source = items.getStackInSlot(SpellLoomBlockEntity.SLOT_SOURCE);
         ItemStack target = items.getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL);
@@ -176,13 +267,17 @@ public final class LoomInscription {
         if (!outcome.isPermitted()) {
             return outcome.reasonCode();
         }
+        String schoolRefusal = schoolReason(school);
+        if (schoolRefusal != null) {
+            return schoolRefusal;
+        }
 
         Optional<Spell> spell = ArsSpellExportUtil.extractArsSpell(source);
         if (spell.isEmpty()) {
             return REASON_NO_ARS_SPELL;
         }
         ItemStack carrier = ArsSpellExportUtil.createIronsScrollCarrier(
-            spell.get(), name, nature, iconSymbol);
+            spell.get(), name, nature, iconSymbol, SpellSchoolChoice.normalize(school));
         if (carrier.isEmpty()) {
             return REASON_CARRIER_FAILED;
         }

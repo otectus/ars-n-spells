@@ -193,6 +193,9 @@ public final class CreativeTabGameTests {
     private static Set<String> expectedPaths() {
         Set<String> paths = new TreeSet<>();
         paths.add(ModBlocksRegistry.SPELL_LOOM_ITEM.getId().getPath());
+        // 3.4.0: the Glyph Press and its plate, registered with or without Iron's.
+        paths.add(ModBlocksRegistry.GLYPH_PRESS_ITEM.getId().getPath());
+        paths.add(ModItemsRegistry.blankGlyphPlate().getId().getPath());
         paths.add(SpellUninscriptionRitual.REGISTRY_PATH);
         paths.add(ModItemsRegistry.blankScroll().getId().getPath());
         if (IronsCompat.isLoaded()) {

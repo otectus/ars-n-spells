@@ -30,20 +30,23 @@ public final class HeldSpellInspection {
                 var validation = com.otectus.arsnspells.spell.CrossCastValidator.validate(entry, index, list.size());
                 if (!validation.ok()) return Result.failure(validation.reasonKey());
                 if (validation.resolvedType() == CrossSpellType.ARS_NOUVEAU)
-                    return ars(com.otectus.arsnspells.spell.CrossCastingHandler.decodeArsSpell(entry.arsSpellTag().orElseThrow()), "ans_entry_" + (index + 1), true);
+                    return ars(com.otectus.arsnspells.spell.CrossCastingHandler.decodeArsSpell(entry.arsSpellTag().orElseThrow()), "ans_entry_" + (index + 1), true,
+                        com.otectus.arsnspells.spell.SpellSchoolChoice.effective(entry.school().orElse("")));
                 return iron(player, entry.spellId(), entry.level(), "ans_entry_" + (index + 1), true);
             }
             var nativeSource = InscriptionInputs.readSource(original.copy());
             if (nativeSource == null) return Result.failure("ars_n_spells.diagnostics.inspect_empty");
-            if (nativeSource.arsSpell != null) return ars(nativeSource.arsSpell, "native_ars", false);
+            if (nativeSource.arsSpell != null) return ars(nativeSource.arsSpell, "native_ars", false, null);
             return iron(player, nativeSource.spellId, nativeSource.spellLevel, "native_slot_one", false);
         } catch (RuntimeException invalid) {
             return Result.failure("ars_n_spells.diagnostics.inspect_invalid");
         }
     }
-    private static Result ars(Spell spell, String selection, boolean cross) {
+    /** {@code explicitSchool} is the entry's usable chosen school, or null when the glyphs decide. */
+    private static Result ars(Spell spell, String selection, boolean cross, String explicitSchool) {
         if (spell == null || spell.isEmpty()) return Result.failure("ars_n_spells.diagnostics.inspect_empty");
-        return new Result(selection, "ars_nouveau:spell", SpellAnalysis.analyze(spell).schoolKey(), ResourceUnit.ARS_MANA, spell.getCost(), cross, "");
+        return new Result(selection, "ars_nouveau:spell", SpellAnalysis.analyze(spell).withExplicitSchool(explicitSchool).schoolKey(),
+            ResourceUnit.ARS_MANA, spell.getCost(), cross, "");
     }
     private static Result iron(ServerPlayer player, ResourceLocation id, int level, String selection, boolean cross) {
         if (!IronsCompat.isLoaded()) return Result.failure("ars_n_spells.spell_loom.error.irons_missing");

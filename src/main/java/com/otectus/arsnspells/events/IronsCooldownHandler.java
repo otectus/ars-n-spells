@@ -20,6 +20,11 @@ public class IronsCooldownHandler {
      */
     @SubscribeEvent
     public void onIronsSpellPreCast(SpellPreCastEvent event) {
+        // The Ars cast carrying an imported glyph already passed (and will commit) the category
+        // cooldown; the delegated Iron's call must not be gated or counted a second time.
+        if (com.otectus.arsnspells.glyph.runtime.GlyphInvocationScope.active()) {
+            return;
+        }
         // ANS cross-cast proxies carry a 0s cooldown of their own; the delegated Ars
         // cast applies the real category cooldown. Running the unified cooldown here
         // would gate the wheel slot on a cooldown the Ars spell also charges.

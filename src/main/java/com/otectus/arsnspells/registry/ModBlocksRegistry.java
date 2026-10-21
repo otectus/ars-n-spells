@@ -35,6 +35,18 @@ public final class ModBlocksRegistry {
     public static final DeferredHolder<Item, Item> SPELL_LOOM_ITEM = BLOCK_ITEMS.register("spell_loom",
         () -> new BlockItem(SPELL_LOOM.get(), new Item.Properties()));
 
+    /** Registered with or without Iron's, so placed Presses and their contents always load; only its recipe is Iron's-gated. */
+    public static final DeferredHolder<Block, Block> GLYPH_PRESS = BLOCKS.register("glyph_press",
+        () -> new com.otectus.arsnspells.block.GlyphPressBlock(BlockBehaviour.Properties.of()
+            .mapColor(MapColor.COLOR_GRAY)
+            .noOcclusion()
+            .requiresCorrectToolForDrops()
+            .strength(3.0f, 6.0f)
+            .sound(SoundType.STONE)));
+
+    public static final DeferredHolder<Item, Item> GLYPH_PRESS_ITEM = BLOCK_ITEMS.register("glyph_press",
+        () -> new BlockItem(GLYPH_PRESS.get(), new Item.Properties()));
+
     private ModBlocksRegistry() {}
 
     public static void register(IEventBus modBus) {

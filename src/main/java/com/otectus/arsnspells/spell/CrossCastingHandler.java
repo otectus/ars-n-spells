@@ -12,6 +12,9 @@ import com.otectus.arsnspells.config.AnsConfig;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import com.otectus.arsnspells.network.CrossCastRequestPayload;
 import com.otectus.arsnspells.network.PacketHandler;
+import com.otectus.arsnspells.spell.target.CastTargetHint;
+import com.otectus.arsnspells.spell.target.CastTargetResolver;
+import com.otectus.arsnspells.spell.target.ValidatedCastTarget;
 import com.otectus.arsnspells.util.AdvancementUtil;
 import com.otectus.arsnspells.util.ArsSpellIntegrity;
 import com.otectus.arsnspells.util.CrossCastTrace;
@@ -52,10 +55,19 @@ import java.util.UUID;
  *
  * <p>For Ars casts: deserialises the embedded {@link Spell} via
  * {@link Spell#CODEC} against {@link NbtOps} (the cross-cast NBT shape was
- * preserved through the data-component port). For Iron's casts: looks the
- * spell up by id in {@link SpellRegistry#REGISTRY} and dispatches with
- * {@link CastSource#SCROLL} semantics (instant cast, no charge animation,
- * respects mana checks).
+ * preserved through the data-component port), picks its target on the server
+ * and hands it to the matching resolver entry point through
+ * {@link ArsCastDispatcher}. For Iron's casts: looks the spell up by id in
+ * {@link SpellRegistry#REGISTRY} and starts it with {@link CastSource#SPELLBOOK}
+ * semantics, because a generic ANS carrier is reusable (it is not consumed like
+ * a native scroll).
+ *
+ * <p>Interaction precedence (3.4.0) follows an Ars spellbook: a block's or an
+ * entity's own right-click interaction (a chest, a villager) runs first and
+ * consumes the click; only a click that passes it reaches the item use, where
+ * the carrier sends its one cast request. On a block, the carrier item's own
+ * use-on behaviour is replaced by the cast. Neither the block event nor the two
+ * entity events ever cast, so one click is one request.
  *
  * <p>The {@link SpellCostCalcEvent} hook applies the cross-cast cost
  * multiplier ({@link AnsConfig#CROSS_CAST_COST_MULTIPLIER}) on Ars-side casts
@@ -143,28 +155,51 @@ public class CrossCastingHandler {
         if (player.level().isClientSide()) {
             // Client: announce intent via payload, then cancel local use prediction so
             // vanilla item-use animations and side-effects do not race with the
-            // server-authoritative cast. The client resolves NOTHING itself.
+            // server-authoritative cast. The client resolves NOTHING itself; it only sends
+            // its aim and what its crosshair rests on, which the server re-checks.
             UUID clientAttempt = UUID.randomUUID();
             CrossCastRequestPayload.Action action = player.isCrouching()
                 ? CrossCastRequestPayload.Action.CYCLE
                 : CrossCastRequestPayload.Action.CAST;
             int clientIndex = CrossModSpellComponents.get(stack).normalizedIndex();
+            CastTargetHint hint = action == CrossCastRequestPayload.Action.CAST
+                ? ClientHook.capture(player) : CastTargetHint.ABSENT;
             PacketHandler.sendToServer(
                 new CrossCastRequestPayload(hand, action, clientIndex, clientAttempt,
-                    com.otectus.arsnspells.network.CarrierFingerprint.of(stack, player.level().registryAccess())));
+                    com.otectus.arsnspells.network.CarrierFingerprint.of(stack, player.level().registryAccess()), hint));
             CrossCastTrace.log(clientAttempt, player, CrossCastTrace.Side.C,
                 CrossCastTrace.Stage.REQUEST_SENT,
-                "hand", hand, "action", action, "index", clientIndex);
+                "hand", hand, "action", action, "index", clientIndex, "claim", hint.kind());
+            // A consuming result ends this click: without it the client would go on to the
+            // offhand item's own use in the same click.
+            event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
             event.setCanceled(true);
             return;
         }
 
         // Server-side: suppress vanilla right-click. The payload path executes the
-        // cast; this cancel only stops native item-use running alongside it. When the
-        // client cancels before sending the vanilla use packet this branch never
-        // fires — it is defensive coverage for automation / NPC use / future
-        // server-side triggers.
+        // cast; this cancel only stops native item-use running alongside it. The client
+        // still sends the vanilla use packet after its own cancel (NeoForge predicts the
+        // use either way), so this branch does fire for every click; it must never cast.
         event.setCanceled(true);
+    }
+
+    /**
+     * A carrier used on a block: the block's own interaction keeps precedence, the carrier
+     * item's own use-on behaviour does not run, and nothing is cast here. The click then reaches
+     * the item use, which sends the one cast request. Both sides, so prediction and server agree.
+     */
+    @SubscribeEvent
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (event.getHand() != InteractionHand.MAIN_HAND) {
+            return;
+        }
+        ItemStack stack = event.getItemStack();
+        if (!CrossModSpellComponents.has(stack) || IronsBookBindingUtil.isIronsSpellBook(stack)
+                || event.getEntity().isSecondaryUseActive()) {
+            return;
+        }
+        event.setUseItem(net.neoforged.neoforge.common.util.TriState.FALSE);
     }
 
     /**
@@ -178,6 +213,16 @@ public class CrossCastingHandler {
      */
     public static boolean serverHandleCast(ServerPlayer player, ItemStack item, InteractionHand hand,
                                            CrossCastRequestPayload.Action action, UUID attemptId) {
+        return serverHandleCast(player, item, hand, action, attemptId, CastTargetHint.ABSENT);
+    }
+
+    /**
+     * {@link #serverHandleCast(ServerPlayer, ItemStack, InteractionHand, CrossCastRequestPayload.Action, UUID)}
+     * with the client's aim and claimed target, which only ever aim the server's own pick.
+     */
+    public static boolean serverHandleCast(ServerPlayer player, ItemStack item, InteractionHand hand,
+                                           CrossCastRequestPayload.Action action, UUID attemptId,
+                                           CastTargetHint hint) {
         if (player == null || item == null || item.isEmpty()) {
             return false;
         }
@@ -227,7 +272,7 @@ public class CrossCastingHandler {
 
         boolean castOk;
         if (CrossSpellType.ARS_NOUVEAU.name().equals(entry.typeName())) {
-            castOk = castArsSpell(player, item, entry, attemptId);
+            castOk = castArsSpell(player, item, entry, attemptId, hand, hint);
         } else if (CrossSpellType.IRONS_SPELLBOOKS.name().equals(entry.typeName())) {
             castOk = castIronsSpell(player, item, entry, attemptId);
         } else {
@@ -273,7 +318,8 @@ public class CrossCastingHandler {
      * Cast the Ars Nouveau entry. Deserialises the embedded spell via the
      * Ars 5.x {@link Spell#CODEC}, builds a {@link SpellContext} via
      * {@link SpellContext#fromEntity(Spell, net.minecraft.world.entity.LivingEntity, ItemStack)},
-     * and invokes {@link SpellResolver#onCast(ItemStack, net.minecraft.world.level.Level)}.
+     * picks the target on the server ({@link CastTargetResolver}) and resolves through the
+     * entry point the spell's form needs ({@link ArsCastDispatcher}).
      *
      * <p>Public so the native-wheel proxy spells
      * ({@code spell.irons.ArsCrossProxySpell}) can delegate their server-side
@@ -286,10 +332,19 @@ public class CrossCastingHandler {
     /**
      * As {@link #castArsSpell(Player, ItemStack, CrossModSpell)}, carrying the trace
      * attempt id minted at payload receipt so the resolve stages can be correlated with
-     * the request that started them. The proxy-spell path passes {@code null}: a
-     * native-wheel cast has no cross-cast request behind it.
+     * the request that started them. Without a hint the server picks along the player's own
+     * rotation, which is what a native wheel, hotkey or staff cast has.
      */
     public static boolean castArsSpell(Player player, ItemStack stack, CrossModSpell entry, UUID attemptId) {
+        return castArsSpell(player, stack, entry, attemptId, InteractionHand.MAIN_HAND, null);
+    }
+
+    /**
+     * The full Ars cast: {@code hand} is the hand the cast is attributed to (a block cast carries
+     * it in its use context) and {@code hint} the client's input-time aim, if the request had one.
+     */
+    public static boolean castArsSpell(Player player, ItemStack stack, CrossModSpell entry, UUID attemptId,
+                                       InteractionHand hand, CastTargetHint hint) {
         if (player == null || stack == null || entry == null) return false;
         if (CrossModSpellComponents.schemaVersion(stack) > CrossModSpellComponents.SCHEMA_VERSION) {
             player.displayClientMessage(Component.translatable("arsnspells.crosscast.invalid.future_schema"), true);
@@ -350,20 +405,38 @@ public class CrossCastingHandler {
                 ctxEntry.spellId = entry.spellId().toString();
             }
             castContext = SpellContext.fromEntity(spell, player, stack);
+            // The entry's chosen school, validated now against the installed schools and the
+            // server setting; null means Automatic. Both the right-click route and the
+            // native-wheel proxy reach Ars only through this method, so this is the one place it
+            // is applied. Written before the resolver exists, so the cost events, SpellCastEvent
+            // and every hit see it, and Ars copies it into each child context, projectile and
+            // delayed event the cast spawns.
+            SpellSchoolChoice.stamp(castContext, SpellSchoolChoice.effective(entry.school().orElse("")));
             SpellResolver resolver = new SpellResolver(castContext);
+            ServerPlayer serverPlayer = (ServerPlayer) player;
+            ValidatedCastTarget target = CastTargetResolver.resolve(serverPlayer, spell, hint);
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.TARGET_RESOLVED, "spell", entry.spellId(), "target", target.describe(),
+                "form", spell.getCastMethod() == null ? "none" : spell.getCastMethod().getRegistryName());
+            if (target.isRefused() || (target.kind() == ValidatedCastTarget.Kind.AIR
+                    && ArsCastDispatcher.requiresTarget(resolver.castType))) {
+                // Refused before the resolver runs: no cast event, no reservation, no cooldown.
+                ArsCastDispatcher.Result refusal = ArsCastDispatcher.dispatch(serverPlayer, stack, hand, resolver, target, attemptId);
+                serverPlayer.displayClientMessage(Component.translatable(refusal.detail()).withStyle(ChatFormatting.RED), true);
+                CrossCastContext.clear(player);
+                return false;
+            }
             CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
                 CrossCastTrace.Stage.RESOURCE_CHECK, "spell", entry.spellId());
-            if (resolver.canCast(player)) {
-                CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                    CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "spell", entry.spellId());
-                boolean accepted = resolver.onCast(stack, player.level());
-                CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
-                    CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "spell", entry.spellId(), "accepted", accepted);
-                if (!accepted) CrossCastContext.clear(player);
-                return accepted;
-            }
-            CrossCastContext.clear(player);
-            return false;
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.UPSTREAM_CAST_ENTER, "spell", entry.spellId());
+            // canCast runs inside each resolver entry point, exactly as for an Ars spellbook.
+            ArsCastDispatcher.Result result = ArsCastDispatcher.dispatch(serverPlayer, stack, hand, resolver, target, attemptId);
+            CrossCastTrace.log(attemptId, player, CrossCastTrace.Side.S,
+                CrossCastTrace.Stage.UPSTREAM_CAST_EXIT, "spell", entry.spellId(), "accepted", result.accepted(),
+                "entry", result.entry());
+            if (!result.accepted()) CrossCastContext.clear(player);
+            return result.accepted();
         } catch (Throwable t) {
             LOGGER.warn("Ars cross-cast failed for {}: {}", entry.spellId(), t.toString());
             CrossCastContext.clear(player);
@@ -413,7 +486,9 @@ public class CrossCastingHandler {
             if (ctxEntry != null) {
                 ctxEntry.spellId = entry.spellId().toString();
             }
-            // attemptInitiateCast(ItemStack, int level, Level, Player, CastSource, boolean consumeMana, String slotTag)
+            // attemptInitiateCast(ItemStack, int spellLevel, Level, Player, CastSource, boolean triggerCooldown,
+            // String castingEquipmentSlot): the boolean starts the native cooldown on completion; it
+            // is not a mana switch (Iron's charges by CastSource).
             boolean ok = spell.attemptInitiateCast(stack, level, player.level(), player, source, true, "");
             if (!ok) {
                 CrossCastContext.clear(player);
@@ -435,6 +510,16 @@ public class CrossCastingHandler {
             return Optional.of(CastSource.valueOf(s.get()));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
+        }
+    }
+
+    /** Client-only indirection: the common class never names a client type outside this holder. */
+    @net.neoforged.api.distmarker.OnlyIn(net.neoforged.api.distmarker.Dist.CLIENT)
+    private static final class ClientHook {
+        private ClientHook() {}
+
+        static CastTargetHint capture(Player player) {
+            return com.otectus.arsnspells.client.ClientCastTargets.capture(player);
         }
     }
 

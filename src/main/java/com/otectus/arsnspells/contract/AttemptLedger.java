@@ -36,10 +36,13 @@ public final class AttemptLedger {
     private static final class Entry {
         final CastAttempt attempt;
         final long openedTick;
+        /** This attempt's own TTL, or 0 to use the sweep's default. */
+        final long ttlTicks;
 
-        Entry(CastAttempt attempt, long openedTick) {
+        Entry(CastAttempt attempt, long openedTick, long ttlTicks) {
             this.attempt = attempt;
             this.openedTick = openedTick;
+            this.ttlTicks = ttlTicks;
         }
     }
 
@@ -52,11 +55,22 @@ public final class AttemptLedger {
      */
     public CastAttempt open(UUID playerId, String carrierIdentity, int payloadRevision,
                             CostQuote quote, long openedTick) {
+        return open(playerId, carrierIdentity, payloadRevision, quote, openedTick, 0L);
+    }
+
+    /**
+     * As {@link #open(UUID, String, int, CostQuote, long)} with this attempt's own TTL, for a
+     * reservation that legitimately outlives the default sweep: an imported glyph's prepaid
+     * execution held while its projectile flies or its charge completes. Its owner still closes
+     * it at its own boundary; the TTL is only the leak guard.
+     */
+    public CastAttempt open(UUID playerId, String carrierIdentity, int payloadRevision,
+                            CostQuote quote, long openedTick, long ttlTicks) {
         Objects.requireNonNull(playerId, "playerId");
         CastAttempt attempt =
             new CastAttempt(UUID.randomUUID(), playerId, carrierIdentity, payloadRevision, quote);
         byPlayer.computeIfAbsent(playerId, k -> new LinkedHashMap<>())
-            .put(attempt.attemptId(), new Entry(attempt, openedTick));
+            .put(attempt.attemptId(), new Entry(attempt, openedTick, Math.max(0L, ttlTicks)));
         return attempt;
     }
 
@@ -171,7 +185,8 @@ public final class AttemptLedger {
         List<CastAttempt> expired = new ArrayList<>();
         for (Map<UUID, Entry> open : byPlayer.values()) {
             for (Entry entry : new ArrayList<>(open.values())) {
-                if (nowTicks - entry.openedTick > ttlTicks) {
+                long ttl = entry.ttlTicks > 0 ? entry.ttlTicks : ttlTicks;
+                if (nowTicks - entry.openedTick > ttl) {
                     expired.add(entry.attempt);
                 }
             }
@@ -186,7 +201,7 @@ public final class AttemptLedger {
         CostQuote quote = new CostQuote(ResourceAmount.zero(ResourceUnit.ARS_MANA), List.of(), List.of(), 0);
         CastAttempt attempt = new CastAttempt(id, player, "recovery:" + id, 0, quote);
         attempt.restoreObligation(owed, unknown);
-        byPlayer.computeIfAbsent(player, ignored -> new LinkedHashMap<>()).put(id, new Entry(attempt, 0));
+        byPlayer.computeIfAbsent(player, ignored -> new LinkedHashMap<>()).put(id, new Entry(attempt, 0, 0L));
     }
     public List<CastAttempt> allOpen() {
         return byPlayer.values().stream().flatMap(entries -> entries.values().stream()).map(e -> e.attempt).toList();

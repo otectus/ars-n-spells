@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:smooth_stone" },
+    { "item": "minecraft:gold_nugget" },
+    { "item": "minecraft:amethyst_shard" }
+  ],
+  "result": {
+    "id": "ars_n_spells:blank_glyph_plate",
+    "count": 2
+  }
+}

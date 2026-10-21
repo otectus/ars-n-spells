@@ -28,6 +28,10 @@ public class IronsProgressionHandler {
 
     @SubscribeEvent
     public void onIronsSpellCast(SpellOnCastEvent event) {
+        // One root-cast credit: an imported glyph is credited through the Ars cast that carries it.
+        if (com.otectus.arsnspells.glyph.runtime.GlyphInvocationScope.active()) {
+            return;
+        }
         // The delegated Ars cast credits progression for its own school; crediting the
         // ENDER-school proxy here would both double-count the cast and file it wrong.
         if (CrossModSpellComponents.isArsCrossProxyId(event.getSpellId())) {

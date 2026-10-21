@@ -3,6 +3,7 @@ package com.otectus.arsnspells.network;
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.spell.CrossCastingHandler;
 import com.otectus.arsnspells.contract.RequestAdmission;
+import com.otectus.arsnspells.spell.target.CastTargetHint;
 import net.minecraft.network.chat.Component;
 import com.otectus.arsnspells.util.CrossCastTrace;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -25,12 +26,17 @@ import java.util.UUID;
  * traces. The server never trusts {@code clientSelectedIndex} — it is carried for
  * the trace only; {@link CrossCastingHandler#serverHandleCast} re-reads the held
  * stack and re-resolves the payload at receipt.
+ *
+ * <p>Since 3.4.0 the request also carries the client's input-time aim and, for a click on a block
+ * or entity, what it clicked ({@link CastTargetHint}). The server treats both as hints: it picks
+ * the target itself and only accepts a claimed target its own pick reaches.
  */
 public record CrossCastRequestPayload(InteractionHand hand,
                                       Action action,
                                       int clientSelectedIndex,
                                       UUID clientAttemptId,
-                                      String carrierFingerprint) implements CustomPacketPayload {
+                                      String carrierFingerprint,
+                                      CastTargetHint target) implements CustomPacketPayload {
 
     public enum Action { CAST, CYCLE }
 
@@ -53,23 +59,30 @@ public record CrossCastRequestPayload(InteractionHand hand,
                 buf.writeVarInt(value.clientSelectedIndex());
                 buf.writeUUID(value.clientAttemptId());
                 buf.writeUtf(value.carrierFingerprint(), 64);
+                value.target().write(buf);
             },
             buf -> new CrossCastRequestPayload(
                 buf.readEnum(InteractionHand.class),
                 buf.readEnum(Action.class),
                 buf.readVarInt(),
                 buf.readUUID(),
-                buf.readUtf(64)
+                buf.readUtf(64),
+                CastTargetHint.read(buf)
             )
         );
 
     public CrossCastRequestPayload {
         clientAttemptId = clientAttemptId != null ? clientAttemptId : NIL_UUID;
         carrierFingerprint = carrierFingerprint == null ? "" : carrierFingerprint;
+        target = target == null ? CastTargetHint.ABSENT : target;
     }
 
     public CrossCastRequestPayload(InteractionHand hand, Action action, int selected, UUID attempt) {
-        this(hand, action, selected, attempt, "");
+        this(hand, action, selected, attempt, "", CastTargetHint.ABSENT);
+    }
+
+    public CrossCastRequestPayload(InteractionHand hand, Action action, int selected, UUID attempt, String carrierFingerprint) {
+        this(hand, action, selected, attempt, carrierFingerprint, CastTargetHint.ABSENT);
     }
 
     @Override
@@ -84,7 +97,7 @@ public record CrossCastRequestPayload(InteractionHand hand,
     public static void handleOnServer(CrossCastRequestPayload payload, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
         if (!(ctx.player() instanceof ServerPlayer sender) || payload.hand() != InteractionHand.MAIN_HAND
             || payload.action() == null || !sender.isAlive() || sender.isSpectator() || sender.isSleeping()
-            || sender.containerMenu != sender.inventoryMenu) {
+            || sender.hasDisconnected() || sender.containerMenu != sender.inventoryMenu) {
             return;
         }
         if (NetworkRequestGuard.admit(sender, payload.clientAttemptId()) != RequestAdmission.Result.ACCEPTED) return;
@@ -103,8 +116,9 @@ public record CrossCastRequestPayload(InteractionHand hand,
             "action", payload.action(),
             "clientIndex", payload.clientSelectedIndex(),
             "clientAttempt", payload.clientAttemptId(),
-            "item", stack.getItem());
+            "item", stack.getItem(),
+            "claim", payload.target().kind());
 
-        CrossCastingHandler.serverHandleCast(sender, stack, payload.hand(), payload.action(), serverAttemptId);
+        CrossCastingHandler.serverHandleCast(sender, stack, payload.hand(), payload.action(), serverAttemptId, payload.target());
     }
 }

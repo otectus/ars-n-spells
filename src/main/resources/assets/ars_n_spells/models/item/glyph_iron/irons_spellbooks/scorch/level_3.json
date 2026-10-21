@@ -1,0 +1,16 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "ars_n_spells:item/iron_glyph_icon/irons_spellbooks/scorch",
+    "layer1": "ars_n_spells:item/iron_glyph/frame",
+    "layer2": "ars_n_spells:item/iron_glyph/level_3"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "ars_n_spells:dormant": 1
+      },
+      "model": "ars_n_spells:item/glyph_iron_dormant/level_3"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "spells": [
+    {
+      "spell": "example_addon:frost_lance",
+      "name": "Frost Lance",
+      "school": "irons_spellbooks:ice",
+      "cast_type": "INSTANT",
+      "min_level": 1,
+      "max_level": 5,
+      "rarity": ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"],
+      "default_tier": [1, 2, 2, 3, 3],
+      "requires_learning": false,
+      "enabled_by_default": true,
+      "adapter": "ars_n_spells:projectile",
+      "target": "any",
+      "final_effect_only": false,
+      "status": "supported"
+    }
+  ]
+}

@@ -12,6 +12,9 @@ import com.otectus.arsnspells.spell.CrossModSpellList;
 import com.otectus.arsnspells.spell.CrossSpellType;
 import com.otectus.arsnspells.spell.IronsBookBindingUtil;
 import com.otectus.arsnspells.spell.ScrollKind;
+import com.otectus.arsnspells.spell.SpellSchoolChoice;
+import com.otectus.arsnspells.spell.SpellSchoolNames;
+import com.otectus.arsnspells.util.SpellAnalysis;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -104,9 +107,23 @@ public final class CrossSpellTooltipHandler {
         List<Component> tip = event.getToolTip();
         tip.add(Component.translatable("tooltip.ars_n_spells.cross_spell.header")
             .withStyle(ChatFormatting.GOLD));
+        CrossModSpell shown = list.spells().get(index);
         tip.add(Component.translatable("tooltip.ars_n_spells.cross_spell.entry",
-                index + 1, total, labelFor(list.spells().get(index)))
+                index + 1, total, labelFor(shown))
             .withStyle(ChatFormatting.GRAY));
+        boolean anyChosen = false;
+        if (total > 1 && IronsBookBindingUtil.isIronsSpellBook(stack)) {
+            // A bound book casts every entry from Iron's wheel, so each one's school is listed.
+            for (CrossModSpell entry : list.spells()) {
+                anyChosen |= appendSchoolLine(tip, entry, labelFor(entry));
+            }
+        } else {
+            anyChosen = appendSchoolLine(tip, shown, null);
+        }
+        if (anyChosen) {
+            tip.add(Component.translatable("tooltip.ars_n_spells.cross_spell.school_effect")
+                .withStyle(ChatFormatting.DARK_GRAY));
+        }
         if (total > 1) {
             tip.add(Component.translatable("tooltip.ars_n_spells.cross_spell.cycle_hint")
                 .withStyle(ChatFormatting.DARK_GRAY));
@@ -136,15 +153,43 @@ public final class CrossSpellTooltipHandler {
             if (!customName.isEmpty()) {
                 tip.add(Component.literal(customName).withStyle(ChatFormatting.AQUA));
             }
+            // The background is cosmetic, and says so: the mechanical school is its own line.
             String nature = entry.nature().orElse("");
             if (CrossModSpellComponents.NATURE_KEYS.contains(nature)) {
                 tip.add(Component.translatable("ars_n_spells.spell_loom.nature",
                         Component.translatable("ars_n_spells.nature." + nature))
-                    .withStyle(ChatFormatting.GRAY));
+                    .withStyle(ChatFormatting.DARK_GRAY));
             }
         }
         tip.add(Component.translatable("tooltip.ars_n_spells.carrier.routes")
             .withStyle(ChatFormatting.DARK_GRAY));
+    }
+
+    /**
+     * The mechanical school of an Ars entry: Automatic with what the glyphs resolve to, the
+     * chosen school, or a chosen school that is not applied here and why. An unreadable payload
+     * still gets its line, without the glyph schools. Returns whether the entry has a chosen
+     * school, which earns the caller's one reminder that it changes Ars 'n Spells' bonuses and
+     * not what the glyphs do.
+     */
+    private static boolean appendSchoolLine(List<Component> tip, CrossModSpell entry, Component label) {
+        if (CrossCastValidator.resolveType(entry) != CrossSpellType.ARS_NOUVEAU || entry.arsSpellTag().isEmpty()) {
+            return false;
+        }
+        SpellAnalysis.Result glyphs;
+        try {
+            glyphs = SpellAnalysis.analyze(CrossCastingHandler.decodeArsSpell(entry.arsSpellTag().get()));
+        } catch (Throwable t) {
+            logOnce(null, t);
+            glyphs = SpellAnalysis.analyze((Spell) null);
+        }
+        String stored = entry.school().orElse("");
+        Component school = SpellSchoolNames.describe(stored, glyphs);
+        tip.add((label == null
+                ? Component.translatable("tooltip.ars_n_spells.cross_spell.school", school)
+                : Component.translatable("tooltip.ars_n_spells.cross_spell.entry_school", label, school))
+            .withStyle(ChatFormatting.GRAY));
+        return !SpellSchoolChoice.normalize(stored).isEmpty();
     }
 
     private static Component labelFor(CrossModSpell entry) {
