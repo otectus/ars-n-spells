@@ -32,10 +32,12 @@ import java.util.Set;
  * cost, at the level the augments produce, as a separate payment leg. Charging it again inside
  * the Ars leg would make the player pay twice for the same effect.
  *
- * <p>Amplify and Dampen are the only effect augments, and only where they change something:
- * each raises or lowers the cast level by one, never past the spell's own range, so a level-1
- * glyph accepts no Dampen and a max-level glyph accepts no Amplify. The learned base level, and
- * with it the glyph's identity, never changes.
+ * <p>Amplify and Dampen are the only effect augments: each raises or lowers the cast level by one.
+ * Dampen stops at the spell's first registered level. Amplify stops at Iron's <em>live</em> maximum for the spell (3.4.1), not
+ * the catalog's default, so a server that lowers the maximum also lowers how far Amplify reaches
+ * (and an existing spell that now overshoots is refused at cast time, never silently clamped), and
+ * one that raises it lets Amplify go further. The learned base level, and with it the glyph's
+ * identity, never changes.
  */
 public final class ImportedIronEffect extends AbstractEffect {
     private final ImportedGlyphDefinition definition;
@@ -95,21 +97,27 @@ public final class ImportedIronEffect extends AbstractEffect {
         return isEnabled();
     }
 
+    /**
+     * Amplify is always compatible, because whether it may be used depends on the live maximum,
+     * which {@link #getAugmentLimit} reads each time (Ars caches this set at construction, so it
+     * cannot depend on configuration). Dampen is compatible only above the spell's first registered level.
+     */
     @NotNull
     @Override
     protected Set<AbstractAugment> getCompatibleAugments() {
         if (definition == null) return Set.of();
         Set<AbstractAugment> augments = new HashSet<>();
-        if (definition.canAmplify()) augments.add(AugmentAmplify.INSTANCE);
+        augments.add(AugmentAmplify.INSTANCE);
         if (definition.canDampen()) augments.add(AugmentDampen.INSTANCE);
         return augments;
     }
 
-    /** Amplify may raise the level to the spell's maximum and no further; Dampen may lower it to 1. */
+    /** Amplify may raise the level to Iron's live maximum and no further; Dampen may lower it to the first registered level. */
     @Override
     public int getAugmentLimit(ResourceLocation augmentTag) {
-        if (AugmentAmplify.INSTANCE.getRegistryName().equals(augmentTag)) return definition.maxLevel() - definition.level();
-        if (AugmentDampen.INSTANCE.getRegistryName().equals(augmentTag)) return definition.level() - 1;
+        if (AugmentAmplify.INSTANCE.getRegistryName().equals(augmentTag))
+            return Math.max(0, com.otectus.arsnspells.glyph.behavior.GlyphBehavior.effectiveMax(definition) - definition.level());
+        if (AugmentDampen.INSTANCE.getRegistryName().equals(augmentTag)) return definition.level() - definition.minLevel();
         return super.getAugmentLimit(augmentTag);
     }
 

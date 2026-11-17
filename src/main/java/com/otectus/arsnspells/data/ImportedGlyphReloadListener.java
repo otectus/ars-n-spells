@@ -38,6 +38,11 @@ public class ImportedGlyphReloadListener extends SimplePreparableReloadListener<
 
     @Override
     protected List<GlyphMappingSnapshot.Source> prepare(ResourceManager manager, ProfilerFiller profiler) {
+        return readSources(manager);
+    }
+
+    /** Every mapping file of {@code manager} with its pack and rank; also used by the dry-run validation command. */
+    public static List<GlyphMappingSnapshot.Source> readSources(ResourceManager manager) {
         Map<String, Integer> ranks = new HashMap<>();
         manager.listPacks().forEach(pack -> ranks.putIfAbsent(pack.packId(), ranks.size()));
         List<GlyphMappingSnapshot.Source> sources = new ArrayList<>();

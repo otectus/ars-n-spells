@@ -106,7 +106,9 @@ public final class CastLedger {
         for (var leg : attempt.quote().legs()) access.prepare(attempt.playerId(), leg.unit());
         attempt.validate();
         attempt.markQuoted();
-        return LEDGER.reserve(attempt, access);
+        List<ResourceAmount> moved = LEDGER.reserve(attempt, access);
+        PaymentTimeline.ledger(attempt, PaymentTimeline.Kind.DEBIT, moved, -1);
+        return moved;
     }
 
     /**
@@ -118,16 +120,21 @@ public final class CastLedger {
     public static void commitAndComplete(CastAttempt attempt) {
         LEDGER.commit(attempt);
         LEDGER.complete(attempt);
+        PaymentTimeline.ledger(attempt, PaymentTimeline.Kind.COMMIT, -1);
     }
 
     /** Release a reservation and fail the attempt. Idempotent: a second call refunds nothing. */
     public static List<ResourceAmount> fail(CastAttempt attempt, ResourceAccess access) {
-        return LEDGER.fail(attempt, access);
+        List<ResourceAmount> refunded = LEDGER.fail(attempt, access);
+        if (!refunded.isEmpty()) PaymentTimeline.ledger(attempt, PaymentTimeline.Kind.REFUND, refunded, -1);
+        return refunded;
     }
 
     /** Release a reservation and cancel the attempt. Idempotent. */
     public static List<ResourceAmount> cancel(CastAttempt attempt, ResourceAccess access) {
-        return LEDGER.cancel(attempt, access);
+        List<ResourceAmount> refunded = LEDGER.cancel(attempt, access);
+        if (!refunded.isEmpty()) PaymentTimeline.ledger(attempt, PaymentTimeline.Kind.REFUND, refunded, -1);
+        return refunded;
     }
 
     /**

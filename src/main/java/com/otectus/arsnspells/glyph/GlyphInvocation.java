@@ -17,6 +17,7 @@ import java.util.UUID;
  * @param sessionId      the root cast's session
  * @param recipeIndex    the glyph's position in the Ars recipe
  * @param augmentedLevel base level after Amplify and Dampen, before Iron's equipment bonuses
+ * @param nativeLevel    Iron's level for it, evaluated once at admission ({@code getLevelFor})
  * @param target         the server's description of the Ars target
  * @param hit            the live Ars hit, as Ars resolved it
  * @param form           the recipe's Ars form
@@ -25,7 +26,7 @@ import java.util.UUID;
  * @param continuation   resumes the rest of the Ars recipe after a charged or channelled cast
  */
 public record GlyphInvocation(ServerPlayer caster, ImportedGlyphDefinition definition, UUID sessionId, int recipeIndex,
-                              int augmentedLevel, ValidatedCastTarget target, HitResult hit, ResourceLocation form,
+                              int augmentedLevel, int nativeLevel, ValidatedCastTarget target, HitResult hit, ResourceLocation form,
                               EmissionPayment payment, ItemStack casterTool, GlyphContinuation continuation) {
     /** Self casts the spell as its caster would; every other form points it at the Ars target. */
     public boolean selfForm() {

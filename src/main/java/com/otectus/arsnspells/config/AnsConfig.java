@@ -1354,7 +1354,33 @@ public class AnsConfig {
      *
      * @param configFile the path Forge loaded, used only for the freshness probe
      */
+    /**
+     * 3.4.1 review CONFIG-01: re-resolve the derived policies from the values in force now. Called on
+     * a config reload and by the settings apply service; before this, a changed
+     * {@code payment_open_failure_policy} or {@code conversion_policy} only took effect at the next
+     * start. {@code auto} was replaced by its resolution when the file was loaded, so it is left as
+     * resolved; an explicit value always wins.
+     */
+    public static void refreshResolvedPolicies() {
+        try {
+            EFFECTIVE_CONVERSION_KIND = parseConversionPolicy(CONVERSION_POLICY.get());
+            String raw = PAYMENT_OPEN_FAILURE_POLICY.get();
+            if (!PAYMENT_POLICY_AUTO.equalsIgnoreCase(raw))
+                EFFECTIVE_PAYMENT_POLICY = resolvePaymentOpenFailurePolicy(raw, CURRENT_SCHEMA_VERSION, false);
+        } catch (IllegalStateException notLoaded) {
+            // The SERVER config is not loaded (a client without a world): nothing to resolve.
+        }
+    }
+
+    private static volatile java.nio.file.Path loadedPath;
+
+    /** The SERVER config file this world loaded, or null before one has loaded. */
+    public static java.nio.file.Path loadedPath() {
+        return loadedPath;
+    }
+
     public static void onConfigLoaded(java.nio.file.Path configFile) {
+        loadedPath = configFile;
         int schemaRead = AnsConfig.CONFIG_SCHEMA_VERSION.get();
         // Only an unstamped file can be new: Forge writes the spec default 0, and every load that
         // completes a migration stamps the file. A stamped file is never re-probed, which matters
@@ -1415,8 +1441,7 @@ public class AnsConfig {
             // second start, when the file is no longer new.
             migrated.add("  config_schema_version: " + schemaRead + " -> " + CURRENT_SCHEMA_VERSION
                 + " (migration completed; subsequent loads do not repeat it)");
-            AnsConfig.CONFIG_SCHEMA_VERSION.set(CURRENT_SCHEMA_VERSION);
-            safeSave();
+            AnsConfig.CONFIG_SCHEMA_VERSION.set(CURRENT_SCHEMA_VERSION); // Forge writes the file in set()
         }
 
         if (migrated.isEmpty() || !MIGRATION_REPORTED.compareAndSet(false, true)) {
@@ -1430,42 +1455,18 @@ public class AnsConfig {
     }
 
     /**
-     * ANS-HIGH-017: async config save.
+     * Every change of the ANS server config that ANS itself makes holds this lock (3.4.1 review
+     * CONFIG-01), so two ANS writers never overlap.
      *
-     * <p>The previous implementation did up to {@code 100 + 200 + 400 = 700 ms} of
-     * {@code Thread.sleep} retries plus three blocking {@code SPEC.save()} calls on the
-     * caller's thread. Callers include {@code /ans} command handlers (server main thread)
-     * and the in-game config screen (render thread). Under file-lock contention (antivirus,
-     * OneDrive, simultaneous editor session) this froze the server tick for almost a
-     * full second.
-     *
-     * <p>Now we dispatch the save to a single-thread daemon executor. The caller never
-     * blocks; success is logged async and failures are logged with full stack at WARN
-     * (not retried — NightConfig already serialises writes internally).
+     * <p>Forge 1.20.1 writes a SERVER config file synchronously inside every {@code ConfigValue.set}
+     * (autosave), non-atomically (truncate, then write; NightConfig 3.6 has no atomic mode), and its
+     * file watcher re-reads the file on another thread after each write, "correcting" and rewriting a
+     * file it read half-written. A second writer can therefore leave a file with every table declared
+     * twice, or values silently reset to defaults. ANS used to add exactly such a writer: an
+     * asynchronous {@code safeSave()} that saved again, on its own thread, after a {@code set} had
+     * already saved. It is gone: a {@code set} is the save.
      */
-    private static final java.util.concurrent.ExecutorService SAVE_EXEC =
-        java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "AnsConfig-Save");
-            t.setDaemon(true);
-            return t;
-        });
-
-    public static void safeSave() {
-        SAVE_EXEC.submit(() -> {
-            try {
-                SPEC.save();
-                org.slf4j.LoggerFactory.getLogger(AnsConfig.class).info("OK Config saved successfully");
-            } catch (Exception e) {
-                org.slf4j.LoggerFactory.getLogger(AnsConfig.class).warn(
-                    "Config save failed (will not retry to avoid stalling the caller thread): {}",
-                    e.getMessage(), e);
-            }
-        });
-        // Audit D5: void, not boolean. A prior version returned true unconditionally
-        // ("save scheduled"), which read as "save succeeded" at call sites. The async
-        // WARN above is the only source of truth for whether the file write landed;
-        // the in-memory config value is already live either way.
-    }
+    public static final Object SAVE_LOCK = new Object();
 
     /** Whether imported glyph mana bonuses count once per Iron's spell (the default) rather than per level. */
     public static boolean ironGlyphBonusPerSpell() {

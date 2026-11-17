@@ -74,6 +74,9 @@ public class GlyphPressScreen extends AbstractContainerScreen<GlyphPressMenu> {
     private String serverNoteRevision;
     private ItemStack identifiedScroll = ItemStack.EMPTY;
     private ImportedGlyphDefinition identified;
+    /** The scroll's spell and level as read, even when no glyph identity exists for them. */
+    private ResourceLocation readSpell;
+    private int readLevel;
     private Component spellName = Component.empty();
     private ResourceLocation spellIcon;
 
@@ -112,7 +115,7 @@ public class GlyphPressScreen extends AbstractContainerScreen<GlyphPressMenu> {
         if (revision.isEmpty()) return;
         int action = processing() ? GlyphPressRequestHandler.ACTION_CANCEL : GlyphPressRequestHandler.ACTION_START;
         latestRequest = new LoomRequestContext(menu.containerId, menu.sessionId(), UUID.randomUUID(), revision,
-            GlyphMappingSnapshot.current().digest());
+            com.otectus.arsnspells.glyph.behavior.GlyphBehavior.digest());
         PacketHandler.sendToServer(new GlyphPressActionPacket(action, latestRequest));
     }
 
@@ -175,6 +178,8 @@ public class GlyphPressScreen extends AbstractContainerScreen<GlyphPressMenu> {
         identifiedScroll = scroll.copy();
         if (details != null) details.scrollToTop();
         identified = null;
+        readSpell = null;
+        readLevel = 0;
         spellName = Component.empty();
         spellIcon = null;
         if (scroll.isEmpty()) return;
@@ -182,6 +187,8 @@ public class GlyphPressScreen extends AbstractContainerScreen<GlyphPressMenu> {
         if (!bridge.present()) return;
         IronGlyphBridge.ScrollReading reading = bridge.readScroll(scroll);
         if (reading.kind() != IronGlyphBridge.ScrollReading.Kind.OK || reading.spell() == null) return;
+        readSpell = reading.spell();
+        readLevel = reading.level();
         spellName = bridge.spellName(reading.spell()).orElse(Component.literal(reading.spell().toString()));
         spellIcon = bridge.icon(reading.spell());
         if (reading.level() >= 1 && reading.level() <= ImportedGlyphKey.MAX_LEVEL)
@@ -196,6 +203,12 @@ public class GlyphPressScreen extends AbstractContainerScreen<GlyphPressMenu> {
         return switch (reason) {
             case NEEDS_CATALYST -> Component.translatable(reason.messageKey(), numeral(menu.tier()), menu.catalysts());
             case CAPACITY_TOO_SMALL -> Component.translatable(reason.messageKey(), number(menu.sourceCost()), number(menu.capacity()));
+            case NO_ADAPTER -> Component.translatable(reason.messageKey(), readSpell == null ? "?" : readSpell.toString(),
+                readSpell == null ? "?" : readSpell.getNamespace());
+            case LEVEL_NOT_CATALOGUED -> Component.translatable(reason.messageKey(), readLevel,
+                readSpell == null ? 0 : ImportedGlyphCatalog.get().registeredMax(readSpell));
+            case LEVEL_ABOVE_LIVE_MAX -> Component.translatable(reason.messageKey(), readLevel,
+                identified == null ? "?" : com.otectus.arsnspells.glyph.behavior.GlyphBehavior.effectiveMax(identified));
             default -> Component.translatable(reason.messageKey());
         };
     }
@@ -207,6 +220,7 @@ public class GlyphPressScreen extends AbstractContainerScreen<GlyphPressMenu> {
                 case AWAITING_SOURCE -> Component.translatable("ars_n_spells.glyph_press.status.awaiting_source",
                     number(Math.max(0, menu.sourceCost() - menu.reserved()))).withStyle(ChatFormatting.GOLD);
                 case OUTPUT_BLOCKED -> Component.translatable("ars_n_spells.glyph_press.status.output_blocked").withStyle(ChatFormatting.GOLD);
+                case AWAITING_CONFIG -> Component.translatable("ars_n_spells.glyph_press.status.awaiting_config").withStyle(ChatFormatting.GOLD);
                 default -> Component.translatable("ars_n_spells.glyph_press.status.engraving",
                     menu.duration() <= 0 ? 0 : menu.progress() * 100 / menu.duration()).withStyle(ChatFormatting.DARK_AQUA);
             };
@@ -234,7 +248,7 @@ public class GlyphPressScreen extends AbstractContainerScreen<GlyphPressMenu> {
             paragraphs.add(Component.translatable("ars_n_spells.glyph_press.forms", names(identified.family().forms().stream()
                 .sorted(java.util.Comparator.comparing(id -> id.equals(FORM_SELF) ? "" : id.getPath())).toList())));
             List<ResourceLocation> augments = new ArrayList<>();
-            if (identified.canAmplify()) augments.add(AMPLIFY);
+            if (identified.level() < com.otectus.arsnspells.glyph.behavior.GlyphBehavior.effectiveMax(identified)) augments.add(AMPLIFY);
             if (identified.canDampen()) augments.add(DAMPEN);
             paragraphs.add(augments.isEmpty() ? Component.translatable("ars_n_spells.glyph_press.augments.none")
                 : Component.translatable("ars_n_spells.glyph_press.augments", names(augments)));
@@ -243,7 +257,7 @@ public class GlyphPressScreen extends AbstractContainerScreen<GlyphPressMenu> {
             if (Double.isFinite(mana) && mana > 0)
                 paragraphs.add(Component.translatable("ars_n_spells.glyph_press.cast_estimate", number((int) Math.round(mana)))
                     .withStyle(ChatFormatting.DARK_GRAY));
-            if (identified.requiresLearning())
+            if (com.otectus.arsnspells.glyph.behavior.GlyphBehavior.requiresLearning(identified))
                 paragraphs.add(Component.translatable("tooltip.ars_n_spells.glyph.requires_learning").withStyle(ChatFormatting.DARK_PURPLE));
         } else if (menu.sourceCost() > 0 || menu.catalysts() > 0) {
             paragraphs.add(costs());

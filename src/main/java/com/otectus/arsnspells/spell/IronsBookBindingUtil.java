@@ -368,7 +368,10 @@ public final class IronsBookBindingUtil {
         }
         int removed = 0;
         if (IronsCompat.isLoaded()) {
-            for (int poolId : CrossCastNbt.usedProxyPoolIds(tag)) {
+            // 3.4.1 review UNBIND-01: the sidecar's ids, and any orphan ANS proxy whose entry was lost.
+            java.util.Set<Integer> poolIds = new java.util.TreeSet<>(CrossCastNbt.usedProxyPoolIds(tag));
+            poolIds.addAll(com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.nativeProxyPoolIds(stack));
+            for (int poolId : poolIds) {
                 if (com.otectus.arsnspells.spell.irons.IronsProxySlotWriter
                         .removeProxySlot(stack, poolId)) {
                     removed++;

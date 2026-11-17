@@ -60,6 +60,9 @@ public class ArsNSpells {
         // ArsNSpellsMixinPlugin. FMLLoadCompleteEvent is after every registry pass, so
         // the targets are already loaded and the probe merely observes them.
         modEventBus.addListener(this::onLoadComplete);
+        // 3.4.1: record registry fill order (GameTest evidence for the early identity catalog).
+        modEventBus.addListener(net.minecraftforge.eventbus.api.EventPriority.LOWEST,
+            com.otectus.arsnspells.glyph.RegistrationOrderProbe::onRegister);
 
         // Common items (uninscribe tablet) are registered unconditionally so
         // they remain available for cleanup if Iron's Spellbooks is later
@@ -281,10 +284,16 @@ public class ArsNSpells {
             return;
         }
         try {
+            // 3.4.1 review CONFIG-01: derived policies follow a reload, not only a restart.
+            com.otectus.arsnspells.config.AnsConfig.refreshResolvedPolicies();
             com.otectus.arsnspells.bridge.BridgeManager.refreshMode();
         } catch (Exception e) {
             LOGGER.error("FAILED to refresh mana bridge mode after config reload", e);
         }
+        // 3.4.1: glyph availability reads these settings; republish the behaviour once (coalesced).
+        com.otectus.arsnspells.glyph.behavior.GlyphBehavior.onConfigChanged();
+        // 3.4.1 review CONFIG-01: connected clients follow a file edit too (Forge syncs SERVER configs only at login).
+        com.otectus.arsnspells.config.AnsSettingsService.onFileReloaded();
     }
 
     /**

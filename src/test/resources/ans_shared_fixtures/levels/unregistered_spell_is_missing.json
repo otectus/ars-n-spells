@@ -1,0 +1,13 @@
+{
+ "expect": {
+  "status": {
+   "irons_spellbooks:firebolt@1": "available",
+   "irons_spellbooks:heal@1": "spell_missing"
+  }
+ },
+ "live": {
+  "irons_spellbooks:firebolt": {
+   "max_level": 2
+  }
+ }
+}

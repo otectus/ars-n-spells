@@ -33,22 +33,45 @@ public final class GlyphCastSession {
         public final ImportedGlyphDefinition definition;
         /** Base level after Amplify and Dampen, before Iron's equipment bonuses. */
         public final int augmentedLevel;
+        /**
+         * Iron's own level for {@link #augmentedLevel} ({@code getLevelFor}: Curios affinity and
+         * {@code ModifySpellLevelEvent}), evaluated once at admission and frozen for every
+         * execution of this occurrence, so the quote, the cast event and the effect all start
+         * from the same level and the level event fires once per occurrence, not per lookup.
+         */
+        public final int nativeLevel;
         CastAttempt reservation;
         CostQuote quote;
+        /** 3.4.1 review PAYMENT-01: which resource pays this occurrence; fixed at admission. */
+        GlyphRoute route = GlyphRoute.MANA;
+        /** The first execution's LP leg, reserved at admission on the {@link GlyphRoute#LP} route. */
+        java.util.UUID lpLeg;
+        double lpReserved;
+        /** LP route, insufficient LP, and the server kills instead of refusing (native death option). */
+        boolean deathPenalty;
         boolean redeemed;
         int emissions;
         boolean childPending;
 
-        Occurrence(int index, ImportedGlyphDefinition definition, int augmentedLevel) {
+        Occurrence(int index, ImportedGlyphDefinition definition, int augmentedLevel, int nativeLevel) {
             this.index = index;
             this.definition = definition;
             this.augmentedLevel = augmentedLevel;
+            this.nativeLevel = nativeLevel;
         }
 
         public boolean redeemed() { return redeemed; }
         public int emissions() { return emissions; }
         public CostQuote quote() { return quote; }
         public CastAttempt reservation() { return reservation; }
+        public GlyphRoute route() { return route; }
+        public java.util.UUID lpLeg() { return lpLeg; }
+
+        /** Whether this occurrence still holds an unredeemed first-execution payment, in any resource. */
+        boolean holding() {
+            if (redeemed) return false;
+            return reservation != null && !reservation.state().isTerminal() || lpLeg != null;
+        }
         public boolean childPending() { return childPending; }
     }
 
@@ -58,7 +81,7 @@ public final class GlyphCastSession {
     final java.lang.ref.WeakReference<net.minecraft.server.level.ServerPlayer> ownerRef;
     final ResourceKey<Level> dimension;
     final long createdTick;
-    final long expiresTick;
+    long expiresTick;
     final CostRules rules;
     final int mappingGeneration;
     final GlyphInvocationBudget budget;
@@ -66,6 +89,10 @@ public final class GlyphCastSession {
     State state = State.OPEN;
     /** The Ars leg was committed: the root cast itself succeeded. */
     boolean rootCommitted;
+    /** The root resolver entry has returned; with nothing pending the session is done. */
+    boolean rootFinished;
+    /** Ars projectiles and Ars delays carrying this session that have not finished. */
+    int pending;
     String closeReason = "";
 
     GlyphCastSession(net.minecraft.server.level.ServerPlayer owner, ResourceKey<Level> dimension, long createdTick, long lifetimeTicks,
@@ -98,17 +125,24 @@ public final class GlyphCastSession {
     /** Whether anything still needs this session: an unredeemed reservation or a charged child in flight. */
     boolean hasPendingWork() {
         for (Occurrence occurrence : occurrences.values()) {
-            if (occurrence.childPending) return true;
-            if (!occurrence.redeemed && occurrence.reservation != null && !occurrence.reservation.state().isTerminal()) return true;
+            if (occurrence.childPending || occurrence.holding()) return true;
         }
         return false;
     }
 
+    /** Whether a charged or channelled child of this session is still running or waiting. */
+    boolean childPending() {
+        for (Occurrence occurrence : occurrences.values()) if (occurrence.childPending) return true;
+        return false;
+    }
+
+    public int pending() { return pending; }
+    public boolean rootFinished() { return rootFinished; }
+
     /** Spell ids whose native cooldown is still pending in this session. */
     boolean pendingCooldownFor(ResourceLocation spell) {
         for (Occurrence occurrence : occurrences.values()) {
-            if (occurrence.definition.spell().equals(spell) && (occurrence.childPending
-                || (!occurrence.redeemed && occurrence.reservation != null && !occurrence.reservation.state().isTerminal())))
+            if (occurrence.definition.spell().equals(spell) && (occurrence.childPending || occurrence.holding()))
                 return true;
         }
         return false;

@@ -196,6 +196,7 @@ public final class AlternativePayment {
         leg.reserved = moved; leg.remaining = moved; leg.movement = movement;
         leg.unknown = movement.attempted() && !movement.known();
         leg.reserving = false;
+        PaymentTimeline.record(playerId, -1, PaymentTimeline.Kind.DEBIT, "alt:" + attemptId, "moved=" + unit + ":" + moved);
         if (leg.releaseRequested) {
             release(attemptId, access);
             return new Result(Outcome.DENIED, leg.settled ? null : leg);
@@ -243,6 +244,7 @@ public final class AlternativePayment {
         }
         leg.settled = true;
         OPEN.remove(attemptId);
+        PaymentTimeline.record(leg.playerId, -1, PaymentTimeline.Kind.COMMIT, "alt:" + attemptId, "unit=" + leg.unit + " amount=" + leg.reserved());
         return leg.reserved();
     }
 
@@ -260,11 +262,22 @@ public final class AlternativePayment {
         leg.releasing = true;
         try {
             var movement = access.observeCredit(leg.playerId, leg.unit, leg.remaining);
+            if (movement.credited() > 0)
+                PaymentTimeline.record(leg.playerId, -1, PaymentTimeline.Kind.REFUND, "alt:" + attemptId, "moved=" + leg.unit + ":" + movement.credited());
             if (movement.attempted() && !movement.known()) leg.unknown = true;
             if (movement.known()) leg.remaining = Math.max(0, leg.remaining - movement.credited());
             if (leg.remaining == 0 && !leg.unknown) { leg.settled = true; OPEN.remove(attemptId); }
             return movement.credited();
         } finally { leg.releasing = false; }
+    }
+    /**
+     * Give the held leg back through the very access that took it. A resource access keeps the
+     * receipt of what its own debit moved (Blood Magic or health for LP, the aura receipt), so a new
+     * access instance would refund nothing and leave the leg pending until the periodic retry.
+     */
+    public static double release(UUID attemptId) {
+        Leg leg = OPEN.get(attemptId);
+        return leg == null ? 0 : release(attemptId, leg.access);
     }
     public static java.util.List<Leg> allOpen() { return java.util.List.copyOf(OPEN.values()); }
     public static void retryReleases() {

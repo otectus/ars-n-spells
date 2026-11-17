@@ -36,9 +36,11 @@ public final class IronGlyphBridges {
 
         @Override public boolean present() { return false; }
         @Override public SpellState spellState(ResourceLocation spell) { return SpellState.MISSING; }
+        @Override public com.otectus.arsnspells.glyph.behavior.LiveSpellFacts liveFacts(ResourceLocation spell, int registeredMax) { return null; }
         @Override public String rarity(ResourceLocation spell, int level) { return null; }
         @Override public boolean meetsLearning(Player player, ResourceLocation spell) { return false; }
         @Override public double manaCost(ResourceLocation spell, int level) { return Double.NaN; }
+        @Override public double lpCost(net.minecraft.server.level.ServerPlayer player, ResourceLocation spell, int level, double manaCost) { return Double.NaN; }
         @Override public int castTimeTicks(ResourceLocation spell, int level) { return -1; }
         @Override public Optional<Component> spellName(ResourceLocation spell) { return Optional.empty(); }
         @Override public ResourceLocation icon(ResourceLocation spell) { return null; }
@@ -48,6 +50,8 @@ public final class IronGlyphBridges {
             return InvocationOutcome.rejected("message.ars_n_spells.glyph.dormant.irons_absent");
         }
         @Override public boolean nativeCastInProgress(Player player) { return false; }
+        @Override public java.util.List<NativeSpell> nativeSpells() { return java.util.List.of(); }
+        @Override public void cancelChildCast(net.minecraft.server.level.ServerPlayer player, ResourceLocation spell, String slotTag) { }
         @Override public boolean onCooldown(Player player, ResourceLocation spell) { return false; }
         @Override public boolean hasRecast(Player player, ResourceLocation spell) { return false; }
         @Override public int levelFor(ResourceLocation spell, int level, Player player) { return level; }

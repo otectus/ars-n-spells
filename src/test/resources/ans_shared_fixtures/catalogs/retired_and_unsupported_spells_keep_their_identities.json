@@ -1,0 +1,123 @@
+{
+ "expect": {
+  "fails_startup": false,
+  "identities": 8,
+  "status": {
+   "irons_spellbooks:firebolt": "supported",
+   "irons_spellbooks:ice_block": "retired",
+   "irons_spellbooks:odd": "unsupported"
+  }
+ },
+ "ledger": [
+  "ars_n_spells:iron/irons_spellbooks/ice_block/level_1",
+  "ars_n_spells:iron/irons_spellbooks/odd/level_2"
+ ],
+ "sources": [
+  {
+   "json": {
+    "catalog_version": "fixture",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:firebolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:summon",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 2
+      },
+      "name": "Heal",
+      "rarity": [
+       "COMMON",
+       "LEGENDARY"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:holy",
+      "spell": "irons_spellbooks:heal",
+      "target": "position",
+      "tier": [
+       1,
+       3
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 1
+      },
+      "name": "Ice Block",
+      "rarity": [
+       "EPIC"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:ice",
+      "spell": "irons_spellbooks:ice_block",
+      "status": "retired",
+      "target": "any",
+      "tier": [
+       3
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 2
+      },
+      "name": "Odd",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:evocation",
+      "spell": "irons_spellbooks:odd",
+      "status": "unsupported",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "base",
+   "required": true
+  }
+ ]
+}

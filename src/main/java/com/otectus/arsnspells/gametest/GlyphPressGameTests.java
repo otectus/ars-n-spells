@@ -509,7 +509,7 @@ public final class GlyphPressGameTests {
             }))
             .thenExecuteAfter(2, restoring(original, () -> {
                 helper.assertTrue(!press.working() && inputs.equals(snapshot(press)), "a reload that disables the spell ends the job cleanly");
-                helper.assertTrue(press.plan(player).reason() == GlyphPressPlan.Reason.SPELL_DISABLED, "and the press now refuses it");
+                helper.assertTrue(press.plan(player).reason() == GlyphPressPlan.Reason.DISABLED_BY_PACK, "and the press now refuses it, naming the pack");
                 // An allowlist naming a spell Iron's itself disables cannot enable it.
                 publish("{\"schema_version\":1,\"type\":\"ars_n_spells:policy\",\"allow_spells\":[\"irons_spellbooks:cloud_of_regeneration\"]}");
                 press.getItems().setStackInSlot(GlyphPressBlockEntity.SLOT_SCROLL, scroll("irons_spellbooks:cloud_of_regeneration", 1));
@@ -581,7 +581,7 @@ public final class GlyphPressGameTests {
     }
 
     private static LoomRequestContext context(GlyphPressMenu menu, UUID request, String revision) {
-        return new LoomRequestContext(menu.containerId, menu.sessionId(), request, revision, GlyphMappingSnapshot.current().digest());
+        return new LoomRequestContext(menu.containerId, menu.sessionId(), request, revision, com.otectus.arsnspells.glyph.behavior.GlyphBehavior.digest());
     }
 
     private static void publish(String json) {

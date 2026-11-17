@@ -2,7 +2,8 @@
 """Build original ANS icons, state variants and HD32 pack deterministically.
 
 SPDX-License-Identifier: GPL-3.0-only. Run: python tools/generate_icons.py
-Requires Pillow. --check compares all generated assets without writing them.
+Requires Pillow. --check compares all generated assets without writing them;
+ZIP contents are compared independently of Python's archive metadata and compression.
 No downloaded art, dependency textures, random seeds or lossy resizes are used.
 """
 from pathlib import Path
@@ -23,6 +24,21 @@ ALIASES = {'spark':'spell/burst','flame':'spell/ignite','leaf':'school/nature',
 def png(im):
     out = io.BytesIO(); im.save(out, format='PNG', optimize=False, compress_level=9)
     return out.getvalue()
+
+def generated_asset_matches(path, content):
+    if not path.exists():
+        return False
+    existing = path.read_bytes()
+    if existing == content:
+        return True
+    if path.suffix != '.zip':
+        return False
+    try:
+        with zipfile.ZipFile(io.BytesIO(existing)) as old, zipfile.ZipFile(io.BytesIO(content)) as new:
+            return (old.namelist() == new.namelist()
+                    and all(old.read(name) == new.read(name) for name in new.namelist()))
+    except (zipfile.BadZipFile, RuntimeError, NotImplementedError):
+        return False
 
 def rgba(value): return ImageColor.getrgb(value) + (255,)
 
@@ -222,7 +238,7 @@ public final class IconCatalog {
     mismatches=[]
     for path,content in outputs.items():
         if check:
-            if not path.exists() or path.read_bytes()!=content: mismatches.append(str(path.relative_to(ROOT)))
+            if not generated_asset_matches(path, content): mismatches.append(str(path.relative_to(ROOT)))
         else:
             path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(content)
     if mismatches: raise SystemExit('Generated files differ: '+', '.join(mismatches[:20]))

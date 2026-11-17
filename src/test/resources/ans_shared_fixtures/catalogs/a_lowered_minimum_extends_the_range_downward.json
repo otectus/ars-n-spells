@@ -1,0 +1,129 @@
+{
+ "_comment": "CATALOG-02: a later version with a lower native minimum adds the levels below; the added levels take that version's rarity.",
+ "expect": {
+  "accepted": [
+   "a_first",
+   "b_second"
+  ],
+  "fails_startup": false,
+  "first_level": {
+   "addon:bolt": 1
+  },
+  "identities": 9,
+  "rarity_at": {
+   "ars_n_spells:iron/addon/bolt/level_1": "UNCOMMON",
+   "ars_n_spells:iron/addon/bolt/level_2": "RARE",
+   "ars_n_spells:iron/addon/bolt/level_3": "RARE",
+   "ars_n_spells:iron/addon/bolt/level_4": "EPIC"
+  },
+  "registered_max": {
+   "addon:bolt": 6
+  }
+ },
+ "sources": [
+  {
+   "json": {
+    "catalog_version": "fixture",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:firebolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "base",
+   "required": true
+  },
+  {
+   "json": {
+    "catalog": "addon",
+    "catalog_version": "a_first",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 4,
+       "min": 3,
+       "registered_max": 6
+      },
+      "name": "Bolt",
+      "rarity": [
+       "RARE",
+       "EPIC"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:bolt",
+      "target": "any",
+      "tier": [
+       2,
+       3
+      ]
+     }
+    ]
+   },
+   "name": "a_first",
+   "required": false
+  },
+  {
+   "json": {
+    "catalog": "addon",
+    "catalog_version": "b_second",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Bolt",
+      "rarity": [
+       "UNCOMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:bolt",
+      "target": "any",
+      "tier": [
+       2,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "b_second",
+   "required": false
+  }
+ ]
+}

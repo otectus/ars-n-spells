@@ -27,12 +27,47 @@ import java.util.List;
  * {@link GlyphMappingSnapshot#pressTerms}), so a conversion is listed only if the Press would
  * accept it, at the cost the Press would charge. Without Iron's there is nothing to list.
  */
-public record GlyphPressJeiRecipe(ImportedGlyphDefinition definition, ItemStack scroll, ItemStack plate,
-                                  List<ItemStack> catalysts, ItemStack output, int tier,
-                                  GlyphMappingSnapshot.PressTerms terms) {
+public final class GlyphPressJeiRecipe {
+    private final ImportedGlyphDefinition definition;
+    private final ItemStack scroll;
+    private final ItemStack plate;
+    private final List<ItemStack> catalysts;
+    private final ItemStack output;
+    private final int tier;
+    private final GlyphMappingSnapshot.PressTerms terms;
+
+    public GlyphPressJeiRecipe(ImportedGlyphDefinition definition, ItemStack scroll, ItemStack plate, List<ItemStack> catalysts,
+                               ItemStack output, int tier, GlyphMappingSnapshot.PressTerms terms) {
+        this.definition = definition;
+        this.scroll = scroll;
+        this.plate = plate;
+        this.catalysts = catalysts;
+        this.output = output;
+        this.tier = tier;
+        this.terms = terms;
+    }
+
+    public ImportedGlyphDefinition definition() { return definition; }
+    public ItemStack scroll() { return scroll; }
+    public ItemStack plate() { return plate; }
+    public List<ItemStack> catalysts() { return catalysts; }
+    public ItemStack output() { return output; }
+    public int tier() { return tier; }
+    public GlyphMappingSnapshot.PressTerms terms() { return terms; }
 
     public ResourceLocation id() {
         return definition.glyphId();
+    }
+
+    /**
+     * What makes two entries the same conversion for the viewer: every material input (3.4.1 review
+     * VIEW-01): the glyph, its tier and terms, and the catalyst tag's resolved members. A tag reload that
+     * swaps a member is a different recipe, so the viewer stops offering the old item.
+     */
+    String key() {
+        StringBuilder members = new StringBuilder();
+        for (ItemStack catalyst : catalysts) members.append(BuiltInRegistries.ITEM.getKey(catalyst.getItem())).append('x').append(catalyst.getCount()).append(',');
+        return definition.glyphId() + "|" + tier + "|" + terms + "|" + members;
     }
 
     public static List<GlyphPressJeiRecipe> build() {

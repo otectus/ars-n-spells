@@ -235,7 +235,11 @@ public final class SchoolResolver {
         return result.isEmpty() ? List.of(SchoolKeys.normalize(heuristic(path).id())) : List.copyOf(result);
     }
 
-    /** The Iron's school of an imported glyph id, from the startup catalog; null for any other id. */
+    /**
+     * The Iron's school of an imported glyph id: its spell's live school (3.4.1 B3), the one Iron's
+     * configuration gives it on this server and synced to clients, not the school it was catalogued
+     * with. Progression and discounts follow it like school policy does. Null for any other id.
+     */
     @Nullable
     private static String importedGlyphSchool(String registryId) {
         if (!registryId.startsWith(com.otectus.arsnspells.glyph.ImportedGlyphKey.NAMESPACE + ":"
@@ -243,7 +247,7 @@ public final class SchoolResolver {
         net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(registryId);
         if (id == null) return null;
         return com.otectus.arsnspells.glyph.ImportedGlyphCatalog.get().byGlyphId(id)
-            .map(definition -> definition.school().toString()).orElse(null);
+            .map(definition -> com.otectus.arsnspells.glyph.behavior.GlyphBehavior.school(definition).toString()).orElse(null);
     }
 
     /** Full registry id of a glyph, or null when it has none. */

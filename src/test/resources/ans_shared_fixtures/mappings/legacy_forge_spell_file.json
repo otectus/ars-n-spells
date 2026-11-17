@@ -1,0 +1,24 @@
+{
+ "expect": {
+  "tier": {
+   "irons_spellbooks:firebolt@2": 3
+  },
+  "valid": true
+ },
+ "files": [
+  {
+   "id": "test:legacy",
+   "json": {
+    "levels": {
+     "2": {
+      "ars_tier": 3
+     }
+    },
+    "schema_version": 1,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

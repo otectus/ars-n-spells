@@ -27,10 +27,10 @@ class PacketHandlerDirectionGuardsTest {
         String src = Files.readString(Paths.get(
             "src/main/java/com/otectus/arsnspells/network/PacketHandler.java"));
         // 3.4.0: the Glyph Press action is the one new client command; it is request-guarded like the Loom's.
-        Set<String> clientCommands = Set.of("CrossCastRequestPacket", "SpellLoomExportPacket", "GlyphPressActionPacket");
+        Set<String> clientCommands = Set.of("CrossCastRequestPacket", "SpellLoomExportPacket", "GlyphPressActionPacket", "SettingsApplyPacket");
         Set<String> requiredSnapshots = Set.of("AffinitySyncPacket", "CooldownSyncPacket",
             "ResonanceSyncPacket", "SchoolMappingsSyncPacket", "SpellLoomResultPacket",
-            "JournalSnapshotPacket", "GlyphPressResultPacket", "GlyphCatalogHandshakePacket", "GlyphMappingSyncPacket");
+            "JournalSnapshotPacket", "GlyphPressResultPacket", "GlyphCatalogHandshakePacket", "GlyphMappingSyncPacket", "GlyphLiveSyncPacket", "SettingsSyncPacket");
         Matcher registrations = Pattern.compile(
             "INSTANCE\\.registerMessage\\(id\\+\\+,\\s*(\\w+)\\.class,(.*?)\\);", Pattern.DOTALL).matcher(src);
         Map<String, String> directions = new HashMap<>();

@@ -52,6 +52,17 @@ public enum GlyphFamily {
     }
 
     /** {@code ars_n_spells:<family>} as written in the catalog. */
+    /**
+     * The adapter execution-contract version this build implements for every family (3.4.1 review
+     * CATALOG-02). A catalog entry with a newer version is registered and dormant, never executed
+     * under an older contract; version 0 marks a placeholder that never had a contract.
+     */
+    public static final int ADAPTER_VERSION = 1;
+
+    public static boolean supportsAdapterVersion(int version) {
+        return version == ADAPTER_VERSION;
+    }
+
     public String adapterId() {
         return "ars_n_spells:" + name().toLowerCase(Locale.ROOT);
     }

@@ -29,16 +29,63 @@ public final class GlyphClientSync {
     }
 
     /**
-     * Adopt the server's behaviour view. A single-player or LAN host shares the server's own
-     * snapshot in this JVM, which is already authoritative, so only a remote client replaces it.
+     * 3.4.1 review SYNC-01: the server's mapping view and live facts arrive as two packets of one
+     * publication; a remote client applies them together, once both are here, and never a refused or
+     * stale part. A single-player or LAN host shares the server's own state in this JVM.
      */
-    public static void acceptMapping(GlyphMappingSnapshot.ClientView view) {
+    private static final com.otectus.arsnspells.glyph.behavior.PublicationStage<GlyphMappingSnapshot.ClientView,
+        com.otectus.arsnspells.glyph.behavior.GlyphLiveSnapshot> STAGE = new com.otectus.arsnspells.glyph.behavior.PublicationStage<>();
+
+    public static void acceptMapping(com.otectus.arsnspells.network.GlyphMappingSyncPacket packet) {
         if (Minecraft.getInstance().hasSingleplayerServer()) return;
-        GlyphMappingSnapshot.publish(GlyphMappingSnapshot.fromClientView(view));
+        if (packet.view() == null) {
+            refuse(packet.publication(), "mapping view", packet.rejection());
+            return;
+        }
+        apply(STAGE.mapping(packet.publication(), packet.view()));
+    }
+
+    public static void acceptLive(com.otectus.arsnspells.network.GlyphLiveSyncPacket packet) {
+        if (Minecraft.getInstance().hasSingleplayerServer()) return;
+        if (packet.snapshot() == null) {
+            refuse(packet.publication(), "live facts", packet.rejection());
+            return;
+        }
+        apply(STAGE.live(packet.publication(), packet.snapshot()));
+    }
+
+    private static void apply(@org.jetbrains.annotations.Nullable com.otectus.arsnspells.glyph.behavior.PublicationStage.Complete<
+            GlyphMappingSnapshot.ClientView, com.otectus.arsnspells.glyph.behavior.GlyphLiveSnapshot> complete) {
+        if (complete == null) return;
+        com.otectus.arsnspells.glyph.behavior.GlyphBehavior.acceptClientGeneration(GlyphMappingSnapshot.fromClientView(complete.mapping()),
+            complete.live());
+    }
+
+    private static void refuse(long publication, String part, String why) {
+        STAGE.refused(publication);
+        LOGGER.error("Refused the server's imported-glyph {} (publication {}): {}; keeping the last accepted view", part, publication, why);
+    }
+
+    /** Joining a remote server: its facts are unknown until it sends them, which is not the same as unavailable. */
+    public static void onLoggingIn() {
+        STAGE.reset();
+        if (!Minecraft.getInstance().hasSingleplayerServer()) com.otectus.arsnspells.glyph.behavior.GlyphBehavior.resetClient(true);
     }
 
     /** Leaving a remote server drops its view, so nothing of it outlives the connection. */
     public static void onLoggingOut() {
-        if (!Minecraft.getInstance().hasSingleplayerServer()) GlyphMappingSnapshot.publish(GlyphMappingSnapshot.defaults());
+        STAGE.reset();
+        if (!Minecraft.getInstance().hasSingleplayerServer()) {
+            GlyphMappingSnapshot.publish(GlyphMappingSnapshot.defaults());
+            com.otectus.arsnspells.glyph.behavior.GlyphBehavior.resetClient(false);
+        }
+    }
+
+    /**
+     * 3.4.1 review SYNC-01 / VIEW-01: a catalyst tag's members can change without the behaviour
+     * changing (it names the tag, not its items), so the viewer re-reads them when tags arrive.
+     */
+    public static void onTagsUpdated() {
+        com.otectus.arsnspells.glyph.behavior.GlyphBehavior.viewerInputsChanged();
     }
 }

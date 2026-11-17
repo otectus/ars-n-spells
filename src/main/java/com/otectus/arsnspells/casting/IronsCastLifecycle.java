@@ -60,6 +60,11 @@ public final class IronsCastLifecycle {
         /** A proxy's delegated Ars result; null until a proxy effect reports one. */
         Boolean delegated;
         public boolean started, finished, aborted;
+        /**
+         * 3.4.1 review PROGRESSION-01: training (progression, affinity) staged at the cast event,
+         * committed when this invocation's effect starts and dropped otherwise.
+         */
+        java.util.List<Runnable> training;
         final boolean owns;
         final boolean standalone;
         Frame(Session session, MagicData data, ServerPlayer player, AbstractSpell spell, int level, CastSource source,
@@ -102,6 +107,8 @@ public final class IronsCastLifecycle {
         }
         session.active = true; session.lastDuration = duration; session.sequence++;
         trace(frame, "effect_boundary");
+        PaymentTimeline.record(player.getUUID(), -1, PaymentTimeline.Kind.NATIVE_INVOCATION, spell.getSpellId(),
+            "level=" + level + " source=" + source + " final=" + finalInvocation + " step=" + session.sequence);
         return frame;
     }
     /** Re-check after external event listeners and native synchronization callbacks. */
@@ -114,6 +121,36 @@ public final class IronsCastLifecycle {
             ? null : TransactionSnapshot.Reason.CONFIG_CHANGED;
     }
     public static Frame current() { return ACTIVE.get().peek(); }
+
+    /**
+     * Credit training for a native cast only once its effect is accepted (3.4.1 review
+     * PROGRESSION-01). Called by the progression and affinity listeners from Iron's cast event: inside
+     * an invocation ANS is pricing, the credit waits for {@link #startEffect} and is dropped when the
+     * invocation is refused, vetoed or ends without an effect; outside one (a mod posting the event
+     * itself), it runs at once, as before. A channel stages and commits per pulse, as it is paid.
+     */
+    public static void stageTraining(net.minecraft.world.entity.player.Player player, String spellId, Runnable credit) {
+        Frame frame = current();
+        if (frame == null || frame.player != player || !frame.spell.getSpellId().equals(spellId) || frame.started || frame.aborted) {
+            credit.run();
+            return;
+        }
+        if (frame.training == null) frame.training = new java.util.ArrayList<>(2);
+        frame.training.add(credit);
+    }
+
+    private static void commitTraining(Frame frame) {
+        java.util.List<Runnable> staged = frame.training;
+        frame.training = null;
+        if (staged == null) return;
+        for (Runnable credit : staged) {
+            try {
+                credit.run();
+            } catch (RuntimeException | LinkageError failure) {
+                LOG.warn("[CastPayment] training credit failed for {}: {}", frame.spell.getSpellId(), failure.toString());
+            }
+        }
+    }
     /**
      * Iron's has reached its own mana write. Everything between the cost event and here,
      * including another mod's affordability check or top-up, ran against the undebited pool.
@@ -140,6 +177,11 @@ public final class IronsCastLifecycle {
         private PaymentRefused() { super("Payment refused at Iron's native mana write", null, false, false); }
     }
     public static void startEffect() {
+        startEffect(-1);
+    }
+
+    /** As {@link #startEffect()}, with the level the effect runs at (what Iron's cast event settled on). */
+    public static void startEffect(int effectLevel) {
         Frame frame = current();
         if (frame == null || frame.outcome == null || !frame.outcome.allowed()) throw new IllegalStateException("Missing accepted payment boundary");
         if (boundaryFailure() != null) throw new IllegalStateException("Cast identity or pricing changed before effect entry");
@@ -157,6 +199,13 @@ public final class IronsCastLifecycle {
                 Component.translatable("message.ars_n_spells.lp.consumed", Math.round(paid)), true);
         }
         frame.started = true; frame.session.started++; trace(frame, "effect_started");
+        commitTraining(frame);
+        com.otectus.arsnspells.glyph.GlyphChildren.Child glyphChild = com.otectus.arsnspells.glyph.GlyphChildren.forNativeCast(
+            frame.player.getUUID(), frame.spell.getSpellResource(), frame.data.getCastingEquipmentSlot());
+        if (glyphChild != null) glyphChild.effectStarted(frame.outcome.payment() == null ? frame.outcome.route() : legs(frame.quote),
+            effectLevel > 0 ? effectLevel : frame.level);
+        PaymentTimeline.record(frame.player.getUUID(), -1, PaymentTimeline.Kind.NATIVE_EFFECT, frame.spell.getSpellId(),
+            "level=" + frame.level + " quote=" + legs(frame.quote) + " step=" + frame.session.sequence);
     }
     public static void finishEffect() {
         Frame frame = current();
@@ -205,7 +254,7 @@ public final class IronsCastLifecycle {
             io.redspace.ironsspellbooks.api.magic.MagicHelper.MAGIC_MANAGER.addCooldown(player, spell, source);
         if (source == CastSource.SCROLL) io.redspace.ironsspellbooks.item.Scroll.attemptRemoveScrollAfterCast(player);
         com.otectus.arsnspells.glyph.GlyphChildren.Child glyphChild =
-            com.otectus.arsnspells.glyph.GlyphChildren.running(player.getUUID(), spell.getSpellResource());
+            com.otectus.arsnspells.glyph.GlyphChildren.forNativeCast(player.getUUID(), spell.getSpellResource(), data.getCastingEquipmentSlot());
         if (glyphChild != null) glyphChild.completed = true;
         spell.onServerCastComplete(player.level(), level, player, data, false);
         exhaustedChannels++;
@@ -248,19 +297,35 @@ public final class IronsCastLifecycle {
      * without ANS.
      */
     public static void notReached(Frame frame) {
+        frame.training = null;
         if (frame.outcome != null && !frame.outcome.allowed()) { abort(frame, null); return; }
         var payment = frame.outcome == null ? null : frame.outcome.payment();
         var refund = NativePayment.abortBeforeEffect(frame.player, payment, TransactionSnapshot.Reason.NATIVE_VETO);
         if (frame.alternativeId != null) AlternativePayment.release(frame.alternativeId, frame.alternativeAccess);
         vetoedInvocations++;
+        PaymentTimeline.record(frame.player.getUUID(), -1, PaymentTimeline.Kind.NATIVE_ABORT, frame.spell.getSpellId(), "vetoed_before_effect");
         if (AnsConfig.DEBUG_MODE.get() && com.otectus.arsnspells.util.LogThrottle.allow(frame.player.getUUID(), 1000))
             LOG.info("[CastPayment] attempt={} step={} player={} spell={}/{} source={} stage=vetoed_before_effect quote={} refund={}",
                 frame.session.id, frame.session.sequence, LogPrivacy.token(frame.player.getUUID()), frame.spell.getSpellId(),
                 frame.level, frame.source, legs(frame.quote), refund == null ? "none" : refund.refunded());
     }
-    public static void abort(Frame frame, RuntimeException failure) {
+    /**
+     * End an invocation that its own caller already refused and explained (an imported glyph's
+     * policy re-check): the same native follow-through as {@link #abort}, without a second message.
+     */
+    public static void refuseQuietly(Frame frame) {
+        if (frame.owns) frame.session.messaged = true;
+        if (frame.outcome == null || frame.outcome.allowed())
+            frame.outcome = IronsCastPayments.Outcome.refused(frame.session.id, TransactionSnapshot.Reason.CONFIG_CHANGED);
+        abort(frame, null);
+    }
+
+    public static void abort(Frame frame, Throwable failure) {
         if (frame.aborted) return;
         frame.aborted = true;
+        frame.training = null;
+        PaymentTimeline.record(frame.player.getUUID(), -1, PaymentTimeline.Kind.NATIVE_ABORT, frame.spell.getSpellId(),
+            (frame.started ? "after_effect" : "before_effect") + (failure == null ? "" : " " + failure));
         if (!frame.owns) { trace(frame, "reentrant_rejection"); return; }
         frame.session.terminal = true;
         var payment = frame.outcome == null ? null : frame.outcome.payment();
@@ -273,6 +338,11 @@ public final class IronsCastLifecycle {
             failedSessions++;
             report(frame, payment, failure);
         }
+        // 3.4.1 review CAST-04: a paid effect that began and then threw keeps its payment and gets the
+        // cooldown castSpell applies after onCast returns, so a failing spell cannot be retried for free.
+        // A continuous spell gets it from Iron's own cancellation below.
+        if (failure != null && frame.started && frame.finalInvocation && frame.spell.getCastType() != CastType.CONTINUOUS)
+            applyNativeCooldown(frame);
         try {
             if (frame.session.started > 0 && frame.data.isCasting())
                 io.redspace.ironsspellbooks.api.util.Utils.serverSideCancelCast(frame.player);
@@ -284,6 +354,17 @@ public final class IronsCastLifecycle {
         }
     }
 
+    /** What castSpell does after {@code onCast} returns: the cooldown, unless a recast is pending or creative is exempt. */
+    private static void applyNativeCooldown(Frame frame) {
+        try {
+            if (!frame.data.getPlayerRecasts().hasRecastForSpell(frame.spell.getSpellId())
+                    && (!frame.player.isCreative() || io.redspace.ironsspellbooks.config.ServerConfigs.CREATIVE_COOLDOWN.get()))
+                io.redspace.ironsspellbooks.api.magic.MagicHelper.MAGIC_MANAGER.addCooldown(frame.player, frame.spell, frame.source);
+        } catch (RuntimeException bookkeeping) {
+            LOG.debug("[CastPayment] cooldown after a failed effect could not be applied", bookkeeping);
+        }
+    }
+
     /**
      * One message and at most one log line per failed session.
      *
@@ -292,7 +373,7 @@ public final class IronsCastLifecycle {
      * else (an identity or pricing change, a settlement or adapter failure, an exception) is a
      * fault worth a throttled warning.
      */
-    private static void report(Frame frame, NativePayment.Result payment, RuntimeException failure) {
+    private static void report(Frame frame, NativePayment.Result payment, Throwable failure) {
         String stage = frame.started ? "failed_during_effect" : frame.session.started > 0 ? "interrupted_after_effect" : "aborted_before_effect";
         boolean shortage = failure == null && payment != null && payment.shortage();
         String who = LogPrivacy.token(frame.player.getUUID());
@@ -334,6 +415,7 @@ public final class IronsCastLifecycle {
     public static boolean aborted(ServerPlayer player) { return ABORTED.containsKey(MagicData.getPlayerMagicData(player)); }
     public static void clearCaller(ServerPlayer player) { ABORTED.remove(MagicData.getPlayerMagicData(player)); }
     public static void exit(Frame frame) {
+        frame.training = null;
         if (frame.owns) {
             frame.session.active = false;
             if (frame.standalone) IronsCastPayments.clear(frame.data);

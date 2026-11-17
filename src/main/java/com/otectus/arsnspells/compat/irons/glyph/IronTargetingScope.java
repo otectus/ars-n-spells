@@ -56,6 +56,10 @@ public final class IronTargetingScope {
         final boolean nativePipeline;
         final List<Entity> spawned = new ArrayList<>();
         int redirects;
+        /** The charged or channelled child this native invocation belongs to; null for an instant execution. */
+        com.otectus.arsnspells.glyph.GlyphChildren.Child child;
+        /** Set when the invocation was refused before it was entered: the scope was never pushed. */
+        String refusal;
 
         Scope(ServerPlayer caster, GlyphInvocation invocation, boolean redirectAim, boolean capture, boolean nativePipeline) {
             this.caster = caster;
@@ -68,6 +72,16 @@ public final class IronTargetingScope {
         public List<Entity> spawned() { return spawned; }
         public int redirects() { return redirects; }
         public GlyphInvocation invocation() { return invocation; }
+        /** Whether this native invocation was refused before its pricing and effect. */
+        public boolean refused() { return refusal != null; }
+
+        /** A refusal marker for an invocation that must not run; never pushed. */
+        static Scope refusedFor(com.otectus.arsnspells.glyph.GlyphChildren.Child child, String key) {
+            Scope scope = new Scope(child.invocation.caster(), child.invocation, false, false, true);
+            scope.child = child;
+            scope.refusal = key;
+            return scope;
+        }
     }
 
     /**
@@ -116,7 +130,8 @@ public final class IronTargetingScope {
         Scope scope = current();
         if (scope != null && scope.caster == player) return true;
         net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(spellId);
-        return player != null && id != null && com.otectus.arsnspells.glyph.GlyphChildren.running(player.getUUID(), id) != null;
+        return player != null && id != null && com.otectus.arsnspells.glyph.GlyphChildren.forNativeCast(player.getUUID(), id,
+            io.redspace.ironsspellbooks.api.magic.MagicData.getPlayerMagicData(player).getCastingEquipmentSlot()) != null;
     }
 
     /**
@@ -133,6 +148,12 @@ public final class IronTargetingScope {
         if (origin != null && origin != scope.caster) return null;
         if (start == null || start.distanceToSqr(scope.caster.getEyePosition()) > EYE_TOLERANCE_SQR) return null;
         HitResult hit = aim(level, scope.invocation.target(), scope.invocation.hit(), checkForBlocks);
+        // 3.4.1 review CAST-03: movement goes to the place it was hit, which outlives the entity there.
+        if (hit == null && scope.invocation.definition().family() == GlyphFamily.MOVEMENT
+                && scope.invocation.target().kind() == CastTargetKind.ENTITY) {
+            Vec3 place = scope.invocation.target().location();
+            hit = BlockHitResult.miss(place, Direction.UP, BlockPos.containing(place));
+        }
         if (hit != null) scope.redirects++;
         return hit;
     }

@@ -3,7 +3,9 @@ package com.otectus.arsnspells.rituals;
 import com.otectus.arsnspells.compat.IronsCompat;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
 import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
+import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
 import io.redspace.ironsspellbooks.api.spells.SpellData;
+import io.redspace.ironsspellbooks.api.spells.SpellSlot;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
@@ -44,23 +46,27 @@ public final class IronsInscriptionReader {
             return null;
         }
         try {
+            if (!ISpellContainer.isSpellContainer(stack)) {
+                return null;
+            }
             ISpellContainer container = ISpellContainer.get(stack);
-            if (container == null) {
+            if (container == null || container.isEmpty()) {
                 return null;
             }
-            SpellData data = container.getSpellAtIndex(0);
-            if (data == null) {
-                return null;
+            // The first real native spell in slot order. Slot 0 alone was wrong twice over: an
+            // empty or "none" slot 0 hid a real spell behind it, and on a bound book slot 0 can
+            // be an ANS proxy, which is a placeholder for an Ars inscription, not a native spell.
+            for (SpellSlot slot : container.getActiveSpells()) {
+                SpellData data = slot == null ? null : slot.spellData();
+                AbstractSpell spell = data == null ? null : data.getSpell();
+                if (spell == null || spell == SpellRegistry.none() || spell.getSpellId() == null) continue;
+                if (spell instanceof com.otectus.arsnspells.spell.irons.ArsCrossProxySpell
+                        || com.otectus.arsnspells.spell.CrossCastNbt.isArsCrossProxyId(spell.getSpellId())) continue;
+                ResourceLocation id = ResourceLocation.tryParse(spell.getSpellId());
+                if (id == null || data.getLevel() < 1) continue;
+                return InscriptionSource.irons(id, data.getLevel());
             }
-            AbstractSpell spell = data.getSpell();
-            if (spell == null || spell.getSpellId() == null) {
-                return null;
-            }
-            ResourceLocation id = ResourceLocation.tryParse(spell.getSpellId());
-            if (id == null) {
-                return null;
-            }
-            return InscriptionSource.irons(id, Math.max(1, data.getLevel()));
+            return null;
         } catch (Exception ignored) {
             // Narrow to Exception (not Throwable) so LinkageError / OutOfMemoryError
             // still propagate — see ANS-MED-020 for the rationale on InscriptionInputs.

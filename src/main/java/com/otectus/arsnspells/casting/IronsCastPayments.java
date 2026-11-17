@@ -43,7 +43,8 @@ public final class IronsCastPayments {
 
     private static Plan quote(Player player, AbstractSpell spell, int level, CastSource source, MagicData data) {
         var context = CrossCastContext.peek(player);
-        boolean glyphChild = com.otectus.arsnspells.glyph.GlyphChildren.running(player.getUUID(), spell.getSpellResource()) != null;
+        boolean glyphChild = com.otectus.arsnspells.glyph.GlyphChildren.forNativeCast(player.getUUID(), spell.getSpellResource(),
+            data.getCastingEquipmentSlot()) != null;
         // 3.4.0: a charged or channelled imported glyph is an Iron's spell cast for an Ars cast,
         // priced like an Iron's spell cast from an ANS carrier: the cross-cast multiplier once.
         var carrier = glyphChild || (context != null && context.type == CrossSpellType.IRONS_SPELLBOOKS
@@ -54,14 +55,7 @@ public final class IronsCastPayments {
         double ironsMax = BridgeManager.getNativeIronsBridge().transactionMax(player);
         CostQuote mana = StandardQuotePolicy.INSTANCE.quote(new ResourceAmount(ResourceUnit.IRONS_MANA, cost),
             rules, carrier, arsMax, ironsMax);
-        double rarityScale = switch (spell.getRarity(level).name()) {
-            case "UNCOMMON" -> AnsConfig.IRONS_LP_UNCOMMON_MULTIPLIER.get();
-            case "RARE" -> AnsConfig.IRONS_LP_RARE_MULTIPLIER.get();
-            case "EPIC" -> AnsConfig.IRONS_LP_EPIC_MULTIPLIER.get();
-            case "LEGENDARY" -> AnsConfig.IRONS_LP_LEGENDARY_MULTIPLIER.get();
-            default -> AnsConfig.IRONS_LP_COMMON_MULTIPLIER.get();
-        };
-        double lpScale = AnsConfig.IRONS_LP_BASE_MULTIPLIER.get() * (1 + level * AnsConfig.IRONS_LP_PER_LEVEL_MULTIPLIER.get()) * rarityScale;
+        double lpScale = lpScale(level, spell.getRarity(level).name());
         int minimum = AnsConfig.IRONS_LP_MINIMUM_COST.get();
         double blasphemy = SanctifiedLegacyCompat.getBlasphemyLPMultiplier(player, spell.getSchoolType().getId().toString());
         ResourceAmount alternative = null;
@@ -76,6 +70,33 @@ public final class IronsCastPayments {
             arsMax, ironsMax, shouldCharge(player, spell, source, data), AnsConfig.DEATH_ON_INSUFFICIENT_LP.get(),
             alternative == null ? null : AlternativeResourceAccess.lp(id -> id.equals(player.getUUID()) ? player : null),
             alternative == null ? null : AlternativeResourceAccess.lpStatus(), lpScale, minimum, blasphemy);
+    }
+
+    /** The LP-per-mana scale of a Cursed-Ring cast at {@code level} of the given rarity. */
+    static double lpScale(int level, String rarity) {
+        double rarityScale = switch (rarity) {
+            case "UNCOMMON" -> AnsConfig.IRONS_LP_UNCOMMON_MULTIPLIER.get();
+            case "RARE" -> AnsConfig.IRONS_LP_RARE_MULTIPLIER.get();
+            case "EPIC" -> AnsConfig.IRONS_LP_EPIC_MULTIPLIER.get();
+            case "LEGENDARY" -> AnsConfig.IRONS_LP_LEGENDARY_MULTIPLIER.get();
+            default -> AnsConfig.IRONS_LP_COMMON_MULTIPLIER.get();
+        };
+        return AnsConfig.IRONS_LP_BASE_MULTIPLIER.get() * (1 + level * AnsConfig.IRONS_LP_PER_LEVEL_MULTIPLIER.get()) * rarityScale;
+    }
+
+    /** The LP a final Iron's-unit {@code manaCost} costs: the minimum, the scale, then the Blasphemy factor. */
+    static double lpFor(double manaCost, double lpScale, int minimum, double blasphemy) {
+        return manaCost <= 0 ? 0 : Math.max(0, Math.round(Math.max(minimum, Math.round(manaCost * lpScale)) * blasphemy));
+    }
+
+    /**
+     * 3.4.1 review PAYMENT-01: the LP a Cursed-Ring cast of {@code spell} at {@code level} pays for an
+     * Iron's-unit {@code manaCost}, by exactly the formula native casting uses, so an imported glyph
+     * and a native cast of the same spell are priced the same.
+     */
+    public static double lpCost(Player player, AbstractSpell spell, int level, double manaCost) {
+        return lpFor(manaCost, lpScale(level, spell.getRarity(level).name()), AnsConfig.IRONS_LP_MINIMUM_COST.get(),
+            SanctifiedLegacyCompat.getBlasphemyLPMultiplier(player, spell.getSchoolType().getId().toString()));
     }
 
     public static boolean shouldCharge(Player player, AbstractSpell spell, CastSource source, MagicData data) {
@@ -158,8 +179,7 @@ public final class IronsCastPayments {
             UUID attempt = UUID.randomUUID();
             ResourceAccess access = plan.alternativeAccess;
             if (AlternativePayment.pending(player.getUUID())) return Outcome.refused(attempt, TransactionSnapshot.Reason.INCOMPLETE_COMPENSATION);
-            double finalLp = event.getManaCost() <= 0 ? 0 : Math.max(0, Math.round(
-                Math.max(plan.lpMinimum, Math.round(event.getManaCost() * plan.lpScale)) * plan.blasphemy));
+            double finalLp = lpFor(event.getManaCost(), plan.lpScale, plan.lpMinimum, plan.blasphemy);
             var payment = AlternativePayment.reserve(attempt, player.getUUID(), ResourceUnit.LP,
                 finalLp, access, plan.compatibility, plan.failurePolicy);
             if (payment.allowsCast()) {

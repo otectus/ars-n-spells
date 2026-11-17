@@ -132,7 +132,7 @@ public class BridgeManager {
      * rebuilding them is safe. {@code synchronized} serialises concurrent refreshes;
      * the single volatile publish gives readers a consistent snapshot rather than a
      * mixture of old and new fields. Callers must persist the config value
-     * ({@code AnsConfig.MANA_UNIFICATION_MODE.set} + {@code safeSave}) first, and invoke
+     * ({@code AnsConfig.MANA_UNIFICATION_MODE.set}, which Forge saves) first, and invoke
      * this on the server thread (command handlers already are; the config screen marshals
      * via the integrated server executor).
      */
@@ -174,6 +174,19 @@ public class BridgeManager {
                                IManaBridge nativeArs, IManaBridge nativeIrons) {
         isIronsLoaded = ironsPresent;
         publish(buildRouting(mode, ironsPresent, nativeArs, ironsPresent ? nativeIrons : null));
+    }
+
+    /**
+     * 3.4.1 review CONFIG-01: a remote client follows the mode the server runs. Its own copy of the
+     * SERVER config arrived once, at login, so without this its routing (which mana bar shows, for one)
+     * kept the mode it joined with after the server changed it. Keeps the client's adapters.
+     */
+    public static void applyServerMode(String effectiveMode) {
+        ManaUnificationMode mode = ManaUnificationMode.fromString(effectiveMode);
+        Routing current = routing;
+        publish(buildRouting(mode, isIronsLoaded,
+            current != null ? current.nativeArs : FALLBACK_BRIDGE,
+            current != null ? current.nativeIrons : null));
     }
 
     private static synchronized void publish(Routing next) {

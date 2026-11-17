@@ -112,6 +112,42 @@ final class IronsTableDriver {
         return ItemStack.EMPTY;
     }
 
+    /**
+     * Take the result slot the way a player does, through the menu's own click handling
+     * ({@code QUICK_MOVE} is shift-click, {@code PICKUP} puts it on the cursor, {@code THROW} drops it).
+     */
+    static void takeResult(Object menu, ServerPlayer player, String clickType) {
+        ((InscriptionTableMenu) menu).clicked(SLOT_RESULT, 0, net.minecraft.world.inventory.ClickType.valueOf(clickType), player);
+    }
+
+    /** What the player holds on the cursor in this menu. */
+    static ItemStack carried(Object menu) {
+        return ((InscriptionTableMenu) menu).getCarried();
+    }
+
+    /** Close the menu as a player does: Iron's returns the book and scroll, never the result. */
+    static void close(Object menu, ServerPlayer player) {
+        ((InscriptionTableMenu) menu).removed(player);
+    }
+
+    /** The wheel index of the ANS proxy for {@code poolId} in {@code book}, or -1. */
+    static int proxyIndex(ItemStack book, int poolId) {
+        if (!ISpellContainer.isSpellContainer(book)) return -1;
+        ISpellContainer container = ISpellContainer.get(book);
+        for (int i = 0; i < container.getMaxSpellCount(); i++) {
+            var data = container.getSpellAtIndex(i);
+            if (data != null && data.getSpell() instanceof com.otectus.arsnspells.spell.irons.ArsCrossProxySpell proxy && proxy.getPoolId() == poolId)
+                return i;
+        }
+        return -1;
+    }
+
+    /** Remove the sidecar payload of the entry for {@code poolId}, leaving its wheel slot: a damaged book. */
+    static void corruptPayload(ItemStack book, int poolId) {
+        var entry = com.otectus.arsnspells.spell.CrossCastNbt.findEntryByProxyPoolId(book.getOrCreateTag(), poolId);
+        if (entry != null) entry.remove(com.otectus.arsnspells.spell.CrossCastNbt.TAG_ARS_SPELL);
+    }
+
     /** How many {@code ars_cross_*} proxy slots {@code book}'s native container holds. */
     static int proxySlotCount(ItemStack book) {
         if (!ISpellContainer.isSpellContainer(book)) {

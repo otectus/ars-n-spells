@@ -1,0 +1,159 @@
+{
+ "_comment": "Exported by GlyphCatalogInventoryGameTests with Wind's Spellbooks 1.20.1-1.0.0 and Iron's 1.20.1-3.16.3 loaded, trimmed to the wind_spellbooks namespace.",
+ "irons_spellbooks": "1.20.1-3.16.3",
+ "spells": [
+  {
+   "ans_proxy": false,
+   "cast_type": "INSTANT",
+   "class": "net.raptorzizi.wind_spellbooks.spells.wind.AeropicSpell",
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/aeropic.png",
+   "max_level": 4,
+   "min_level": 1,
+   "min_rarity": 1,
+   "none": false,
+   "rarity_by_level": [
+    "UNCOMMON",
+    "RARE",
+    "EPIC",
+    "LEGENDARY"
+   ],
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:aeropic"
+  },
+  {
+   "ans_proxy": false,
+   "cast_type": "INSTANT",
+   "class": "net.raptorzizi.wind_spellbooks.spells.wind.AlmightyPushSpell",
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/almighty_push.png",
+   "max_level": 10,
+   "min_level": 1,
+   "min_rarity": 1,
+   "none": false,
+   "rarity_by_level": [
+    "UNCOMMON",
+    "UNCOMMON",
+    "UNCOMMON",
+    "RARE",
+    "RARE",
+    "RARE",
+    "EPIC",
+    "EPIC",
+    "LEGENDARY",
+    "LEGENDARY"
+   ],
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:almighty_push"
+  },
+  {
+   "ans_proxy": false,
+   "cast_type": "LONG",
+   "class": "net.raptorzizi.wind_spellbooks.spells.wind.IronSlashSpell",
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/iron_slash.png",
+   "max_level": 5,
+   "min_level": 1,
+   "min_rarity": 1,
+   "none": false,
+   "rarity_by_level": [
+    "UNCOMMON",
+    "RARE",
+    "RARE",
+    "EPIC",
+    "LEGENDARY"
+   ],
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:iron_slash"
+  },
+  {
+   "ans_proxy": false,
+   "cast_type": "INSTANT",
+   "class": "net.raptorzizi.wind_spellbooks.spells.wind.TailwindSpell",
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/tailwind.png",
+   "max_level": 3,
+   "min_level": 1,
+   "min_rarity": 2,
+   "none": false,
+   "rarity_by_level": [
+    "RARE",
+    "EPIC",
+    "LEGENDARY"
+   ],
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:tailwind"
+  },
+  {
+   "ans_proxy": false,
+   "cast_type": "LONG",
+   "class": "net.raptorzizi.wind_spellbooks.spells.wind.TornadoSpell",
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/tornado.png",
+   "max_level": 5,
+   "min_level": 1,
+   "min_rarity": 3,
+   "none": false,
+   "rarity_by_level": [
+    "EPIC",
+    "EPIC",
+    "EPIC",
+    "LEGENDARY",
+    "LEGENDARY"
+   ],
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:tornado"
+  },
+  {
+   "ans_proxy": false,
+   "cast_type": "INSTANT",
+   "class": "net.raptorzizi.wind_spellbooks.spells.wind.WindBladeSpell",
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/wind_blade.png",
+   "max_level": 10,
+   "min_level": 1,
+   "min_rarity": 0,
+   "none": false,
+   "rarity_by_level": [
+    "COMMON",
+    "COMMON",
+    "COMMON",
+    "UNCOMMON",
+    "UNCOMMON",
+    "RARE",
+    "RARE",
+    "EPIC",
+    "EPIC",
+    "LEGENDARY"
+   ],
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:wind_blade"
+  },
+  {
+   "ans_proxy": false,
+   "cast_type": "INSTANT",
+   "class": "net.raptorzizi.wind_spellbooks.spells.wind.WindJumpSpell",
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/wind_jump.png",
+   "max_level": 3,
+   "min_level": 1,
+   "min_rarity": 0,
+   "none": false,
+   "rarity_by_level": [
+    "UNCOMMON",
+    "RARE",
+    "LEGENDARY"
+   ],
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:wind_jump"
+  }
+ ],
+ "wind_spellbooks": "1.20.1-1.0.0"
+}

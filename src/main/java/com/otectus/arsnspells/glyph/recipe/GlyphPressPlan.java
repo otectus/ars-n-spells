@@ -33,7 +33,16 @@ public record GlyphPressPlan(Reason reason, @Nullable ImportedGlyphDefinition de
         NO_PLATE("no_plate"),
         NEEDS_CATALYST("needs_catalyst"),
         CAPACITY_TOO_SMALL("capacity_too_small"),
-        OUTPUT_FULL("output_full");
+        OUTPUT_FULL("output_full"),
+        // 3.4.1, appended: menu data carries ordinals.
+        /** The level is registered but above Iron's live maximum for the spell. */
+        LEVEL_ABOVE_LIVE_MAX("level_above_live_max"),
+        /** A datapack mapping or policy disables the spell or this level. */
+        DISABLED_BY_PACK("disabled_by_pack"),
+        /** The catalog registers the spell but marks it unsupported or retired. */
+        UNSUPPORTED_ADAPTER("unsupported_adapter"),
+        /** Iron's configuration has not been built yet (a server before its first datapack sync). */
+        CONFIG_PENDING("config_pending");
 
         private final String code;
 

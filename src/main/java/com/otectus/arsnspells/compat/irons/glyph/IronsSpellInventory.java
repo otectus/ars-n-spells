@@ -35,10 +35,14 @@ public final class IronsSpellInventory {
             boolean proxy = spell instanceof com.otectus.arsnspells.spell.irons.ArsCrossProxySpell;
             List<String> rarities = new ArrayList<>();
             int max = none ? 0 : spell.getMaxLevel();
-            for (int level = 1; level <= max; level++) rarities.add(spell.getRarity(level).name());
+            int min = none ? 0 : Math.max(1, spell.getMinLevel());
+            // rarity_by_level[i] is level min + i, as on NeoForge and as the pack tool reads it (3.4.1 review
+            // CATALOG-02). Bounded: an extreme configured maximum must not become an extreme loop.
+            for (int level = Math.max(1, min); level <= Math.min(max, com.otectus.arsnspells.glyph.ImportedGlyphKey.MAX_LEVEL); level++)
+                rarities.add(spell.getRarity(level).name());
             entries.add(new Entry(spell.getSpellResource().toString(),
                 none ? "" : spell.getSchoolType().getId().toString(),
-                spell.getCastType().name(), none ? 0 : spell.getMinLevel(), max, none ? 0 : spell.getMinRarity(), rarities,
+                spell.getCastType().name(), min, max, none ? 0 : spell.getMinRarity(), rarities,
                 !none && spell.requiresLearning(), !none && spell.isEnabled(), spell.getClass().getName(),
                 spell.getSpellIconResource().toString(), proxy, none));
         }

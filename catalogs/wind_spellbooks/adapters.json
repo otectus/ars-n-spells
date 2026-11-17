@@ -1,0 +1,33 @@
+{
+ "_comment": "Adapter assignments for Wind's Spellbooks 1.20.1-1.0.0 on Forge 1.20.1, read from each spell's bytecode (onCast) and verified by WindSpellbooksGameTests.",
+ "spells": {
+  "wind_spellbooks:aeropic": {
+   "adapter": "ars_n_spells:caster",
+   "reason": "Applies the Acrobatics effect to the caster."
+  },
+  "wind_spellbooks:almighty_push": {
+   "adapter": "ars_n_spells:caster",
+   "reason": "Spawns an AlmightyPushEntity on the caster that pushes everything around it away."
+  },
+  "wind_spellbooks:iron_slash": {
+   "reason": "A charged dash that computes its own path from the caster's look (ClipContext) before Iron's teleport helper; no adapter can place that path at an Ars target, so it is catalogued dormant.",
+   "status": "unsupported"
+  },
+  "wind_spellbooks:tailwind": {
+   "adapter": "ars_n_spells:caster",
+   "reason": "Applies the Tailwind effect to the caster."
+  },
+  "wind_spellbooks:tornado": {
+   "reason": "Not castable with Iron's 1.20.1-3.16.3 even natively: Wind's Spellbooks 1.20.1-1.0.0's TornadoEntity constructor reads a field this Iron's build does not have (NoSuchFieldError: fireTransitionTick), observed in the -PwithWindSpellbooks GameTest profile; catalogued dormant until a compatible Wind's Spellbooks build.",
+   "status": "unsupported"
+  },
+  "wind_spellbooks:wind_blade": {
+   "adapter": "ars_n_spells:projectile",
+   "reason": "Launches a WindBladeProjectile along the caster's look."
+  },
+  "wind_spellbooks:wind_jump": {
+   "adapter": "ars_n_spells:caster",
+   "reason": "Launches the caster upward with slow falling and a gust collider at its own position."
+  }
+ }
+}

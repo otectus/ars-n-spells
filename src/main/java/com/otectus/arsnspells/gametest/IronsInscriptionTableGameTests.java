@@ -478,12 +478,13 @@ public final class IronsInscriptionTableGameTests {
     // ------------------------------------------------------------------ (j) extraction guard
 
     /**
-     * A proxy entry cannot be extracted back onto a scroll: that would hand the player a
-     * proxy with no payload and strand the real entry on the book. The native spell in the
-     * same book is still extractable, so the guard is targeted rather than a blanket block.
+     * 3.4.1 review UNBIND-01: a bound Ars entry is offered back as a real ANS carrier, never as a
+     * scroll holding the bare proxy spell (a spell that resolves to nothing, which would also
+     * strand the real entry on the book). The native spell in the same book is still offered by
+     * Iron's own code. Taking the offer is covered by {@code TableExtractionGameTests}.
      */
     @GameTest(template = "platform", batch = "ans_irons_table")
-    public static void table_proxyEntryCannotBeExtracted(GameTestHelper helper) {
+    public static void table_proxyEntryIsOfferedAsACarrierNeverABareProxy(GameTestHelper helper) {
         if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
         }
@@ -511,10 +512,12 @@ public final class IronsInscriptionTableGameTests {
                 + "the guard is blocking more than ANS proxies");
         }
         IronsTableDriver.click(menu, player, proxyIndex);
-        if (!IronsTableDriver.item(menu, IronsTableDriver.SLOT_RESULT).isEmpty()) {
-            helper.fail("selecting a bound Ars entry must offer nothing for extraction, but the "
-                + "result slot holds "
-                + IronsTableDriver.item(menu, IronsTableDriver.SLOT_RESULT));
+        ItemStack offered = IronsTableDriver.item(menu, IronsTableDriver.SLOT_RESULT);
+        // 3.4.1 review UNBIND-01: the offer is a real carrier holding the entry's Ars payload, never
+        // a scroll holding the bare proxy spell (which would cast nothing).
+        if (offered.isEmpty() || com.otectus.arsnspells.spell.IronsBookBindingUtil.extractSingleEntry(offered).isEmpty()) {
+            helper.fail("selecting a bound Ars entry must offer it as an ANS carrier, but the result slot holds "
+                + offered + " " + offered.getTag());
         }
         helper.succeed();
     }

@@ -48,7 +48,8 @@ public final class ImportedGlyphItem extends Glyph {
                 player.displayClientMessage(status.message(definition()).copy().withStyle(ChatFormatting.RED), false);
                 return InteractionResultHolder.fail(stack);
             }
-            if (definition().requiresLearning() && !IronGlyphBridges.get().meetsLearning(player, definition().spell())) {
+            // Iron's live requirement, whatever the catalog recorded (a reconfigured school can add one).
+            if (!IronGlyphBridges.get().meetsLearning(player, definition().spell())) {
                 player.displayClientMessage(Component.translatable("message.ars_n_spells.glyph.requires_irons_learning",
                     effect.displayName()).withStyle(ChatFormatting.RED), false);
                 return InteractionResultHolder.fail(stack);

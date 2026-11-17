@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * <ul>
  *   <li>The new {@code IRONS_AURA_<RARITY>_MULTIPLIER} static fields exist (×5).</li>
  *   <li>The removed {@code ENABLE_PER_CAST_REAGENT} field is absent.</li>
- *   <li>{@code safeSave} is async (no Thread.sleep in the body).</li>
+ *   <li>No second, asynchronous config writer exists (3.4.1 review: Forge saves in {@code set}).</li>
  *   <li>{@code ArsNSpells.java} registers the config as {@code ModConfig.Type.SERVER}.</li>
  * </ul>
  *
@@ -110,24 +110,19 @@ class AnsConfigStructureTest {
     }
 
     @Test
-    void safeSave_doesNotBlockCallerThread() throws IOException {
-        // Source-text assertion: safeSave body must not contain Thread.sleep (ANS-HIGH-017).
-        String source = Files.readString(Paths.get(
-            "src/main/java/com/otectus/arsnspells/config/AnsConfig.java"));
-        // Audit D5: void — a prior boolean return was unconditionally true and read
-        // as "save succeeded" at call sites.
-        int methodIdx = source.indexOf("public static void safeSave()");
-        assertTrue(methodIdx > 0, "safeSave method must exist and return void (audit D5)");
-        // Find the body bounds: from the method declaration to the next top-level "}" at column 0.
-        int bodyStart = source.indexOf('{', methodIdx);
-        int bodyEnd = source.indexOf("\n    }", bodyStart);
-        if (bodyEnd < 0) bodyEnd = source.length();
-        String body = source.substring(bodyStart, bodyEnd);
-        assertFalse(body.contains("Thread.sleep"),
-            "safeSave must not call Thread.sleep (ANS-HIGH-017 made it async); "
-                + "blocking the caller thread is the regressed behaviour");
-        assertTrue(body.contains("SAVE_EXEC.submit") || body.contains("submit("),
-            "safeSave must dispatch via an executor (async)");
+    void configWrites_haveOneWriterAndNeverSleep() throws IOException {
+        // 3.4.1 review: Forge 1.20.1 saves a SERVER config inside every ConfigValue.set. The old
+        // asynchronous safeSave() added a second writer on another thread, which raced Forge's own
+        // writes and its file watcher into doubled or defaulted files. ANS-HIGH-017 (no sleep-and-retry
+        // on the caller's thread) still holds: nothing here sleeps or retries.
+        String source = Files.readString(Paths.get("src/main/java/com/otectus/arsnspells/config/AnsConfig.java"));
+        assertFalse(source.contains("public static void safeSave()"), "the second, asynchronous writer must be gone");
+        assertFalse(source.contains("SAVE_EXEC"), "no config-save executor may exist");
+        assertFalse(source.contains("Thread.sleep"), "no config write may sleep and retry (ANS-HIGH-017)");
+        assertTrue(source.contains("public static final Object SAVE_LOCK"), "ANS's own config changes are serialised");
+        String service = Files.readString(Paths.get("src/main/java/com/otectus/arsnspells/config/AnsSettingsService.java"));
+        assertFalse(service.contains("SPEC.save()"), "the settings service must not save a second time after Forge's set");
+        assertTrue(service.contains("synchronized (AnsConfig.SAVE_LOCK)"), "the settings service changes values under the lock");
     }
 
     @Test

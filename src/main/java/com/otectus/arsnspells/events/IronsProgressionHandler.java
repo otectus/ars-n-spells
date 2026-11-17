@@ -54,9 +54,11 @@ public class IronsProgressionHandler {
         if (school.isEmpty()) {
             return;
         }
-        player.getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(data -> {
-            data.incrementCastCount(school);
-            ProgressionAttributes.applyTransientBonus(player, school, data.getBonusForSchool(school));
-        });
+        // 3.4.1 review PROGRESSION-01: credited when the cast's effect is accepted, not at its event.
+        com.otectus.arsnspells.casting.IronsCastLifecycle.stageTraining(player, event.getSpellId(), () ->
+            player.getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(data -> {
+                data.incrementCastCount(school);
+                ProgressionAttributes.applyTransientBonus(player, school, data.getBonusForSchool(school));
+            }));
     }
 }

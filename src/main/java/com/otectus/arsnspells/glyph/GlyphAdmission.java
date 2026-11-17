@@ -32,9 +32,25 @@ import java.util.List;
  * all of them funded or with none of them. What it checks: a real player is casting through a
  * player caster (never a turret, rune or fake player); no more imported glyphs than
  * {@code max_imported_effects_per_spell}; every one available, learned in Iron's where Iron's
- * requires it, off its native cooldown (or holding a native recast) and not already pending in
- * another cast; and fewer than {@code max_active_glyph_sessions_per_player} sessions in flight.
- * Each refusal tells the caster why and costs nothing.
+ * requires it now, off its native cooldown (or holding a native recast) and not already pending in
+ * another cast; its Amplified level within Iron's live maximum; and fewer than
+ * {@code max_active_glyph_sessions_per_player} sessions in flight. Each refusal tells the caster why
+ * and costs nothing.
+ *
+ * <p><b>Levels (3.4.1).</b> Each occurrence carries four levels: the glyph's base level; the Ars
+ * level after Amplify and Dampen, which must not exceed Iron's live maximum (refused, never
+ * clamped, so lowering the maximum cannot be bypassed with Amplify); Iron's own level for it
+ * ({@code getLevelFor}: equipment affinity and {@code ModifySpellLevelEvent}), evaluated once here
+ * and frozen; and, per execution, the level Iron's {@code SpellOnCastEvent} settles on, which the
+ * payment, the effect and the client packet all use. Native bonuses may legitimately take the cast
+ * above the scroll maximum; only the Ars-adjusted level is bounded.
+ *
+ * <p><b>Money.</b> The first execution of every occurrence is reserved here at Iron's price for its
+ * native level, all or nothing. The cast event can still change that price; the payment at the
+ * effect boundary then settles the difference (refunding a discount, charging an increase or
+ * refusing the effect before it runs). A discount cannot rescue a cast the caster cannot afford at
+ * the native price: Iron's posts its cast event at cast time and ANS does not post it twice to
+ * probe. A native recast is free and reserves nothing.
  */
 public final class GlyphAdmission {
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(GlyphAdmission.class);
@@ -58,14 +74,23 @@ public final class GlyphAdmission {
         return false;
     }
 
-    /** The level an occurrence casts at before Iron's equipment bonuses: base, plus Amplify, minus Dampen, within the spell's range. */
-    public static int augmentedLevel(Spell spell, int index, ImportedGlyphDefinition definition, Player caster) {
+    /** Base level plus Amplify minus Dampen, never below the first registered level, before any bound: what the spell asks for. */
+    public static int requestedLevel(Spell spell, int index, ImportedGlyphDefinition definition, Player caster) {
         int amplify = 0, dampen = 0;
         for (AbstractAugment augment : spell.getAugments(index, caster)) {
             if (augment == AugmentAmplify.INSTANCE) amplify++;
             else if (augment == AugmentDampen.INSTANCE) dampen++;
         }
-        return Math.max(1, Math.min(definition.maxLevel(), definition.level() + amplify - dampen));
+        return Math.max(definition.minLevel(), definition.level() + amplify - dampen);
+    }
+
+    /**
+     * The level an occurrence casts at before Iron's own modifiers: {@link #requestedLevel}, which
+     * admission has already checked against Iron's live maximum (an over-maximum request is
+     * refused there, never clamped here).
+     */
+    public static int augmentedLevel(Spell spell, int index, ImportedGlyphDefinition definition, Player caster) {
+        return requestedLevel(spell, index, definition, caster);
     }
 
     /**
@@ -83,6 +108,8 @@ public final class GlyphAdmission {
         int limit = Math.min(AnsConfig.MAX_IMPORTED_EFFECTS_PER_SPELL.get(), AnsConfig.MAX_IMPORTED_EFFECTS_CEILING);
         if (found.size() > limit) return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.too_many", found.size(), limit);
         IronGlyphBridge bridge = IronGlyphBridges.get();
+        if (!com.otectus.arsnspells.glyph.behavior.GlyphBehavior.live().authoritative())
+            return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.config_pending");
         for (Found f : found) {
             ImportedGlyphDefinition definition = f.effect().definition();
             GlyphAvailability.Status status = GlyphAvailability.status(definition);
@@ -90,8 +117,13 @@ public final class GlyphAdmission {
                 serverPlayer.displayClientMessage(status.message(definition).copy().withStyle(ChatFormatting.RED), true);
                 return false;
             }
-            if (definition.requiresLearning() && !bridge.meetsLearning(serverPlayer, definition.spell()))
+            // Iron's live requirement: the catalog's flag only says what was true when it was generated.
+            if (!bridge.meetsLearning(serverPlayer, definition.spell()))
                 return refuse(serverPlayer, "message.ars_n_spells.glyph.requires_irons_learning", f.effect().displayName());
+            int requested = requestedLevel(context.getSpell(), f.index(), definition, serverPlayer);
+            int liveMax = com.otectus.arsnspells.glyph.behavior.GlyphBehavior.effectiveMax(definition);
+            if (requested > liveMax)
+                return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.above_max", f.effect().displayName(), requested, liveMax);
             boolean recast = bridge.hasRecast(serverPlayer, definition.spell());
             if (!recast && !bridge.creativeNoCooldown(serverPlayer) && bridge.onCooldown(serverPlayer, definition.spell()))
                 return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.cooldown", f.effect().displayName());
@@ -112,13 +144,37 @@ public final class GlyphAdmission {
         for (Found f : found) {
             ImportedGlyphDefinition definition = f.effect().definition();
             int level = augmentedLevel(context.getSpell(), f.index(), definition, serverPlayer);
-            GlyphCastSession.Occurrence occurrence = new GlyphCastSession.Occurrence(f.index(), definition, level);
+            // The one evaluation of Iron's level modifiers for this occurrence (see Occurrence#nativeLevel).
+            int nativeLevel = bridge.levelFor(definition.spell(), level, serverPlayer);
+            GlyphCastSession.Occurrence occurrence = new GlyphCastSession.Occurrence(f.index(), definition, level, nativeLevel);
             session.occurrences.put(f.index(), occurrence);
             boolean free = bridge.hasRecast(serverPlayer, definition.spell()) || bridge.creativeFree(serverPlayer);
-            double cost = free ? 0 : bridge.manaCost(definition.spell(), bridge.levelFor(definition.spell(), level, serverPlayer));
+            double cost = free ? 0 : bridge.manaCost(definition.spell(), nativeLevel);
             if (!Double.isFinite(cost)) {
                 release(reserved, access);
+                releaseLp(session, serverPlayer);
                 return refuse(serverPlayer, "message.ars_n_spells.glyph.dormant.spell_missing", f.effect().displayName());
+            }
+            // 3.4.1 review PAYMENT-01: the resource native casting would take from this caster now.
+            occurrence.route = free ? GlyphRoute.MANA : GlyphRoute.decide(serverPlayer);
+            if (occurrence.route == GlyphRoute.AURA_NATIVE) {
+                // Covenant takes the aura at Iron's pre-cast event and refuses there when it is short.
+                occurrence.quote = EmissionPayment.quote(serverPlayer, rules, 0);
+                continue;
+            }
+            if (occurrence.route == GlyphRoute.LP) {
+                Component lpRefusal = EmissionPayment.admitLp(serverPlayer, occurrence,
+                    bridge.lpCost(serverPlayer, definition.spell(), nativeLevel, cost), f.effect().displayName());
+                if (lpRefusal != null) {
+                    release(reserved, access);
+                    releaseLp(session, serverPlayer);
+                    return refuseWith(serverPlayer, lpRefusal);
+                }
+                if (occurrence.route == GlyphRoute.LP) {
+                    occurrence.quote = EmissionPayment.quote(serverPlayer, rules, 0);
+                    continue;
+                }
+                // The native fallback policy moved it to the mana route.
             }
             CostQuote quote = EmissionPayment.quote(serverPlayer, rules, cost);
             occurrence.quote = quote;
@@ -129,7 +185,9 @@ public final class GlyphAdmission {
             if (!attempt.paymentAccepted()) {
                 CastLedger.fail(attempt, access);
                 release(reserved, access);
-                return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.shortage", f.effect().displayName());
+                releaseLp(session, serverPlayer);
+                return refuseWith(serverPlayer, withManaOnlyNote(Component.translatable("message.ars_n_spells.glyph.refused.shortage",
+                    f.effect().displayName())));
             }
             occurrence.reservation = attempt;
             reserved.add(attempt);
@@ -143,7 +201,33 @@ public final class GlyphAdmission {
         for (CastAttempt attempt : reserved) CastLedger.cancel(attempt, access);
     }
 
+    /**
+     * 3.4.1 review PAYMENT-01: Animus pays native Iron's casts with Life Essence inside Iron's own
+     * mana block, which an imported glyph never runs through, so imported glyphs are paid only by
+     * their route (mana here). When Animus is installed, a mana shortage says so.
+     */
+    public static Component withManaOnlyNote(Component shortage) {
+        if (!net.minecraftforge.fml.ModList.get().isLoaded("animus")) return shortage;
+        return shortage.copy().append(" ").append(Component.translatable("message.ars_n_spells.glyph.refused.mana_only_note", "Animus"));
+    }
+
+    /** A refused admission returns every LP leg it took. */
+    private static void releaseLp(GlyphCastSession session, ServerPlayer player) {
+        for (GlyphCastSession.Occurrence occurrence : session.occurrences.values())
+            EmissionPayment.releaseLp(occurrence, player.getUUID(), player, player.getServer());
+    }
+
+    private static boolean refuseWith(ServerPlayer player, Component why) {
+        GlyphSessions.record(player, new GlyphSessions.CastRecord(new net.minecraft.resources.ResourceLocation("ars_n_spells", "cast"),
+            0, 0, -1, -1, "nothing", "refused " + GlyphSessions.detail(why), "admission", player.level().getGameTime()));
+        player.displayClientMessage(why.copy().withStyle(ChatFormatting.RED), true);
+        LOGGER.debug("[Glyph] admission refused for {}: {}", com.otectus.arsnspells.util.LogPrivacy.token(player.getUUID()), why.getString());
+        return false;
+    }
+
     private static boolean refuse(ServerPlayer player, String key, Object... args) {
+        GlyphSessions.record(player, new GlyphSessions.CastRecord(new net.minecraft.resources.ResourceLocation("ars_n_spells", "cast"),
+            0, 0, -1, -1, "nothing", "refused " + key, "admission", player.level().getGameTime()));
         player.displayClientMessage(Component.translatable(key, args).withStyle(ChatFormatting.RED), true);
         LOGGER.debug("[Glyph] admission refused for {}: {}", com.otectus.arsnspells.util.LogPrivacy.token(player.getUUID()), key);
         return false;

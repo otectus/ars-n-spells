@@ -55,12 +55,16 @@ minecraft {
             property 'ans.gametest.expected.ars_elemental', project.hasProperty('withArsElemental').toString()
             property 'ans.gametest.expected.ars_zero', project.hasProperty('withArsZero').toString()
             property 'ans.gametest.expected.toomanyglyphs', project.hasProperty('withTooManyGlyphs').toString()
+            property 'ans.gametest.expected.wind_spellbooks', project.hasProperty('withWindSpellbooks').toString()
             property 'ans.gametest.expected.covenant_of_the_seven', project.hasProperty('withCovenantRuntimeGameTests').toString()
             property 'ans.gametest.covenant.mods', covenantProfileVersions.keySet().join(',')
             covenantProfileVersions.each { id, expected -> property 'ans.gametest.covenant.version.' + id, expected }
             property 'forge.enabledGameTestNamespaces', 'ars_n_spells'
             // Applies the GameTest-only MixinCastProbe (see ArsNSpellsMixinPlugin); inert until a test arms it.
             property 'ans.gametest.castProbe', 'true'
+            // 3.4.1 review SAVE-01: -Psave01Phase=<n> runs that phase of the package-removal experiment on this
+            // run directory's world (IdentityRecoveryGameTests); without it the experiment self-skips.
+            property 'ans.gametest.save01.phase', (project.findProperty('save01Phase') ?: '').toString()
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
         }
@@ -160,6 +164,11 @@ dependencies {
     if (project.hasProperty('withTooManyGlyphs')) {
         runtimeOnly fg.deobf("curse.maven:${toomanyglyphs_project}:${toomanyglyphs_file}")
     }
+    // 3.4.1 review CATALOG-01: a real Iron's addon. Needs the Iron's profile; its GeckoLib, Curios and
+    // PlayerAnimator requirements are already on that profile's runtime classpath.
+    if (project.hasProperty('withWindSpellbooks')) {
+        runtimeOnly fg.deobf("maven.modrinth:winds-spellbooks:${winds_spellbooks_modrinth_version}")
+    }
     // Ars Zero: local-only profile, resolved from the flatDir repository above against
     // libs/ars_zero-1.20.1-2.0.2HOTFIX.jar. It hard-depends on TerraBlender, which the
     // flatDir coordinate carries no metadata for, so that comes from the Forge maven.
@@ -255,3 +264,44 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 17
 }
+
+// 3.4.1 review CATALOG-01: the imported-glyph catalog packages Ars 'n' Spells ships, one per catalogs/<name>/,
+// built by the shared tools/build_catalog_packages.py into catalog-only jars and loose catalogs (validated
+// against this loader's own catalog rules before anything is written). Part of `build`.
+def catalogPackagesDir = layout.buildDirectory.dir('catalog-packages')
+tasks.register('catalogPackages', Exec) {
+    group = 'build'
+    description = 'Builds the imported-glyph catalog packages in catalogs/ (catalog-only jars and loose catalogs).'
+    inputs.dir('catalogs')
+    inputs.files('tools/glyph_catalog_pack.py', 'tools/build_catalog_packages.py')
+    outputs.dir(catalogPackagesDir)
+    doFirst {
+        project.delete(catalogPackagesDir)
+        catalogPackagesDir.get().asFile.mkdirs()
+    }
+    commandLine 'python3', '-I', 'tools/build_catalog_packages.py', '--loader', 'forge', '--catalogs', 'catalogs',
+        '--out', catalogPackagesDir.get().asFile.path
+}
+tasks.named('build') { dependsOn 'catalogPackages' }
+
+// -PwithCatalogPackages=<name>[,<name>...] installs those packages into the GameTest run directory's mods/
+// folder; every run first removes packages a previous run staged there (ans_catalog_*.jar only).
+tasks.register('stageCatalogPackages') {
+    def requested = (project.findProperty('withCatalogPackages') ?: '').toString().split(',').collect { it.trim() }.findAll { it }
+    if (!requested.isEmpty()) dependsOn 'catalogPackages'
+    def modsDir = file("${gametestRunDir}/mods")
+    doLast {
+        modsDir.mkdirs()
+        fileTree(modsDir) { include 'ans_catalog_*.jar' }.each { it.delete() }
+        requested.each { name ->
+            def definition = file("catalogs/${name}/package.json")
+            if (!definition.isFile()) throw new GradleException("no catalog package named ${name} in catalogs/")
+            def pkg = new groovy.json.JsonSlurper().parse(definition)
+            def jar = catalogPackagesDir.get().file("${pkg.mod_id}-${pkg.mod_version}.jar").asFile
+            if (!jar.isFile()) throw new GradleException("catalog package ${name} was not built: ${jar}")
+            copy { from jar; into modsDir }
+            logger.lifecycle("Staged catalog package ${name} into ${modsDir}")
+        }
+    }
+}
+tasks.matching { it.name == 'runGameTestServer' }.configureEach { dependsOn 'stageCatalogPackages' }

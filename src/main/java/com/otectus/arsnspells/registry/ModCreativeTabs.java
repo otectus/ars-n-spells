@@ -133,6 +133,11 @@ public final class ModCreativeTabs {
             ItemStack stack = entry.getKey();
             if (isOurs(stack) && !(keepImportedGlyphs && stack.getItem() instanceof com.otectus.arsnspells.glyph.ImportedGlyphItem)) {
                 ours.add(stack);
+            } else if (stack.getItem() instanceof com.otectus.arsnspells.glyph.ImportedGlyphItem glyph && glyph.definition().reserved()
+                    && !com.otectus.arsnspells.glyph.GlyphAvailability.status(glyph.definition()).available()) {
+                // 3.4.1: reserved levels (above Iron's default maximum) are registered ahead of a server
+                // raising that maximum; while dormant they would only add hundreds of unusable entries.
+                ours.add(stack);
             }
         }
         for (ItemStack stack : ours) {

@@ -1,0 +1,20 @@
+{
+ "expect": {
+  "self_only": [
+   "irons_spellbooks:firebolt"
+  ],
+  "valid": true
+ },
+ "files": [
+  {
+   "id": "test:self",
+   "json": {
+    "adapter": "ars_n_spells:self",
+    "schema_version": 2,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

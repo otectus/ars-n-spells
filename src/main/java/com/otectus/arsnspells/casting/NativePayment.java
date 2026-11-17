@@ -77,15 +77,17 @@ public final class NativePayment {
         CastAttempt attempt = ledger.open(player, "native-payment:" + id, 0, quote, tick);
         attempt.validate(); attempt.markQuoted();
         List<ResourceAmount> debited = ledger.reserve(attempt, access);
+        PaymentTimeline.ledger(attempt, PaymentTimeline.Kind.DEBIT, debited, -1);
         if (!attempt.paymentAccepted()) {
             ResourceMovement failed = attempt.movements().get(attempt.movements().size() - 1);
             var reason = failed.error() == null ? TransactionSnapshot.Reason.RESOURCE_CHANGED : TransactionSnapshot.Reason.SETTLEMENT_EXCEPTION;
             List<ResourceAmount> refunds = ledger.fail(attempt, access);
+            if (!refunds.isEmpty()) PaymentTimeline.ledger(attempt, PaymentTimeline.Kind.REFUND, refunds, -1);
             return new Result(attempt.attemptId(), false, debited, refunds, reason,
                 quote.legs().get(debited.size() - 1).unit(), attempt.remainingRefunds(), attempt.unknownUnits(), attempt.movements(),
                 failed.requested(), failed.before());
         }
-        if (complete) { ledger.commit(attempt); ledger.complete(attempt); }
+        if (complete) { ledger.commit(attempt); ledger.complete(attempt); PaymentTimeline.ledger(attempt, PaymentTimeline.Kind.COMMIT, -1); }
         return new Result(attempt.attemptId(), true, debited, List.of(), TransactionSnapshot.Reason.NONE,
             quote.origin().unit(), List.of(), Set.of(), attempt.movements(), Double.NaN, Double.NaN);
     }

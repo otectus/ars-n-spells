@@ -18,6 +18,7 @@
     "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem",
     "irons.MixinInscriptionTableMenu",
+    "irons.MixinInscriptionResultSlot",
     "sanctified.MixinSanctifiedAbstractSpell",
     "sanctified.MixinCovenantSpellEvents",
     "gametest.MixinCastProbe"

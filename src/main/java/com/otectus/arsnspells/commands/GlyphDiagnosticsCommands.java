@@ -55,7 +55,7 @@ public final class GlyphDiagnosticsCommands {
     private GlyphDiagnosticsCommands() {}
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
-        return Commands.literal("glyph")
+        return GlyphReportCommands.attach(Commands.literal("glyph"))
             .then(Commands.literal("inspect").executes(GlyphDiagnosticsCommands::inspect))
             .then(Commands.literal("catalog").requires(source -> source.hasPermission(2)).executes(GlyphDiagnosticsCommands::catalog))
             .then(Commands.literal("coverage").requires(source -> source.hasPermission(2))
@@ -137,7 +137,7 @@ public final class GlyphDiagnosticsCommands {
             definition.spell().toString(), definition.level(), definition.maxLevel()), false);
         source.sendSuccess(() -> Component.translatable("commands.ans.glyph.inspect.glyph_detail",
             definition.family().adapterId(), forms(definition.family()), GlyphAvailability.tier(definition),
-            definition.school().toString(), definition.castType()), false);
+            liveSchool(definition), definition.castType()), false);
         source.sendSuccess(() -> Component.translatable("commands.ans.glyph.inspect.glyph_status", status(definition),
             Component.translatable(known ? "commands.ans.glyph.known" : "commands.ans.glyph.unknown")), false);
     }
@@ -145,6 +145,12 @@ public final class GlyphDiagnosticsCommands {
     private static Component status(ImportedGlyphDefinition definition) {
         GlyphAvailability.Status status = GlyphAvailability.status(definition);
         return status.available() ? Component.translatable("commands.ans.glyph.available") : status.message(definition);
+    }
+
+    /** The spell's live school, naming the catalogued one when Iron's configuration has moved it. */
+    private static String liveSchool(ImportedGlyphDefinition definition) {
+        String live = com.otectus.arsnspells.glyph.behavior.GlyphBehavior.school(definition).toString();
+        return live.equals(definition.school().toString()) ? live : live + " (catalogued " + definition.school() + ")";
     }
 
     private static String forms(GlyphFamily family) {

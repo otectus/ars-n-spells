@@ -25,7 +25,10 @@ public class PacketHandler {
     // connect rather than misdecode.
     // Bumped 7 -> 8 in 3.4.0: cross-cast requests carry the client's aim hint, and the Glyph
     // Press action/result packets and the imported-glyph handshake and mapping view were added.
-    private static final String PROTOCOL_VERSION = "8";
+    // Bumped 8 -> 9 in 3.4.1: the imported-glyph mapping view gained per-level overrides and the
+    // Self restriction, and the live Iron's facts packet was added.
+    // 3.4.1 review CONFIG-01: 9 -> 10 for the settings apply/sync messages appended below.
+    private static final String PROTOCOL_VERSION = "10";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ArsNSpells.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -88,6 +91,17 @@ public class PacketHandler {
             java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         INSTANCE.registerMessage(id++, GlyphMappingSyncPacket.class,
             GlyphMappingSyncPacket::toBytes, GlyphMappingSyncPacket::new, GlyphMappingSyncPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        // 3.4.1: the live Iron's facts the client's glyph availability is decided from.
+        INSTANCE.registerMessage(id++, GlyphLiveSyncPacket.class,
+            GlyphLiveSyncPacket::toBytes, GlyphLiveSyncPacket::new, GlyphLiveSyncPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        // 3.4.1 review CONFIG-01: world settings, applied on the server and synced to every client.
+        INSTANCE.registerMessage(id++, SettingsApplyPacket.class,
+            SettingsApplyPacket::toBytes, SettingsApplyPacket::new, SettingsApplyPacket::handle,
+            java.util.Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        INSTANCE.registerMessage(id++, SettingsSyncPacket.class,
+            SettingsSyncPacket::toBytes, SettingsSyncPacket::new, SettingsSyncPacket::handle,
             java.util.Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 

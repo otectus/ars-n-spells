@@ -1,0 +1,33 @@
+{
+ "expect": {
+  "allows": {
+   "irons_spellbooks:firebolt@1": false
+  },
+  "failed_closed": [
+   "irons_spellbooks:firebolt"
+  ],
+  "valid": false
+ },
+ "files": [
+  {
+   "id": "test:a",
+   "json": {
+    "enabled": false,
+    "schema_version": 2,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "same",
+   "rank": 1
+  },
+  {
+   "id": "test:b",
+   "json": {
+    "enabled": true,
+    "schema_version": 2,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "same",
+   "rank": 1
+  }
+ ]
+}

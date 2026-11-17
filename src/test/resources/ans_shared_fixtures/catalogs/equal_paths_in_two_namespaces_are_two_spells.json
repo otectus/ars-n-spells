@@ -1,0 +1,93 @@
+{
+ "_comment": "CATALOG-01/02: addon:firebolt and irons_spellbooks:firebolt share a path but are different spells with different identities; nothing matches by path alone.",
+ "expect": {
+  "accepted": [
+   "a_addon"
+  ],
+  "adapter": {
+   "addon:firebolt": "ars_n_spells:summon",
+   "irons_spellbooks:firebolt": "ars_n_spells:projectile"
+  },
+  "fails_startup": false,
+  "identities": 6,
+  "rarity_at": {
+   "ars_n_spells:iron/addon/firebolt/level_1": "COMMON",
+   "ars_n_spells:iron/irons_spellbooks/firebolt/level_2": "RARE"
+  },
+  "registered_max": {
+   "addon:firebolt": 3,
+   "irons_spellbooks:firebolt": 3
+  }
+ },
+ "sources": [
+  {
+   "json": {
+    "catalog_version": "fixture",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:firebolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "base",
+   "required": true
+  },
+  {
+   "json": {
+    "catalog": "addon",
+    "catalog_version": "a_addon",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:summon",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "addon:fire",
+      "spell": "addon:firebolt",
+      "target": "position",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "a_addon",
+   "required": false
+  }
+ ]
+}

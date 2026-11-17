@@ -14,6 +14,7 @@ The 3.3.0 release review covers Forge 1.20.1 and the separate NeoForge 1.21.1 bu
 | Ars Elemental | 0.6.8.0+ (`[0.6.8.0,)`) | No |
 | Ars Zero | 2.0.2+ (`[2.0.2,)`) requires Forge 47.4.10+ | No |
 | Covenant of the Seven (Sanctified Legacy) | 2.2.6+ (`[2.2.6,)`)¹ | No |
+| Wind's Spellbooks | 1.20.1-1.0.0 tested, with the `ans_catalog_wind_spellbooks` catalog package ([matrix](docs/3.4.1/catalog-packages.md#winds-spellbooks)) | No |
 | Blood Magic | Any | No |
 | Apotheosis / Apothic Curios | Any | No² |
 | Curios API | Any | Included via Ars |
@@ -48,7 +49,7 @@ Five modes are available via the `mana_unification_mode` config:
 | `separate` | Independent pools. Cross-mod casts split costs between both pools. |
 | `disabled` | No mana integration; each mod uses its own pool. |
 
-**Changing the mode:** in singleplayer, open Mods → Ars 'n' Spells → Config and click the **Mana Mode** row to cycle it (applies on *Done*). Server operators can run `/ans mode set <mode>`. Either path — or editing the config file directly — takes effect **without a restart** as of 2.0.1. Confirm the active mode with `/ans mode`.
+**Changing the mode:** while in the world, open Mods → Ars 'n' Spells → Config, click the **Mana mode** row to cycle it and press **Apply** (Cancel or Esc discards the edit), or run `/ans mode set <mode>`. Both are open to the owner of a single-player world, with or without cheats, and to operators (permission level 2) and the server console. LAN guests and other players see the settings read-only. The mode is a world setting: it applies to every player in that world. Either path — or editing the config file directly — takes effect **without a restart** as of 2.0.1. Confirm the active mode with `/ans mode`.
 
 Conversion rates (`conversion_rate_ars_to_iron`, `conversion_rate_iron_to_ars`) and dual-cost percentages are configurable.
 
@@ -132,7 +133,7 @@ Right-click the target. Sneak-right-click cycles between multiple inscriptions o
 Cross-cast spells pay an overhead set by `cross_cast_cost_multiplier` (default `1.25`, range `0.5`-`5.0`). The multiplier applies to both Iron's spells cast from non-Iron's items and Ars spells cast from non-Ars items, once per cast, before mana deduction.
 
 **4. Strip an inscription.**
-Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank parchment (reagent), a water bucket, a source gem, and an archwood log -- 500 source. Drop one inscribed item within three blocks of the brazier with no other items in range. Ash and smoke particles plus a fire-extinguish sound mark the strip; the result is bit-identical to a fresh blank target so the same item can be re-inscribed cleanly. The uninscribe ritual is Iron's-independent and remains useful for cleanup even if Iron's Spellbooks is later removed.
+Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank parchment (reagent), a water bucket, a source gem, and an archwood log -- 500 source. Drop one inscribed item within three blocks of the brazier with no other items in range. Ash and smoke particles plus a fire-extinguish sound mark the strip. The ritual erases **every** Ars 'n' Spells inscription on that item: on an Iron's spellbook, all bound Ars spells and their wheel entries, not a chosen one, and nothing is returned. It keeps the item's own Iron's spells, its name, enchantments and other mods' data, so the item is not a factory-fresh copy, but it can be inscribed again. To take back a single bound Ars spell as a scroll, use the Inscription Table instead (see step 5). The uninscribe ritual is Iron's-independent and remains useful for cleanup even if Iron's Spellbooks is later removed.
 
 ---
 
@@ -165,7 +166,7 @@ Whichever route you use, on success one scroll is consumed and the Ars entry is 
 > **This is not Ars Nouveau's "Binding" ritual.** Ars ships `ars_nouveau:ritual_binding`, whose display name is exactly **Binding**; it converts nearby mobs into Bound Scripts for familiars and ignores dropped scrolls entirely. The tablet you want is **Spellbook Binding** (`ars_n_spells:spellbook_binding`, shown as *Ritual of Spellbook Binding* on the brazier). Lighting the wrong one looks identical to the feature being broken, because neither ritual says anything about the other.
 
 **5. Cast from the spellbook — through Iron's native spell wheel.**
-Each bound Ars spell appears as its **own entry in Iron's native spell-selection wheel**, with the name and icon you chose. Select it like any Iron's spell and right-click the spellbook to cast — it runs the real Ars spell through Ars 'n' Spells' server-authoritative cross-cast pipeline (mana, the `cross_cast_cost_multiplier`, scaling, cooldown). Your book's native Iron's spells are untouched and cast exactly as before. Under the hood, each entry occupies one of a small pool of registered proxy spells (`ars_cross_1..8`); the real Ars data lives in the book's `arsnspells:cross_spells` sidecar, since Iron's own per-slot data has no room for it. Up to **8** Ars spells per book show in the wheel. Selecting a bound Ars entry in the Inscription Table's own spell list does not offer it in the extraction slot; use the Spell Uninscription ritual to remove one. (Generic inscribed items that aren't Iron's spellbooks still cast via right-click / sneak-cycle as before.)
+Each bound Ars spell appears as its **own entry in Iron's native spell-selection wheel**, with the name and icon you chose. Select it like any Iron's spell and right-click the spellbook to cast — it runs the real Ars spell through Ars 'n' Spells' server-authoritative cross-cast pipeline (mana, the `cross_cast_cost_multiplier`, scaling, cooldown). Your book's native Iron's spells are untouched and cast exactly as before. Under the hood, each entry occupies one of a small pool of registered proxy spells (`ars_cross_1..8`); the real Ars data lives in the book's `arsnspells:cross_spells` sidecar, since Iron's own per-slot data has no room for it. Up to **8** Ars spells per book show in the wheel. To take one bound Ars spell back off the book, select its entry in the Inscription Table's spell list: the table offers it as an Ars 'n' Spells scroll carrier with the spell, name, nature, icon and school it was bound with, and taking that scroll removes exactly that entry and its wheel slot, leaving every other spell on the book alone. The scroll binds again like one from the Spell Loom. An entry whose data is missing, unreadable or in a newer format is not offered, and the table says why; the Spell Uninscription ritual erases everything instead. (Generic inscribed items that aren't Iron's spellbooks still cast via right-click / sneak-cycle as before.)
 
 ### Choosing a spell school (3.3.7)
 
@@ -199,7 +200,7 @@ Operators can do the same to a held item with `/ans school set <school>` or `/an
 
 ## Iron's glyphs and the Glyph Press (3.4.0)
 
-With Iron's Spells 'n Spellbooks installed, every Iron's player spell can become a real **Ars Nouveau glyph**, one per spell level (*Firebolt I* to *Firebolt X*). Glyphs are knowledge: use the glyph item to learn it the normal Ars way, then add it to spells in your spell book beside any other glyph. 111 spells (777 glyphs) are covered in both tested Iron's builds; see [the coverage table](docs/3.4.0/iron-glyph-coverage.md).
+With Iron's Spells 'n Spellbooks installed, every Iron's player spell can become a real **Ars Nouveau glyph**, one per spell level (*Firebolt I* to *Firebolt X*). Glyphs are knowledge: use the glyph item to learn it the normal Ars way, then add it to spells in your spell book beside any other glyph. 111 spells are covered in both tested Iron's builds: 777 glyphs at Iron's default maximum levels and 1,110 registered, because every spell reserves levels up to 10 for servers that raise Iron's maximum. See [the coverage table](docs/3.4.1/iron-glyph-coverage.md) and [identity and levels](docs/3.4.1/identity-and-levels.md).
 
 **The Glyph Press** makes them. Craft it (gold ingot, Source gem, gold ingot / archwood planks, lectern, archwood planks / three obsidian; requires Iron's) and blank glyph plates (smooth stone + gold nugget + amethyst shard, makes two). Put a filled Iron's scroll in the cradle slot, a plate below it and Source gems beside the plate, keep Source jars within a few blocks, and press **Inscribe Glyph**. Nothing is consumed until the glyph is finished, and **Cancel** returns everything. The glyph's Ars tier follows Iron's rarity for that level and sets the price: tier I takes 1 gem and 500 Source (5 s), tier II 2 and 1,500 (7 s), tier III 4 and 3,000 (10 s); servers can change these. Spells Iron's makes you learn must be learned there first. Hoppers can supply scrolls from above and plates and gems from the sides, and take glyphs from below; only a player can start a job. Full guide: [docs/3.4.0/glyph-press.md](docs/3.4.0/glyph-press.md), and the worn notebook's *Ars 'n' Spells* chapter.
 
@@ -210,6 +211,8 @@ With Iron's Spells 'n Spellbooks installed, every Iron's player spell can become
 - **Mana:** the Iron's spell's own cost joins the Ars spell's cost under your server's mana mode, with the cross-cast multiplier applied once, and is paid once. A cast that cannot pay is refused before anything happens.
 - Iron's **cooldowns** apply per spell and are shared by all its levels. Charged and channelled spells charge or channel in Iron's own cast slot, and the rest of the Ars spell waits for them.
 - Turret, rune and other non-player casters do not run imported glyphs.
+
+**Addon spells and levels above X (3.4.1).** Spells from Iron's addons need a glyph catalog. ANS 3.4.1 builds two catalog packages alongside the mod jar: one for Wind's Spellbooks (five of its seven spells castable; Tornado and Iron Slash stay dormant, with the reason) and one that registers levels XI-XV of every Iron's spell for servers whose Iron's maximum goes past 10. Install a package on the server and every client, then restart. The support matrix (loader, addon version, spell, adapter, verdict and the tested effect), the level-15 steps and the tool for other addons are in [docs/3.4.1/catalog-packages.md](docs/3.4.1/catalog-packages.md). If a package is later removed, ANS's retained copy keeps its glyphs registered and dormant; a world whose glyph ids are missing altogether refuses to start instead of dropping them ([identity and levels](docs/3.4.1/identity-and-levels.md#the-world-identity-record)).
 
 If Iron's is removed or the server disables a spell, its glyphs stay in your books and inventory as **dormant** glyphs that do nothing and say why; they work again when restored. Both client and server need Ars 'n' Spells 3.4.0.
 
@@ -264,12 +267,12 @@ Wearing the Cursed Ring (with `enable_lp_system` on) makes **LP replace mana** r
 
 ## Commands
 
-Root command: `/ans`. Mutating subcommands require permission level 2; read-only ones are unrestricted.
+Root command: `/ans`. Mutating subcommands require permission level 2, except `/ans mode set`, which the owner of a single-player world can also use without cheats; read-only ones are unrestricted.
 
 | Command | Permission | Description |
 | --- | --- | --- |
 | `/ans mode` | -- | Show the current mana unification mode |
-| `/ans mode set <mode>` | Op 2 | Switch the mana unification mode live (no restart) |
+| `/ans mode set <mode>` | Op 2, or the single-player world's owner | Switch the mana unification mode live (no restart); not open to LAN guests |
 | `/ans mana getdefault` | -- | View the current default max mana fallback |
 | `/ans mana setdefault <1–100000>` | Op 2 | Set the default max mana fallback (persisted to config) |
 | `/ans info <player>` | Op 2 | Diagnostics: mana, aura, resonance, ring status, per-school affinity, the registered Iron's school count and raw Iron's mana (the last two when Iron's is loaded) |
@@ -291,7 +294,7 @@ Root command: `/ans`. Mutating subcommands require permission level 2; read-only
 
 ## Configuration
 
-Config file (per-world, server-authoritative, auto-synced to clients): `<world>/serverconfig/ars_n_spells-server.toml` — singleplayer: `.minecraft/saves/<World>/serverconfig/`; dedicated server: `<server>/world/serverconfig/`. (Changed from `config/ars_n_spells-common.toml` in 2.0.0 when the config became `ModConfig.Type.SERVER`; the old global file is ignored.) On multiplayer clients the in-game config screen is read-only ("Read-only: server-managed config").
+Config file (per-world, server-authoritative, auto-synced to clients): `<world>/serverconfig/ars_n_spells-server.toml` — singleplayer: `.minecraft/saves/<World>/serverconfig/`; dedicated server: `<server>/world/serverconfig/`. (Changed from `config/ars_n_spells-common.toml` in 2.0.0 when the config became `ModConfig.Type.SERVER`; the old global file is ignored.) The in-game settings screen shows the settings of the world you are in. The world's owner and operators can apply changes from it; everyone else sees them read-only ("Read-only: only this world's owner or an operator can change these.").
 
 > **Migration note:** the 3.0.1 audit removed a number of config keys that no code ever read (hybrid sync rate, mana overflow, per-glyph/per-school bonus tables, several resonance/cooldown caps, progression/affinity multipliers, discount stacking, per-cast reagent, mana sync/caching). If your TOML still contains them they are silently ignored. The tables describe the supported settings; the audit ledger records behavior tests and any outstanding validation.
 

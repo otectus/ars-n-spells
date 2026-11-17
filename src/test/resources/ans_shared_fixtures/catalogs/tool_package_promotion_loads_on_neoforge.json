@@ -1,0 +1,211 @@
+{
+ "_comment": "CATALOG-02: tools/glyph_catalog_pack.py output (regenerated and compared by tools/test_glyph_catalog_pack.py): a placeholder catalog and its promotion load with no rejected source and keep every identity.",
+ "expect": {
+  "accepted": [
+   "a_v1",
+   "b_v2"
+  ],
+  "adapter": {
+   "addon:bolt": "ars_n_spells:projectile"
+  },
+  "executable": {
+   "addon:bolt": true,
+   "addon:ward": false
+  },
+  "fails_startup": false,
+  "first_level": {
+   "addon:bolt": 2
+  },
+  "identities": 26,
+  "registered_max": {
+   "addon:bolt": 12,
+   "addon:ward": 12
+  },
+  "status": {
+   "addon:bolt": "supported",
+   "addon:ward": "unsupported"
+  }
+ },
+ "loader": "neoforge",
+ "sources": [
+  {
+   "json": {
+    "catalog_version": "fixture",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:firebolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "base",
+   "required": true
+  },
+  {
+   "json": {
+    "catalog": "addon",
+    "catalog_version": "1.0.0",
+    "id_encoding": "ars_n_spells:iron/<spell namespace>/<spell path>/level_<n>",
+    "provenance": {
+     "generator": "tools/generate_iron_glyph_catalog.py pack",
+     "inventory": "inventory-4.json",
+     "native": "1.0"
+    },
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:self",
+      "adapter_version": 0,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "final_effect_only": false,
+      "icon": "addon:textures/gui/spell_icons/x.png",
+      "levels": {
+       "default_max": 4,
+       "min": 2,
+       "registered_max": 12
+      },
+      "name": "Bolt",
+      "rarity": [
+       "COMMON",
+       "RARE",
+       "EPIC"
+      ],
+      "reason": "no adapter assigned",
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:bolt",
+      "status": "unsupported",
+      "target": "self",
+      "tier": [
+       1,
+       2,
+       3
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:self",
+      "adapter_version": 0,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "final_effect_only": false,
+      "icon": "addon:textures/gui/spell_icons/x.png",
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 12
+      },
+      "name": "Ward",
+      "rarity": [
+       "RARE"
+      ],
+      "reason": "no adapter assigned",
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:ward",
+      "status": "unsupported",
+      "target": "self",
+      "tier": [
+       2
+      ]
+     }
+    ]
+   },
+   "name": "a_v1",
+   "required": false
+  },
+  {
+   "json": {
+    "catalog": "addon",
+    "catalog_version": "2.0.0",
+    "id_encoding": "ars_n_spells:iron/<spell namespace>/<spell path>/level_<n>",
+    "provenance": {
+     "generator": "tools/generate_iron_glyph_catalog.py pack",
+     "inventory": "inventory-4.json",
+     "native": "1.0"
+    },
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "final_effect_only": false,
+      "icon": "addon:textures/gui/spell_icons/x.png",
+      "levels": {
+       "default_max": 4,
+       "min": 2,
+       "registered_max": 12
+      },
+      "name": "Bolt",
+      "rarity": [
+       "COMMON",
+       "RARE",
+       "EPIC"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:bolt",
+      "status": "supported",
+      "target": "any",
+      "tier": [
+       1,
+       2,
+       3
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:self",
+      "adapter_version": 0,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "final_effect_only": false,
+      "icon": "addon:textures/gui/spell_icons/x.png",
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 12
+      },
+      "name": "Ward",
+      "rarity": [
+       "RARE"
+      ],
+      "reason": "no adapter assigned",
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:ward",
+      "status": "unsupported",
+      "target": "self",
+      "tier": [
+       2
+      ]
+     }
+    ]
+   },
+   "name": "b_v2",
+   "required": false
+  }
+ ]
+}

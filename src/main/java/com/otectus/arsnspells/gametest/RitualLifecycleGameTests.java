@@ -53,9 +53,10 @@ import java.util.List;
  * the level's entity list, so both the initiator lookup and the proximity fallback in
  * {@code RitualFeedback} return null here and no message is ever delivered.
  *
- * <p>These run in their own {@code ans_rituals} batch on purpose. The rituals scan a 7x7x7 box that
+ * <p>Each ritual test runs in a batch of its own on purpose. The rituals scan a 7x7x7 box that
  * overhangs the 5x5 platform, so a neighbouring test's dropped items would drift into range and trip
- * the strict "unexpected items" guard -- a flake that is very hard to read after the fact.
+ * the strict "unexpected items" guard, and a neighbouring ritual (an uninscription next to a binding)
+ * would act on the other test's items -- flakes that are very hard to read after the fact.
  */
 @GameTestHolder("ars_n_spells")
 @PrefixGameTestTemplate(false)
@@ -91,12 +92,26 @@ public final class RitualLifecycleGameTests {
         return tile;
     }
 
-    /** Drop a stack with zero motion and no pickup, so the ritual's 3-block scan is deterministic. */
+    /**
+     * Drop a stack with zero motion, no pickup and no gravity, in the air layer above the
+     * platform's floor, so the ritual's 3-block scan is deterministic.
+     *
+     * <p>3.4.1: the platform's floor occupies local y 1 (the template sits one block above its
+     * structure block), so a stack spawned at y 1.3 started inside a floor block and Minecraft's
+     * push-out decided where it ended up, sometimes outside the ritual's range. Stacks now start
+     * at y 2.25 or higher, hold that position, and must be inside the scanned box of a brazier at
+     * {@link #BRAZIER}; a fixture that is not fails loudly instead of flaking.
+     */
     static ItemEntity dropNear(GameTestHelper helper, Vec3 local, ItemStack stack) {
-        Vec3 abs = helper.absoluteVec(local);
+        Vec3 placed = new Vec3(local.x, Math.max(local.y, 2.25), local.z);
+        Vec3 abs = helper.absoluteVec(placed);
         ItemEntity entity = new ItemEntity(helper.getLevel(), abs.x, abs.y, abs.z, stack, 0.0, 0.0, 0.0);
         entity.setNeverPickUp();
+        entity.setNoGravity(true);
         helper.getLevel().addFreshEntity(entity);
+        net.minecraft.world.phys.AABB scan = new net.minecraft.world.phys.AABB(helper.absolutePos(BRAZIER)).inflate(3);
+        if (!scan.contains(entity.position()))
+            helper.fail("fixture: " + stack + " at " + entity.position() + " is outside the ritual's scan " + scan);
         return entity;
     }
 
@@ -138,7 +153,7 @@ public final class RitualLifecycleGameTests {
      * No inputs are needed -- the ritual reports an empty range and stops -- so this asserts only
      * the property that was broken: that the ritual completes rather than burning forever.
      */
-    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals")
+    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals_finish")
     public static void everyOneShotRitual_actuallyFinishes(GameTestHelper helper) {
         List<String> paths = new ArrayList<>();
         paths.add(SpellUninscriptionRitual.REGISTRY_PATH);
@@ -173,7 +188,7 @@ public final class RitualLifecycleGameTests {
     // ------------------------------------------------------------------
 
     /** The happy path: dropped carrier scroll + dropped Iron's book, bound by the ritual itself. */
-    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals")
+    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals_bind")
     public static void bindingRitual_bindsDroppedScrollOntoDroppedBook(GameTestHelper helper) {
         if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;
@@ -209,7 +224,7 @@ public final class RitualLifecycleGameTests {
      * the wrong stack. The happy-path test above is the positive control that stops this one from
      * passing for the wrong reason.
      */
-    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals")
+    @GameTest(template = "platform", timeoutTicks = 200, batch = "ans_rituals_stray")
     public static void bindingRitual_strayItemInRangeAbortsWithoutMutating(GameTestHelper helper) {
         if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) {
             return;

@@ -16,14 +16,13 @@ import net.minecraftforge.fml.common.Mod;
 public final class ImportedGlyphSyncHandler {
     private ImportedGlyphSyncHandler() {}
 
+    /**
+     * The catalog identity first; the behaviour itself follows from {@code GlyphBehavior.onDatapackSync}
+     * (lowest priority, after Iron's rebuilt its configuration) as one publication of mapping view and
+     * live facts (3.4.1 review SYNC-01).
+     */
     @SubscribeEvent
     public static void sync(OnDatapackSyncEvent event) {
-        GlyphMappingSyncPacket view = new GlyphMappingSyncPacket(GlyphMappingSnapshot.current().clientView());
-        if (event.getPlayer() != null) {
-            PacketHandler.sendToClient(GlyphCatalogHandshakePacket.current(), event.getPlayer());
-            PacketHandler.sendToClient(view, event.getPlayer());
-        } else {
-            event.getPlayerList().getPlayers().forEach(player -> PacketHandler.sendToClient(view, player));
-        }
+        if (event.getPlayer() != null) PacketHandler.sendToClient(GlyphCatalogHandshakePacket.current(), event.getPlayer());
     }
 }

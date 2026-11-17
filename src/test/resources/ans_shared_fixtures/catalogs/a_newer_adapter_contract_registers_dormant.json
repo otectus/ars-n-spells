@@ -1,0 +1,87 @@
+{
+ "_comment": "CATALOG-02: a contract version this build does not implement keeps its identities registered but never executes.",
+ "expect": {
+  "accepted": [
+   "a_future"
+  ],
+  "executable": {
+   "addon:bolt": false,
+   "irons_spellbooks:firebolt": true
+  },
+  "fails_startup": false,
+  "identities": 6,
+  "status": {
+   "addon:bolt": "supported"
+  }
+ },
+ "sources": [
+  {
+   "json": {
+    "catalog_version": "fixture",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:firebolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "base",
+   "required": true
+  },
+  {
+   "json": {
+    "catalog_version": "a_future",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 2,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Bolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:bolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "a_future",
+   "required": false
+  }
+ ]
+}

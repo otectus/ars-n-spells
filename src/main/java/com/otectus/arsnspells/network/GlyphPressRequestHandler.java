@@ -22,7 +22,7 @@ public final class GlyphPressRequestHandler {
             || !(sender.containerMenu instanceof GlyphPressMenu menu) || menu.getBlockEntity() == null
             || !menu.stillValid(sender)) return null;
         if (NetworkRequestGuard.admit(sender, request.request()) != RequestAdmission.Result.ACCEPTED) return REJECTED;
-        if (!request.matches(menu.containerId, menu.sessionId(), GlyphPressRevision.of(menu), GlyphMappingSnapshot.current().digest()))
+        if (!request.matches(menu.containerId, menu.sessionId(), GlyphPressRevision.of(menu), com.otectus.arsnspells.glyph.behavior.GlyphBehavior.digest()))
             return STALE;
         GlyphPressBlockEntity press = menu.getBlockEntity();
         return switch (action) {

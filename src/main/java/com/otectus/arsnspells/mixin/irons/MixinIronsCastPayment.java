@@ -32,13 +32,15 @@ public abstract class MixinIronsCastPayment {
         // 3.4.0: a charged or channelled imported glyph runs in this slot; its invocation sees the Ars target.
         var glyphScope = com.otectus.arsnspells.compat.irons.glyph.IronsGlyphChildHooks.enter(player, (AbstractSpell)(Object)this);
         try {
+            // 3.4.1 review CAST-03: a child whose policy no longer allows it ends before pricing and effect.
+            if (glyphScope != null && glyphScope.refused()) { IronsCastLifecycle.refuseQuietly(frame); return; }
             if (frame.outcome != null && !frame.outcome.allowed()) { IronsCastLifecycle.abort(frame, null); return; }
             IronsCastPayments.ensurePlan(player, (AbstractSpell)(Object)this, spellLevel, source);
             original.call(level, spellLevel, player, source, cooldown);
             if (!frame.started && !frame.aborted) IronsCastLifecycle.notReached(frame);
             else IronsCastLifecycle.afterEffect(frame);
         } catch (IronsCastLifecycle.PaymentRefused refused) { IronsCastLifecycle.abort(frame, null); }
-        catch (RuntimeException error) { IronsCastLifecycle.abort(frame, error); }
+        catch (RuntimeException | LinkageError error) { IronsCastLifecycle.abort(frame, error); }
         finally {
             com.otectus.arsnspells.compat.irons.glyph.IronsGlyphChildHooks.exit(glyphScope, frame.started && !frame.aborted, cooldown);
             IronsCastLifecycle.exit(frame);
@@ -64,7 +66,7 @@ public abstract class MixinIronsCastPayment {
         target = "Lio/redspace/ironsspellbooks/api/spells/AbstractSpell;onCast(Lnet/minecraft/world/level/Level;ILnet/minecraft/world/entity/LivingEntity;Lio/redspace/ironsspellbooks/api/spells/CastSource;Lio/redspace/ironsspellbooks/api/magic/MagicData;)V"), require = 1, allow = 1)
     private void arsnspells$effect(AbstractSpell spell, Level world, int level, LivingEntity caster, CastSource source,
                                   MagicData data, Operation<Void> original) {
-        IronsCastLifecycle.startEffect();
+        IronsCastLifecycle.startEffect(level);
         original.call(spell, world, level, caster, source, data);
         IronsCastLifecycle.finishEffect();
     }

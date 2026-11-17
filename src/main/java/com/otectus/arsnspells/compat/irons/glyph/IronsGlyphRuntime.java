@@ -41,6 +41,17 @@ public final class IronsGlyphRuntime implements IronGlyphBridge {
     }
 
     @Override
+    public com.otectus.arsnspells.glyph.behavior.LiveSpellFacts liveFacts(ResourceLocation id, int registeredMax) {
+        AbstractSpell spell = spell(id);
+        if (spell == null) return com.otectus.arsnspells.glyph.behavior.LiveSpellFacts.missing(id);
+        int max = spell.getMaxLevel();
+        java.util.List<String> rarities = new java.util.ArrayList<>(Math.max(0, registeredMax));
+        for (int level = 1; level <= registeredMax; level++) rarities.add(spell.getRarity(level).name());
+        return new com.otectus.arsnspells.glyph.behavior.LiveSpellFacts(true, spell.isEnabled(), Math.max(1, spell.getMinLevel()), max,
+            spell.getSchoolType().getId(), spell.requiresLearning(), rarities);
+    }
+
+    @Override
     public String rarity(ResourceLocation id, int level) {
         AbstractSpell spell = spell(id);
         if (spell == null || level < 1 || level > spell.getMaxLevel()) return null;
@@ -63,6 +74,12 @@ public final class IronsGlyphRuntime implements IronGlyphBridge {
     public double manaCost(ResourceLocation id, int level) {
         AbstractSpell spell = spell(id);
         return spell == null ? Double.NaN : spell.getManaCost(level);
+    }
+
+    @Override
+    public double lpCost(net.minecraft.server.level.ServerPlayer player, ResourceLocation id, int level, double manaCost) {
+        AbstractSpell spell = spell(id);
+        return spell == null ? Double.NaN : com.otectus.arsnspells.casting.IronsCastPayments.lpCost(player, spell, level, manaCost);
     }
 
     @Override
@@ -157,6 +174,32 @@ public final class IronsGlyphRuntime implements IronGlyphBridge {
     @Override
     public boolean creativeNoCooldown(Player player) {
         return player.isCreative() && !io.redspace.ironsspellbooks.config.ServerConfigs.CREATIVE_COOLDOWN.get();
+    }
+
+    @Override
+    public java.util.List<NativeSpell> nativeSpells() {
+        java.util.List<NativeSpell> out = new java.util.ArrayList<>();
+        for (AbstractSpell spell : SpellRegistry.REGISTRY.get().getValues()) {
+            ResourceLocation id = spell.getSpellResource();
+            boolean none = spell == SpellRegistry.none();
+            boolean proxy = spell instanceof com.otectus.arsnspells.spell.irons.ArsCrossProxySpell;
+            String version = net.minecraftforge.fml.ModList.get().getModContainerById(id.getNamespace())
+                .map(c -> c.getModInfo().getVersion().toString()).orElse("?");
+            out.add(new NativeSpell(id, id.getNamespace(), version, none ? 0 : spell.getMaxLevel(),
+                none ? new ResourceLocation("irons_spellbooks", "none") : spell.getSchoolType().getId(),
+                spell.getCastType().name(), !none && spell.isEnabled(), proxy, none));
+        }
+        out.sort(java.util.Comparator.comparing(spell -> spell.id().toString()));
+        return out;
+    }
+
+    @Override
+    public void cancelChildCast(net.minecraft.server.level.ServerPlayer player, ResourceLocation id, String slotTag) {
+        if (player == null || player.isRemoved() || slotTag == null) return;
+        io.redspace.ironsspellbooks.api.magic.MagicData data = io.redspace.ironsspellbooks.api.magic.MagicData.getPlayerMagicData(player);
+        // Iron's own cancellation: a continuous spell gets its native cooldown, a charge does not.
+        if (data.isCasting() && id.toString().equals(data.getCastingSpellId()) && slotTag.equals(data.getCastingEquipmentSlot()))
+            io.redspace.ironsspellbooks.api.util.Utils.serverSideCancelCast(player);
     }
 
     @Override

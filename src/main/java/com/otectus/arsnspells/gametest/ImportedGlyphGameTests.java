@@ -51,7 +51,18 @@ public final class ImportedGlyphGameTests {
     @GameTest(template = "platform")
     public static void registration_everyCatalogGlyphIsAnArsPartWithAnItem(GameTestHelper helper) {
         ImportedGlyphCatalog catalog = ImportedGlyphCatalog.get();
-        helper.assertTrue(catalog.size() == 777, "the shipped catalog registers 777 glyphs, got " + catalog.size());
+        // 3.4.1: 777 default levels plus reserved levels up to 10 for every spell. Counted from the shipped catalog
+        // alone (a run may add a pack's catalog, which may extend the shipped spells), and every one is registered.
+        ImportedGlyphCatalog shipped;
+        try (java.io.InputStream in = ImportedGlyphCatalog.class.getResourceAsStream(ImportedGlyphCatalog.RESOURCE)) {
+            helper.assertTrue(in != null, "the shipped catalog is in the jar");
+            shipped = ImportedGlyphCatalog.parse(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+        } catch (java.io.IOException unreadable) {
+            throw new IllegalStateException(unreadable);
+        }
+        helper.assertTrue(shipped.size() == 1110, "the shipped catalog registers 1,110 glyphs, got " + shipped.size());
+        helper.assertTrue(shipped.definitions().stream().allMatch(d -> catalog.byGlyphId(d.glyphId()).isPresent()),
+            "every shipped identity is registered");
         for (ImportedGlyphDefinition definition : catalog.definitions()) {
             AbstractSpellPart part = GlyphRegistry.getSpellPart(definition.glyphId());
             helper.assertTrue(part instanceof ImportedIronEffect, definition.glyphId() + " must be an imported Ars part");
@@ -317,7 +328,8 @@ public final class ImportedGlyphGameTests {
         java.util.Map<ResourceLocation, Integer> live = IronsGlyphTestSupport.playerSpells();
         for (var entry : live.entrySet()) {
             var levels = ImportedGlyphCatalog.get().levelsOf(entry.getKey());
-            if (levels.size() != entry.getValue()) missing.add(entry.getKey() + " has " + levels.size() + " of " + entry.getValue() + " levels");
+            if (levels.size() < entry.getValue()) missing.add(entry.getKey() + " has " + levels.size() + " of " + entry.getValue() + " levels");
+            if (levels.size() < 10) missing.add(entry.getKey() + " reserves only " + levels.size() + " levels, not the level-10 envelope");
             for (int level = 1; level <= entry.getValue(); level++)
                 if (GlyphRegistry.getSpellPart(new ImportedGlyphKey(entry.getKey(), level).glyphId()) == null)
                     missing.add(entry.getKey() + " level " + level + " is not a registered glyph");
@@ -331,16 +343,25 @@ public final class ImportedGlyphGameTests {
         for (ResourceLocation spell : ImportedGlyphCatalog.get().spells()) {
             ImportedGlyphDefinition first = ImportedGlyphCatalog.get().levelsOf(spell).get(0);
             if (live.containsKey(spell)) {
-                if (ImportedGlyphCatalog.get().ironsBuilds().contains(build) && !first.ironsVersions().contains(build))
+                // The pinned-build rule is the shipped catalog's: a pack's catalog (an addon's) names no Iron's builds.
+                boolean shipped = first.source().startsWith("ars_n_spells" + ImportedGlyphCatalog.RESOURCE);
+                if (shipped && ImportedGlyphCatalog.get().ironsBuilds().contains(build) && !first.ironsVersions().contains(build))
                     unexplained.add(spell + " is registered by " + build + " but not catalogued for it");
-            } else if (first.ironsVersions().contains(build)
-                    || GlyphAvailability.status(first).reason() != GlyphAvailability.Reason.SPELL_MISSING) {
+            } else if (first.ironsVersions().contains(build) || !dormantWithoutItsSpell(GlyphAvailability.status(first).reason())) {
                 unexplained.add(spell + " is catalogued for " + first.ironsVersions() + " but not registered, status "
                     + GlyphAvailability.status(first).reason());
             }
         }
         helper.assertTrue(unexplained.isEmpty(), "catalog and loaded registry disagree: " + unexplained);
         helper.succeed();
+    }
+
+    /**
+     * A registered identity whose native spell is not loaded is dormant: its spell is missing, or (3.4.1
+     * review SAVE-01) only ANS's retained copy keeps it registered because its catalog package is gone.
+     */
+    private static boolean dormantWithoutItsSpell(GlyphAvailability.Reason reason) {
+        return reason == GlyphAvailability.Reason.SPELL_MISSING || reason == GlyphAvailability.Reason.PACKAGE_MISSING;
     }
 
     /**
@@ -359,7 +380,7 @@ public final class ImportedGlyphGameTests {
             helper.assertTrue(!levels.isEmpty(), id + " must be catalogued");
             families.add(levels.get(0).family());
             int max = IronsGlyphTestSupport.maxLevel(id);
-            helper.assertTrue(levels.size() == max, id + " must have a glyph per level 1-" + max);
+            helper.assertTrue(levels.size() >= max, id + " must have a glyph per level 1-" + max);
             for (int level : new int[]{1, max}) {
                 ItemStack scroll = GlyphPressGameTests.scroll(id, level);
                 var plan = com.otectus.arsnspells.glyph.recipe.GlyphPressPlanner.plan(scroll, GlyphPressGameTests.plates(1),
@@ -367,8 +388,17 @@ public final class ImportedGlyphGameTests {
                 helper.assertTrue(plan.ok() && GlyphPressGameTests.isGlyph(plan.output(), id, level),
                     id + " level " + level + " must press into exactly its glyph, got " + plan.reason());
             }
-            helper.assertTrue(ImportedGlyphCatalog.get().byKey(new ImportedGlyphKey(spell, max + 1)).isEmpty(),
-                id + " level " + (max + 1) + " must not exist");
+            // 3.4.1: the level above the maximum is a reserved identity, registered and dormant until
+            // Iron's maximum reaches it; a level past the envelope does not exist.
+            int registered = ImportedGlyphCatalog.get().registeredMax(spell);
+            if (max < registered) {
+                var above = ImportedGlyphCatalog.get().byKey(new ImportedGlyphKey(spell, max + 1));
+                helper.assertTrue(above.isPresent() && GlyphAvailability.status(above.get()).reason() == GlyphAvailability.Reason.LEVEL_UNSUPPORTED,
+                    id + " level " + (max + 1) + " must be a dormant reserved identity, got "
+                        + above.map(d -> GlyphAvailability.status(d).reason()).orElse(null));
+            }
+            helper.assertTrue(ImportedGlyphCatalog.get().byKey(new ImportedGlyphKey(spell, registered + 1)).isEmpty(),
+                id + " level " + (registered + 1) + " must not exist");
             helper.assertTrue(ImportedGlyphKey.decode(new ResourceLocation("ars_n_spells", "iron/" + spell.getNamespace() + "/"
                 + spell.getPath() + "/level_0")).isEmpty(), "level 0 is not a glyph id");
         }

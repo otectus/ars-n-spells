@@ -132,8 +132,19 @@ class GlyphMappingSnapshotTest {
             catalog, 7);
         assertTrue(server.errors().isEmpty(), server.errors().toString());
         var buffer = new net.minecraft.network.FriendlyByteBuf(io.netty.buffer.Unpooled.buffer());
-        new com.otectus.arsnspells.network.GlyphMappingSyncPacket(server.clientView()).toBytes(buffer);
-        GlyphMappingSnapshot client = GlyphMappingSnapshot.fromClientView(new com.otectus.arsnspells.network.GlyphMappingSyncPacket(buffer).view());
+        new com.otectus.arsnspells.network.GlyphMappingSyncPacket(1, server.clientView()).toBytes(buffer);
+        // The client decodes against its own catalog, which the handshake made the server's.
+        ImportedGlyphCatalog installed = ImportedGlyphCatalog.get();
+        com.otectus.arsnspells.network.GlyphMappingSyncPacket received;
+        try {
+            ImportedGlyphCatalog.setForTesting(catalog);
+            received = new com.otectus.arsnspells.network.GlyphMappingSyncPacket(buffer);
+        } finally {
+            ImportedGlyphCatalog.setForTesting(installed);
+        }
+        assertNotNull(received.view(), received.rejection());
+        assertEquals(1, received.publication());
+        GlyphMappingSnapshot client = GlyphMappingSnapshot.fromClientView(received.view());
         assertEquals(server.digest(), client.digest(), "the client keeps the server's identity");
         assertEquals(7, client.generation());
         for (int level = 1; level <= 2; level++) {
@@ -149,9 +160,16 @@ class GlyphMappingSnapshotTest {
 
     @Test
     void syncPacketRejectsAnOversizedView() {
+        // 3.4.1 review SYNC-01: refused into a rejection the client logs, never thrown into the network
+        // layer (which would disconnect the client), and nothing of it is published.
         var buffer = new net.minecraft.network.FriendlyByteBuf(io.netty.buffer.Unpooled.buffer());
+        buffer.writeVarLong(9);
         buffer.writeVarInt(0);
         buffer.writeVarInt(100_000);
-        assertThrows(IllegalArgumentException.class, () -> new com.otectus.arsnspells.network.GlyphMappingSyncPacket(buffer));
+        var packet = new com.otectus.arsnspells.network.GlyphMappingSyncPacket(buffer);
+        assertNull(packet.view());
+        assertEquals(9, packet.publication());
+        assertTrue(packet.rejection().contains("exceeds its bound"), packet.rejection());
+        assertEquals(0, buffer.readableBytes(), "the refused frame is consumed");
     }
 }

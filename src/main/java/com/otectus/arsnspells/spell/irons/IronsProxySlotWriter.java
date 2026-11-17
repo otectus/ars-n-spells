@@ -71,6 +71,28 @@ public final class IronsProxySlotWriter {
         return removed;
     }
 
+    /**
+     * 3.4.1 review UNBIND-01: the pool ids of every ANS proxy in {@code book}'s native container, read
+     * from the container itself. Unlike the sidecar's ids this also finds an orphan proxy, one whose
+     * sidecar entry was lost, so it can be repaired. Only ANS's own registered proxy spells count; a
+     * real native spell never does. Empty when the container cannot be read.
+     */
+    public static java.util.Set<Integer> nativeProxyPoolIds(ItemStack book) {
+        java.util.Set<Integer> ids = new java.util.TreeSet<>();
+        try {
+            if (book == null || book.isEmpty() || !ISpellContainer.isSpellContainer(book)) return ids;
+            ISpellContainer container = ISpellContainer.get(book);
+            if (container == null) return ids;
+            for (int i = 0; i < container.getMaxSpellCount(); i++) {
+                var data = container.getSpellAtIndex(i);
+                if (data != null && data.getSpell() instanceof ArsCrossProxySpell proxy) ids.add(proxy.getPoolId());
+            }
+        } catch (RuntimeException unreadable) {
+            ids.clear();
+        }
+        return ids;
+    }
+
     public static void restoreBaseCapacity(ItemStack book) {
         String key = com.otectus.arsnspells.spell.CrossCastNbt.TAG_NATIVE_BASE_CAPACITY;
         if (!book.hasTag() || !book.getTag().contains(key) || !ISpellContainer.isSpellContainer(book)) return;

@@ -24,6 +24,13 @@ public interface IronGlyphBridge {
     /** The live state of an Iron's spell: whether it is registered and what Iron's config says about it. */
     SpellState spellState(ResourceLocation spell);
 
+    /**
+     * Iron's effective configuration for {@code spell}, through Iron's own getters, with rarity read
+     * only for levels {@code 1..registeredMax}; null when Iron's is absent. Never allocates or loops
+     * in proportion to the configured maximum.
+     */
+    @Nullable com.otectus.arsnspells.glyph.behavior.LiveSpellFacts liveFacts(ResourceLocation spell, int registeredMax);
+
     /** Iron's live rarity name for {@code level} of {@code spell}, or null when unavailable. */
     @Nullable String rarity(ResourceLocation spell, int level);
 
@@ -32,6 +39,12 @@ public interface IronGlyphBridge {
 
     /** Iron's own mana cost of {@code spell} at {@code level}, before cast-time listeners; NaN when unknown. */
     double manaCost(ResourceLocation spell, int level);
+
+    /**
+     * The LP a Cursed-Ring cast of {@code spell} at {@code level} pays for an Iron's-unit {@code manaCost},
+     * by native casting's own formula; NaN when Iron's cannot price it.
+     */
+    double lpCost(net.minecraft.server.level.ServerPlayer player, ResourceLocation spell, int level, double manaCost);
 
     /** Iron's own cast time of {@code spell} at {@code level} in ticks (charge or channel length); -1 when unknown. */
     int castTimeTicks(ResourceLocation spell, int level);
@@ -53,6 +66,12 @@ public interface IronGlyphBridge {
 
     /** Run one imported-glyph invocation. Only called with {@link #present()} true. */
     InvocationOutcome invoke(com.otectus.arsnspells.glyph.GlyphInvocation invocation);
+
+    /**
+     * Stop {@code player}'s charged imported-glyph cast of {@code spell} if, and only if, Iron's slot
+     * holds exactly that attempt ({@code slotTag}); a native cast of the same spell is never touched.
+     */
+    void cancelChildCast(net.minecraft.server.level.ServerPlayer player, ResourceLocation spell, String slotTag);
 
     /** Whether a native Iron's cast slot is busy for this player (a cast in progress). */
     boolean nativeCastInProgress(Player player);
@@ -90,8 +109,27 @@ public interface IronGlyphBridge {
         public boolean ok() { return kind == Kind.OK; }
     }
 
-    record InvocationOutcome(Status status, String reasonKey) {
-        public enum Status { REJECTED, ACCEPTED_PENDING, EFFECT_APPLIED, COMPLETED, CANCELED }
+    /**
+     * One entry of the loaded native spell registry as plain data, for the registry-to-catalog
+     * report: every spell Iron's knows, including addon spells, proxies and {@code none}.
+     */
+    record NativeSpell(ResourceLocation id, String provider, String providerVersion, int maxLevel, ResourceLocation school,
+                       String castType, boolean enabled, boolean proxy, boolean none) {}
+
+    /** The loaded native spell registry, sorted by id; empty when Iron's is absent. */
+    java.util.List<NativeSpell> nativeSpells();
+
+    /** {@code finalLevel}: the level Iron's cast event settled on, when an effect ran; -1 otherwise. */
+    record InvocationOutcome(Status status, String reasonKey, int finalLevel) {
+        public InvocationOutcome(Status status, String reasonKey) {
+            this(status, reasonKey, -1);
+        }
+
+        /**
+         * {@code FAILED_AFTER_PAYMENT}: the spell's own code threw after its execution was paid for
+         * and its effect had begun; it is kept paid (no refund) and its native cooldown applies.
+         */
+        public enum Status { REJECTED, ACCEPTED_PENDING, EFFECT_APPLIED, COMPLETED, CANCELED, FAILED_AFTER_PAYMENT }
         public static InvocationOutcome rejected(String reasonKey) { return new InvocationOutcome(Status.REJECTED, reasonKey); }
         public boolean applied() { return status == Status.EFFECT_APPLIED || status == Status.COMPLETED; }
     }

@@ -78,8 +78,18 @@ public final class CrossCastGameTests {
     }
 
     /** Find any registered Iron's spellbook item (tier-agnostic), or null if none. */
+    /**
+     * The Iron's spell book fixtures bind into: Iron's netherite spell book when present, else the first
+     * book other than the wimpy book (which has no spell slots). Never "whatever registers first": registry
+     * order follows the world's saved id snapshot, and a zero-slot first book made binds refuse at random.
+     */
     static Item findIronsSpellBook() {
+        Item preferred = ForgeRegistries.ITEMS.getValue(new net.minecraft.resources.ResourceLocation("irons_spellbooks", "netherite_spell_book"));
+        if (preferred != null && preferred != net.minecraft.world.item.Items.AIR && IronsBookBindingUtil.isIronsSpellBook(new ItemStack(preferred)))
+            return preferred;
         for (Item item : ForgeRegistries.ITEMS) {
+            var id = ForgeRegistries.ITEMS.getKey(item);
+            if (id != null && "wimpy_spell_book".equals(id.getPath())) continue;
             if (IronsBookBindingUtil.isIronsSpellBook(new ItemStack(item))) {
                 return item;
             }

@@ -102,6 +102,7 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.endsWith("MagicDataAccessor")
             || mixinClassName.endsWith("MixinScrollItem")
             || mixinClassName.endsWith("MixinInscriptionTableMenu")
+            || mixinClassName.endsWith("MixinInscriptionResultSlot")
             || mixinClassName.endsWith("MixinInscriptionTableScreen")
             || mixinClassName.endsWith("MixinAbstractSpellArsIcon")
             || mixinClassName.endsWith("MixinItemStackIconContext")) {

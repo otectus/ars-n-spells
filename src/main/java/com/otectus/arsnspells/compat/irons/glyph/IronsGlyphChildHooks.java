@@ -51,7 +51,9 @@ public final class IronsGlyphChildHooks {
                 }
                 continue;
             }
-            boolean stillRunning = data.isCasting() && child.spell.toString().equals(data.getCastingSpellId());
+            // Exactly this attempt: a native cast of the same spell the player started since is not the child.
+            boolean stillRunning = data.isCasting() && child.spell.toString().equals(data.getCastingSpellId())
+                && child.slotTag.equals(data.getCastingEquipmentSlot());
             if (!stillRunning) GlyphChildren.finish(child, child.completed, server);
         }
     }

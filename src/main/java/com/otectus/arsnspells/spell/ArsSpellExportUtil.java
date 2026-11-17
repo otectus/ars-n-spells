@@ -124,6 +124,40 @@ public final class ArsSpellExportUtil {
     }
 
     /**
+     * 3.4.1 review UNBIND-01: a carrier holding exactly {@code entry}, an Ars entry taken off a bound
+     * book. The entry is copied whole (the serialized spell, its chosen name, nature, icon and school,
+     * and any key a later version added) with its proxy id cleared, so the carrier binds again to a
+     * fresh wheel slot exactly like one made at the Spell Loom. Empty when Iron's cannot build a
+     * scroll, which callers treat as "cannot extract".
+     */
+    public static ItemStack carrierFromEntry(net.minecraft.nbt.CompoundTag entry) {
+        if (entry == null || !IronsCompat.isLoaded()) return ItemStack.EMPTY;
+        Item item = ForgeRegistries.ITEMS.getValue(IRONS_SCROLL_ID);
+        if (item == null) return ItemStack.EMPTY;
+        ItemStack out = new ItemStack(item);
+        if (!com.otectus.arsnspells.spell.irons.IronsScrollFactory.initializeCarrierContainer(out)) return ItemStack.EMPTY;
+        net.minecraft.nbt.CompoundTag copy = entry.copy();
+        copy.remove(CrossCastNbt.TAG_PROXY_POOL_ID);
+        net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+        list.add(copy);
+        out.getOrCreateTag().put(CrossCastNbt.TAG_CROSS_MOD_SPELLS, list);
+        CrossCastNbt.stampSchemaVersion(out.getOrCreateTag());
+        String name = copy.getString(CrossCastNbt.TAG_CUSTOM_NAME);
+        String label = name.isEmpty() ? labelOf(copy.getCompound(CrossCastNbt.TAG_ARS_SPELL)) : name;
+        out.setHoverName(Component.translatable("item.ars_n_spells.transcribed_ars_scroll", label));
+        out.getOrCreateTag().putString(TAG_EXPORT_MODE, EXPORT_MODE_SCROLL_CARRIER);
+        return out;
+    }
+
+    private static String labelOf(net.minecraft.nbt.CompoundTag arsTag) {
+        try {
+            return buildDisplayLabel(Spell.fromTag(arsTag));
+        } catch (RuntimeException unreadable) {
+            return "Ars Spell";
+        }
+    }
+
+    /**
      * Best-effort human-readable label for an Ars spell, derived from its glyph
      * recipe. Used for the carrier hover name and tooltip lines.
      */

@@ -50,7 +50,6 @@ import net.minecraftforge.common.MinecraftForge;
  */
 final class IronsGlyphInvoker {
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(IronsGlyphInvoker.class);
-    static final String CHILD_SLOT = "ars_n_spells_glyph";
     /** How long a deferred child may wait for the slot before it is refused. */
     static final int MAX_CHILD_WAIT_TICKS = 40;
 
@@ -72,7 +71,9 @@ final class IronsGlyphInvoker {
     private static IronGlyphBridge.InvocationOutcome runInstant(GlyphInvocation invocation, AbstractSpell spell, MagicData data) {
         ServerPlayer player = invocation.caster();
         Level level = player.level();
-        int castLevel = spell.getLevelFor(invocation.augmentedLevel(), player);
+        // Frozen at admission: re-evaluating getLevelFor here posted ModifySpellLevelEvent a second
+        // time per execution and could cast at a level other than the one that was quoted.
+        int castLevel = invocation.nativeLevel();
         ICastData previous = data.getAdditionalCastData();
         IronTargetingScope.Scope scope = IronTargetingScope.push(invocation);
         boolean effectStarted = false;
@@ -87,21 +88,41 @@ final class IronsGlyphInvoker {
                 spell.getSchoolType(), CastSource.SPELLBOOK);
             MinecraftForge.EVENT_BUS.post(event);
             boolean free = recast || (player.isCreative() && !ServerConfigs.CREATIVE_MANA_COST.get());
-            if (!invocation.payment().payAtEffect(event.getManaCost(), free))
-                return IronGlyphBridge.InvocationOutcome.rejected("message.ars_n_spells.glyph.refused.shortage");
+            if (!invocation.payment().payAtEffect(event.getManaCost(), event.getSpellLevel(), free)) {
+                var why = invocation.payment().refusal();
+                if (why == null && net.minecraftforge.fml.ModList.get().isLoaded("animus"))
+                    why = com.otectus.arsnspells.glyph.GlyphAdmission.withManaOnlyNote(net.minecraft.network.chat.Component.translatable(
+                        "message.ars_n_spells.glyph.refused.shortage", invocation.definition().spellName() + " " + invocation.definition().levelNumeral()));
+                if (why != null) player.displayClientMessage(why.copy().withStyle(net.minecraft.ChatFormatting.RED), true);
+                return IronGlyphBridge.InvocationOutcome.rejected(why == null ? "message.ars_n_spells.glyph.refused.shortage" : "");
+            }
             effectStarted = true;
-            spell.onCast(level, event.getSpellLevel(), player, CastSource.SPELLBOOK, data);
-            deliver(scope, invocation);
+            Throwable failure = null;
+            try {
+                spell.onCast(level, event.getSpellLevel(), player, CastSource.SPELLBOOK, data);
+                deliver(scope, invocation);
+            } catch (RuntimeException | LinkageError thrown) {
+                // Paid and begun: keep the payment and apply the cooldown below, as a native cast
+                // would have, rather than refunding an effect that may already have happened.
+                failure = thrown;
+                LOGGER.warn("[Glyph] {} threw after its effect began for {}: {}", invocation.definition().key(),
+                    com.otectus.arsnspells.util.LogPrivacy.token(player.getUUID()), thrown.toString());
+                LOGGER.debug("[Glyph] failure", thrown);
+            }
             boolean recastsLeft = data.getPlayerRecasts().hasRecastForSpell(spell.getSpellId());
             if (recast && recastsLeft) {
                 data.getPlayerRecasts().decrementRecastCount(spell.getSpellId());
             } else if (!recastsLeft && (!player.isCreative() || ServerConfigs.CREATIVE_COOLDOWN.get())) {
                 MagicHelper.MAGIC_MANAGER.addCooldown(player, spell, CastSource.SPELLBOOK);
             }
+            if (failure != null)
+                return new IronGlyphBridge.InvocationOutcome(IronGlyphBridge.InvocationOutcome.Status.FAILED_AFTER_PAYMENT,
+                    "message.ars_n_spells.glyph.refused.failed", event.getSpellLevel());
+            // The committed level: what the cast event settled on, as the effect ran with.
             io.redspace.ironsspellbooks.setup.PacketDistributor.sendToPlayer(player,
-                new io.redspace.ironsspellbooks.network.casting.OnClientCastPacket(spell.getSpellId(), castLevel, CastSource.SPELLBOOK,
+                new io.redspace.ironsspellbooks.network.casting.OnClientCastPacket(spell.getSpellId(), event.getSpellLevel(), CastSource.SPELLBOOK,
                     data.getAdditionalCastData()));
-            return new IronGlyphBridge.InvocationOutcome(IronGlyphBridge.InvocationOutcome.Status.EFFECT_APPLIED, "");
+            return new IronGlyphBridge.InvocationOutcome(IronGlyphBridge.InvocationOutcome.Status.EFFECT_APPLIED, "", event.getSpellLevel());
         } finally {
             IronTargetingScope.pop(scope);
             // The execution's own cast data (a target marker, a targeting area) is spent;
@@ -138,6 +159,11 @@ final class IronsGlyphInvoker {
      * Start {@code child} in the native slot through Iron's own entry point. The reservation the
      * Ars cast took is handed back first: from here Iron's pipeline prices and pays each
      * invocation at its native mana write, as a cross-cast (see {@code IronsCastPayments}).
+     *
+     * <p>3.4.1 review CAST-03: a deferred child may start up to {@link #MAX_CHILD_WAIT_TICKS} after
+     * it was accepted, so the whole execution authorization is repeated here first. The cast runs
+     * under its own attempt tag, so only this attempt is ever identified, cancelled or completed as
+     * the child.
      */
     static boolean begin(GlyphChildren.Child child) {
         GlyphInvocation invocation = child.invocation;
@@ -146,18 +172,28 @@ final class IronsGlyphInvoker {
         if (spell == null || player.isRemoved()) return false;
         MagicData data = MagicData.getPlayerMagicData(player);
         if (data.isCasting()) return false;
+        String refusal = authorize(child);
+        if (refusal != null) {
+            refuse(player, invocation, refusal);
+            return false;
+        }
         invocation.payment().releaseForNativePipeline();
         IronTargetingScope.Scope scope = IronTargetingScope.push(invocation);
+        scope.child = child;
         boolean started;
+        GlyphChildren.initiating(child);
         try {
             ItemStack tool = invocation.casterTool() == null ? ItemStack.EMPTY : invocation.casterTool();
-            started = spell.attemptInitiateCast(tool, spell.getLevelFor(invocation.augmentedLevel(), player), player.level(), player,
-                CastSource.SPELLBOOK, true, CHILD_SLOT);
+            // Iron's own callers apply getLevelFor before attemptInitiateCast, which does not apply
+            // it again; the level frozen at admission is that value.
+            started = spell.attemptInitiateCast(tool, invocation.nativeLevel(), player.level(), player,
+                CastSource.SPELLBOOK, true, child.slotTag);
         } finally {
+            GlyphChildren.initiating(null);
             IronTargetingScope.pop(scope);
         }
         if (!started && LOGGER.isDebugEnabled()) {
-            var check = spell.canBeCastedBy(spell.getLevelFor(invocation.augmentedLevel(), player), CastSource.SPELLBOOK, data, player);
+            var check = spell.canBeCastedBy(invocation.nativeLevel(), CastSource.SPELLBOOK, data, player);
             LOGGER.debug("[Glyph] Iron's refused to start {} for {}: {} {}", child.spell,
                 com.otectus.arsnspells.util.LogPrivacy.token(player.getUUID()), check.type,
                 check.message == null ? "" : check.message.getString());
@@ -167,22 +203,55 @@ final class IronsGlyphInvoker {
         return started;
     }
 
-    /** Called by the native ticker hook when a child's invocation starts and ends. */
+    /** The execution authorization for {@code child} now, or null when it may run. */
+    private static String authorize(GlyphChildren.Child child) {
+        GlyphInvocation invocation = child.invocation;
+        com.otectus.arsnspells.glyph.GlyphCastSession session = com.otectus.arsnspells.glyph.GlyphSessions.byId(child.sessionId);
+        if (session == null) return "message.ars_n_spells.glyph.refused.no_session";
+        com.otectus.arsnspells.glyph.GlyphCastSession.Occurrence occurrence = session.occurrence(child.recipeIndex);
+        if (occurrence == null) return "message.ars_n_spells.glyph.refused.no_session";
+        return com.otectus.arsnspells.glyph.GlyphExecutionPolicy.refusal(invocation.caster(), session, occurrence,
+            invocation.caster().level(), invocation.selfForm() ? null : invocation.hit(), invocation.form());
+    }
+
+    private static void refuse(ServerPlayer player, GlyphInvocation invocation, String key) {
+        player.displayClientMessage(net.minecraft.network.chat.Component.translatable(key,
+            invocation.definition().spellName() + " " + invocation.definition().levelNumeral())
+            .withStyle(net.minecraft.ChatFormatting.RED), true);
+        LOGGER.debug("[Glyph] {} refused for {}: {}", invocation.definition().key(),
+            com.otectus.arsnspells.util.LogPrivacy.token(player.getUUID()), key);
+    }
+
+    /**
+     * Called by the native ticker hook when a child's invocation (a release, a channel pulse) is
+     * about to run. 3.4.1 review CAST-03: the policy is checked again first, so a lowered maximum,
+     * a new rule, a learning change, a disabled feature, a dead or unloaded target stops a charge
+     * before its release and a channel before its next pulse; the refused invocation is ended
+     * before it is priced and runs no effect.
+     */
     static IronTargetingScope.Scope enterChildInvocation(ServerPlayer player, AbstractSpell spell) {
-        GlyphChildren.Child child = GlyphChildren.running(player.getUUID(), spell.getSpellResource());
-        if (child == null || !child.started) return null;
-        return IronTargetingScope.push(child.invocation);
+        MagicData data = MagicData.getPlayerMagicData(player);
+        GlyphChildren.Child child = GlyphChildren.forNativeCast(player.getUUID(), spell.getSpellResource(), data.getCastingEquipmentSlot());
+        if (child == null || !child.started || child.finished) return null;
+        String refusal = authorize(child);
+        if (refusal != null) {
+            refuse(player, child.invocation, refusal);
+            return IronTargetingScope.Scope.refusedFor(child, refusal);
+        }
+        IronTargetingScope.Scope scope = IronTargetingScope.push(child.invocation);
+        scope.child = child;
+        return scope;
     }
 
     static void exitChildInvocation(IronTargetingScope.Scope scope, boolean effectReached, boolean finalInvocation) {
-        if (scope == null) return;
+        if (scope == null || scope.refused()) return;
         try {
             if (effectReached) deliver(scope, scope.invocation());
         } finally {
             IronTargetingScope.pop(scope);
         }
-        GlyphChildren.Child child = GlyphChildren.running(scope.caster.getUUID(), scope.invocation().definition().spell());
-        if (child != null) {
+        GlyphChildren.Child child = scope.child;
+        if (child != null && !child.finished) {
             child.effectReached |= effectReached;
             if (effectReached && finalInvocation) child.completed = true;
         }
@@ -218,7 +287,9 @@ final class IronsGlyphInvoker {
         ValidatedCastTarget target = invocation.target();
         if (target.kind() == CastTargetKind.ENTITY) {
             Entity entity = target.entity(level);
-            return entity == null ? null : entity.getBoundingBox().getCenter();
+            if (entity != null) return entity.getBoundingBox().getCenter();
+            // 3.4.1 review CAST-03: a summon acts at the place it was hit, which outlives the entity.
+            return invocation.definition().family() == GlyphFamily.SUMMON ? target.location() : null;
         }
         return target.location();
     }

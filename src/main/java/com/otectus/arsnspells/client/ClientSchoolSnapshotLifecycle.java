@@ -10,8 +10,16 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 @Mod.EventBusSubscriber(modid = "ars_n_spells", value = Dist.CLIENT)
 public final class ClientSchoolSnapshotLifecycle {
     private ClientSchoolSnapshotLifecycle() {}
+    @SubscribeEvent public static void connect(ClientPlayerNetworkEvent.LoggingIn event) {
+        GlyphClientSync.onLoggingIn();
+    }
     @SubscribeEvent public static void disconnect(ClientPlayerNetworkEvent.LoggingOut event) {
         SchoolMappings.reset();
         GlyphClientSync.onLoggingOut();
+        ClientSettings.reset();
+    }
+    /** 3.4.1 review SYNC-01: the server's tags arrived; tag-derived views (catalyst members) are re-read. */
+    @SubscribeEvent public static void tags(net.minecraftforge.event.TagsUpdatedEvent event) {
+        if (event.getUpdateCause() == net.minecraftforge.event.TagsUpdatedEvent.UpdateCause.CLIENT_PACKET_RECEIVED) GlyphClientSync.onTagsUpdated();
     }
 }

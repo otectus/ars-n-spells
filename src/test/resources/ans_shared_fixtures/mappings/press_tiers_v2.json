@@ -1,0 +1,33 @@
+{
+ "expect": {
+  "terms": {
+   "irons_spellbooks:heal@1": {
+    "catalyst_count": 0,
+    "duration_ticks": 20,
+    "source_cost": 50,
+    "tier": 1
+   }
+  },
+  "valid": true
+ },
+ "files": [
+  {
+   "id": "test:tiers",
+   "json": {
+    "schema_version": 2,
+    "tiers": {
+     "1": {
+      "catalyst": {
+       "count": 0
+      },
+      "duration_ticks": 20,
+      "source_cost": 50
+     }
+    },
+    "type": "ars_n_spells:press_tiers"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

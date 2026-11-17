@@ -686,7 +686,10 @@ public final class SpellSchoolGameTests {
             SpellbookBindingRitual.REGISTRY_PATH);
         tile.startRitual(CrossCastGameTests.scenarioPlayer(helper, "school_ritual"));
         helper.startSequence()
-            .thenExecuteAfter(RITUAL_SETTLE_TICKS, () -> {
+            // Wait for the bind (a slower, freshly generated world needs longer than the ritual's nominal duration).
+            .thenWaitUntil(() -> helper.assertTrue(CrossCastNbt.findEntryByProxyPoolId(book.getItem().getOrCreateTag(), 1) != null
+                || helper.getTick() >= RITUAL_SETTLE_TICKS * 2, "waiting for the bind"))
+            .thenExecute(() -> {
                 CompoundTag entry = CrossCastNbt.findEntryByProxyPoolId(book.getItem().getOrCreateTag(), 1);
                 if (entry == null) {
                     StringBuilder nearby = new StringBuilder();

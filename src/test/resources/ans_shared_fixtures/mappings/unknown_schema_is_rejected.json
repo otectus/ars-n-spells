@@ -1,0 +1,19 @@
+{
+ "expect": {
+  "errors_contain": [
+   "schema_version"
+  ],
+  "valid": false
+ },
+ "files": [
+  {
+   "id": "test:v9",
+   "json": {
+    "schema_version": 9,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

@@ -63,20 +63,25 @@ public final class GlyphPressPlanner {
             case OK -> { }
         }
         ImportedGlyphCatalog catalog = ImportedGlyphCatalog.get();
+        // No catalog lists the spell: an addon's spell needs an addon catalog (and a restart).
         if (catalog.levelsOf(reading.spell()).isEmpty()) return GlyphPressPlan.refused(GlyphPressPlan.Reason.NO_ADAPTER);
         if (reading.level() < 1 || reading.level() > ImportedGlyphKey.MAX_LEVEL)
             return GlyphPressPlan.refused(GlyphPressPlan.Reason.INVALID_LEVEL);
+        // A level Iron's accepts but no catalog registered: above the spell's envelope. Never downcast.
         Optional<ImportedGlyphDefinition> found = catalog.byKey(new ImportedGlyphKey(reading.spell(), reading.level()));
         if (found.isEmpty()) return GlyphPressPlan.refused(GlyphPressPlan.Reason.LEVEL_NOT_CATALOGUED);
         ImportedGlyphDefinition definition = found.get();
         int tier = GlyphAvailability.tier(definition);
         GlyphMappingSnapshot.PressTerms terms = GlyphMappingSnapshot.current().pressTerms(definition, tier);
         GlyphAvailability.Status status = GlyphAvailability.status(definition);
-        if (!status.available()) return GlyphPressPlan.refused(GlyphPressPlan.Reason.SPELL_DISABLED, definition, tier, terms);
-        if (player != null && definition.requiresLearning() && !bridge.meetsLearning(player, definition.spell()))
+        if (!status.available()) return GlyphPressPlan.refused(reasonFor(status.reason()), definition, tier, terms);
+        // A job is never started on provisional facts: the conversion must be judged on Iron's real config.
+        if (status.provisional()) return GlyphPressPlan.refused(GlyphPressPlan.Reason.CONFIG_PENDING, definition, tier, terms);
+        // Iron's live learning requirement, not the catalog's record of it.
+        if (player != null && !bridge.meetsLearning(player, definition.spell()))
             return GlyphPressPlan.refused(GlyphPressPlan.Reason.REQUIRES_LEARNING, definition, tier, terms);
         if (!isPlate(plate)) return GlyphPressPlan.refused(GlyphPressPlan.Reason.NO_PLATE, definition, tier, terms);
-        if (!isCatalyst(catalyst, terms) || catalyst.getCount() < terms.catalystCount())
+        if (!catalystSatisfied(catalyst, terms))
             return GlyphPressPlan.refused(GlyphPressPlan.Reason.NEEDS_CATALYST, definition, tier, terms);
         if (terms.sourceCost() > capacity) return GlyphPressPlan.refused(GlyphPressPlan.Reason.CAPACITY_TOO_SMALL, definition, tier, terms);
         ItemStack result = ImportedGlyphRegistrar.part(definition.key())
@@ -87,8 +92,48 @@ public final class GlyphPressPlanner {
         return new GlyphPressPlan(GlyphPressPlan.Reason.OK, definition, tier, terms, result);
     }
 
+    /** The Press's own explanation for an availability refusal. */
+    static GlyphPressPlan.Reason reasonFor(GlyphAvailability.Reason reason) {
+        return switch (reason) {
+            case LEVEL_UNSUPPORTED -> GlyphPressPlan.Reason.LEVEL_ABOVE_LIVE_MAX;
+            case DISABLED_BY_DATAPACK -> GlyphPressPlan.Reason.DISABLED_BY_PACK;
+            case RETIRED, UNSUPPORTED -> GlyphPressPlan.Reason.UNSUPPORTED_ADAPTER;
+            case DISABLED_BY_SERVER -> GlyphPressPlan.Reason.FEATURE_DISABLED;
+            case IRONS_ABSENT -> GlyphPressPlan.Reason.IRONS_ABSENT;
+            case NOT_SYNCED -> GlyphPressPlan.Reason.CONFIG_PENDING;
+            default -> GlyphPressPlan.Reason.SPELL_DISABLED;
+        };
+    }
+
     public static boolean isPlate(ItemStack stack) {
         return !stack.isEmpty() && ModItemsRegistry.blankGlyphPlate() != null && stack.is(ModItemsRegistry.blankGlyphPlate().get());
+    }
+
+    /**
+     * Whether the catalyst slot meets {@code terms}. A zero-count conversion needs nothing, so an
+     * empty slot satisfies it and nothing is consumed; a positive count needs that many items of
+     * the terms' tag.
+     */
+    public static boolean catalystSatisfied(ItemStack catalyst, GlyphMappingSnapshot.PressTerms terms) {
+        if (terms.catalystCount() <= 0) return true;
+        return isCatalyst(catalyst, terms) && catalyst.getCount() >= terms.catalystCount();
+    }
+
+    /**
+     * Whether a stack may sit in the catalyst slot at all: an item of any catalyst tag the current
+     * behaviour names (the default tag, every tier's and every per-spell override's). The planner
+     * still checks the one tag a given conversion needs.
+     */
+    public static boolean mayBeCatalyst(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        for (net.minecraft.resources.ResourceLocation tag : GlyphMappingSnapshot.current().catalystTags()) {
+            try {
+                if (stack.is(TagKey.create(Registries.ITEM, tag))) return true;
+            } catch (RuntimeException unboundTags) {
+                return false;
+            }
+        }
+        return false;
     }
 
     /** Any item in the terms' catalyst tag (Source gems by default). */

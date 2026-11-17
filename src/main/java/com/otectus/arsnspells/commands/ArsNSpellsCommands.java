@@ -88,7 +88,9 @@ public class ArsNSpellsCommands {
                 .then(Commands.literal("mode")
                     .executes(ArsNSpellsCommands::showMode)
                     .then(Commands.literal("set")
-                        .requires(source -> source.hasPermission(2))
+                        // 3.4.1 review CONFIG-01: an operator, the console, or the owner of a
+                        // single-player world with cheats off; never a LAN guest or a non-op.
+                        .requires(com.otectus.arsnspells.config.ConfigAuthority::mayChange)
                         .then(Commands.argument("mode", StringArgumentType.word())
                             .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(MODE_NAMES, builder))
                             .executes(ArsNSpellsCommands::setMode)
@@ -136,8 +138,10 @@ public class ArsNSpellsCommands {
 
     private static int setDefaultMana(CommandContext<CommandSourceStack> context) {
         double value = DoubleArgumentType.getDouble(context, "value");
-        AnsConfig.DEFAULT_MAX_MANA.set(value);
-        AnsConfig.safeSave();
+        // Forge writes the file in set(); a second save would only race its file watcher (AnsConfig.SAVE_LOCK).
+        synchronized (AnsConfig.SAVE_LOCK) {
+            AnsConfig.DEFAULT_MAX_MANA.set(value);
+        }
 
         context.getSource().sendSuccess(
             () -> Component.translatable("commands.ans.mana.setdefault.success", String.format("%.1f", value)),
@@ -160,8 +164,9 @@ public class ArsNSpellsCommands {
 
     private static int toggleDebug(CommandContext<CommandSourceStack> context) {
         boolean current = AnsConfig.DEBUG_MODE.get();
-        AnsConfig.DEBUG_MODE.set(!current);
-        AnsConfig.safeSave();
+        synchronized (AnsConfig.SAVE_LOCK) {
+            AnsConfig.DEBUG_MODE.set(!current);
+        }
 
         context.getSource().sendSuccess(
             () -> Component.translatable(current ? "commands.ans.debug.disabled" : "commands.ans.debug.enabled")
@@ -718,21 +723,23 @@ public class ArsNSpellsCommands {
     }
 
     private static int showMode(CommandContext<CommandSourceStack> context) {
-        ManaUnificationMode mode = AnsConfig.getManaMode();
+        String requested = AnsConfig.MANA_UNIFICATION_MODE.get();
+        String effective = BridgeManager.getCurrentMode().getConfigName();
         context.getSource().sendSuccess(
-            () -> Component.translatable("commands.ans.mode.current", mode.name())
-                .withStyle(ChatFormatting.YELLOW),
-            false
-        );
+            () -> Component.translatable("commands.ans.mode.current", requested, effective).withStyle(ChatFormatting.YELLOW), false);
+        context.getSource().sendSuccess(() -> Component.translatable(
+            com.otectus.arsnspells.config.ConfigAuthority.mayChange(context.getSource())
+                ? "commands.ans.mode.can_change" : "commands.ans.mode.cannot_change").withStyle(ChatFormatting.GRAY), false);
         return 1;
     }
 
+    /**
+     * 3.4.1 review CONFIG-01: the same apply as the settings screen ({@code AnsSettingsService}): the
+     * mode is validated, written, routed, every online player reconciled, the file saved and every
+     * client told, in one step on the server thread.
+     */
     private static int setMode(CommandContext<CommandSourceStack> context) {
         String requested = StringArgumentType.getString(context, "mode");
-
-        // Strict match against the known config names. Unlike ManaUnificationMode.fromString,
-        // we do NOT silently fall back to ISS_PRIMARY — a typo must be reported so the op
-        // knows the mode did not change.
         ManaUnificationMode parsed = null;
         for (ManaUnificationMode mode : ManaUnificationMode.values()) {
             if (mode.getConfigName().equalsIgnoreCase(requested)) {
@@ -741,34 +748,24 @@ public class ArsNSpellsCommands {
             }
         }
         if (parsed == null) {
-            context.getSource().sendFailure(
-                Component.translatable("commands.ans.mode.set.invalid", requested)
-            );
+            context.getSource().sendFailure(Component.translatable("commands.ans.mode.set.invalid", requested));
             return 0;
         }
-
-        AnsConfig.MANA_UNIFICATION_MODE.set(parsed.getConfigName());
-        AnsConfig.safeSave();
-        // Apply live: re-read the config and re-select bridges (server thread — command
-        // handlers run there). refreshMode() may downgrade the effective mode when a
-        // mode needs Iron's and it is absent (e.g. ISS_PRIMARY -> ARS_PRIMARY), so we
-        // echo both the requested and the now-active mode.
-        BridgeManager.refreshMode();
-        // V14: the routing generation has moved, so every online player's transient state is
-        // now describing the old mode. Strip it, rebuild whatever the new mode enables, clamp
-        // and re-sync — otherwise a bonus the new mode does not grant stays applied until the
-        // player next swapped gear or died.
-        com.otectus.arsnspells.bridge.ModeChangeCleanup.reconcileAll();
-
-        final String requestedName = parsed.getConfigName();
-        final String effectiveName = BridgeManager.getCurrentMode().getConfigName();
+        var actor = context.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer player
+            && !context.getSource().hasPermission(com.otectus.arsnspells.config.ConfigAuthority.OPERATOR_LEVEL) ? player : null;
+        var outcome = com.otectus.arsnspells.config.AnsSettingsService.apply(actor,
+            java.util.Map.of(com.otectus.arsnspells.config.AnsSettings.MODE, parsed.getConfigName()));
+        if (!outcome.applied()) {
+            context.getSource().sendFailure(Component.translatable(outcome.resultKey(), outcome.requestedMode(), outcome.effectiveMode(), outcome.detail()));
+            return 0;
+        }
+        final String requestedName = outcome.requestedMode();
+        final String effectiveName = outcome.effectiveMode();
         context.getSource().sendSuccess(
-            () -> Component.translatable("commands.ans.mode.set.success", requestedName, effectiveName)
-                .withStyle(ChatFormatting.GREEN),
-            true
-        );
-        LOGGER.info("Mana unification mode set to {} (effective {}) by {}",
-            requestedName, effectiveName, context.getSource().getTextName());
+            () -> Component.translatable("commands.ans.mode.set.success", requestedName, effectiveName).withStyle(ChatFormatting.GREEN), true);
+        if (outcome.resultKey().endsWith("not_saved"))
+            context.getSource().sendFailure(Component.translatable(outcome.resultKey(), requestedName, effectiveName, outcome.detail()));
+        LOGGER.info("Mana unification mode set to {} (effective {}) by {}", requestedName, effectiveName, context.getSource().getTextName());
         return 1;
     }
 }

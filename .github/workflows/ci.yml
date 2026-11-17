@@ -35,6 +35,10 @@ jobs:
             build/forge
           key: forgegradle-${{ runner.os }}-${{ hashFiles('gradle.properties', 'build.gradle') }}
       - run: chmod +x ./gradlew
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install Pillow
       - name: Verify tooling and icon assets
         run: |
           python3 -m unittest discover -s tools -p "test_*.py"
@@ -51,7 +55,7 @@ jobs:
             build/reports/tests/test
             build/test-results/test
 
-  # The expected counts are pinned to the final 3.3.3 Forge run. The verifier
+  # The expected counts are pinned to the 3.4.1 Forge suite. The verifier
   # rejects a green ForgeGradle exit that did not complete the requested suite.
   gametest:
     name: Forge GameTests (${{ matrix.profile }})
@@ -65,12 +69,12 @@ jobs:
           - profile: absent
             flags: ""
             executed: 1
-            skipped: 84
+            skipped: 282
             identity: "--absent irons_spellbooks --absent ars_elemental --absent ars_zero --absent toomanyglyphs"
           - profile: loaded
             flags: "-PwithIronsRuntimeGameTests -PwithArsElemental"
-            executed: 75
-            skipped: 10
+            executed: 249
+            skipped: 34
             identity: "--present irons_spellbooks --present ars_elemental --absent ars_zero --absent toomanyglyphs"
     steps:
       - uses: actions/checkout@v4
@@ -92,7 +96,7 @@ jobs:
       - name: Verify completed tests and actual runtime profile
         run: >
           python3 tools/verify_gametest_log.py run-${{ matrix.profile }}/logs/latest.log
-          --required 115 --executed ${{ matrix.executed }} --skipped ${{ matrix.skipped }} ${{ matrix.identity }}
+          --required 344 --executed ${{ matrix.executed }} --skipped ${{ matrix.skipped }} ${{ matrix.identity }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -127,7 +131,7 @@ jobs:
       - name: Verify loaded preparation
         run: >
           python3 tools/verify_gametest_log.py run-removal/logs/latest.log
-          --required 115 --executed 75 --skipped 10
+          --required 344 --executed 249 --skipped 34
           --present irons_spellbooks --present ars_elemental
           --absent ars_zero --absent toomanyglyphs
       - name: Upload removal preparation log

@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.4.1] - Unreleased
+
+**Client and server both need 3.4.1.** The network protocol changed (version 10): the server now sends Iron's live spell settings to clients, and settings changed from the in-game screen are applied and synced through the server.
+
+### Fixed
+
+- **Spell Uninscription works on bound books again** (#14). It refused with "spell-bearing item(s) in range" because the bound book itself was counted as a spell source. Native spells, the book's name and its capacity are kept; an unrelated item in range still refuses it, and nothing changes.
+- **Iron's server settings are respected by imported glyphs.**
+  - Lowering a spell's maximum level makes its higher glyphs dormant, with the reason. They stay in books and work again when it is raised.
+  - Amplify can no longer push a cast past that maximum. Such a cast is refused before anything is paid, instead of being quietly cast at a lower level. Amplify now reaches the server's maximum, not only the catalogued one.
+  - A spell moved to another school in Iron's config counts as that school for allow and deny lists, progression, discounts, colours and explanations.
+  - Learning requirements follow Iron's live rule.
+  - Before Iron's has loaded its settings (just after a server starts), glyphs are no longer judged on placeholder values. Casts are refused with a message saying the server's settings are still loading, and Glyph Press jobs pause instead of being cancelled.
+- **Equipment and events that change an Iron's spell's level apply to imported glyphs**, once per glyph (for example Curios affinity). The level and cost Iron's cast event settles on are what is cast and paid. A cast-event discount is charged exactly and never makes an unaffordable cast affordable.
+- **Glyph Press.**
+  - A conversion that needs no catalyst starts with an empty catalyst slot.
+  - Custom catalyst tags from data packs can be placed in the catalyst slot by hand, shift-click or hopper.
+  - Cancelling after Source was refilled returns the full reservation; before, anything over capacity was lost.
+  - A damaged saved job returns only a reservation it can prove. Damaged data can no longer create Source.
+  - An unrelated `/reload` no longer replans or cancels running jobs; a job is checked once per real change.
+- **Imported-glyph casts end cleanly.** Instant casts free their bookkeeping at once. Changing dimension, logging out or turning glyphs off closes every cast in flight, and a closing cast cancels only the charged or channelled cast it started. If Iron's effect fails after the price was taken, the cast says so and the cooldown still applies, so a broken effect cannot be retried for free.
+- **JEI** refreshes Glyph Press recipes after a reload, without stale or duplicate entries.
+
+### Added
+
+- **Every imported spell reserves levels up to 10.** Servers that raise Iron's maximum level get working glyphs without a new catalog: 1,110 glyph ids, up from 777. The extra levels stay dormant and hidden from the creative glyph tab until the server allows them.
+- **Glyph ids are permanent.** ANS ships a ledger of every id it has published and refuses to start with a catalog that lost one. A spell that leaves its catalog stays as a dormant "retired" glyph, and each world remembers the glyph ids it has used and warns at startup if any go missing.
+- **Addon spells.** Catalogs are also read from `ans_glyph_catalog/*.json` in any mod and from `config/ars_n_spells/glyph_catalogs/`. A catalog may add spells and extend levels but never remove or reassign ids; a broken one is rejected with the reason. `tools/generate_iron_glyph_catalog.py pack` builds an addon catalog, optionally as a catalog-only jar, from `/ans glyph inventory export`. Guide: `docs/3.4.1/catalog-packages.md`.
+- **One mapping schema on both loaders** (schema 2, 3.4.0 files still accepted): per-spell `defaults`, per-level `enabled`, a Self-only restriction (`"adapter": "ars_n_spells:self"`), and unknown fields and malformed numbers reported with their file and field instead of ignored or truncated. A higher-priority pack overrides a lower one; two conflicting files at the same priority disable that spell until fixed. Press durations may now be up to one hour. Reference: `docs/3.4.1/mapping-schema.md`.
+- **New commands.** `/ans glyph report`, `explain <spell> [level]`, `validate` (a dry run of the loaded mapping files) and `inventory export` for operators, and `/ans glyph last` for your own last imported-glyph casts. Offline: `tools/validate_glyph_mappings.py`.
+
+### For developers
+
+- New GameTests cover the Press catalyst, Source and readiness cases, uninscription through the real brazier with a really bound book in both drop orders, native level events, cast-event pricing, live maximum and school changes, session cleanup and the registry order behind early identities: 344 required.
+- Shared fixtures in `src/test/resources/ans_shared_fixtures` (catalogs, mapping schema, effective levels, policies and Press terms) are run by both loaders' unit tests and by the offline validator. `tools/verify_loader_parity.py --section behaviour` checks that they and the shared tools are identical in both checkouts.
+- The ritual GameTests no longer drop items where they could fall out of range, and config GameTests wait for the config to apply instead of relying on timing.
+- Evidence: `docs/3.4.1/testing.md`. Contracts: `docs/3.4.1/identity-and-levels.md`, `docs/3.4.1/casting-contract.md`.
+
 ## [3.4.0] - 2026-10-21
 
 3.3.7 was never published; 3.4.0 also ships everything listed under 3.3.7 below.

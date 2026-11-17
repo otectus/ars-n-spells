@@ -1,0 +1,31 @@
+{
+ "expect": {
+  "terms": {
+   "irons_spellbooks:heal@1": {
+    "catalyst_count": 0,
+    "duration_ticks": 100,
+    "source_cost": 500,
+    "tier": 1
+   }
+  },
+  "valid": true
+ },
+ "files": [
+  {
+   "id": "test:free",
+   "json": {
+    "levels": {
+     "1": {
+      "catalyst": {
+       "count": 0
+      }
+     }
+    },
+    "schema_version": 2,
+    "spell": "irons_spellbooks:heal"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

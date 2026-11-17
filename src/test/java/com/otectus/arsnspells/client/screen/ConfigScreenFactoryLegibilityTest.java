@@ -41,17 +41,18 @@ class ConfigScreenFactoryLegibilityTest {
     @Test
     void nativeControls_gatePointerAndKeyboardMutations() throws IOException {
         String src = source();
-        int gate = src.indexOf("if (!canMutate) return;");
-        assertTrue(gate > 0 && gate < src.indexOf("option.toggle()"),
+        // 3.4.1 review CONFIG-01: the gate is the server's answer (canEdit), not the client's guess.
+        int gate = src.indexOf("if (!canEdit()) return;");
+        assertTrue(gate > 0 && gate < src.indexOf("step(setting);"),
             "the native button action must refuse changes in read-only mode");
-        assertTrue(src.contains("control.active = canMutate;"),
+        assertTrue(src.contains("control.active = canEdit();"),
             "disabled controls must also reject keyboard activation");
     }
 
     @Test
     void controls_useNativeWidgetHitboxesAndNarration() throws IOException {
         String src = source();
-        assertTrue(src.contains("Button.builder(optionLabel(option)"));
+        assertTrue(src.contains("Button.builder(valueLabel(setting)"));
         assertTrue(src.contains("optionButtons.add(addRenderableWidget(control))"));
         assertTrue(src.contains(".createNarration("));
         assertFalse(src.contains("drawButtonChrome("), "native buttons own drawing and hit testing");
@@ -60,9 +61,10 @@ class ConfigScreenFactoryLegibilityTest {
     @Test
     void readOnlyMode_showsExplanatoryNote() throws IOException {
         String src = source();
-        assertTrue(src.contains("Read-only: server-managed config."),
-            "multiplayer clients must see a note that the config is server-managed");
-        assertTrue(src.contains("/ans commands"),
-            "the note must point at the /ans command path");
+        // 3.4.1 review CONFIG-01: localized, and it says who may edit instead of pointing at commands.
+        assertTrue(src.contains("ars_n_spells.settings.read_only"),
+            "clients that may not edit must see why the settings are read-only");
+        assertTrue(src.contains("ars_n_spells.settings.scope"),
+            "the screen must say the settings are world-global");
     }
 }

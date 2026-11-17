@@ -55,13 +55,17 @@ final class GlyphInvocations {
             refuse(player, definition, "message.ars_n_spells.glyph.refused.no_session");
             return;
         }
-        if (player.level() != world || !world.dimension().equals(session.dimension())) {
-            refuse(player, definition, "message.ars_n_spells.glyph.refused.other_world");
-            return;
-        }
+        ResourceLocation castForm = context.getSpell().getCastMethod() == null ? null
+            : context.getSpell().getCastMethod().getRegistryName();
         GlyphAvailability.Status status = GlyphAvailability.status(definition);
         if (!status.available()) {
             player.displayClientMessage(status.message(definition).copy().withStyle(ChatFormatting.RED), true);
+            return;
+        }
+        // 3.4.1 review CAST-03: the same authorization every later stage repeats, against the policy now.
+        String refusal = GlyphExecutionPolicy.refusal(player, session, occurrence, world, hit, castForm);
+        if (refusal != null) {
+            refuse(player, definition, refusal);
             return;
         }
         ValidatedCastTarget target = ValidatedCastTarget.of(world, hit);
@@ -73,16 +77,15 @@ final class GlyphInvocations {
             refuse(player, definition, "message.ars_n_spells.glyph.refused.budget");
             return;
         }
-        ResourceLocation form = context.getSpell().getCastMethod() == null ? null
-            : context.getSpell().getCastMethod().getRegistryName();
+        ResourceLocation form = castForm;
         EmissionPayment payment = GlyphSessions.payment(player, session, occurrence);
-        GlyphContinuation continuation = new GlyphContinuation(resolver, hit, world);
+        GlyphContinuation continuation = new GlyphContinuation(resolver, hit, world, session.id(), player.getUUID());
         GlyphInvocation invocation = new GlyphInvocation(player, definition, session.id(), index, occurrence.augmentedLevel,
-            target, hit, form, payment, context.getCasterTool(), continuation);
+            occurrence.nativeLevel, target, hit, form, payment, context.getCasterTool(), continuation);
         IronGlyphBridge.InvocationOutcome outcome;
         try {
             outcome = IronGlyphBridges.get().invoke(invocation);
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | LinkageError failure) {
             payment.releaseIfUnpaid();
             LOGGER.warn("[Glyph] {} failed for {}: {}", definition.key(), LogPrivacy.token(player.getUUID()), failure.toString());
             LOGGER.debug("[Glyph] failure", failure);
@@ -90,6 +93,12 @@ final class GlyphInvocations {
             return;
         }
         occurrence.emissions++;
+        com.otectus.arsnspells.casting.PaymentTimeline.record(player.getUUID(), -1, com.otectus.arsnspells.casting.PaymentTimeline.Kind.EMISSION,
+            "glyph:" + session.id() + "/" + index, definition.key() + " " + outcome.status() + " final=" + outcome.finalLevel());
+        GlyphSessions.record(player, new GlyphSessions.CastRecord(definition.spell(), definition.level(), occurrence.augmentedLevel,
+            occurrence.nativeLevel, outcome.finalLevel(), payment.describe(), outcome.status().name().toLowerCase(java.util.Locale.ROOT)
+                + (outcome.reasonKey() == null || outcome.reasonKey().isEmpty() ? "" : " " + outcome.reasonKey()),
+            "execution", player.level().getGameTime()));
         switch (outcome.status()) {
             case REJECTED, CANCELED -> {
                 payment.releaseIfUnpaid();
@@ -103,6 +112,12 @@ final class GlyphInvocations {
                 occurrence.childPending = true;
                 continuation.suspend();
                 trace(player, definition, "accepted_pending");
+            }
+            case FAILED_AFTER_PAYMENT -> {
+                // The effect had started and was paid for: nothing is refunded and the native
+                // cooldown already applies, so a failure can never yield both an effect and a refund.
+                refuse(player, definition, "message.ars_n_spells.glyph.refused.failed");
+                trace(player, definition, "failed_after_payment");
             }
             default -> trace(player, definition, outcome.status().name().toLowerCase(java.util.Locale.ROOT));
         }

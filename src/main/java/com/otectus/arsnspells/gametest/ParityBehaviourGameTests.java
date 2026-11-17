@@ -264,7 +264,9 @@ public final class ParityBehaviourGameTests {
             var inventory = top.theillusivec4.curios.api.CuriosApi.getCuriosInventory(player).resolve();
             helper.assertTrue(inventory.isPresent() && !inventory.get().getCurios().isEmpty(),
                 "the test player must have Curios slots");
-            var handler = inventory.get().getCurios().values().iterator().next();
+            // The first slot type with a slot: in the Covenant profile the first registered type has none.
+            var handler = inventory.get().getCurios().values().stream().filter(h -> h.getStacks().getSlots() > 0).findFirst()
+                .orElseThrow(() -> new IllegalStateException("no Curios slot type has a slot"));
             var stacks = handler.getStacks();
             var previous = stacks.getStackInSlot(0);
             stacks.setStackInSlot(0, new net.minecraft.world.item.ItemStack(tagged.get()));

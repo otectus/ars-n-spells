@@ -70,16 +70,34 @@ import java.util.UUID;
  *
  * <p>Saved with a schema version; a job that cannot be resumed on load is cancelled with its
  * items kept, and a completed job's output is never produced twice.
+ *
+ * <p><b>Source conservation (3.4.1).</b> Free Source plus a job's reservation never grows past
+ * the capacity through intake, but Source the press already holds is never destroyed: a cancelled
+ * job's reservation returns to the buffer in full even when a refill or a lowered capacity left no
+ * room, and that over-capacity balance is simply not topped up again until it is spent. Ars sizes a
+ * push as {@code getMaxSource() - getSource()}, so the reported maximum never drops below what is
+ * held, which keeps that difference from going negative. A saved reservation is only recovered
+ * when it is a validated amount (see {@link #recoverReservation}).
  */
 public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, ISourceTile {
     private static final Logger LOGGER = LoggerFactory.getLogger(GlyphPressBlockEntity.class);
     public static final int SLOT_SCROLL = 0, SLOT_PLATE = 1, SLOT_CATALYST = 2, SLOT_OUTPUT = 3, SLOT_COUNT = 4;
-    public static final int SCHEMA_VERSION = 1;
+    /** 2 (3.4.1): same layout; a malformed or newer job's reservation is recovered only when validated. */
+    public static final int SCHEMA_VERSION = 2;
+    /**
+     * Upper bound on Source a press can ever legitimately hold: the largest configurable capacity
+     * plus one refunded reservation. Anything beyond it in saved data is corruption, not value.
+     */
+    static final int MAX_HELD_SOURCE = 100_000 + GlyphMappingSnapshot.MAX_SOURCE_COST;
     private static final int TRANSFER_RATE = 1000;
     private static final int ENGRAVE_SOUND_INTERVAL = 40;
 
-    /** Why a running job is not advancing. */
-    public enum Pause { NONE, AWAITING_SOURCE, OUTPUT_BLOCKED }
+    /**
+     * Why a running job is not advancing. {@code AWAITING_CONFIG} (3.4.1, appended: menu data carries
+     * ordinals): Iron's configuration is not authoritative yet, so the job is neither advanced nor
+     * judged, its inputs stay locked and its reservation held.
+     */
+    public enum Pause { NONE, AWAITING_SOURCE, OUTPUT_BLOCKED, AWAITING_CONFIG }
 
     /** The display state, derived from the job and the inputs. */
     public enum State { IDLE, READY, PROCESSING, OUTPUT_READY }
@@ -98,6 +116,14 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
         UUID starter;
         String mappingDigest;
         int schoolColor;
+        /**
+         * The job's immutable terms ({@link #terms(GlyphPressPlan)}): glyph, tier, Source, duration,
+         * catalyst tag and count. Null only for a job saved by 3.4.0, which adopts the terms its
+         * first revalidation confirms.
+         */
+        @Nullable String terms;
+        /** The behaviour generation these terms were last confirmed under; not saved (generations restart with the server). */
+        int generation = -1;
     }
 
     private final PressItems items = new PressItems();
@@ -170,7 +196,7 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
         return switch (slot) {
             case SLOT_SCROLL -> GlyphPressPlanner.mayBeScroll(stack);
             case SLOT_PLATE -> GlyphPressPlanner.isPlate(stack);
-            case SLOT_CATALYST -> GlyphPressPlanner.isCatalyst(stack, null);
+            case SLOT_CATALYST -> GlyphPressPlanner.mayBeCatalyst(stack);
             default -> false;
         };
     }
@@ -301,8 +327,10 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
         created.duration = plan.terms().durationTicks();
         created.catalysts = plan.terms().catalystCount();
         created.starter = player.getUUID();
-        created.mappingDigest = GlyphMappingSnapshot.current().digest();
+        created.mappingDigest = com.otectus.arsnspells.glyph.behavior.GlyphBehavior.digest();
         created.schoolColor = schoolColor(definition);
+        created.terms = terms(plan);
+        created.generation = com.otectus.arsnspells.glyph.behavior.GlyphBehavior.generation();
         job = created;
         takeFromBuffer();
         revision++;
@@ -316,7 +344,10 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
     /** Cancel the running job: inputs unlock untouched, reserved Source returns to the buffer. */
     public String cancel(String reason) {
         if (job == null) return NOT_WORKING;
-        source = Math.min(capacity(), source + job.reservedSource);
+        // Returned in full, never clamped to the capacity: the reservation is Source this press
+        // already holds. A refill or a lowered capacity can leave the buffer over its capacity,
+        // which only stops intake until the balance is spent.
+        source = Math.min(MAX_HELD_SOURCE, source + job.reservedSource);
         LOGGER.debug("[GlyphPress] {} job {} cancelled: {}", worldPosition, job.id, reason);
         job = null;
         revision++;
@@ -343,18 +374,29 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
     private void tickJob(Level level) {
         Job running = job;
         if (!pressAllowed()) { cancel("disabled"); return; }
-        if (revalidateRestoredJob) {
+        // Iron's configuration is built on a server's first datapack sync (its first login). Until
+        // then Iron's answers with fallbacks, and judging a job on them would cancel a valid one:
+        // the job waits, locked and reserved, and nothing is decided.
+        if (!com.otectus.arsnspells.glyph.behavior.GlyphBehavior.live().authoritative()) {
+            if (running.pause != Pause.AWAITING_CONFIG) {
+                running.pause = Pause.AWAITING_CONFIG;
+                setChanged();
+            }
+            return;
+        }
+        // Once per behaviour generation (a reload, a config change, a restart): the same terms are
+        // acknowledged and the job continues; different terms end it with everything returned.
+        int generation = com.otectus.arsnspells.glyph.behavior.GlyphBehavior.generation();
+        if (revalidateRestoredJob || running.generation != generation) {
+            boolean restored = revalidateRestoredJob;
             revalidateRestoredJob = false;
-            if (!running.fingerprint.equals(inputFingerprint()) || !stillPlanned(running)) {
-                cancel("restored_job_no_longer_valid");
+            if (!termsStillHold(running)) {
+                cancel(restored ? "restored_job_no_longer_valid" : "terms_changed");
                 return;
             }
-        }
-        // A reload that changed what this job quoted ends it cleanly rather than finishing an
-        // obsolete conversion; an unchanged snapshot (same digest) leaves it alone.
-        if (!running.mappingDigest.equals(GlyphMappingSnapshot.current().digest()) && !stillPlanned(running)) {
-            cancel("mapping_changed");
-            return;
+            running.generation = generation;
+            if (running.pause == Pause.AWAITING_CONFIG) running.pause = Pause.NONE;
+            revalidations++;
         }
         if (running.reservedSource < running.sourceCost) {
             takeFromBuffer();
@@ -384,10 +426,15 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
 
     /** Complete {@code running}: revalidate, then consume the inputs and Source and insert the glyph in one mutation. */
     private void complete(Level level, Job running) {
+        // The final authoritative check, immediately before the one completion mutation.
         GlyphPressPlan plan = plan(null);
         if (!running.fingerprint.equals(inputFingerprint()) || !plan.identified()
                 || !running.glyph.equals(plan.definition().glyphId())) {
             cancel("inputs_changed");
+            return;
+        }
+        if (running.terms != null && !running.terms.equals(terms(plan))) {
+            cancel("terms_changed");
             return;
         }
         if (plan.reason() == GlyphPressPlan.Reason.OUTPUT_FULL) {
@@ -427,6 +474,43 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
 
     /** Conversions this press has completed since it loaded; read by diagnostics and tests. */
     private int completed;
+    /** Behaviour-generation revalidations this press has made since it loaded; diagnostics and tests. */
+    private int revalidations;
+
+    public int revalidationCount() {
+        return revalidations;
+    }
+
+    /**
+     * A job's terms as one comparable string: the glyph, its tier, Source, duration, catalyst tag
+     * and catalyst count. Null when the plan does not identify a conversion.
+     */
+    @Nullable
+    static String terms(GlyphPressPlan plan) {
+        if (!plan.identified() || plan.terms() == null) return null;
+        GlyphMappingSnapshot.PressTerms terms = plan.terms();
+        return plan.definition().glyphId() + "|tier=" + plan.tier() + "|source=" + terms.sourceCost() + "|ticks=" + terms.durationTicks()
+            + "|catalyst=" + terms.catalystTag() + "x" + terms.catalystCount();
+    }
+
+    /**
+     * Whether the current behaviour still plans exactly this job: the same inputs, the same terms,
+     * and a conversion that is allowed (a full output only pauses it). A 3.4.0 job with no saved
+     * terms is checked field by field once and then adopts its terms.
+     */
+    private boolean termsStillHold(Job running) {
+        if (!running.fingerprint.equals(inputFingerprint())) return false;
+        GlyphPressPlan plan = plan(null);
+        if (!(plan.ok() || plan.reason() == GlyphPressPlan.Reason.OUTPUT_FULL)) return false;
+        String now = terms(plan);
+        if (now == null || !running.glyph.equals(plan.definition().glyphId())) return false;
+        if (running.terms == null) {
+            if (!stillPlanned(running)) return false;
+            running.terms = now;
+            return true;
+        }
+        return running.terms.equals(now);
+    }
 
     public int completedCount() {
         return completed;
@@ -465,7 +549,7 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
     /** Ask nearby jars, through Ars's own lookup (loaded positions only), for up to {@code needed} Source. */
     private void pullSource(Level level, int needed) {
         int radius = Math.max(1, Math.min(8, AnsConfig.GLYPH_PRESS_SOURCE_RADIUS.get()));
-        int room = capacity() - source;
+        int room = capacity() - source - reservedSource();
         int want = Math.min(needed, room);
         if (want <= 0) return;
         scanCount++;
@@ -495,8 +579,11 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
         return scanCount;
     }
 
+    /** The colour of the spell's effective school; a school of another namespace with the same path is a different school. */
     private int schoolColor(ImportedGlyphDefinition definition) {
-        return switch (definition.school().getPath()) {
+        ResourceLocation school = com.otectus.arsnspells.glyph.behavior.GlyphBehavior.school(definition);
+        if (!"irons_spellbooks".equals(school.getNamespace())) return 0x9966FF;
+        return switch (school.getPath()) {
             case "fire" -> 0xFF7A2E;
             case "ice" -> 0x8FE3FF;
             case "lightning" -> 0x9FD8FF;
@@ -533,14 +620,27 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
     // ---- Source ---------------------------------------------------------------------------
 
     @Override public int getTransferRate() { return TRANSFER_RATE; }
-    @Override public boolean canAcceptSource() { return source < capacity(); }
+    @Override public boolean canAcceptSource() { return room() > 0; }
     @Override public int getSource() { return source; }
-    @Override public int getMaxSource() { return capacity(); }
+    /** The free capacity, and never less than what is held, so Ars's push size is never negative. */
+    @Override public int getMaxSource() { return Math.max(source, capacity() - reservedSource()); }
     @Override public void setMaxSource(int max) { }
 
+    /** Room for new Source: the capacity less the free buffer and the running job's reservation. */
+    private int room() {
+        return Math.max(0, capacity() - source - reservedSource());
+    }
+
+    /**
+     * Set the free buffer. An increase is limited to the room left (free plus reserved within the
+     * capacity, or no increase at all over it); a decrease is always taken as asked, so nothing
+     * held is clamped away by an unrelated write.
+     */
     @Override
     public int setSource(int amount) {
-        source = Math.max(0, Math.min(capacity(), amount));
+        int target = Math.max(0, amount);
+        if (target > source) target = Math.min(target, source + room());
+        source = target;
         setChanged();
         return source;
     }
@@ -577,6 +677,7 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
             jobTag.putUUID("starter", job.starter);
             jobTag.putString("mapping_digest", job.mappingDigest);
             jobTag.putInt("school_color", job.schoolColor);
+            if (job.terms != null) jobTag.putString("terms", job.terms);
             tag.put("job", jobTag);
         }
     }
@@ -586,12 +687,12 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
         super.load(tag);
         int schema = tag.contains("schema") ? tag.getInt("schema") : SCHEMA_VERSION;
         if (tag.contains("items")) items.deserializeNBT(tag.getCompound("items"));
-        source = Math.max(0, tag.getInt("source"));
+        source = Math.max(0, Math.min(MAX_HELD_SOURCE, tag.getInt("source")));
         job = null;
         if (tag.contains("job", Tag.TAG_COMPOUND)) {
             if (schema > SCHEMA_VERSION) {
                 // A newer press format: keep every item and the Source it held, drop the job we cannot interpret.
-                source = Math.min(capacity(), source + Math.max(0, tag.getCompound("job").getInt("reserved_source")));
+                source = Math.min(MAX_HELD_SOURCE, source + recoverReservation(tag.getCompound("job")));
                 LOGGER.warn("[GlyphPress] {} was saved by a newer version (schema {}); its job is cancelled, items kept",
                     worldPosition, schema);
                 return;
@@ -603,6 +704,8 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
                 restored.fingerprint = jobTag.getString("fingerprint");
                 restored.glyph = new ResourceLocation(jobTag.getString("glyph"));
                 restored.sourceCost = jobTag.getInt("source_cost");
+                if (restored.sourceCost < 0 || restored.sourceCost > GlyphMappingSnapshot.MAX_SOURCE_COST)
+                    throw new IllegalArgumentException("source_cost out of range");
                 restored.duration = Math.max(1, jobTag.getInt("duration"));
                 restored.catalysts = jobTag.getInt("catalysts");
                 restored.reservedSource = Math.max(0, Math.min(restored.sourceCost, jobTag.getInt("reserved_source")));
@@ -611,14 +714,31 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider, 
                 restored.starter = jobTag.getUUID("starter");
                 restored.mappingDigest = jobTag.getString("mapping_digest");
                 restored.schoolColor = jobTag.getInt("school_color");
+                restored.terms = jobTag.contains("terms", Tag.TAG_STRING) ? jobTag.getString("terms") : null;
                 job = restored;
                 // Resumed only if, on its first tick, the inputs and the current data still plan it.
                 revalidateRestoredJob = true;
             } catch (RuntimeException malformed) {
-                LOGGER.warn("[GlyphPress] {} had an unreadable job; it is cancelled with its items kept", worldPosition);
+                int recovered = recoverReservation(jobTag);
+                source = Math.min(MAX_HELD_SOURCE, source + recovered);
+                LOGGER.warn("[GlyphPress] {} had an unreadable job; it is cancelled with its items kept and {} reserved Source returned",
+                    worldPosition, recovered);
                 job = null;
             }
         }
+    }
+
+    /**
+     * The reservation a saved job held, when it can be trusted: both {@code source_cost} and
+     * {@code reserved_source} present as integers with {@code 0 <= reserved <= cost <= }
+     * {@link GlyphMappingSnapshot#MAX_SOURCE_COST}. Anything else returns nothing, because
+     * minting Source from a corrupt field would be worse than losing an unverifiable amount.
+     */
+    static int recoverReservation(CompoundTag jobTag) {
+        if (jobTag == null || !jobTag.contains("reserved_source", Tag.TAG_INT) || !jobTag.contains("source_cost", Tag.TAG_INT)) return 0;
+        int reserved = jobTag.getInt("reserved_source");
+        int cost = jobTag.getInt("source_cost");
+        return reserved >= 0 && reserved <= cost && cost <= GlyphMappingSnapshot.MAX_SOURCE_COST ? reserved : 0;
     }
 
     @Override
