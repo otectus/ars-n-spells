@@ -47,7 +47,7 @@ prefixes to most event paths.
 Run these before any manual pass.
 
 ```bash
-./gradlew test                                                   # JUnit suite; dated counts in docs/3.4.2/testing.md
+./gradlew test                                                   # JUnit suite; dated counts in docs/3.4.3/testing.md
 ./gradlew runGameTestServer                                      # Iron's-absent boot + fallback
 rm -rf run/world && ./gradlew runGameTestServer -PwithIronsRuntimeGameTests
 rm -rf run/world && ./gradlew runGameTestServer -PwithArsElemental

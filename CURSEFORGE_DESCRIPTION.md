@@ -133,7 +133,7 @@ Pack authors: gate the whole feature with `allow_ars_spells_in_irons_spellbooks`
 
 ## Iron's Glyphs & the Glyph Press *(3.4.0)*
 
-Every Iron's player spell can now become a real **Ars Nouveau glyph**, one per level: *Firebolt I* through *Firebolt X*, 111 spells and 777 glyphs in all. Learn a glyph the normal Ars way and add it to your spells like any other glyph.
+Every Iron's player spell can now become a real **Ars Nouveau glyph**, one per level: *Firebolt I* through *Firebolt X*, 111 spells and 777 glyphs at Iron's default maximum levels. Learn a glyph the normal Ars way and add it to your spells like any other glyph.
 
 - **The Glyph Press** makes them. Put a filled Iron's scroll, a blank glyph plate and Source gems in it, keep Source jars nearby, and press **Inscribe Glyph**. Nothing is consumed until the glyph is finished, and Cancel gives everything back.
 - **Price by tier:** the glyph's Ars tier follows Iron's rarity for that level. Tier I costs 1 gem and 500 Source, tier II 2 gems and 1,500, tier III 4 gems and 3,000. Servers can retune it with datapacks.
@@ -146,7 +146,9 @@ JEI shows every conversion, and the worn notebook has a Glyph Press chapter.
 
 **Also in 3.4.0:** Touch spells cast from exported scrolls, inscribed items and bound Iron's books now hit what you aim at exactly like a spell book. A miss no longer trains your school or starts a cooldown.
 
-Client and server both need the same Ars 'n' Spells version: 3.4.2 for the current release (network protocol 11).
+**New in 3.4.3** (with the never-published 3.4.1 and 3.4.2): a Projectile spell with an imported Iron's glyph that misses no longer blocks that spell for a minute, and two projectiles of one spell give one effect and one payment. The Ars spellbook gets an **Iron's glyphs** bookmark that groups the levels you know under their original spell; choose **Individual levels** or **Hidden** under Mods → Ars 'n' Spells → Config → Personal display. Imported glyphs follow the server's Iron's settings (maximum level, school, learning), every spell reserves levels up to 10, and Iron's addon spells can get glyphs through catalog packages; Wind's Spellbooks has one. Imported glyphs cast with a Virtue Ring can no longer go off for free after the ring comes off, and Spell Uninscription works on bound books again.
+
+Client and server both need the same Ars 'n' Spells version: 3.4.3 for the current release (network protocol 11).
 
 ---
 

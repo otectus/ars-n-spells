@@ -147,13 +147,13 @@ Run `check_mod.py` for a full consistency check (missing models, lang keys, text
 
 ## Current focus
 
-3.4.2 (Forge 1.20.1): remediation of the 2026-11-17 audit (ANS-001 to ANS-015), on top of the never-published 3.4.1. Evidence in `docs/3.4.2/testing.md`, config reference in `docs/3.4.2/config-reference.md`; nothing published. The last published release is 3.4.0 (`update.json` still names it).
+3.4.3 (Forge 1.20.1), released 2026-11-27 and tagged `v3.4.3`: a missed projectile no longer locks its Iron's glyph. It also ships the never-published 3.4.1 and 3.4.2; 3.4.2 is the remediation of the 2026-11-17 audit (ANS-001 to ANS-015). Evidence in `docs/3.4.3/testing.md`; the config reference is still `docs/3.4.2/config-reference.md`, since 3.4.3 changed no setting. `update.json` names 3.4.3 for both loaders.
 
 ## Roadmap
 
 - [ ] Manual survival playthrough and a dedicated-server session with a remote client (see `docs/3.4.0/testing.md`, open gaps).
 - [ ] Iron's addon spells in a later catalog (`docs/3.4.0/adapter-authoring.md`).
-- [ ] Port the 3.4.2 fixes to the NeoForge 1.21.1 branch, and sync the shared `tools/verify_loader_parity.py` table and the new lang keys there.
+- [x] Port the 3.4.2 and 3.4.3 fixes to the NeoForge 1.21.1 branch (`docs/3.4.2/testing.md`, `docs/3.4.3/testing.md`).
 
 ## Decisions
 

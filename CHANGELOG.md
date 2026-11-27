@@ -2,9 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.4.3] - Unreleased
+## [3.4.3] - 2026-11-27
 
-**The fixes are server-side.** The network protocol is unchanged (version 11), so a 3.4.2 client can still join a 3.4.3 server, but update clients too: a 3.4.2 client shows the new "expired" message as its translation key and the old wording of the changed one. 3.4.3 also contains every 3.4.2 and 3.4.1 change below, since neither was published.
+3.4.1 and 3.4.2 were never published; 3.4.3 also ships everything listed under them below.
+
+**Client and server both need 3.4.3.** The network protocol is version 11; 3.4.0 used 8.
 
 ### Fixed
 
