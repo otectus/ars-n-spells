@@ -14,6 +14,8 @@ source = CONFIG.read_text(encoding="utf-8")
 java = list((ROOT / "src/main/java").rglob("*.java"))
 tests = list((ROOT / "src/test/java").rglob("*.java")) + list((ROOT / "src/main/java/com/otectus/arsnspells/gametest").glob("*.java"))
 texts = {p: p.read_text(encoding="utf-8") for p in set(java+tests)}
+# Numeric constants a comment may concatenate, by name.
+CONSTANTS={m.group(1): m.group(2) for m in re.finditer(r'static\s+final\s+(?:int|long|double)\s+([A-Z][A-Z0-9_]*)\s*=\s*(-?[0-9][0-9_.]*)\s*;', source)}
 rows=[]
 for match in re.finditer(r'(\w+)\s*=\s*BUILDER([\s\S]*?)\.define(?:InRange|ListAllowEmpty|List)?\(\s*"([^"\n]+)"\s*,', source):
     field, block, key = match.group(1,2,3)
@@ -36,6 +38,8 @@ for match in re.finditer(r'(\w+)\s*=\s*BUILDER([\s\S]*?)\.define(?:InRange|ListA
         if section_token.group(1)=="push": section.append(section_token.group(2))
         elif section: section.pop()
     comments=[]
+    # A comment that concatenates a numeric constant ("Hard ceiling " + X_CEILING + ".") keeps its value.
+    block=re.sub(r'"\s*\+\s*([A-Z][A-Z0-9_]*)\s*\+\s*"', lambda m: CONSTANTS.get(m.group(1), m.group(0)), block)
     for c in re.findall(r'"(?:\\.|[^"\\])*"',block):
         try: comments.append(json.loads(c))
         except ValueError: pass

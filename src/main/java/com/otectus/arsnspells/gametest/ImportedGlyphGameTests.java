@@ -45,6 +45,8 @@ import net.minecraftforge.registries.ForgeRegistries;
 @PrefixGameTestTemplate(false)
 public final class ImportedGlyphGameTests {
     private static final String FIREBOLT = "irons_spellbooks:firebolt";
+    private static final String CHAIN_LIGHTNING = "irons_spellbooks:chain_lightning";
+    private static final String FIREBALL = "irons_spellbooks:fireball";
 
     // ---- Identity and dormancy (every profile) --------------------------------------------
 
@@ -637,7 +639,311 @@ public final class ImportedGlyphGameTests {
         helper.succeed();
     }
 
+    // ---- Repeated casts of one spell (3.4.3) -------------------------------------------------
+
+    /**
+     * The reported bug: a projectile that misses flies on for Ars's projectile lifespan (a minute by
+     * default), and its unredeemed Iron's reservation used to refuse every later cast of the spell for that
+     * long ("... is still in flight from an earlier cast"). The newer cast is admitted at once and the missed
+     * one's hold is handed back, so only the newest cast holds Iron's price.
+     */
+    @GameTest(template = "platform", timeoutTicks = 100)
+    public static void ironsLoaded_projectileMiss_theSpellCanBeCastAgainAtOnce(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        ServerPlayer player = payingCaster(helper, "glyph_miss_recast");
+        TouchRegressionGameTests.lookAtSky(player);
+        double before = TouchRegressionGameTests.arsMana(player);
+        double arsLeg = com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE.getCastingCost();
+        double ironsLeg = IronsGlyphTestSupport.manaCost(FIREBOLT, 1) * com.otectus.arsnspells.config.AnsConfig.CROSS_CAST_COST_MULTIPLIER.get();
+        Spell spell = new Spell(com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE, glyph(FIREBOLT, 1));
+        cast(helper, player, spell);
+        cast(helper, player, spell);
+        java.util.List<com.hollingsworth.arsnouveau.common.entity.EntityProjectileSpell> flying = ownProjectiles(player, 16);
+        try {
+            helper.assertTrue(records(player, "admission", "refused message.ars_n_spells.glyph.refused.pending") == 0,
+                "the second cast must not be refused as pending: " + GlyphSessions.records(player.getUUID()));
+            helper.assertTrue(flying.size() == 2, "both casts must launch their projectile, found " + flying.size());
+            helper.assertTrue(GlyphSessions.activeFor(player.getUUID()) == 1,
+                "only the newest cast still holds Iron's price, active " + GlyphSessions.activeFor(player.getUUID()));
+            double spent = before - TouchRegressionGameTests.arsMana(player);
+            helper.assertTrue(Math.abs(spent - (2 * arsLeg + ironsLeg)) < 1.01,
+                "two Ars legs (" + arsLeg + ") and one held Iron's leg (" + ironsLeg + ") expected, spent " + spent);
+        } finally {
+            discard(flying);
+        }
+        helper.assertTrue(GlyphSessions.forPlayer(player.getUUID()).isEmpty(), "both sessions close with their projectiles");
+        double kept = before - TouchRegressionGameTests.arsMana(player);
+        helper.assertTrue(Math.abs(kept - 2 * arsLeg) < 1.01, "the unused Iron's hold comes back, only the Ars legs are kept: " + kept);
+        helper.succeed();
+    }
+
+    /**
+     * Two flights of one spell at one target, cast back to back: the first landing runs, pays Iron's price once
+     * and starts the cooldown; the second lands on that cooldown and is refused before any effect, giving back
+     * what it held.
+     */
+    @GameTest(template = "platform", timeoutTicks = 100)
+    public static void ironsLoaded_twoFlightsOfOneSpell_onlyTheFirstLandingRuns(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        ServerPlayer player = payingCaster(helper, "glyph_two_flights");
+        Pig pig = sturdyPig(helper);
+        TouchRegressionGameTests.aimAt(player, pig.getBoundingBox().getCenter());
+        double before = TouchRegressionGameTests.arsMana(player);
+        double arsLeg = com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE.getCastingCost();
+        double ironsLeg = IronsGlyphTestSupport.manaCost(CHAIN_LIGHTNING, 1) * com.otectus.arsnspells.config.AnsConfig.CROSS_CAST_COST_MULTIPLIER.get();
+        Spell spell = new Spell(com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE, glyph(CHAIN_LIGHTNING, 1));
+        java.util.List<String> casts = new java.util.ArrayList<>();
+        Object watch = IronsGlyphTestSupport.watchCasts(player, casts);
+        cast(helper, player, spell);
+        cast(helper, player, spell);
+        helper.assertTrue(ownProjectiles(player, 8).size() == 2, "both casts are admitted and fly: " + GlyphSessions.records(player.getUUID()));
+        helper.startSequence()
+            .thenWaitUntil(() -> helper.assertTrue(GlyphSessions.forPlayer(player.getUUID()).isEmpty(), "both flights land and their sessions close"))
+            .thenExecute(() -> {
+                IronsGlyphTestSupport.stopWatching(watch);
+                var history = GlyphSessions.records(player.getUUID());
+                helper.assertTrue(records(player, "execution", "effect_applied") == 1, "exactly one landing runs: " + history);
+                helper.assertTrue(records(player, "execution", "refused message.ars_n_spells.glyph.refused.cooldown") == 1,
+                    "the other is refused on the cooldown the first started: " + history);
+                helper.assertTrue(casts.stream().filter(CHAIN_LIGHTNING::equals).count() == 1, "Iron's casts Chain Lightning once: " + casts);
+                double spent = before - TouchRegressionGameTests.arsMana(player);
+                helper.assertTrue(Math.abs(spent - (2 * arsLeg + ironsLeg)) < 1.01,
+                    "two Ars legs (" + arsLeg + ") and Iron's price (" + ironsLeg + ") once expected, spent " + spent);
+                helper.assertTrue(IronsGlyphTestSupport.onCooldown(player, CHAIN_LIGHTNING), "the first landing started Iron's cooldown");
+                helper.assertTrue(GlyphSessions.activeFor(player.getUUID()) == 0, "nothing is held any more");
+            })
+            .thenSucceed();
+    }
+
+    /**
+     * The hole the effect-boundary check closes: the spell goes on Iron's cooldown (as a native cast of it would
+     * put it) while the Ars projectile flies. The landing used to run anyway; now it is refused before its effect
+     * and the Iron's price it held is given back.
+     */
+    @GameTest(template = "platform", timeoutTicks = 100)
+    public static void ironsLoaded_cooldownStartedInFlight_refusesTheLanding(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        ServerPlayer player = payingCaster(helper, "glyph_cd_in_flight");
+        Pig pig = sturdyPig(helper);
+        TouchRegressionGameTests.aimAt(player, pig.getBoundingBox().getCenter());
+        double before = TouchRegressionGameTests.arsMana(player);
+        double arsLeg = com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE.getCastingCost();
+        java.util.List<String> casts = new java.util.ArrayList<>();
+        Object watch = IronsGlyphTestSupport.watchCasts(player, casts);
+        cast(helper, player, new Spell(com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE, glyph(CHAIN_LIGHTNING, 1)));
+        helper.assertTrue(ownProjectiles(player, 8).size() == 1, "the cast is admitted and flies");
+        IronsGlyphTestSupport.startCooldown(player, CHAIN_LIGHTNING);
+        helper.startSequence()
+            .thenWaitUntil(() -> helper.assertTrue(GlyphSessions.forPlayer(player.getUUID()).isEmpty(), "the projectile lands and its session closes"))
+            .thenExecute(() -> {
+                IronsGlyphTestSupport.stopWatching(watch);
+                var history = GlyphSessions.records(player.getUUID());
+                helper.assertTrue(records(player, "execution", "refused message.ars_n_spells.glyph.refused.cooldown") == 1,
+                    "the landing is refused on the cooldown: " + history);
+                helper.assertTrue(records(player, "execution", "effect_applied") == 0 && casts.isEmpty(),
+                    "no Iron's effect runs at the pig: " + history + " " + casts);
+                double spent = before - TouchRegressionGameTests.arsMana(player);
+                helper.assertTrue(Math.abs(spent - arsLeg) < 1.01, "only the Ars leg (" + arsLeg + ") is kept, Iron's price is given back; spent " + spent);
+            })
+            .thenSucceed();
+    }
+
+    /** One cast, the same instant glyph twice: the second occurrence runs on the cooldown the first one started. */
+    @GameTest(template = "platform")
+    public static void ironsLoaded_sameGlyphTwiceInOneCast_bothRun(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        ServerPlayer player = payingCaster(helper, "glyph_twice_one");
+        Pig pig = sturdyPig(helper);
+        TouchRegressionGameTests.aimAt(player, pig.getBoundingBox().getCenter());
+        java.util.List<String> casts = new java.util.ArrayList<>();
+        Object watch = IronsGlyphTestSupport.watchCasts(player, casts);
+        try {
+            cast(helper, player, new Spell(MethodTouch.INSTANCE, glyph(CHAIN_LIGHTNING, 1), glyph(CHAIN_LIGHTNING, 1)));
+        } finally {
+            IronsGlyphTestSupport.stopWatching(watch);
+        }
+        var history = GlyphSessions.records(player.getUUID());
+        helper.assertTrue(records(player, "execution", "effect_applied") == 2, "both occurrences run: " + history);
+        helper.assertTrue(casts.stream().filter(CHAIN_LIGHTNING::equals).count() == 2, "Iron's casts Chain Lightning twice: " + casts);
+        helper.assertTrue(records(player, "execution", "refused message.ars_n_spells.glyph.refused.cooldown") == 0,
+            "a cooldown the cast started itself refuses none of its own executions: " + history);
+        helper.assertTrue(GlyphSessions.forPlayer(player.getUUID()).isEmpty(), "the instant cast's session closes");
+        helper.succeed();
+    }
+
+    /** A charged child still holds Iron's one cast slot: a second cast of its spell is refused as pending, as before. */
+    @GameTest(template = "platform", timeoutTicks = 200)
+    public static void ironsLoaded_chargingChild_stillRefusesItsSpell(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        ServerPlayer player = payingCaster(helper, "glyph_charge_again");
+        Pig pig = sturdyPig(helper);
+        TouchRegressionGameTests.aimAt(player, pig.getBoundingBox().getCenter());
+        cast(helper, player, new Spell(MethodTouch.INSTANCE, glyph(FIREBALL, 1)));
+        helper.assertTrue(IronsGlyphTestSupport.casting(player) && FIREBALL.equals(IronsGlyphTestSupport.castingSpell(player)),
+            "Fireball is a long cast: it charges in Iron's own cast slot");
+        // While a cast charges, Iron's refuses every right-click but its own casting item's (Ars hands it a copy of
+        // the book), so the second cast comes the other way a player has: an ANS carrier's cast request.
+        ItemStack carrier = TouchRegressionGameTests.genericCarrier(new Spell(MethodTouch.INSTANCE, glyph(FIREBALL, 1)));
+        player.setItemInHand(InteractionHand.MAIN_HAND, carrier);
+        helper.assertTrue(!TouchRegressionGameTests.request(player, carrier, com.otectus.arsnspells.spell.target.TargetHint.entity(pig.getId())),
+            "the second cast does not resolve");
+        var history = GlyphSessions.records(player.getUUID());
+        helper.assertTrue(records(player, "admission", "refused message.ars_n_spells.glyph.refused.pending") == 1,
+            "the second cast is refused while the first one's Fireball charges: " + history);
+        helper.assertTrue(GlyphSessions.forPlayer(player.getUUID()).size() == 1, "the refused cast opens no session");
+        helper.assertTrue(FIREBALL.equals(IronsGlyphTestSupport.castingSpell(player)), "and the charge is untouched");
+        IronsGlyphTestSupport.cancelNativeCast(player);
+        helper.succeedWhen(() -> helper.assertTrue(GlyphSessions.forPlayer(player.getUUID()).isEmpty(), "the cancelled child closes its session"));
+    }
+
+    /**
+     * 3.4.3: a delivery that arrives after its session ended by its lifetime bound is told that its cast
+     * expired, not that it never had one, and runs and costs nothing. The hold came back at the expiry.
+     */
+    @GameTest(template = "platform", timeoutTicks = 200)
+    public static void ironsLoaded_lateDelivery_afterItsSessionExpired_saysSo(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        ServerPlayer player = payingCaster(helper, "glyph_late_expired");
+        Pig pig = sturdyPig(helper);
+        TouchRegressionGameTests.lookAtSky(player);
+        double before = TouchRegressionGameTests.arsMana(player);
+        double arsLeg = com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE.getCastingCost();
+        cast(helper, player, new Spell(com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE, glyph(CHAIN_LIGHTNING, 1)));
+        java.util.List<com.hollingsworth.arsnouveau.common.entity.EntityProjectileSpell> flying = ownProjectiles(player, 8);
+        helper.assertTrue(flying.size() == 1, "the cast is admitted and flies");
+        hover(helper, flying.get(0));
+        GlyphSessions.expireForTesting(player.getUUID());
+        java.util.List<String> casts = new java.util.ArrayList<>();
+        Object watch = IronsGlyphTestSupport.watchCasts(player, casts);
+        helper.startSequence()
+            .thenWaitUntil(() -> helper.assertTrue(GlyphSessions.forPlayer(player.getUUID()).isEmpty(), "the lifetime bound closes the session"))
+            .thenExecute(() -> {
+                double spent = before - TouchRegressionGameTests.arsMana(player);
+                helper.assertTrue(Math.abs(spent - arsLeg) < 1.01, "the expired cast's Iron's hold is given back, spent " + spent);
+                landOn(flying.get(0), pig);
+            })
+            .thenWaitUntil(() -> helper.assertTrue(records(player, "execution", "refused message.ars_n_spells.glyph.refused.expired") == 1,
+                "the late landing is refused as expired: " + GlyphSessions.records(player.getUUID())))
+            .thenExecute(() -> {
+                IronsGlyphTestSupport.stopWatching(watch);
+                discard(flying);
+                helper.assertTrue(casts.isEmpty() && records(player, "execution", "effect_applied") == 0, "nothing runs: " + casts);
+                double spent = before - TouchRegressionGameTests.arsMana(player);
+                helper.assertTrue(Math.abs(spent - arsLeg) < 1.01, "and nothing more is paid, spent " + spent);
+            })
+            .thenSucceed();
+    }
+
+    private static final String LIFESPAN_BATCH = "ans_glyph_lifespan";
+    private static volatile Integer lifespanBeforeBatch;
+
+    /**
+     * 3.4.3: a session lives as long as Ars lets its projectile fly, plus 15 seconds, so on a server that raises
+     * Ars's projectile lifespan a projectile that lands after the old fixed 60-second bound still runs its glyph.
+     * Its own batch: the lifespan is Ars's global setting.
+     */
+    @GameTest(template = "platform", batch = LIFESPAN_BATCH, timeoutTicks = 1800)
+    public static void ironsLoaded_longProjectileLifespan_aLateLandingStillRuns(GameTestHelper helper) {
+        if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
+        var lifespan = com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE.PROJECTILE_TTL;
+        if (lifespanBeforeBatch == null) lifespanBeforeBatch = lifespan.get();
+        TestConfig.set(lifespan, 90);
+        ServerPlayer player = payingCaster(helper, "glyph_long_flight");
+        Pig pig = sturdyPig(helper);
+        TouchRegressionGameTests.lookAtSky(player);
+        cast(helper, player, new Spell(com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE, glyph(CHAIN_LIGHTNING, 1)));
+        java.util.List<com.hollingsworth.arsnouveau.common.entity.EntityProjectileSpell> flying = ownProjectiles(player, 8);
+        helper.assertTrue(flying.size() == 1, "the cast is admitted and flies");
+        hover(helper, flying.get(0));
+        var sessions = GlyphSessions.forPlayer(player.getUUID());
+        helper.assertTrue(sessions.size() == 1 && sessions.get(0).lifetimeTicks() == GlyphSessions.lifetimeFor(90),
+            "the session lives as long as a 90-second flight plus the margin: " + (sessions.isEmpty() ? "none" : sessions.get(0).lifetimeTicks()));
+        long launched = helper.getLevel().getGameTime();
+        java.util.List<String> casts = new java.util.ArrayList<>();
+        Object watch = IronsGlyphTestSupport.watchCasts(player, casts);
+        helper.startSequence()
+            .thenWaitUntil(() -> helper.assertTrue(helper.getLevel().getGameTime() - launched >= GlyphSessions.LIFETIME_TICKS + 100,
+                "waiting past the old 60-second bound"))
+            .thenExecute(() -> {
+                helper.assertTrue(!flying.get(0).isRemoved() && GlyphSessions.forPlayer(player.getUUID()).size() == 1,
+                    "after 65 seconds the projectile still flies and its session is open");
+                landOn(flying.get(0), pig);
+            })
+            .thenWaitUntil(() -> helper.assertTrue(GlyphSessions.forPlayer(player.getUUID()).isEmpty(), "the late landing closes the session"))
+            .thenExecute(() -> {
+                IronsGlyphTestSupport.stopWatching(watch);
+                discard(flying);
+                var history = GlyphSessions.records(player.getUUID());
+                helper.assertTrue(records(player, "execution", "effect_applied") == 1, "the late landing runs its glyph: " + history);
+                helper.assertTrue(casts.stream().filter(CHAIN_LIGHTNING::equals).count() == 1, "Iron's casts Chain Lightning: " + casts);
+            })
+            .thenSucceed();
+    }
+
+    @net.minecraft.gametest.framework.AfterBatch(batch = LIFESPAN_BATCH)
+    public static void afterLifespanBatch(net.minecraft.server.level.ServerLevel level) {
+        Integer before = lifespanBeforeBatch;
+        if (before == null) return;
+        TestConfig.set(com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE.PROJECTILE_TTL, before);
+        lifespanBeforeBatch = null;
+    }
+
     // ---- Fixtures --------------------------------------------------------------------------
+
+    /**
+     * Park a flying Ars projectile, still and weightless, in the air above this test's platform, which GameTest
+     * cleared for it: a projectile that has missed, without flying into the run's randomly generated terrain or
+     * another test's entities. Ars still ages it and removes it at its lifespan.
+     */
+    static void hover(GameTestHelper helper, com.hollingsworth.arsnouveau.common.entity.EntityProjectileSpell projectile) {
+        Vec3 spot = helper.absoluteVec(new Vec3(0.5, 8.0, 0.5));
+        projectile.isNoGravity = true;
+        projectile.setDeltaMovement(Vec3.ZERO);
+        projectile.setPos(spot.x, spot.y, spot.z);
+    }
+
+    /** Bring a flying Ars projectile down onto {@code target}: it hits it on its next tick. */
+    static void landOn(com.hollingsworth.arsnouveau.common.entity.EntityProjectileSpell projectile, net.minecraft.world.entity.Entity target) {
+        Vec3 above = target.getBoundingBox().getCenter().add(0, target.getBbHeight() + 0.5, 0);
+        projectile.setPos(above.x, above.y, above.z);
+        projectile.setDeltaMovement(0, -0.8, 0);
+    }
+
+    /** A survival caster with funded pools and no cooldowns: only a paying caster can hold a reservation. */
+    static ServerPlayer payingCaster(GameTestHelper helper, String scenario) {
+        ServerPlayer player = TouchRegressionGameTests.aimingPlayer(helper, scenario);
+        player.setGameMode(GameType.SURVIVAL);
+        TouchRegressionGameTests.fundArs(player);
+        IronsGlyphTestSupport.fundIronsPool(player, 5000.0f);
+        IronsGlyphTestSupport.clearCooldowns(player);
+        return player;
+    }
+
+    /** A pig that survives several Iron's effects, so a later delivery still has its target. */
+    static Pig sturdyPig(GameTestHelper helper) {
+        Pig pig = TouchRegressionGameTests.pigInFront(helper);
+        var maxHealth = pig.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
+        if (maxHealth != null) maxHealth.setBaseValue(500.0);
+        pig.setHealth(500.0f);
+        return pig;
+    }
+
+    /** The Ars projectiles {@code player} owns within {@code radius} blocks. */
+    static java.util.List<com.hollingsworth.arsnouveau.common.entity.EntityProjectileSpell> ownProjectiles(ServerPlayer player, double radius) {
+        return player.level().getEntitiesOfClass(com.hollingsworth.arsnouveau.common.entity.EntityProjectileSpell.class,
+            player.getBoundingBox().inflate(radius), projectile -> projectile.getOwner() == player);
+    }
+
+    /** Remove stray projectiles, so nothing flies on for a minute after the test. */
+    static void discard(java.util.List<? extends net.minecraft.world.entity.Entity> entities) {
+        for (net.minecraft.world.entity.Entity entity : entities) if (!entity.isRemoved()) entity.discard();
+    }
+
+    /** How many of the player's recent imported-glyph records are at {@code stage} with exactly {@code outcome}. */
+    static long records(ServerPlayer player, String stage, String outcome) {
+        return GlyphSessions.records(player.getUUID()).stream()
+            .filter(record -> stage.equals(record.stage()) && outcome.equals(record.outcome())).count();
+    }
 
     static ImportedIronEffect glyph(String spell, int level) {
         return ImportedGlyphRegistrar.part(new ImportedGlyphKey(new ResourceLocation(spell), level))

@@ -31,10 +31,17 @@ import java.util.List;
  * all of them funded or with none of them. What it checks: a real player is casting through a
  * player caster (never a turret, rune or fake player); no more imported glyphs than
  * {@code max_imported_effects_per_spell}; every one available, learned in Iron's where Iron's
- * requires it now, off its native cooldown (or holding a native recast) and not already pending in
- * another cast; its Amplified level within Iron's live maximum; and fewer than
- * {@code max_active_glyph_sessions_per_player} sessions in flight. Each refusal tells the caster why
- * and costs nothing.
+ * requires it now, off its native cooldown (or holding a native recast) and not charging or
+ * channelling in Iron's cast slot for another of the player's casts; its Amplified level within
+ * Iron's live maximum; and fewer than {@code max_active_glyph_sessions_per_player} sessions still
+ * holding something. Each refusal tells the caster why and costs nothing.
+ *
+ * <p><b>Repeated casts (3.4.3).</b> An earlier cast of the same Iron's spell that is only travelling
+ * or delayed (a projectile that missed flies on for a minute) no longer refuses this one. What it
+ * still holds for that spell is handed back before this cast is counted and funded, and its delivery
+ * stays live: if it arrives, it pays at its effect boundary like any later execution, where Iron's
+ * cooldown is checked too ({@code GlyphInvocations}). If this admission is refused after that point,
+ * the earlier holds stay released; those deliveries pay on arrival.
  *
  * <p><b>Levels (3.4.1).</b> Each occurrence carries four levels: the glyph's base level; the Ars
  * level after Amplify and Dampen, which must not exceed Iron's live maximum (refused, never
@@ -125,17 +132,25 @@ public final class GlyphAdmission {
             boolean recast = bridge.hasRecast(serverPlayer, definition.spell());
             if (!recast && !bridge.creativeNoCooldown(serverPlayer) && bridge.onCooldown(serverPlayer, definition.spell()))
                 return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.cooldown", f.effect().displayName());
-            if (GlyphSessions.spellPending(serverPlayer.getUUID(), definition.spell()))
+            // 3.4.3: Iron's has one cast slot; only a charged or channelled child of the spell keeps this cast out.
+            if (GlyphSessions.childPending(serverPlayer.getUUID(), definition.spell()))
                 return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.pending", f.effect().displayName());
         }
+        // 3.4.3: before the session count (a session that holds nothing is not active) and before the
+        // reservations below (a caster low on mana pays for this cast with what the earlier one held).
+        java.util.Set<net.minecraft.resources.ResourceLocation> released = new java.util.HashSet<>();
+        for (Found f : found)
+            if (released.add(f.effect().definition().spell())) GlyphSessions.releaseHoldsFor(serverPlayer, f.effect().definition().spell());
         int sessions = Math.min(AnsConfig.MAX_ACTIVE_GLYPH_SESSIONS_PER_PLAYER.get(), AnsConfig.MAX_GLYPH_SESSIONS_CEILING);
         if (GlyphSessions.activeFor(serverPlayer.getUUID()) >= sessions)
             return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.sessions", sessions);
 
         CostRules rules = QuoteService.currentRules();
         long now = serverPlayer.level().getGameTime();
+        // 3.4.3: as long as Ars lets this cast's projectile fly, within the published bounds.
+        long lifetime = GlyphSessions.lifetimeTicks();
         GlyphCastSession session = new GlyphCastSession(serverPlayer, serverPlayer.level().dimension(), now,
-            GlyphSessions.LIFETIME_TICKS, rules, GlyphMappingSnapshot.current().generation(),
+            lifetime, rules, GlyphMappingSnapshot.current().generation(),
             new GlyphInvocationBudget(AnsConfig.MAX_FOREIGN_EMISSIONS_PER_CAST.get(), AnsConfig.MAX_FOREIGN_EMISSIONS_CEILING));
         List<CastAttempt> reserved = new ArrayList<>();
         var access = CastLedger.forPlayer(serverPlayer);
@@ -187,7 +202,7 @@ public final class GlyphAdmission {
             occurrence.quote = quote;
             if (quote.isFree()) continue;
             CastAttempt attempt = CastLedger.open(serverPlayer.getUUID(), "glyph:" + session.id + "/" + f.index(), 0,
-                quote, now, GlyphSessions.LIFETIME_TICKS + 20);
+                quote, now, lifetime + 20);
             CastLedger.reserve(attempt, access);
             if (!attempt.paymentAccepted()) {
                 CastLedger.fail(attempt, access);

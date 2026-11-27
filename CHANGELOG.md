@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.4.3] - Unreleased
+
+**The fixes are server-side.** The network protocol is unchanged (version 11), so a 3.4.2 client can still join a 3.4.3 server, but update clients too: a 3.4.2 client shows the new "expired" message as its translation key and the old wording of the changed one. 3.4.3 also contains every 3.4.2 and 3.4.1 change below, since neither was published.
+
+### Fixed
+
+- **A missed projectile no longer blocks its spell for a minute.** A projectile carrying an imported Iron's glyph that hits nothing flies on until Ars removes it, a minute by default. Every cast of that Iron's spell in that time was refused with "… is still in flight from an earlier cast." The new cast now goes ahead at once, and what the missed one still held for the spell is given back. If the earlier projectile does land later, it pays then, like any later hit. Only a charged or channelled imported spell still blocks a second cast of the same spell while it charges, because Iron's has one cast slot. That message now reads "… is still being cast from an earlier spell."
+- **An imported glyph that lands while its spell is on cooldown from another cast does nothing and costs nothing.** Iron's cooldown is now also checked where the effect would run. Two projectiles of one spell give one effect and one payment, and the second says "… is on cooldown." The same check closes two older ways to get two effects from one cooldown: casting the spell natively while the projectile flew, and several casts in flight at once that held no reservation (paid in aura, with the LP death option, or free). A spell's own further hits in the same cast still run, as before: a split, pierce, linger or wall, or the same glyph twice in the recipe.
+- **Projectiles that fly for more than a minute still cast their glyph.** Servers can raise Ars's projectile lifespan (`max_lifespan`). A cast now stays valid for that long plus 15 seconds, at least a minute and at most 10 minutes. Before, a projectile that landed after a minute was refused with "it can only run inside a spell you cast yourself". Anything that arrives after its cast has expired now says so: "… did nothing: it arrived after its cast had expired."
+
+### For developers
+
+- 7 new required GameTests (379 in total), every one cast by a paying survival player: a creative cast reserves nothing, so it could never show the lock. Evidence: [docs/3.4.3/testing.md](docs/3.4.3/testing.md). The rules are in [docs/3.4.1/casting-contract.md](docs/3.4.1/casting-contract.md).
+- `tools/generate_release_references.py` keeps numeric constants written into config comments. The 3.4.2 configuration reference showed "Hard ceiling  ." with no value for `max_imported_effects_per_spell`, `max_foreign_emissions_per_cast` and `max_active_glyph_sessions_per_player`; it now gives 8, 64 and 32.
+
 ## [3.4.2] - Unreleased
 
 **Client and server both need 3.4.2.** The network protocol changed again (version 11): the settings sync now carries the mana-bar display settings. 3.4.2 also contains every 3.4.1 change below, since 3.4.1 was never published. It is the remediation of the 2026-11-17 audit, findings ANS-001 to ANS-015.

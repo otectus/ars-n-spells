@@ -56,8 +56,8 @@ jobs:
             build/reports/tests/test
             build/test-results/test
 
-  # The expected counts are pinned to the 3.4.2 Forge suite (the 2026-11-18 audit remediation
-  # added 28 GameTests to 3.4.1's 344). The verifier
+  # The expected counts are pinned to the 3.4.3 Forge suite (3.4.3 added 7 GameTests to 3.4.2's 372,
+  # all Iron's-gated; the 2026-11-18 audit remediation had added 28 to 3.4.1's 344). The verifier
   # rejects a green ForgeGradle exit that did not complete the requested suite.
   gametest:
     name: Forge GameTests (${{ matrix.profile }})
@@ -71,11 +71,11 @@ jobs:
           - profile: absent
             flags: ""
             executed: 1
-            skipped: 308
+            skipped: 315
             identity: "--absent irons_spellbooks --absent ars_elemental --absent ars_zero --absent toomanyglyphs"
           - profile: loaded
             flags: "-PwithIronsRuntimeGameTests -PwithArsElemental"
-            executed: 268
+            executed: 275
             skipped: 41
             identity: "--present irons_spellbooks --present ars_elemental --absent ars_zero --absent toomanyglyphs"
     steps:
@@ -98,7 +98,7 @@ jobs:
       - name: Verify completed tests and actual runtime profile
         run: >
           python3 tools/verify_gametest_log.py run-${{ matrix.profile }}/logs/latest.log
-          --required 372 --executed ${{ matrix.executed }} --skipped ${{ matrix.skipped }} ${{ matrix.identity }}
+          --required 379 --executed ${{ matrix.executed }} --skipped ${{ matrix.skipped }} ${{ matrix.identity }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -133,7 +133,7 @@ jobs:
       - name: Verify loaded preparation
         run: >
           python3 tools/verify_gametest_log.py run-removal/logs/latest.log
-          --required 372 --executed 268 --skipped 41
+          --required 379 --executed 275 --skipped 41
           --present irons_spellbooks --present ars_elemental
           --absent ars_zero --absent toomanyglyphs
       - name: Upload removal preparation log

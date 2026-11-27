@@ -29,11 +29,17 @@ import java.util.UUID;
  * <p><b>Completion (3.4.1).</b> A session closes as soon as nothing can use it any more: its root
  * cast has returned and no Ars projectile, Ars delay or charged child that carries it is still
  * pending. An instant Touch or Self cast therefore closes when its resolution returns; a projectile
- * cast when its last projectile leaves the world. The lifetime ({@link #LIFETIME_TICKS}) is only the
+ * cast when its last projectile leaves the world. The lifetime ({@link #lifetimeTicks()}) is only the
  * safety bound. A session is also closed, and whatever it still holds returned, when its root cast
  * fails, when its owner logs out, dies or changes dimension, when imported glyphs are disabled, and
  * when the server stops. Closing never refunds an execution that already ran, and it cancels the
  * session's own charged child in Iron's slot, never an unrelated cast.
+ *
+ * <p><b>Repeated casts (3.4.3).</b> A projectile that hits nothing flies on until Ars removes it, a
+ * minute by default. Its session no longer refuses a later cast of the same Iron's spell: admitting
+ * that cast hands back what earlier sessions still hold for the spell ({@link #releaseHoldsFor}), and
+ * only a charged or channelled child still refuses it ({@link #childPending}). A delivery that arrives
+ * after its session ended by its lifetime bound is told so ({@link #expiredFor}).
  *
  * <p>Sessions are indexed by owner, so per-player checks never scan every session. They are bounded
  * twice: {@code max_active_glyph_sessions_per_player} counts those still holding a reservation or a
@@ -46,11 +52,18 @@ public final class GlyphSessions {
     /** Context tag key; Ars copies the tag into every child context, projectile and delay. */
     public static final String CONTEXT_TAG = "ars_n_spells:glyph_session";
     /**
-     * Published lifetime of a session: 60 seconds. Longer than any base Iron's cast time or
-     * channel and than an Ars projectile's flight; afterwards an unredeemed reservation is
-     * returned and a late delivery does nothing.
+     * The shortest lifetime of a session: 60 seconds, longer than any base Iron's cast time or channel.
+     * When a session's lifetime runs out, an unredeemed reservation is returned and a late delivery does
+     * nothing; since 3.4.3 it is told that its cast expired.
      */
     public static final long LIFETIME_TICKS = 1200L;
+    /** 3.4.3: the longest lifetime of a session, 10 minutes, however long Ars lets a projectile fly. */
+    public static final long MAX_LIFETIME_TICKS = 12_000L;
+    /**
+     * 3.4.3: how long a session outlives Ars's longest projectile flight: 15 seconds, room for a charge or
+     * channel that a projectile starts at the end of its flight (the longest base one is 10 seconds).
+     */
+    public static final long LIFETIME_MARGIN_TICKS = 300L;
     public static final int MAX_SESSIONS_PER_PLAYER = 64;
 
     private static final Map<UUID, GlyphCastSession> SESSIONS = new LinkedHashMap<>();
@@ -63,6 +76,15 @@ public final class GlyphSessions {
     /** The last imported-glyph outcomes per player, oldest first; bounded, cleared on logout. */
     private static final Map<UUID, java.util.ArrayDeque<CastRecord>> RECORDS = new java.util.HashMap<>();
     public static final int RECORD_HISTORY = 16;
+    /** 3.4.3: how many sessions that ended by their lifetime bound (or were evicted) are remembered. */
+    static final int EXPIRED_HISTORY = 1024;
+    /** 3.4.3: those sessions' owners by session id, oldest first; bounded, cleared on logout and server stop. */
+    private static final Map<UUID, UUID> EXPIRED = new LinkedHashMap<>() {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<UUID, UUID> eldest) {
+            return size() > EXPIRED_HISTORY;
+        }
+    };
 
     /**
      * One imported-glyph outcome, as {@code /ans glyph last} explains it. Only the spell, its levels,
@@ -145,9 +167,67 @@ public final class GlyphSessions {
         return count;
     }
 
-    public static boolean spellPending(UUID player, net.minecraft.resources.ResourceLocation spell) {
-        for (GlyphCastSession session : forPlayer(player)) if (session.pendingCooldownFor(spell)) return true;
+    /**
+     * 3.4.3: whether a charged or channelled child of {@code spell} is running in Iron's cast slot, or
+     * waiting for it, in one of {@code player}'s casts. Iron's has one cast slot, so that refuses a second
+     * cast of the spell; a cast that is only travelling or delayed does not.
+     */
+    public static boolean childPending(UUID player, net.minecraft.resources.ResourceLocation spell) {
+        for (GlyphCastSession session : forPlayer(player)) if (session.childPendingFor(spell)) return true;
         return false;
+    }
+
+    /**
+     * 3.4.3: a newer cast of {@code spell} is being admitted: hand back what the player's earlier casts still
+     * hold for it. Their deliveries stay live. One that still arrives settles its price at the effect
+     * boundary like any later execution, and meets the cooldown check there. The money moves exactly as
+     * {@link #close} moves it: the reservation is cancelled through the ledger, an LP leg is released, and
+     * the occurrence is marked redeemed, so its payment takes the later-execution path.
+     */
+    static void releaseHoldsFor(ServerPlayer player, net.minecraft.resources.ResourceLocation spell) {
+        for (GlyphCastSession session : forPlayer(player.getUUID())) {
+            for (GlyphCastSession.Occurrence occurrence : session.occurrences.values()) {
+                if (occurrence.childPending || !occurrence.holding() || !occurrence.definition.spell().equals(spell)) continue;
+                CastAttempt reservation = occurrence.reservation;
+                if (reservation != null && !reservation.state().isTerminal())
+                    CastLedger.cancel(reservation, CastLedger.forPlayer(player));
+                if (occurrence.lpLeg != null) EmissionPayment.releaseLp(occurrence, session.owner, player, player.getServer());
+                occurrence.redeemed = true;
+                if (CrossCastTrace.enabled())
+                    LOGGER.info("[GlyphSession] session={} owner={} released its hold on {} for a newer cast", session.id,
+                        com.otectus.arsnspells.util.LogPrivacy.token(session.owner), spell);
+            }
+        }
+    }
+
+    /**
+     * 3.4.3: the lifetime of a session admitted now. Ars removes a projectile that hits nothing after its
+     * {@code max_lifespan}, a server setting (60 seconds by default, unbounded); a session lives that long plus
+     * {@link #LIFETIME_MARGIN_TICKS}, at least {@link #LIFETIME_TICKS} and at most {@link #MAX_LIFETIME_TICKS}.
+     */
+    public static long lifetimeTicks() {
+        int seconds;
+        try {
+            seconds = com.hollingsworth.arsnouveau.common.spell.method.MethodProjectile.INSTANCE.getProjectileLifespan();
+        } catch (RuntimeException unavailable) {
+            seconds = 60; // Ars's own default, as it answers before its config is loaded
+        }
+        return lifetimeFor(seconds);
+    }
+
+    /** {@link #lifetimeTicks()} for an Ars projectile lifespan of {@code projectileSeconds}. */
+    public static long lifetimeFor(long projectileSeconds) {
+        long flight = Math.max(0L, projectileSeconds) * 20L;
+        return Math.min(MAX_LIFETIME_TICKS, Math.max(LIFETIME_TICKS, flight + LIFETIME_MARGIN_TICKS));
+    }
+
+    /**
+     * 3.4.3: whether {@code context} belongs to a session of {@code player}'s that ended by its lifetime bound
+     * (or was evicted as the oldest idle one), so a delivery that arrives now is told its cast expired.
+     */
+    public static boolean expiredFor(SpellContext context, UUID player) {
+        if (context == null || context.tag == null || !context.tag.hasUUID(CONTEXT_TAG)) return false;
+        return player.equals(EXPIRED.get(context.tag.getUUID(CONTEXT_TAG)));
     }
 
     public static EmissionPayment payment(ServerPlayer player, GlyphCastSession session, GlyphCastSession.Occurrence occurrence) {
@@ -284,6 +364,7 @@ public final class GlyphSessions {
         if (session.state == GlyphCastSession.State.CLOSED) return;
         session.state = GlyphCastSession.State.CLOSED;
         session.closeReason = reason;
+        if ("expired".equals(reason) || "evicted".equals(reason)) EXPIRED.put(session.id, session.owner);
         MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
         for (GlyphCastSession.Occurrence occurrence : session.occurrences.values()) {
             CastAttempt reservation = occurrence.reservation;
@@ -328,7 +409,7 @@ public final class GlyphSessions {
     /** Bookkeeping sizes, for diagnostics and the leak tests: sessions, owners, carriers, delays. */
     public static String bookkeeping() {
         return "sessions=" + SESSIONS.size() + " owners=" + BY_OWNER.size() + " carriers=" + CARRIERS.size() + " delayed=" + DELAYED.size()
-            + " queued=" + QUEUED.size() + " children=" + GlyphChildren.all().size();
+            + " queued=" + QUEUED.size() + " children=" + GlyphChildren.all().size() + " expired=" + EXPIRED.size();
     }
 
     /** Close every open session (imported glyphs were disabled). */
@@ -368,6 +449,7 @@ public final class GlyphSessions {
         if (event.getEntity() instanceof ServerPlayer) {
             closeAll(event.getEntity().getUUID(), "logout");
             RECORDS.remove(event.getEntity().getUUID());
+            EXPIRED.values().removeIf(event.getEntity().getUUID()::equals);
             com.otectus.arsnspells.casting.PaymentTimeline.clear(event.getEntity().getUUID());
         }
     }
@@ -386,6 +468,7 @@ public final class GlyphSessions {
         DELAYED.clear();
         QUEUED.clear();
         RECORDS.clear();
+        EXPIRED.clear();
         com.otectus.arsnspells.casting.PaymentTimeline.clearAll();
     }
 }

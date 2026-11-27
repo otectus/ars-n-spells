@@ -28,6 +28,16 @@ import org.slf4j.LoggerFactory;
  * An execution runs only for a real player, inside the session its root cast was admitted
  * with, at a target that is still in the caster's world, within the cast's emission budget,
  * and while the glyph is available. Anything else is refused without an effect or a payment.
+ *
+ * <p><b>Cooldown (3.4.3).</b> Admission no longer keeps a second cast of a spell out while an
+ * earlier one is still travelling or delayed, so Iron's cooldown is checked here, immediately before
+ * the effect: an execution that arrives while its spell is on a cooldown this cast did not start (a
+ * faster cast of the same spell landed first, or a native cast started it) is refused with the
+ * cooldown message and gives back what it holds. A cooldown this cast started is its own: a split,
+ * pierce, linger, wall or the same glyph again in the recipe still runs, as before. A native recast
+ * and Iron's creative no-cooldown rule exempt an execution exactly as they exempt admission. The
+ * check runs here only, never before a charged release or a channel pulse, which belong to a child
+ * that already passed it.
  */
 final class GlyphInvocations {
     private static final Logger LOGGER = LoggerFactory.getLogger(GlyphInvocations.class);
@@ -46,6 +56,14 @@ final class GlyphInvocations {
         }
         GlyphCastSession session = GlyphSessions.forContext(context);
         if (session == null || !session.owner().equals(player.getUUID())) {
+            // 3.4.3: a delivery that outlived its cast's lifetime is told so, not that it never had a cast.
+            if (session == null && GlyphSessions.expiredFor(context, player.getUUID())) {
+                int index = context.getCurrentIndex() - 1;
+                record(player, definition, GlyphAdmission.requestedLevel(context.getSpell(), index, definition, player), -1,
+                    "message.ars_n_spells.glyph.refused.expired");
+                refuse(player, definition, "message.ars_n_spells.glyph.refused.expired");
+                return;
+            }
             refuse(player, definition, "message.ars_n_spells.glyph.refused.no_session");
             return;
         }
@@ -75,6 +93,18 @@ final class GlyphInvocations {
             refuse(player, definition, "message.ars_n_spells.glyph.refused.target_gone");
             return;
         }
+        // 3.4.3: admission no longer keeps a second cast of this spell out while an earlier one is
+        // unresolved, so the cooldown is enforced here, where the effect would run. The exemptions are
+        // admission's own (GlyphAdmission): this cast's own cooldown, a native recast, Iron's creative rule.
+        IronGlyphBridge bridge = IronGlyphBridges.get();
+        ResourceLocation spellId = definition.spell();
+        if (!session.started.contains(spellId) && !bridge.hasRecast(player, spellId)
+                && !bridge.creativeNoCooldown(player) && bridge.onCooldown(player, spellId)) {
+            GlyphSessions.payment(player, session, occurrence).releaseIfUnpaid();
+            record(player, definition, occurrence.augmentedLevel, occurrence.nativeLevel, "message.ars_n_spells.glyph.refused.cooldown");
+            refuse(player, definition, "message.ars_n_spells.glyph.refused.cooldown");
+            return;
+        }
         if (!session.budget().tryConsume()) {
             refuse(player, definition, "message.ars_n_spells.glyph.refused.budget");
             return;
@@ -86,7 +116,7 @@ final class GlyphInvocations {
             occurrence.nativeLevel, target, hit, form, payment, context.getCasterTool(), continuation);
         IronGlyphBridge.InvocationOutcome outcome;
         try {
-            outcome = IronGlyphBridges.get().invoke(invocation);
+            outcome = bridge.invoke(invocation);
         } catch (RuntimeException | LinkageError failure) {
             payment.releaseIfUnpaid();
             LOGGER.warn("[Glyph] {} failed for {}: {}", definition.key(), LogPrivacy.token(player.getUUID()), failure.toString());
@@ -95,6 +125,11 @@ final class GlyphInvocations {
             return;
         }
         occurrence.emissions++;
+        // 3.4.3: from here on a cooldown on this spell is this cast's own (an applied or failed effect, or a
+        // child accepted into Iron's cast slot); a rejected or cancelled execution started nothing.
+        if (outcome.status() != IronGlyphBridge.InvocationOutcome.Status.REJECTED
+                && outcome.status() != IronGlyphBridge.InvocationOutcome.Status.CANCELED)
+            session.started.add(spellId);
         com.otectus.arsnspells.casting.PaymentTimeline.record(player.getUUID(), -1, com.otectus.arsnspells.casting.PaymentTimeline.Kind.EMISSION,
             "glyph:" + session.id() + "/" + index, definition.key() + " " + outcome.status() + " final=" + outcome.finalLevel());
         GlyphSessions.record(player, new GlyphSessions.CastRecord(definition.spell(), definition.level(), occurrence.augmentedLevel,
@@ -133,6 +168,12 @@ final class GlyphInvocations {
         if (target.kind() == CastTargetKind.BLOCK)
             return world.isLoaded(target.blockPos()) && world.getWorldBorder().isWithinBounds(target.blockPos());
         return world.getWorldBorder().isWithinBounds(net.minecraft.core.BlockPos.containing(hit.getLocation()));
+    }
+
+    /** A refusal before any effect, as {@code /ans glyph last} lists it (3.4.3). */
+    private static void record(ServerPlayer player, ImportedGlyphDefinition definition, int augmented, int nativeLevel, String key) {
+        GlyphSessions.record(player, new GlyphSessions.CastRecord(definition.spell(), definition.level(), augmented, nativeLevel, -1,
+            "nothing", "refused " + key, "execution", player.level().getGameTime()));
     }
 
     private static void refuse(ServerPlayer player, ImportedGlyphDefinition definition, String key) {

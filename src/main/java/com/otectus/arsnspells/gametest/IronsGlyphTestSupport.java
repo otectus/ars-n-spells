@@ -30,6 +30,26 @@ final class IronsGlyphTestSupport {
         MagicData.getPlayerMagicData(player).getPlayerCooldowns().clearCooldowns();
     }
 
+    /** Put {@code spellId} on the player's Iron's cooldown exactly as a native spellbook cast of it does. */
+    static void startCooldown(ServerPlayer player, String spellId) {
+        AbstractSpell spell = SpellRegistry.getSpell(new ResourceLocation(spellId));
+        io.redspace.ironsspellbooks.api.magic.MagicHelper.MAGIC_MANAGER.addCooldown(player, spell,
+            io.redspace.ironsspellbooks.api.spells.CastSource.SPELLBOOK);
+    }
+
+    /**
+     * Record the spell id of every Iron's {@code SpellOnCastEvent} {@code player} posts into {@code sink},
+     * until {@link #stopWatching}: the observable that Iron's cast a spell at all, whenever it lands.
+     */
+    static Object watchCasts(ServerPlayer player, java.util.List<String> sink) {
+        java.util.function.Consumer<io.redspace.ironsspellbooks.api.events.SpellOnCastEvent> listener = event -> {
+            if (event.getEntity() == player) sink.add(event.getSpellId());
+        };
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(net.minecraftforge.eventbus.api.EventPriority.LOWEST, false,
+            io.redspace.ironsspellbooks.api.events.SpellOnCastEvent.class, listener);
+        return listener;
+    }
+
     static int magicProjectilesNear(ServerPlayer player, AABB box) {
         return player.level().getEntitiesOfClass(AbstractMagicProjectile.class, box).size();
     }

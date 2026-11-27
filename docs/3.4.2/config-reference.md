@@ -891,7 +891,7 @@ Direct test references: none found; behavior may be covered indirectly, not cert
 
 Default: `4`. Declaration arguments after default: `1 ; MAX_IMPORTED_EFFECTS_CEILING`.
 
-Most imported Iron's glyphs one Ars spell may contain. Enforced by the spell editor and again at cast time. Hard ceiling  .
+Most imported Iron's glyphs one Ars spell may contain. Enforced by the spell editor and again at cast time. Hard ceiling 8.
 
 Runtime readers: `src/main/java/com/otectus/arsnspells/glyph/GlyphAdmission.java`, `src/main/java/com/otectus/arsnspells/glyph/ImportedGlyphCompositionValidator.java`.
 
@@ -901,7 +901,7 @@ Direct test references: none found; behavior may be covered indirectly, not cert
 
 Default: `16`. Declaration arguments after default: `1 ; MAX_FOREIGN_EMISSIONS_CEILING`.
 
-Most Iron's spell executions one Ars cast may produce, counting every target of a split, burst, linger or repeated delivery. Each execution is priced and paid; once the budget is spent further deliveries do nothing. Hard ceiling  .
+Most Iron's spell executions one Ars cast may produce, counting every target of a split, burst, linger or repeated delivery. Each execution is priced and paid; once the budget is spent further deliveries do nothing. Hard ceiling 64.
 
 Runtime readers: `src/main/java/com/otectus/arsnspells/glyph/GlyphAdmission.java`.
 
@@ -911,7 +911,7 @@ Direct test references: none found; behavior may be covered indirectly, not cert
 
 Default: `8`. Declaration arguments after default: `1 ; MAX_GLYPH_SESSIONS_CEILING`.
 
-Most Ars casts with imported glyphs still in flight (projectiles, delays, channels) one player may have at once. A further cast is refused before anything is paid. Hard ceiling  .
+Most Ars casts with imported glyphs still in flight (projectiles, delays, channels) one player may have at once. A further cast is refused before anything is paid. Hard ceiling 32.
 
 Runtime readers: `src/main/java/com/otectus/arsnspells/glyph/GlyphAdmission.java`.
 

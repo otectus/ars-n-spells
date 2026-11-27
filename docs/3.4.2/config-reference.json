@@ -1429,7 +1429,7 @@
         "1",
         "MAX_IMPORTED_EFFECTS_CEILING"
       ],
-      "description": "Most imported Iron's glyphs one Ars spell may contain. Enforced by the spell editor and again at cast time. Hard ceiling  .",
+      "description": "Most imported Iron's glyphs one Ars spell may contain. Enforced by the spell editor and again at cast time. Hard ceiling 8.",
       "runtime_references": [
         "src/main/java/com/otectus/arsnspells/glyph/GlyphAdmission.java",
         "src/main/java/com/otectus/arsnspells/glyph/ImportedGlyphCompositionValidator.java"
@@ -1444,7 +1444,7 @@
         "1",
         "MAX_FOREIGN_EMISSIONS_CEILING"
       ],
-      "description": "Most Iron's spell executions one Ars cast may produce, counting every target of a split, burst, linger or repeated delivery. Each execution is priced and paid; once the budget is spent further deliveries do nothing. Hard ceiling  .",
+      "description": "Most Iron's spell executions one Ars cast may produce, counting every target of a split, burst, linger or repeated delivery. Each execution is priced and paid; once the budget is spent further deliveries do nothing. Hard ceiling 64.",
       "runtime_references": [
         "src/main/java/com/otectus/arsnspells/glyph/GlyphAdmission.java"
       ],
@@ -1458,7 +1458,7 @@
         "1",
         "MAX_GLYPH_SESSIONS_CEILING"
       ],
-      "description": "Most Ars casts with imported glyphs still in flight (projectiles, delays, channels) one player may have at once. A further cast is refused before anything is paid. Hard ceiling  .",
+      "description": "Most Ars casts with imported glyphs still in flight (projectiles, delays, channels) one player may have at once. A further cast is refused before anything is paid. Hard ceiling 32.",
       "runtime_references": [
         "src/main/java/com/otectus/arsnspells/glyph/GlyphAdmission.java"
       ],
