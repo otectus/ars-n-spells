@@ -413,11 +413,13 @@ public class AnsConfig {
         CROSS_SYSTEM_REGEN_CONVERSION = BUILDER
             .comment(
                 "How mana regen values are translated when crossing the Ars / Iron's boundary.",
-                "Iron's regen is a percentage-of-pool multiplier; Ars regen is absolute mana/sec.",
+                "Iron's regen is a percentage-of-pool multiplier; Ars regen is a nominal rate. Both are",
+                "converted to the real mana per second their native schedulers deliver: Ars's update",
+                "interval, and Iron's 10-tick cadence and its own manaRegenMultiplier, are read live.",
                 "Without conversion, an Ars enchantment like Mana Regen III applied to Iron's regen",
-                "will produce hundreds of mana/sec because the absolute value is misread as a percentage.",
+                "will produce hundreds of mana/sec because the nominal value is misread as a percentage.",
                 "  EQUAL_EFFECT  - Convert by the target system's current max pool (DEFAULT, recommended).",
-                "                  Preserves equivalent mana/sec on both sides at any pool size.",
+                "                  Preserves equivalent real mana/sec on both sides at any pool size.",
                 "  REFERENCE_POOL - Convert using a fixed reference pool (see cross_system_regen_reference_pool).",
                 "                   Predictable but ignores the wearer's actual pool size.",
                 "  DISABLED      - Do not translate cross-system regen at all. Mana Regen enchantments",
@@ -665,8 +667,11 @@ public class AnsConfig {
 
         DEATH_ON_INSUFFICIENT_LP = BUILDER
             .comment(
-                "If enabled: Spell casts but player dies when LP is insufficient",
-                "If disabled: Spell is cancelled and player takes minor damage (1 heart)"
+                "What happens when the Cursed Ring's LP cost cannot be paid:",
+                "  false (default) - The cast is refused before anything is taken (no LP, health or mana).",
+                "  true            - The spell casts, and the player dies after its effect.",
+                "payment_open_failure_policy can change the false case: native_fallback pays the native",
+                "mana cost instead; legacy_open drains whatever LP there is and casts anyway."
             )
             .define("death_on_insufficient_lp", false);
 
@@ -912,7 +917,7 @@ public class AnsConfig {
             .comment("Master kill switch for the Source Jar proximity regen synergy.",
                      "Set false to disable the periodic block scan entirely (zero per-tick cost).",
                      "This is the supported way to turn the feature off;",
-                     "source_jar_synergy_multiplier keeps its 0.1 minimum. (ANS-CRIT-005 follow-up)")
+                     "source_jar_synergy_multiplier keeps its 0.01 minimum. (ANS-CRIT-005 follow-up)")
             .define("enable_source_jar_synergy", true);
 
         SOURCE_JAR_SCAN_INTERVAL_TICKS = BUILDER

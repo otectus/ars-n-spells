@@ -44,6 +44,12 @@ public final class GlyphCastSession {
         CostQuote quote;
         /** 3.4.1 review PAYMENT-01: which resource pays this occurrence; fixed at admission. */
         GlyphRoute route = GlyphRoute.MANA;
+        /**
+         * Audit ANS-001: the route native casting used for this caster at admission, which every
+         * later execution must still be authorized for. Null for a free (creative or recast)
+         * admission, which pays nothing on any route.
+         */
+        GlyphRoute admittedRoute;
         /** The first execution's LP leg, reserved at admission on the {@link GlyphRoute#LP} route. */
         java.util.UUID lpLeg;
         double lpReserved;
@@ -65,6 +71,7 @@ public final class GlyphCastSession {
         public CostQuote quote() { return quote; }
         public CastAttempt reservation() { return reservation; }
         public GlyphRoute route() { return route; }
+        public GlyphRoute admittedRoute() { return admittedRoute; }
         public java.util.UUID lpLeg() { return lpLeg; }
 
         /** Whether this occurrence still holds an unredeemed first-execution payment, in any resource. */

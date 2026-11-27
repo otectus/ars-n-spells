@@ -56,8 +56,7 @@ final class TestConfig {
          */
         @net.minecraftforge.eventbus.api.SubscribeEvent
         public static void onLoading(net.minecraftforge.fml.event.config.ModConfigEvent.Loading event) {
-            if (!Boolean.getBoolean("ans.gametest.castProbe") || !"ars_n_spells".equals(event.getConfig().getModId())
-                    || event.getConfig().getType() != net.minecraftforge.fml.config.ModConfig.Type.SERVER) return;
+            if (!Boolean.getBoolean("ans.gametest.castProbe") || !com.otectus.arsnspells.config.AnsClientConfig.isServerSpec(event.getConfig())) return;
             java.nio.file.Path file = event.getConfig().getFullPath();
             com.electronwill.nightconfig.core.file.FileWatcher.defaultInstance().removeWatch(file);
             org.slf4j.LoggerFactory.getLogger(TestConfig.class).info("[GameTest] stopped Forge's file watcher on {}", file);
@@ -65,8 +64,34 @@ final class TestConfig {
 
         @net.minecraftforge.eventbus.api.SubscribeEvent
         public static void onReload(net.minecraftforge.fml.event.config.ModConfigEvent.Reloading event) {
-            if (!Boolean.getBoolean("ans.gametest.castProbe") || !"ars_n_spells".equals(event.getConfig().getModId())) return;
+            if (!Boolean.getBoolean("ans.gametest.castProbe") || !com.otectus.arsnspells.config.AnsClientConfig.isServerSpec(event.getConfig())) return;
             WANTED.forEach(TestConfig::reapply);
+        }
+    }
+
+    /**
+     * Audit ANS-011 tests (and the older native-restriction tests) write Iron's and Ars's own SERVER
+     * configs, whose watchers raced the same way: a reload from a half-written file reverted a value a
+     * running test had just set (observed 2026-11-18: Iron's reload 4 ms before an adventure-mode
+     * assertion read the default). Their configs are loaded when the server starts, so their watchers
+     * are stopped then; ModConfigEvent never reaches this mod for another mod's config. GameTest runs only.
+     */
+    @net.minecraftforge.fml.common.Mod.EventBusSubscriber(modid = "ars_n_spells")
+    static final class NativeWatchers {
+        private static final java.util.Set<String> MODS = java.util.Set.of("irons_spellbooks", "ars_nouveau");
+
+        private NativeWatchers() {}
+
+        @net.minecraftforge.eventbus.api.SubscribeEvent
+        public static void onStarted(net.minecraftforge.event.server.ServerStartedEvent event) {
+            if (!Boolean.getBoolean("ans.gametest.castProbe")) return;
+            var configs = net.minecraftforge.fml.config.ConfigTracker.INSTANCE.configSets().get(net.minecraftforge.fml.config.ModConfig.Type.SERVER);
+            if (configs == null) return;
+            for (var config : configs) {
+                if (!MODS.contains(config.getModId()) || config.getFullPath() == null) continue;
+                com.electronwill.nightconfig.core.file.FileWatcher.defaultInstance().removeWatch(config.getFullPath());
+                org.slf4j.LoggerFactory.getLogger(TestConfig.class).info("[GameTest] stopped Forge's file watcher on {}", config.getFullPath());
+            }
         }
     }
 

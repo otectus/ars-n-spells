@@ -36,19 +36,25 @@ import java.util.Set;
  *       data file, not here.</li>
  * </ol>
  *
- * <h2>Determinism</h2>
- * A glyph may declare several schools (Ars Elemental does this). The winner is the one earliest
- * in {@link SpellSchoolId}'s declaration order — a total, stable ordering — rather than whichever
- * the underlying collection happened to yield first. The old scaling code iterated a
- * {@code HashMap}, so a path matching two elements resolved by hash order.
+ * <h2>Determinism and the primary school (audit ANS-005)</h2>
+ * A glyph may declare several schools (Ars Elemental does this). Its memberships are an ordered
+ * list ({@link #resolveKeys}): an explicit glyph mapping in its datapack order, otherwise the
+ * glyph's own declared Ars schools in declaration order, each translated through any overlay.
+ * The <em>primary</em> school is the first of them, always; {@link #resolve} is only its built-in
+ * projection ({@link SchoolKeys#builtin}), so an addon or custom primary projects to GENERIC
+ * rather than to an arbitrary built-in school. Before 3.4.2 (audit ANS-005) {@code resolve}
+ * picked the lowest {@link SpellSchoolId} ordinal instead, so a conjuration-then-earth glyph
+ * trained and scaled as evocation (the ordered primary) but took nature's mana and LP discounts.
+ * The old scaling code had also iterated a {@code HashMap}, so a path matching two elements
+ * resolved by hash order; an ordered list keeps every answer deterministic.
  *
  * <h2>One school or all of them</h2>
  * {@link #resolve} answers "which single school is this glyph?", which is what affinity,
- * progression, cooldowns and the UI need — one glyph, one credited track. {@link #resolveAll}
+ * progression, discounts, cooldowns and the UI need — one glyph, one credited track. {@link #resolveAll}
  * answers "which schools does this glyph belong to at all?", which is what damage scaling needs:
  * a dual-element or compound-element addon glyph really does carry several, and collapsing it to
- * one silently discarded the rest. The two share a single resolution chain, so they can never
- * disagree: {@code resolve} is the deterministic winner among {@code resolveAll}'s answers.
+ * one silently discarded the rest. Both come from the same ordered chain, so they cannot disagree:
+ * {@code resolve} is the projection of the first ordered membership.
  */
 public final class SchoolResolver {
 
@@ -125,24 +131,19 @@ public final class SchoolResolver {
     /**
      * The resolution chain itself, expressed over plain data.
      *
-     * <p>Defined as the deterministic winner among {@link #resolveAll(String, List)}: the school
-     * earliest in {@link SpellSchoolId} declaration order, or {@link SpellSchoolId#GENERIC} when
-     * that set is empty. Declaration order of the glyph's own schools is deliberately *not* the
-     * tie-break here — two addons declaring the same pair in opposite orders must still credit
-     * the same affinity track.
+     * <p>Audit ANS-005: the built-in projection of the glyph's primary school, the first of its
+     * ordered memberships ({@link #resolveKeys(String, List)}), so every consumer — affinity,
+     * progression, primary scaling, mana and LP discounts, the journal — names the same primary.
+     * A primary with no built-in school (an addon or custom one) is {@link SpellSchoolId#GENERIC}:
+     * no built-in school-matched bonus, never an arbitrary built-in substitute.
      *
      * @param registryId   full glyph registry id, e.g. {@code ars_nouveau:glyph_ignite}
-     * @param arsSchoolIds the Ars school ids the glyph declares, possibly empty
+     * @param arsSchoolIds the Ars school ids the glyph declares, in declaration order, possibly empty
      */
     public static SpellSchoolId resolve(@Nullable String registryId,
                                         @Nullable List<String> arsSchoolIds) {
-        SpellSchoolId best = SpellSchoolId.GENERIC;
-        for (SpellSchoolId candidate : resolveAll(registryId, arsSchoolIds)) {
-            if (candidate.ordinal() < best.ordinal()) {
-                best = candidate;
-            }
-        }
-        return best;
+        List<String> keys = resolveKeys(registryId, arsSchoolIds);
+        return keys.isEmpty() ? SpellSchoolId.GENERIC : SchoolKeys.builtin(keys.get(0));
     }
 
     /**

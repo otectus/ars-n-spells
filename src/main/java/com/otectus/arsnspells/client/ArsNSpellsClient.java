@@ -2,6 +2,7 @@ package com.otectus.arsnspells.client;
 
 import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.config.AnsClientConfig;
 import com.otectus.arsnspells.client.screen.ConfigScreenFactory;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.ConfigScreenHandler;
@@ -62,24 +63,24 @@ public class ArsNSpellsClient {
 
     @SubscribeEvent
     public static void onClientConfigLoaded(net.minecraftforge.fml.event.config.ModConfigEvent.Loading event) {
-        syncDiagnostics(event.getConfig().getModId());
+        syncDiagnostics(event.getConfig());
     }
 
     @SubscribeEvent
     public static void onClientConfigReloaded(net.minecraftforge.fml.event.config.ModConfigEvent.Reloading event) {
-        syncDiagnostics(event.getConfig().getModId());
+        syncDiagnostics(event.getConfig());
     }
 
     @SubscribeEvent
     public static void onClientConfigUnloaded(net.minecraftforge.fml.event.config.ModConfigEvent.Unloading event) {
-        if (ArsNSpells.MODID.equals(event.getConfig().getModId()))
+        if (AnsClientConfig.isServerSpec(event.getConfig()))
             net.minecraft.client.Minecraft.getInstance().execute(OverlayDiagnostics::disable);
     }
 
-    private static void syncDiagnostics(String modId) {
-        if (!ArsNSpells.MODID.equals(modId)) return;
+    private static void syncDiagnostics(net.minecraftforge.fml.config.ModConfig config) {
+        if (!AnsClientConfig.isServerSpec(config)) return;
         net.minecraft.client.Minecraft.getInstance().execute(() -> {
-            if (AnsConfig.DEBUG_MODE.get()) OverlayDiagnostics.enable();
+            if (AnsConfig.SPEC.isLoaded() && AnsConfig.DEBUG_MODE.get()) OverlayDiagnostics.enable();
             else OverlayDiagnostics.disable();
         });
     }

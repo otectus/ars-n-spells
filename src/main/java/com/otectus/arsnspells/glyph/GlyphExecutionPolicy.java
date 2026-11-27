@@ -32,7 +32,9 @@ import org.jetbrains.annotations.Nullable;
  *   <li>the session is open and owned by this caster, who is alive, connected and in the session's
  *       world;</li>
  *   <li>the target is still in that world, in a loaded chunk inside the border, and alive if it is an
- *       entity. Nothing loads a chunk to run a stale cast.</li>
+ *       entity. Nothing loads a chunk to run a stale cast;</li>
+ *   <li>(audit ANS-001) the resource route admitted is still the route native casting would use, and
+ *       an aura route is still one Covenant will charge ({@link GlyphRoute#refusal}).</li>
  * </ul>
  *
  * <p><b>Reload policy.</b> The current policy gates any effect that has not started. An effect that
@@ -51,6 +53,10 @@ public final class GlyphExecutionPolicy {
         if (caster != null) return caster;
         String policy = policyRefusal(player, occurrence, form);
         if (policy != null) return policy;
+        // Audit ANS-001: the admitted resource route must still be the one native casting uses now,
+        // and an aura route one Covenant will actually charge, before any Iron's event is posted.
+        String route = GlyphRoute.refusal(player, occurrence.admittedRoute);
+        if (route != null) return route;
         return hit == null ? null : targetRefusal(world, hit, occurrence.definition.family());
     }
 
@@ -82,6 +88,8 @@ public final class GlyphExecutionPolicy {
     public static String casterRefusal(ServerPlayer player, GlyphCastSession session, Level world) {
         if (session == null || session.state() != GlyphCastSession.State.OPEN || !session.owner().equals(player.getUUID()))
             return "message.ars_n_spells.glyph.refused.no_session";
+        // ANS-002: a session never transfers to a fake caster, even one sharing the owner's UUID.
+        if (GlyphCasters.realPlayer(player) == null) return "message.ars_n_spells.glyph.refused.no_session";
         if (player.isRemoved() || !player.isAlive() || player.hasDisconnected()) return "message.ars_n_spells.glyph.refused.no_session";
         if (player.level() != world || !world.dimension().equals(session.dimension())) return "message.ars_n_spells.glyph.refused.other_world";
         return null;

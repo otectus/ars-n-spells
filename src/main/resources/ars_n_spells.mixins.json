@@ -14,6 +14,12 @@
     "ars.MixinStandardSpellValidator",
     "ars.MixinAugmentCostForImportedGlyph"
   ],
+  "client": [
+    "ars.MixinGuiSpellBookBrowserHost",
+    "ars.MixinInfinityGuiSpellBookBrowserHost",
+    "ars.MixinGlyphUnlockMenuBrowser",
+    "ars.MixinCraftingButtonImportedWarning"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

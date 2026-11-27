@@ -1,0 +1,12 @@
+{
+  "mode": "flat",
+  "view": "LEARNED",
+  "query": "firebolt III",
+  "pending": false,
+  "source": "",
+  "school": "",
+  "fits": false,
+  "expected": [
+    "alpha:bolt#3"
+  ]
+}

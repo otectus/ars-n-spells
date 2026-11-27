@@ -4,7 +4,6 @@ import com.hollingsworth.arsnouveau.api.spell.AbstractAugment;
 import com.hollingsworth.arsnouveau.api.spell.AbstractSpellPart;
 import com.hollingsworth.arsnouveau.api.spell.Spell;
 import com.hollingsworth.arsnouveau.api.spell.SpellContext;
-import com.hollingsworth.arsnouveau.api.spell.wrapped_caster.PlayerCaster;
 import com.hollingsworth.arsnouveau.common.spell.augment.AugmentAmplify;
 import com.hollingsworth.arsnouveau.common.spell.augment.AugmentDampen;
 import com.otectus.arsnspells.casting.CastLedger;
@@ -101,10 +100,9 @@ public final class GlyphAdmission {
     public static boolean admit(Player player, SpellContext context) {
         List<Found> found = importedIn(context.getSpell());
         if (found.isEmpty()) return true;
-        if (!(player instanceof ServerPlayer serverPlayer) || player instanceof com.hollingsworth.arsnouveau.api.ANFakePlayer
-                || !(context.getCaster() instanceof PlayerCaster)) {
-            return false;
-        }
+        // ANS-002: one predicate for root admission and every later stage; Forge and Ars fake players alike are refused.
+        ServerPlayer serverPlayer = GlyphCasters.admissible(player, context);
+        if (serverPlayer == null) return false;
         int limit = Math.min(AnsConfig.MAX_IMPORTED_EFFECTS_PER_SPELL.get(), AnsConfig.MAX_IMPORTED_EFFECTS_CEILING);
         if (found.size() > limit) return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.too_many", found.size(), limit);
         IronGlyphBridge bridge = IronGlyphBridges.get();
@@ -157,8 +155,17 @@ public final class GlyphAdmission {
             }
             // 3.4.1 review PAYMENT-01: the resource native casting would take from this caster now.
             occurrence.route = free ? GlyphRoute.MANA : GlyphRoute.decide(serverPlayer);
+            // Audit ANS-001: every later execution must still be authorized for this route.
+            occurrence.admittedRoute = free ? null : occurrence.route;
             if (occurrence.route == GlyphRoute.AURA_NATIVE) {
-                // Covenant takes the aura at Iron's pre-cast event and refuses there when it is short.
+                if (!GlyphRoute.auraProviderServices(serverPlayer)) {
+                    // A ring only in #ars_n_spells:virtue_rings: Covenant checks its own item and would
+                    // charge nothing, so the native delegation is refused rather than marked paid.
+                    release(reserved, access);
+                    releaseLp(session, serverPlayer);
+                    return refuse(serverPlayer, "message.ars_n_spells.glyph.refused.aura_unsupported", f.effect().displayName());
+                }
+                // Covenant takes the aura at Iron's pre-cast event; the execution then needs its receipt.
                 occurrence.quote = EmissionPayment.quote(serverPlayer, rules, 0);
                 continue;
             }

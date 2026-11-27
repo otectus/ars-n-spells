@@ -169,10 +169,10 @@ public class EquipmentIntegration {
             return;
         }
         ManaBonus arsBonus = getArsManaBonuses(player);
-        // Ars regen is absolute mana/sec; Iron's MANA_REGEN is a percentage-of-pool
+        // Ars regen is a nominal rate; Iron's MANA_REGEN is a percentage-of-pool
         // multiplier. Direct assignment is a unit-mismatch bug — go through the bridge.
-        double absRegenPerSec = arsBonus.manaRegen * conversionRate;
-        double regenAttr = ManaRegenBridge.convertArsToIrons(absRegenPerSec, player);
+        double arsNominal = arsBonus.manaRegen * conversionRate;
+        double regenAttr = ManaRegenBridge.convertArsToIrons(arsNominal, player);
         applyAttributeModifier(player, AttributeRegistry.MANA_REGEN.get(), ARS_TO_IRON_REGEN_ID,
             "Ars Gear Mana Regen", regenAttr);
     }

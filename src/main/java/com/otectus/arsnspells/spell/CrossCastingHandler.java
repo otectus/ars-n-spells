@@ -387,11 +387,14 @@ public class CrossCastingHandler {
             return false;
         }
 
+        // ANS-014: exact; Iron's answers its none sentinel for an unknown id.
         io.redspace.ironsspellbooks.api.spells.AbstractSpell spell =
-            io.redspace.ironsspellbooks.api.registry.SpellRegistry.getSpell(spellId);
+            com.otectus.arsnspells.spell.irons.IronsSpellLookup.lookupExact(spellId);
 
         if (spell == null) {
             LOGGER.warn("Cross-mod Iron spell not found: {}", spellId);
+            player.displayClientMessage(Component.translatable("arsnspells.crosscast.invalid.iron_unresolved")
+                .withStyle(net.minecraft.ChatFormatting.RED), true);
             return false;
         }
 

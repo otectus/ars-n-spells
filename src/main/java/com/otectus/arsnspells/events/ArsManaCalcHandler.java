@@ -153,12 +153,12 @@ public class ArsManaCalcHandler {
         }
 
         // Iron's MANA_REGEN attribute is a percentage-of-pool multiplier; the Ars regen
-        // event expects an absolute mana/sec delta. Going through ManaRegenBridge is
+        // event expects a delta in Ars's nominal regen units. Going through ManaRegenBridge is
         // mandatory — adding ironBonus.manaRegen directly is a unit-mismatch bug that
         // can produce hundreds of mana/sec on geared wizards.
-        double absRegenPerSec = ManaRegenBridge.convertIronsToArs(ironBonus.manaRegen, player);
+        double arsNominal = ManaRegenBridge.convertIronsToArs(ironBonus.manaRegen, player);
         double conversionRate = AnsConfig.CONVERSION_RATE_IRON_TO_ARS.get();
-        double updatedRegen = Math.max(0.0, event.getRegen() + absRegenPerSec * conversionRate);
+        double updatedRegen = Math.max(0.0, event.getRegen() + arsNominal * conversionRate);
         event.setRegen(updatedRegen);
     }
 }

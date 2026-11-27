@@ -58,6 +58,30 @@ public final class StateEvictionHandler {
         ResonanceManager.clear(player);
         CrossCastContext.clear(player);
         CombatDebugState.clear(player.getUUID());
+        // Audit ANS-003: the server-side ring cache entry; the integrated client clears its own.
+        com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearServerEntry(player.getUUID());
+    }
+
+    /**
+     * Audit ANS-003: a clone (death, End return), a respawn or a dimension change hands the player a
+     * new body or new surroundings; its ring state is read afresh rather than served from the cache.
+     */
+    @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        if (event.getEntity() != null && !event.getEntity().level().isClientSide())
+            com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearServerEntry(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() != null && !event.getEntity().level().isClientSide())
+            com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearServerEntry(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() != null && !event.getEntity().level().isClientSide())
+            com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearServerEntry(event.getEntity().getUUID());
     }
 
     @SubscribeEvent
@@ -72,6 +96,10 @@ public final class StateEvictionHandler {
         MinecraftServer server = event.getServer();
         if (server != null) {
             ResonanceManager.cleanupOfflinePlayers(server);
+            // Audit ANS-003: the ring cache returns to the online-player bound.
+            java.util.List<java.util.UUID> online = new java.util.ArrayList<>();
+            for (var player : server.getPlayerList().getPlayers()) online.add(player.getUUID());
+            com.otectus.arsnspells.compat.SanctifiedLegacyCompat.retainServerEntries(online);
         }
     }
 
@@ -87,5 +115,6 @@ public final class StateEvictionHandler {
         CombatDebugState.clearAll();
         LogThrottle.clearAll();
         com.otectus.arsnspells.bridge.ManaTrace.clearAll();
+        com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearServerCache();
     }
 }

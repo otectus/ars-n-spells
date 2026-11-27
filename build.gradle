@@ -35,6 +35,7 @@ minecraft {
             property 'ans.iconSmoke', project.hasProperty('withIconClientSmoke').toString()
             property 'ans.iconSmoke.packs', project.hasProperty('withIconPackReview').toString()
             property 'ans.worldUiSmoke', project.hasProperty('withWorldUiSmoke').toString()
+            property 'ans.glyphBrowserSmoke', project.hasProperty('withGlyphBrowserClientSmoke').toString()
             property 'ans.castingSmoke.client', project.hasProperty('withCastingClientSmoke').toString()
             property 'ans.castingSmoke.address', project.findProperty('castingSmokeAddress') ?: ''
         }

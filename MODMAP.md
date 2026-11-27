@@ -147,12 +147,13 @@ Run `check_mod.py` for a full consistency check (missing models, lang keys, text
 
 ## Current focus
 
-3.4.0 (Forge 1.20.1): Touch casting repair, imported Iron's glyphs and the Glyph Press. Release docs in `docs/3.4.0/`; nothing published.
+3.4.2 (Forge 1.20.1): remediation of the 2026-11-17 audit (ANS-001 to ANS-015), on top of the never-published 3.4.1. Evidence in `docs/3.4.2/testing.md`, config reference in `docs/3.4.2/config-reference.md`; nothing published. The last published release is 3.4.0 (`update.json` still names it).
 
 ## Roadmap
 
 - [ ] Manual survival playthrough and a dedicated-server session with a remote client (see `docs/3.4.0/testing.md`, open gaps).
 - [ ] Iron's addon spells in a later catalog (`docs/3.4.0/adapter-authoring.md`).
+- [ ] Port the 3.4.2 fixes to the NeoForge 1.21.1 branch, and sync the shared `tools/verify_loader_parity.py` table and the new lang keys there.
 
 ## Decisions
 
@@ -163,8 +164,10 @@ Run `check_mod.py` for a full consistency check (missing models, lang keys, text
 - The Press menu always builds its four slots on the client (placeholder handler) and predicts locks from the synced state; the server's block entity is the only authority.
 - Glyph item visuals use the `ars_n_spells:imported_glyph` geometry with Iron's icons stitched by a block-atlas directory source (palette textures filtered out to keep mipmaps).
 - `iron_glyph_mana_bonus_policy` defaults to `per_spell`.
+- An imported glyph's resource route is fixed at admission and re-authorized before every later execution; an aura route counts as paid only on Covenant's receipt (`MixinCovenantAuraReceipt`), never by assumption.
+- A multi-school glyph's primary school is its first ordered membership; `dominantSchool()` is only its built-in projection.
 
 ## Known issues
 
-- GameTests that write the SERVER config (`ans_mana_config`, `ans_school_disabled`, `ans_glyph_modes`) and the ritual stray-item test fail intermittently under Forge's asynchronous config reload or timing; each passed on rerun. Recorded per run in `docs/3.4.0/testing.md`.
+- GameTests that write the SERVER config (`ans_mana_config`, `ans_school_disabled`, `ans_glyph_modes`) and the ritual stray-item test fail intermittently under Forge's asynchronous config reload or timing; each passed on rerun. Recorded per run in `docs/3.4.0/testing.md`. Since 3.4.2, GameTest runs also stop the watchers on Iron's and Ars Nouveau's server configs (`TestConfig.NativeWatchers`).
 - Imported glyphs with Iron's recast stages are handled by Iron's own recast bookkeeping but not exercised by an imported-glyph GameTest.

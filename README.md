@@ -35,6 +35,10 @@ If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars b
 ³ The pinned Forge runtime is Iron's `1.20.1-3.15.0` (CurseForge file 7402504). 3.4.0 passed the loaded GameTest suite against both `1.20.1-3.15.0` and `1.20.1-3.16.3` (file 8680180, with irons_lib `1.20.1-2.1.0`, `-PwithIrons316RuntimeGameTests`); see [docs/3.4.0/testing.md](docs/3.4.0/testing.md). The imported-glyph catalog covers the spells of those two builds. The rest of the admitted 3.x range is not a runtime verification claim; test another version with the loaded profile before deployment.
 ⁴ Every published Ars Affinity file targets NeoForge 1.21.1. The NeoForge build of Ars 'n' Spells is tested with Ars Affinity 1.1.1; this Forge build makes no Ars Affinity claim.
 
+## Personal spellbook display
+
+Converted Iron's glyphs have their own bookmark in the Ars spellbook. The default **Organized** view groups learned levels by their original spell. Choose **Individual levels** or **Hidden** under **Mods → Ars 'n' Spells → Config → Personal display**. Saved spells retain their exact glyphs in every mode. [Glyph library and config examples](docs/3.4.2/glyph-browser.md)
+
 ## Features
 
 ### Mana unification
@@ -212,9 +216,9 @@ With Iron's Spells 'n Spellbooks installed, every Iron's player spell can become
 - Iron's **cooldowns** apply per spell and are shared by all its levels. Charged and channelled spells charge or channel in Iron's own cast slot, and the rest of the Ars spell waits for them.
 - Turret, rune and other non-player casters do not run imported glyphs.
 
-**Addon spells and levels above X (3.4.1).** Spells from Iron's addons need a glyph catalog. ANS 3.4.1 builds two catalog packages alongside the mod jar: one for Wind's Spellbooks (five of its seven spells castable; Tornado and Iron Slash stay dormant, with the reason) and one that registers levels XI-XV of every Iron's spell for servers whose Iron's maximum goes past 10. Install a package on the server and every client, then restart. The support matrix (loader, addon version, spell, adapter, verdict and the tested effect), the level-15 steps and the tool for other addons are in [docs/3.4.1/catalog-packages.md](docs/3.4.1/catalog-packages.md). If a package is later removed, ANS's retained copy keeps its glyphs registered and dormant; a world whose glyph ids are missing altogether refuses to start instead of dropping them ([identity and levels](docs/3.4.1/identity-and-levels.md#the-world-identity-record)).
+**Addon spells and levels above X (3.4.1).** Spells from Iron's addons need a glyph catalog. Since 3.4.1, ANS builds two catalog packages alongside the mod jar: one for Wind's Spellbooks (five of its seven spells castable; Tornado and Iron Slash stay dormant, with the reason) and one that registers levels XI-XV of every Iron's spell for servers whose Iron's maximum goes past 10. Install a package on the server and every client, then restart. The support matrix (loader, addon version, spell, adapter, verdict and the tested effect), the level-15 steps and the tool for other addons are in [docs/3.4.1/catalog-packages.md](docs/3.4.1/catalog-packages.md). If a package is later removed, ANS's retained copy keeps its glyphs registered and dormant; a world whose glyph ids are missing altogether refuses to start instead of dropping them ([identity and levels](docs/3.4.1/identity-and-levels.md#the-world-identity-record)).
 
-If Iron's is removed or the server disables a spell, its glyphs stay in your books and inventory as **dormant** glyphs that do nothing and say why; they work again when restored. Both client and server need Ars 'n' Spells 3.4.0.
+If Iron's is removed or the server disables a spell, its glyphs stay in your books and inventory as **dormant** glyphs that do nothing and say why; they work again when restored. Both client and server need Ars 'n' Spells 3.4.2.
 
 ---
 
@@ -231,9 +235,10 @@ Wearing the Cursed Ring converts mana costs to **Life Points**. LP can be source
   - `BLOOD_MAGIC_ONLY` -- Blood Magic only; fails if BM is not installed.
   - `HEALTH_ONLY` -- Always use health (100 LP = 5 hearts).
 - **Insufficient LP behavior** (`death_on_insufficient_lp`):
-  - `false` (default) -- Spell is cancelled with 1 heart of damage.
-  - `true` -- Spell casts but the player dies.
-- LP costs scale with configurable base multipliers, per-tier multipliers (Ars glyph tiers), per-level and rarity multipliers (Iron's spells), and a minimum cost floor. Delayed-resolution spells stage costs in a per-player FIFO queue, so rapid back-to-back casts can't overwrite each other's pending cost.
+  - `false` (default) -- The cast is refused before anything is taken: no LP, no health and no mana are spent.
+  - `true` -- The spell casts, and the player dies after its effect.
+  - With `payment_open_failure_policy = native_fallback`, a cast that cannot pay its LP pays its native mana cost instead. With `legacy_open` (the pre-3.3.0 behaviour, which `auto` keeps for config files written before 3.3.0), a short LP balance is drained and the cast proceeds, and an LP adapter that cannot be used lets the cast through unpaid.
+- LP costs scale with configurable base multipliers, per-tier multipliers (Ars glyph tiers), per-level and rarity multipliers (Iron's spells), and a minimum cost floor. Each cast owns its payment. The LP leg is reserved when the cast is admitted and committed when its effect runs. If the cast is refused before then, the leg is released. Back-to-back and delayed casts therefore never share or overwrite a pending cost. Imported Iron's glyphs pay through the same route: a delayed or repeated execution runs only while the ring that set its route is still worn (see the Virtue Ring note below).
 
 ### Ring of Seven Virtues (aura costs)
 
@@ -242,6 +247,7 @@ Wearing the Virtue Ring converts **Ars** mana costs to **Covenant aura**. The au
 - Gated by `enable_virtue_aura_system` (default on).
 - The aura cost is `Ars mana cost × ars_virtue_aura_multiplier` (default 1.0, range 0.1–10).
 - Insufficient aura cancels the spell with an action bar message.
+- Imported Iron's glyphs under the Virtue Ring are paid by Covenant itself, each time one executes. A delayed, projectile, repeated, charged or channelled execution is refused, not run for free and not charged in mana, if the ring came off, the aura toggle was turned off or a Cursed Ring was added since the cast. Equipping the ring after a mana-paid cast refuses that cast's later executions the same way. Only Covenant's own Ring of the Seven Virtues can pay imported glyphs in aura: a ring that is merely added to `#ars_n_spells:virtue_rings` is refused with a message, because Covenant charges nothing for it.
 
 **Ring conflict:** wearing both rings at once cancels both effects — costs fall back to normal mana and the player is notified.
 
@@ -319,7 +325,7 @@ Config file (per-world, server-authoritative, auto-synced to clients): `<world>/
 | `conversion_rate_ars_to_iron` | `1.0` | 0.01–10 | Multiplier for Ars costs paid from Iron's pool. |
 | `conversion_rate_iron_to_ars` | `1.0` | 0.01–10 | Multiplier for Iron's costs paid from Ars pool. |
 | `hybrid_mana_bar` | `irons` | `ars`/`irons` | Which HUD bar to show in `hybrid` mode. |
-| `hide_mana_bar_with_ring` | `true` | -- | Hide mana bars while a Cursed or Virtue Ring is equipped. |
+| `hide_mana_bar_with_ring` | `true` | -- | Hide mana bars while a Cursed or Virtue Ring actually replaces mana: the Cursed Ring with `enable_lp_system` on, the Virtue Ring with `enable_virtue_aura_system` on. |
 | `dual_cost_ars_percentage` | `0.5` | 0–1 | In `separate`, fraction taken from Ars pool. |
 | `dual_cost_iss_percentage` | `0.5` | 0–1 | In `separate`, fraction taken from Iron's pool. The split is normalized so both halves always sum to the base cost. |
 | `default_max_mana` | `100.0` | 1–100000 | Fallback max mana when the native system returns no value. Settable via `/ans mana setdefault`. |
@@ -422,7 +428,7 @@ The aura pool (max, regen, persistence, HUD) belongs to Covenant of the Seven; t
 | `enable_source_jar_synergy` | `true` | -- | Master kill switch for the proximity regen synergy. |
 | `source_jar_scan_interval_ticks` | `20` | 1–200 | Ticks between proximity checks per player. |
 | `source_jar_scan_radius` | `4` | 1–8 | Horizontal scan radius in blocks. |
-| `source_jar_synergy_multiplier` | `5.0` | 0.1–100 | Multiplier for the proximity regen bonus. |
+| `source_jar_synergy_multiplier` | `5.0` | 0.01–2000 | Multiplier for the proximity regen bonus. Turn the feature off with `enable_source_jar_synergy`, not a zero multiplier. |
 | `source_jar_cache_move_threshold` | `4.0` | 1–32 | Distance a player must move before re-scanning. |
 
 ### Cross-cast inscription and spellbook binding
@@ -449,13 +455,13 @@ The aura pool (max, regen, persistence, HUD) belongs to Covenant of the Seven; t
 | `glyph_press_source_scan_interval_ticks` | `20` | 5–200 | Ticks between a working Press's requests to nearby jars; an idle Press never asks. |
 | `glyph_press_source_radius` | `4` | 1–8 | How far a working Press looks for Source jars (loaded positions only). |
 
-All apply without a restart. Per-spell behaviour (availability, tiers, Press costs, allow/deny lists) is datapack data, below. Reference: [docs/3.4.0/config-reference.md](docs/3.4.0/config-reference.md).
+All apply without a restart. Per-spell behaviour (availability, tiers, Press costs, allow/deny lists) is datapack data, below. Reference for this checkout: [docs/3.4.2/config-reference.md](docs/3.4.2/config-reference.md), generated from `AnsConfig`; the 3.4.0 release notes on these keys are in [docs/3.4.0/config-reference.md](docs/3.4.0/config-reference.md).
 
 ### Rituals
 
 These keys configure the Ritual of Mana Infusion and Ritual of the Mana Well. Both are Iron's-gated. **As of 3.2.0 both have a craftable tablet and are obtainable in survival** — they had been registered as rituals with no tablet item at all, so they could never be placed on a brazier. Both tablets are crafted on the Enchanting Apparatus from a blank parchment (reagent): Mana Infusion adds a source gem block, a source gem, an Iron's arcane essence and an archwood log for 1500 source ([recipe](src/main/resources/data/ars_n_spells/recipes/apparatus/mana_infusion.json)); Mana Well swaps the source gem for a water bucket and costs 2000 source ([recipe](src/main/resources/data/ars_n_spells/recipes/apparatus/mana_well.json)).
 
-Mana Infusion grants its amount once, to the nearest player, on completion. Mana Well regenerates mana for every player in range on every ritual tick, which means one radius-`mana_well_range` player query per tick for the ritual's duration — in line with what Ars Nouveau's own area rituals do, but worth lowering the range on a busy server. Both pay into whichever pool the active mana unification mode treats as primary.
+Mana Infusion grants its amount once, on completion, to the player who lit the brazier if they are still online; when it was started without one (a redstone start, or a brazier saved before the initiator was recorded) or that player has left, it goes to the nearest player within 16 blocks of the brazier, and to nobody if there is none. Mana Well regenerates mana for every player in range on every ritual tick, which means one radius-`mana_well_range` player query per tick for the ritual's duration — in line with what Ars Nouveau's own area rituals do, but worth lowering the range on a busy server. Both pay into whichever pool the active mana unification mode treats as primary.
 
 | Option | Default | Range | Description |
 | --- | --- | --- | --- |
@@ -531,12 +537,13 @@ The mod hides redundant mana bars based on mode:
 - **hybrid**: Shows the bar selected by `hybrid_mana_bar`.
 - **separate / disabled**: Both bars may show.
 
-While a Cursed or Virtue Ring is equipped, both mana bars are hidden (`hide_mana_bar_with_ring`, default on); the Covenant aura bar takes over for Virtue Ring wearers.
+While a Cursed or Virtue Ring replaces mana as the cost, both mana bars are hidden (`hide_mana_bar_with_ring`, default on); the Covenant aura bar takes over for Virtue Ring wearers. If the ring's toggle (`enable_lp_system` or `enable_virtue_aura_system`) is off, casts spend mana and the mana bar stays. The server sends these display settings, and `hybrid_mana_bar`, to every connected client on login and again whenever they change, including a config file reload, so no reconnect is needed.
 
 ## Changelog
 
 Full version history lives in [CHANGELOG.md](CHANGELOG.md). Recent highlights:
 
+- **3.4.2 — Audit remediation (also ships the never-published 3.4.1).** Delayed, projectile and charged imported glyphs can no longer run for free after a Virtue Ring comes off, and fake players can no longer cast them. HYBRID honours Ars Mana Regen potions, an End return keeps cooldowns, and multi-school glyphs get one primary school for training and discounts. Remote clients' mana bars follow a server config reload, and the Spell Loom shows the server's refusals. Cross-system regeneration now converts correctly when Iron's or Ars's regen settings are not the defaults. Network protocol 11: client and server both need 3.4.2. See [CHANGELOG.md](CHANGELOG.md) and [docs/3.4.2](docs/3.4.2/).
 - **3.4.0 — Touch casting repaired; Iron's spells become Ars glyphs.** Touch spells cast from exported scrolls, inscribed items and bound Iron's books now hit the block or creature you aim at exactly as a spell book does, report success correctly, and a miss no longer trains the school or starts a wheel cooldown. The new Glyph Press turns a filled Iron's scroll into a learnable Ars glyph for that spell at that level, which then casts its Iron's spell inside your Ars spells with Iron's own targeting, mana cost, cooldown and charge or channel. Client and server both need 3.4.0. See [CHANGELOG.md](CHANGELOG.md) and [docs/3.4.0](docs/3.4.0/).
 - **3.3.5 — Channels end cleanly, `ars_primary` keeps its mana, and inscribed Ars spells get a cooldown.** Channelled Iron's spells such as BielGG's Crystal Barrage no longer stop with a payment error when mana runs low. Each paid pulse is checked at its final price, and the channel finishes the way Iron's itself would, with cooldown and scroll use. In `ars_primary`, Iron's regeneration can no longer lower the Ars pool to Iron's rounded-down `max_mana`, the most likely cause of mana dipping while scrolling (the report itself was not reproduced). Shortages now say what was needed and what you had. New setting: `inscribed_ars_default_cooldown_ticks`. See [CHANGELOG.md](CHANGELOG.md) and [docs/3.3.5](docs/3.3.5/).
 
@@ -587,9 +594,9 @@ Output jar: `build/libs/ars_n_spells-<mod_version>.jar`, where `<mod_version>` c
 
 ### Test profiles
 
-**Tested versions (this release):** Ars Nouveau 4.12.7, Iron's Spellbooks 1.20.1-3.15.0 and 1.20.1-3.16.3, Ars Elemental 0.6.8.0, Ars Zero 2.0.2, Too Many Glyphs 2.3.2 (Forge). See [docs/3.4.0/testing.md](docs/3.4.0/testing.md) for the 3.4.0 commands and results (267 GameTests in every profile).
+**Tested versions (this release):** Ars Nouveau 4.12.7, Iron's Spellbooks 1.20.1-3.15.0 and 1.20.1-3.16.3, Ars Elemental 0.6.8.0, Ars Zero 2.0.2, Too Many Glyphs 2.3.2, Wind's Spellbooks 1.20.1-1.0.0 and the complete Covenant of the Seven 2.2.6-hotfix stack (Forge). See [docs/3.4.2/testing.md](docs/3.4.2/testing.md) for the 3.4.2 commands and results; earlier releases' evidence is kept in [docs/3.4.1/testing.md](docs/3.4.1/testing.md) and [docs/3.4.0/testing.md](docs/3.4.0/testing.md).
 
-`./gradlew test` runs the JUnit suite (966 tests). GameTests run on a real server via `runGameTestServer`, with opt-in profiles:
+`./gradlew test` runs the JUnit suite. GameTests run on a real server via `runGameTestServer`, with opt-in profiles. Current suite counts and results are recorded per run in dated test evidence ([docs/3.4.2/testing.md](docs/3.4.2/testing.md)) rather than here:
 
 | Command | Covers |
 | --- | --- |
@@ -600,7 +607,9 @@ Output jar: `build/libs/ars_n_spells-<mod_version>.jar`, where `<mod_version>` c
 | `./gradlew runGameTestServer -PwithArsZero` | Ars Zero 2.0.2 glyph round-trip and school resolution (local-only: requires jar in `libs/`) |
 | Any combination of the above | Mixed-addon recipes |
 
-*(Covenant of the Seven has no dedicated runtime profile; surface compatibility is verified by `CovenantJarSurfaceTest`, which reads the jar bytecode and skips when absent.)*
+| `./gradlew runGameTestServer -PwithIronsRuntimeGameTests -PwithCovenantRuntimeGameTests -PcovenantRuntimeDir=<dir>` | The complete Covenant of the Seven stack (Covenant 2.2.6-hotfix, Blood Magic, Enigmatic Legacy, Nature's Aura, Caelus, Patchouli) against real Iron's |
+
+The Covenant profile is local and hash-locked. Put the six artifacts in one directory and run `python tools/covenant_profile.py <dir> --write-lock` to inspect and hash them. The build then refuses any jar whose bytes differ from that lock, and the run's log names the versions actually loaded. Never copy a lock from another machine over different bytes. `CovenantJarSurfaceTest` additionally checks the jar's bytecode surfaces in the unit suite and skips when `libs/covenant_of_the_seven-2.2.6-hotfix.jar` is absent.
 
 The `runClient` task with `-PwithWorldUiSmoke -PwithIrons316RuntimeGameTests -PgametestRunDir=<dir>` drives a scripted single-player client through the Spell Loom, Iron's wheel and the Glyph Press against a copied disposable save named `ANS Icon QA`, saving screenshots to `<dir>/world-ui-review/`.
 

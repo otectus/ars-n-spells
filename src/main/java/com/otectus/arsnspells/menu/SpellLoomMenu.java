@@ -13,6 +13,8 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.items.IItemHandler;
+import net.minecraftforge.items.ItemStackHandler;
 import net.minecraftforge.items.SlotItemHandler;
 
 /**
@@ -44,7 +46,10 @@ public class SpellLoomMenu extends AbstractContainerMenu {
 
     private final java.util.UUID sessionId;
     public java.util.UUID sessionId() { return sessionId; }
+    /** The authoritative Loom; the server's menu only. Null on the client, which never plans against it. */
     private final SpellLoomBlockEntity blockEntity;
+    /** The three working slots' contents: the block entity's on the server, a synchronized copy on the client. */
+    private final IItemHandler workItems;
     private final ContainerLevelAccess access;
 
     public SpellLoomMenu(int id, Inventory inv, FriendlyByteBuf buf) {
@@ -55,42 +60,57 @@ public class SpellLoomMenu extends AbstractContainerMenu {
         this(id, inv, be, java.util.UUID.randomUUID());
     }
 
+    /**
+     * Audit ANS-012: both sides always build the same 39 slots, three working slots then the 36
+     * player slots. Only the server's Loom is authoritative; the client always works on its own
+     * three-slot copy, filled by the server's menu synchronization, as the Glyph Press does. Its
+     * layout therefore never depends on whether the client happened to have the block entity when
+     * the menu opened (it used to build only the 36 player slots then, so the server's slot indices
+     * described different slots on each side).
+     */
     public SpellLoomMenu(int id, Inventory inv, SpellLoomBlockEntity be, java.util.UUID sessionId) {
         super(ModMenus.SPELL_LOOM.get(), id);
         this.sessionId = sessionId;
-        this.blockEntity = be;
-        this.access = be == null
-            ? ContainerLevelAccess.NULL
-            : ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
+        boolean server = be != null && be.getLevel() != null && !be.getLevel().isClientSide();
+        this.blockEntity = server ? be : null;
+        this.access = server ? ContainerLevelAccess.create(be.getLevel(), be.getBlockPos()) : ContainerLevelAccess.NULL;
+        this.workItems = server ? be.getItems() : new ItemStackHandler(SpellLoomBlockEntity.SLOT_COUNT) {
+            @Override
+            public boolean isItemValid(int slot, ItemStack stack) {
+                return switch (slot) {
+                    case SpellLoomBlockEntity.SLOT_SOURCE -> com.otectus.arsnspells.inscription.LoomInscription.isSource(stack);
+                    case SpellLoomBlockEntity.SLOT_SCROLL -> com.otectus.arsnspells.inscription.LoomInscription.isTarget(stack);
+                    default -> false;
+                };
+            }
+        };
 
-        if (be != null) {
-            // Audit V18: which slot an item may enter is decided by what the item is, through
-            // the same classifier the planner reads. A blank cannot be a source and a reusable
-            // book cannot be a target -- the latter is how one got consumed in the first place.
-            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SOURCE,
-                SLOT_SOURCE_X, RECIPE_ROW_Y) {
-                @Override
-                public boolean mayPlace(ItemStack stack) {
-                    return com.otectus.arsnspells.inscription.LoomInscription.isSource(stack);
-                }
-            });
-            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SCROLL,
-                SLOT_SCROLL_X, RECIPE_ROW_Y) {
-                @Override
-                public boolean mayPlace(ItemStack stack) {
-                    // A filled scroll is allowed in, so the explicit Convert route can reach
-                    // it; what it is never allowed to be is silently treated as blank.
-                    return com.otectus.arsnspells.inscription.LoomInscription.isTarget(stack);
-                }
-            });
-            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_OUTPUT,
-                SLOT_OUTPUT_X, RECIPE_ROW_Y) {
-                @Override
-                public boolean mayPlace(ItemStack stack) {
-                    return false;
-                }
-            });
-        }
+        // Audit V18: which slot an item may enter is decided by what the item is, through
+        // the same classifier the planner reads. A blank cannot be a source and a reusable
+        // book cannot be a target -- the latter is how one got consumed in the first place.
+        addSlot(new SlotItemHandler(workItems, SpellLoomBlockEntity.SLOT_SOURCE,
+            SLOT_SOURCE_X, RECIPE_ROW_Y) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return com.otectus.arsnspells.inscription.LoomInscription.isSource(stack);
+            }
+        });
+        addSlot(new SlotItemHandler(workItems, SpellLoomBlockEntity.SLOT_SCROLL,
+            SLOT_SCROLL_X, RECIPE_ROW_Y) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                // A filled scroll is allowed in, so the explicit Convert route can reach
+                // it; what it is never allowed to be is silently treated as blank.
+                return com.otectus.arsnspells.inscription.LoomInscription.isTarget(stack);
+            }
+        });
+        addSlot(new SlotItemHandler(workItems, SpellLoomBlockEntity.SLOT_OUTPUT,
+            SLOT_OUTPUT_X, RECIPE_ROW_Y) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return false;
+            }
+        });
 
         addPlayerInventory(inv);
     }
@@ -102,8 +122,17 @@ public class SpellLoomMenu extends AbstractContainerMenu {
         return null;
     }
 
+    /** The authoritative Loom: the server's menu only, null on the client. */
     public SpellLoomBlockEntity getBlockEntity() {
         return blockEntity;
+    }
+
+    /**
+     * The three working slots as this side knows them: the Loom's own inventory on the server, the
+     * synchronized copy on the client. What the client's planning and fingerprints read.
+     */
+    public IItemHandler workItems() {
+        return workItems;
     }
 
     private void addPlayerInventory(Inventory inv) {
@@ -124,10 +153,8 @@ public class SpellLoomMenu extends AbstractContainerMenu {
         if (index < 0 || index >= this.slots.size()) {
             return result;
         }
-        // Audit E5 (defensive): if the client-side BE lookup failed, no working
-        // slots were added and this.slots holds only the 36 player slots â€” the
-        // index math below would then misclassify player slots 0-2 as loom slots.
-        // Unreachable on the authoritative server (createMenu always passes a BE).
+        // Audit E5 / ANS-012: the layout is always the three working slots then the 36 player
+        // slots; this guard only protects the index math below against a future layout change.
         if (this.slots.size() < SpellLoomBlockEntity.SLOT_COUNT + 36) {
             return result;
         }

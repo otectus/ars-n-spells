@@ -1,0 +1,13 @@
+{
+  "mode": "flat",
+  "view": "FAVORITES",
+  "query": "",
+  "pending": false,
+  "source": "",
+  "school": "",
+  "fits": false,
+  "expected": [
+    "alpha:bolt#1",
+    "alpha:bolt#3"
+  ]
+}

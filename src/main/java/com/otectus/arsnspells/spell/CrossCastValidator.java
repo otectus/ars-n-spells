@@ -138,9 +138,10 @@ public final class CrossCastValidator {
 
     /**
      * Isolated to avoid loading Iron's classes when the mod isn't present.
-     * Only called after a {@code ModList.isLoaded} check.
+     * Only called after a {@code ModList.isLoaded} check. Audit ANS-014: an exact lookup, so a
+     * removed spell id is refused here instead of resolving to Iron's none sentinel.
      */
     private static boolean ironSpellResolvable(ResourceLocation spellId) {
-        return io.redspace.ironsspellbooks.api.registry.SpellRegistry.getSpell(spellId) != null;
+        return com.otectus.arsnspells.spell.irons.IronsSpellLookup.resolvable(spellId);
     }
 }

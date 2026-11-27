@@ -4,6 +4,7 @@ import com.otectus.arsnspells.commands.ArsNSpellsCommands;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.config.AnsClientConfig;
 import com.otectus.arsnspells.data.AffinityData;
 import com.otectus.arsnspells.data.ModCapabilityProvider;
 import com.otectus.arsnspells.data.CooldownData;
@@ -117,6 +118,7 @@ public class ArsNSpells {
         // are loaded server-side and auto-synced to clients on login.
         // Existing user configs at config/ars_n_spells-common.toml will be ignored; document
         // this in the 2.0.1 CHANGELOG.
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, AnsClientConfig.SPEC, "ars_n_spells-client.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, AnsConfig.SPEC, "ars_n_spells-server.toml");
 
         MinecraftForge.EVENT_BUS.addGenericListener(Entity.class, this::onAttachCapabilities);
@@ -223,7 +225,7 @@ public class ArsNSpells {
     }
 
     private void onConfigLoading(final ModConfigEvent.Loading event) {
-        if (!event.getConfig().getModId().equals(MODID)) {
+        if (!AnsClientConfig.isServerSpec(event.getConfig())) {
             return;
         }
 
@@ -280,7 +282,7 @@ public class ArsNSpells {
      * mode must follow those too, matching what /ans mode set already does.
      */
     private void onConfigReloading(final ModConfigEvent.Reloading event) {
-        if (!event.getConfig().getModId().equals(MODID)) {
+        if (!AnsClientConfig.isServerSpec(event.getConfig())) {
             return;
         }
         try {

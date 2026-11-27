@@ -29,8 +29,7 @@ public final class IronsGlyphRuntime implements IronGlyphBridge {
 
     /** The registered spell, or null; {@code SpellRegistry.getSpell} answers "none" for unknown ids. */
     static AbstractSpell spell(ResourceLocation id) {
-        AbstractSpell spell = SpellRegistry.getSpell(id);
-        return spell == null || spell == SpellRegistry.none() ? null : spell;
+        return com.otectus.arsnspells.spell.irons.IronsSpellLookup.lookupExact(id);
     }
 
     @Override

@@ -40,6 +40,22 @@ public final class ClientSettings {
             screen.onSettings(snapshot);
     }
 
+    /**
+     * The server's presentation policy for this client's HUD (audit ANS-007): the last snapshot it
+     * sent, which every login, settings change and config reload refreshes. Before the first snapshot
+     * arrives, the SERVER config Forge synchronized at login; the declared defaults if even that is
+     * not loaded. Read only; nothing here writes the client's copy of the config.
+     */
+    public static AnsSettings.ClientPolicy policy() {
+        AnsSettings.Snapshot snapshot = current;
+        if (snapshot != null) return snapshot.policy();
+        try {
+            return AnsSettings.ClientPolicy.current();
+        } catch (IllegalStateException notLoaded) {
+            return AnsSettings.ClientPolicy.DEFAULTS;
+        }
+    }
+
     public static void reset() {
         current = null;
     }

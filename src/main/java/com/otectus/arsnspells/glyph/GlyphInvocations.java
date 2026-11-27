@@ -38,9 +38,9 @@ final class GlyphInvocations {
                         SpellContext context, SpellResolver resolver) {
         if (world.isClientSide()) return;
         ImportedGlyphDefinition definition = effect.definition();
-        if (!(shooter instanceof ServerPlayer player) || shooter instanceof com.hollingsworth.arsnouveau.api.ANFakePlayer
-                || player.isRemoved() || !player.isAlive()) {
-            // A turret, rune or other non-player caster: no session, no payment, no free cast.
+        ServerPlayer player = GlyphCasters.realPlayer(shooter);
+        if (player == null) {
+            // A turret, rune, fake player or other non-player caster: no session, no payment, no free cast.
             trace(null, definition, "refused_non_player_caster");
             return;
         }
@@ -65,6 +65,8 @@ final class GlyphInvocations {
         // 3.4.1 review CAST-03: the same authorization every later stage repeats, against the policy now.
         String refusal = GlyphExecutionPolicy.refusal(player, session, occurrence, world, hit, castForm);
         if (refusal != null) {
+            // Refused before its effect: give back what this occurrence still holds, at once.
+            GlyphSessions.payment(player, session, occurrence).releaseIfUnpaid();
             refuse(player, definition, refusal);
             return;
         }

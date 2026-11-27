@@ -12,11 +12,18 @@ public final class ClientSchoolSnapshotLifecycle {
     private ClientSchoolSnapshotLifecycle() {}
     @SubscribeEvent public static void connect(ClientPlayerNetworkEvent.LoggingIn event) {
         GlyphClientSync.onLoggingIn();
+        // Audit ANS-003: another world's ring state never answers this one's HUD.
+        com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearClientCache();
     }
     @SubscribeEvent public static void disconnect(ClientPlayerNetworkEvent.LoggingOut event) {
         SchoolMappings.reset();
         GlyphClientSync.onLoggingOut();
         ClientSettings.reset();
+        com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearClientCache();
+    }
+    /** A respawn or dimension change replaces the local player; its ring state is read afresh. */
+    @SubscribeEvent public static void clone(ClientPlayerNetworkEvent.Clone event) {
+        com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearClientCache();
     }
     /** 3.4.1 review SYNC-01: the server's tags arrived; tag-derived views (catalyst members) are re-read. */
     @SubscribeEvent public static void tags(net.minecraftforge.event.TagsUpdatedEvent event) {

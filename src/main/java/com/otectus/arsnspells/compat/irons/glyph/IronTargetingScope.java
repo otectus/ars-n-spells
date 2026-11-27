@@ -60,6 +60,8 @@ public final class IronTargetingScope {
         com.otectus.arsnspells.glyph.GlyphChildren.Child child;
         /** Set when the invocation was refused before it was entered: the scope was never pushed. */
         String refusal;
+        /** Audit ANS-001: the route frame opened with this native invocation, closed with it. */
+        com.otectus.arsnspells.glyph.ImportedExecutionScope.Frame routeFrame;
 
         Scope(ServerPlayer caster, GlyphInvocation invocation, boolean redirectAim, boolean capture, boolean nativePipeline) {
             this.caster = caster;

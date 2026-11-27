@@ -116,6 +116,14 @@ FORGE_ONLY_GAMETESTS = {
     'ironsLoaded_policy_deadTargetRefusesTheDelayedEffect': 'NeoForge: ironsLoaded_policy_deadEntityTargetRefusesAtCompletion',
     'ironsLoaded_policy_disablingGlyphsStopsACharge': 'NeoForge: ironsLoaded_cancel_disablingGlyphsAfterAPaidPulseKeepsTheCooldown',
     'ironsLoaded_settings_modeChangeMidChargeNeitherDoubleBillsNorLosesTheHold': 'NeoForge: ironsLoaded_settings_modeChangeMidChargeKeepsTheAdmittedPrice',
+    # 2026-11-18 audit remediation
+    'covenantLoaded_route_delayedVirtueGlyphKeptRingPaysAura': 'Covenant of the Seven has no 1.21.1 build',
+    'covenantLoaded_route_delayedVirtueGlyphRefusedAfterRingRemoved': 'Covenant of the Seven has no 1.21.1 build',
+    'covenantLoaded_route_delayedVirtueGlyphRefusedAfterAuraDisabled': 'Covenant of the Seven has no 1.21.1 build',
+    'covenantLoaded_route_delayedVirtueGlyphRefusedAfterCursedRingAdded': 'Covenant of the Seven has no 1.21.1 build',
+    'covenantLoaded_route_virtueEquippedAfterManaAdmissionIsRefusedNotFree': 'Covenant of the Seven has no 1.21.1 build',
+    'covenantLoaded_route_projectileVirtueGlyphRefusedAfterRingRemoved': 'Covenant of the Seven has no 1.21.1 build',
+    'covenantLoaded_route_chargedVirtueGlyphRefusedWhenRingRemovedBeforeRelease': 'Covenant of the Seven has no 1.21.1 build',
 }
 NEO_ONLY_GAMETESTS = {
     'arsElemancy_everyGlyphResolvesWithoutThrowing': 'Ars Elemancy has no 1.20.1 build',
@@ -161,7 +169,8 @@ NEO_ONLY_GAMETESTS = {
 RESOURCES = Path('src/main/resources')
 FIXTURES = Path('src/test/resources/ans_shared_fixtures')
 # Each shared fixture family and the unit-test class that runs it on each loader.
-FIXTURE_RUNNERS = {'mappings': 'SharedMappingFixturesTest', 'catalogs': 'SharedCatalogFixturesTest', 'levels': 'SharedLevelFixturesTest'}
+FIXTURE_RUNNERS = {'mappings': 'SharedMappingFixturesTest', 'catalogs': 'SharedCatalogFixturesTest', 'levels': 'SharedLevelFixturesTest',
+                   'browser': 'BrowserModelTest'}
 # Tool modules both checkouts ship unchanged.
 SHARED_TOOLS = ('build_catalog_packages.py', 'contract_parity.py', 'glyph_catalog_pack.py', 'test_addon_adapter.py', 'test_glyph_catalog_pack.py',
                 'test_pack_presets.py', 'test_validate_glyph_mappings.py', 'test_verify_gametest_log.py',
@@ -201,6 +210,13 @@ def tree(root: Path) -> dict:
 def behaviour(forge: Path, neo: Path) -> dict:
     """Shared behaviour that must agree exactly; see the module comment."""
     errors = []
+    # The loader-specific editor adapters share one localization vocabulary with resource packs.
+    browser_labels = []
+    for checkout in (forge, neo):
+        locale = json.loads((checkout / 'src/main/resources/assets/ars_n_spells/lang/en_us.json').read_text(encoding='utf-8'))
+        browser_labels.append({key: value for key, value in locale.items() if key.startswith('ars_n_spells.browser.')})
+    if not browser_labels[0] or browser_labels[0] != browser_labels[1]:
+        errors.append('The shared glyph browser labels differ between loaders')
     fa, na = tree(forge / FIXTURES), tree(neo / FIXTURES)
     for name in sorted(fa.keys() | na.keys()):
         if name not in na: errors.append('Shared fixture missing on NeoForge: ' + name)
@@ -237,7 +253,7 @@ def behaviour(forge: Path, neo: Path) -> dict:
         lost = sorted(set(ledger(root / RESOURCES / LEDGER)) - ids)
         if lost: errors.append(f'{loader} catalog lost {len(lost)} published identities, first {lost[0]}')
     adapter_pairs = collections.Counter((fadapters[s], nadapters[s]) for s in fadapters.keys() & nadapters.keys())
-    return {'shared_fixture_cases': cases, 'shared_fixture_files': len(fa), 'shared_tools': len(SHARED_TOOLS),
+    return {'browser_labels': len(browser_labels[0]), 'shared_fixture_cases': cases, 'shared_fixture_files': len(fa), 'shared_tools': len(SHARED_TOOLS),
             'catalog_identities': len(fi), 'ledger_identities': len(fl), 'identities': fi,
             'adapter_pairs': adapter_pairs, 'errors': errors}
 
@@ -465,7 +481,7 @@ def main():
         if report['errors']:
             print('\n'.join(report['errors']), file=sys.stderr); return 1
         print(f"PASS (behaviour): {report['shared_fixture_cases']} shared fixture cases in {report['shared_fixture_files']} identical files, "
-              f"{report['shared_tools']} identical tool modules, {report['catalog_identities']} catalog identities and "
+              f"{report['shared_tools']} identical tool modules, {report['browser_labels']} browser labels, {report['catalog_identities']} catalog identities and "
               f"{report['ledger_identities']} ledger ids agree")
         return 0
     report = audit(forge, neo)

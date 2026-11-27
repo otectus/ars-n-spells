@@ -95,15 +95,53 @@ public final class AnsSettings {
     }
 
     /**
+     * Every SERVER setting the client's own presentation reads (audit ANS-007), as one bounded,
+     * immutable value: the Hybrid bar choice, hide-with-ring, and the two ring resource toggles that
+     * decide whether a ring actually replaces mana. Display-only: receiving these never makes them
+     * editable from the client, and the client never writes them into its config.
+     */
+    public record ClientPolicy(String hybridManaBar, boolean hideManaBarWithRing, boolean lpSystem, boolean virtueAuraSystem) {
+        /** The declared defaults, until a server has said otherwise. */
+        public static final ClientPolicy DEFAULTS = new ClientPolicy("irons", true, true, true);
+
+        public ClientPolicy {
+            hybridManaBar = "irons".equalsIgnoreCase(hybridManaBar) ? "irons" : "ars";
+        }
+
+        /** The server's values now. */
+        public static ClientPolicy current() {
+            return new ClientPolicy(AnsConfig.HYBRID_MANA_BAR.get(), AnsConfig.HIDE_MANA_BAR_WITH_RING.get(),
+                AnsConfig.ENABLE_LP_SYSTEM.get(), AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get());
+        }
+
+        public boolean hybridShowsIrons() {
+            return "irons".equals(hybridManaBar);
+        }
+
+        public void write(FriendlyByteBuf buffer) {
+            buffer.writeUtf(hybridManaBar, 8);
+            buffer.writeBoolean(hideManaBarWithRing);
+            buffer.writeBoolean(lpSystem);
+            buffer.writeBoolean(virtueAuraSystem);
+        }
+
+        public static ClientPolicy read(FriendlyByteBuf buffer) {
+            return new ClientPolicy(buffer.readUtf(8), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean());
+        }
+    }
+
+    /**
      * What one client is told: every setting, the effective mode (what the routing runs after Iron's
-     * presence and the master switch), whether Iron's is installed, and whether this player may edit.
+     * presence and the master switch), whether Iron's is installed, whether this player may edit, and
+     * the presentation policy the client's HUD follows (audit ANS-007).
      */
     public record Snapshot(Map<String, String> values, String effectiveMode, boolean ironsPresent, boolean canEdit,
-                           String resultKey, String resultDetail) {
+                           String resultKey, String resultDetail, ClientPolicy policy) {
         public Snapshot {
             values = Collections.unmodifiableMap(new LinkedHashMap<>(values));
             resultKey = resultKey == null ? "" : resultKey;
             resultDetail = resultDetail == null ? "" : resultDetail;
+            policy = policy == null ? ClientPolicy.DEFAULTS : policy;
         }
 
         public void write(FriendlyByteBuf buffer) {
@@ -117,6 +155,7 @@ public final class AnsSettings {
             buffer.writeBoolean(canEdit);
             buffer.writeUtf(resultKey, 128);
             buffer.writeUtf(resultDetail, 256);
+            policy.write(buffer);
         }
 
         public static Snapshot read(FriendlyByteBuf buffer) {
@@ -125,7 +164,7 @@ public final class AnsSettings {
             Map<String, String> values = new LinkedHashMap<>();
             for (int i = 0; i < size; i++) values.put(buffer.readUtf(MAX_STRING), buffer.readUtf(MAX_STRING));
             return new Snapshot(values, buffer.readUtf(MAX_STRING), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readUtf(128), buffer.readUtf(256));
+                buffer.readUtf(128), buffer.readUtf(256), ClientPolicy.read(buffer));
         }
     }
 

@@ -1,0 +1,14 @@
+{
+  "mode": "grouped",
+  "view": "LEARNED",
+  "query": "",
+  "pending": false,
+  "source": "",
+  "school": "",
+  "fits": false,
+  "expected": [
+    "alpha:bolt#1",
+    "alpha:bolt#3",
+    "beta:bolt#2"
+  ]
+}

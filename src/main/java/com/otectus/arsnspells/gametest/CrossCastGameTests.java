@@ -309,10 +309,14 @@ public final class CrossCastGameTests {
     }
 
     /**
-     * A hurt fake player holding nothing, with no spellbook equipped and clean cast state.
+     * A hurt real player holding nothing, with no spellbook equipped and clean cast state.
+     *
+     * <p>Audit ANS-002: a real {@link ServerPlayer} with a test connection ({@link TestPlayers}),
+     * not Forge's {@code FakePlayer}. Imported glyphs refuse fake players, so a positive cast with
+     * one would pass by being refused; the refusal itself is its own test.
      *
      * <p><b>Every cast-gating property is reset explicitly, not inherited.</b>
-     * {@code FakePlayerFactory.get} returns a cached instance per (level, profile), so all
+     * {@link TestPlayers#get} returns a cached instance per (level, profile), so all
      * tests in this class share ONE player object and whatever the previous test left on it.
      * That was a latent flake: a test that ran after a survival test inherited survival with no
      * mana, and Iron's then refused to initiate the cast for a reason unrelated to what was
@@ -325,7 +329,7 @@ public final class CrossCastGameTests {
 
     /**
      * The same player, but private to {@code scenario}: a distinct {@link GameProfile} means
-     * {@code FakePlayerFactory} hands back a distinct instance, so two tests running concurrently
+     * {@link TestPlayers} hands back a distinct instance, so two tests running concurrently
      * in one batch cannot see each other's inventory, health or cast state.
      */
     static ServerPlayer scenarioPlayer(GameTestHelper helper, String scenario) {
@@ -335,7 +339,7 @@ public final class CrossCastGameTests {
     }
 
     private static ServerPlayer emptyHandedPlayer(GameTestHelper helper, GameProfile profile) {
-        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), profile);
+        ServerPlayer player = TestPlayers.get(helper.getLevel(), profile);
         player.moveTo(helper.absoluteVec(new Vec3(1.0, 2.0, 1.0)));
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
         player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);

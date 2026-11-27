@@ -66,7 +66,7 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         // are present they would independently zero Iron's mana and debit LP or
         // aura.  The 3.3.0 transaction path owns those decisions, so apply the
         // compatibility seam only when both optional mods are actually present.
-        if (mixinClassName.endsWith("MixinCovenantSpellEvents")) {
+        if (mixinClassName.endsWith("MixinCovenantSpellEvents") || mixinClassName.endsWith("MixinCovenantAuraReceipt")) {
             return ironsPresent && sanctifiedPresent;
         }
         // MixinResourceBarOverlay targets Covenant's ResourceBarOverlay (the actual

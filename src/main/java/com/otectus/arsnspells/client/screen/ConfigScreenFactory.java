@@ -41,7 +41,7 @@ public class ConfigScreenFactory {
         private static final int BTN_H = 20;
         private static final int BTN_W_BOOL = 44;
         private static final int BTN_W_CYCLE = 110;
-        private static final int FOOTER_H = 64;
+        private static final int FOOTER_H = 84;
         /** Defaults the Reset button restores in the draft; must match AnsConfig's .define defaults. */
         private static final Map<String, String> TOGGLE_DEFAULTS = Map.of(
             "enable_mana_unification", "true", "enable_resonance_system", "true", "enable_cooldown_system", "false",
@@ -110,6 +110,9 @@ public class ConfigScreenFactory {
             this.addRenderableWidget(Button.builder(Component.translatable("ars_n_spells.compatibility.title"),
                     b -> minecraft.setScreen(new CompatibilityScreen(this)))
                 .bounds(this.width / 2 + 52, this.height - 52, 98, 20).build());
+            this.addRenderableWidget(Button.builder(Component.translatable("ars_n_spells.browser.personal"),
+                    b -> com.otectus.arsnspells.client.glyph.BrowserPlatform.push(new com.otectus.arsnspells.client.glyph.PersonalDisplayScreen()))
+                .bounds(this.width / 2 - 150, this.height - 74, 300, 20).build());
             rebuildOptionButtons();
         }
 

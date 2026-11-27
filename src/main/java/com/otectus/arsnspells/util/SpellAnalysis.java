@@ -53,10 +53,12 @@ public final class SpellAnalysis {
             this.firstEffect = firstEffect;
             this.castMethod = castMethod;
             this.allEffects = Collections.unmodifiableList(allEffects);
-            this.dominantSchool = dominantSchool;
             this.schools = Collections.unmodifiableSet(schools);
             this.category = category;
             this.schoolKeys = SchoolResolver.resolveKeys(firstEffect);
+            // Audit ANS-005: the legacy built-in projection is derived from the one ordered primary,
+            // never re-selected independently, so discounts and progression cannot disagree.
+            this.dominantSchool = SchoolKeys.builtin(this.schoolKeys.get(0)).id();
             this.mappingDigest = SchoolMappings.get().digest();
             // Every non-generic school key across all effects, in order: the candidate set the
             // multi_school_power_policy aggregates over. Affinity and progression keep using
@@ -121,7 +123,10 @@ public final class SpellAnalysis {
         /** All AbstractEffect parts found in the recipe. */
         public List<AbstractSpellPart> allEffects() { return allEffects; }
 
-        /** The derived school id: "fire", "ice", "holy", etc., or "generic" if unknown. */
+        /**
+         * The built-in projection of the primary school, {@link #schoolKey()}: "fire", "ice",
+         * "holy", etc., or "generic" when the primary is unknown or an addon/custom school.
+         */
         public String dominantSchool() { return dominantSchool; }
 
         /** Enum-typed companion to {@link #dominantSchool()}; prefer this at new call sites. */

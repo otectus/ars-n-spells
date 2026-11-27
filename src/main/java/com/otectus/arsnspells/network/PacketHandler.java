@@ -28,7 +28,8 @@ public class PacketHandler {
     // Bumped 8 -> 9 in 3.4.1: the imported-glyph mapping view gained per-level overrides and the
     // Self restriction, and the live Iron's facts packet was added.
     // 3.4.1 review CONFIG-01: 9 -> 10 for the settings apply/sync messages appended below.
-    private static final String PROTOCOL_VERSION = "10";
+    // Audit ANS-007: 10 -> 11, SettingsSyncPacket's snapshot carries the client presentation policy.
+    private static final String PROTOCOL_VERSION = "11";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ArsNSpells.MODID, "main"),
             () -> PROTOCOL_VERSION,

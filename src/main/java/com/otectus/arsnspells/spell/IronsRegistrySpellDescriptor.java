@@ -60,7 +60,8 @@ public record IronsRegistrySpellDescriptor(ResourceLocation spellId, int level, 
         if (!ModList.get().isLoaded("irons_spellbooks") || spellId == null) {
             return null;
         }
-        return io.redspace.ironsspellbooks.api.registry.SpellRegistry.getSpell(spellId);
+        // ANS-014: the requested spell, or null; never Iron's none sentinel standing in for it.
+        return com.otectus.arsnspells.spell.irons.IronsSpellLookup.lookupExact(spellId);
     }
 
     @Override
@@ -69,7 +70,7 @@ public record IronsRegistrySpellDescriptor(ResourceLocation spellId, int level, 
     }
 
     private static boolean ironResolvable(ResourceLocation id) {
-        return io.redspace.ironsspellbooks.api.registry.SpellRegistry.getSpell(id) != null;
+        return com.otectus.arsnspells.spell.irons.IronsSpellLookup.resolvable(id);
     }
 
     static Optional<SpellDescriptor> tryParse(CompoundTag entry) {

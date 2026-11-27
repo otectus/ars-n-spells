@@ -62,32 +62,51 @@ public class ModCapabilityProvider implements ICapabilitySerializable<CompoundTa
     }
 
     /**
-     * Persist affinity and progression data across death/dimension change.
-     * Cooldown data resets on death (clone hook does not copy it) but IS persisted
-     * across server save/restart via {@link #serializeNBT()}.
+     * Persist affinity and progression data across every clone, and cooldowns across a non-death
+     * clone. Forge fires {@code PlayerEvent.Clone} on death and on travel from the End to the
+     * Overworld; {@code isWasDeath()} tells them apart. Cooldown data resets on death by design
+     * (audit ANS-006: only on death; an End return used to reset it too) and IS persisted across
+     * server save/restart via {@link #serializeNBT()}.
      *
      * <p>ANS-HIGH-008: registered at HIGHEST priority so capability copy completes
      * BEFORE any third-party {@code PlayerEvent.Clone} handler at default priority
      * reads our caps. Without this, a HIGHEST-priority reader from another mod
      * would see the freshly-default state.
+     *
+     * <p>The original's capabilities are revived only for the copy and invalidated in
+     * {@code finally}, so a failed copy cannot leave them active. The respawn resync
+     * ({@code CapabilityResyncHandler}) publishes the copied state to the client.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onPlayerClone(PlayerEvent.Clone event) {
         event.getOriginal().reviveCaps();
-        event.getOriginal().getCapability(AffinityData.AFFINITY_DATA).ifPresent(oldData -> {
-            event.getEntity().getCapability(AffinityData.AFFINITY_DATA).ifPresent(newData -> {
-                CompoundTag tag = new CompoundTag();
-                oldData.saveToNBT(tag);
-                newData.loadFromNBT(tag);
+        try {
+            event.getOriginal().getCapability(AffinityData.AFFINITY_DATA).ifPresent(oldData -> {
+                event.getEntity().getCapability(AffinityData.AFFINITY_DATA).ifPresent(newData -> {
+                    CompoundTag tag = new CompoundTag();
+                    oldData.saveToNBT(tag);
+                    newData.loadFromNBT(tag);
+                });
             });
-        });
-        event.getOriginal().getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(oldData -> {
-            event.getEntity().getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(newData -> {
-                CompoundTag tag = new CompoundTag();
-                oldData.saveToNBT(tag);
-                newData.loadFromNBT(tag);
+            event.getOriginal().getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(oldData -> {
+                event.getEntity().getCapability(ProgressionData.PROGRESSION_DATA).ifPresent(newData -> {
+                    CompoundTag tag = new CompoundTag();
+                    oldData.saveToNBT(tag);
+                    newData.loadFromNBT(tag);
+                });
             });
-        });
-        event.getOriginal().invalidateCaps();
+            if (!event.isWasDeath()) {
+                // End return: the same life, so its category cooldowns carry over, in the same
+                // BridgeCooldowns schema (absolute game-time end ticks; game time is server-wide).
+                event.getOriginal().getCapability(CooldownData.COOLDOWN_CAP).ifPresent(oldData ->
+                    event.getEntity().getCapability(CooldownData.COOLDOWN_CAP).ifPresent(newData -> {
+                        CompoundTag saved = new CompoundTag();
+                        oldData.save(saved);
+                        newData.load(saved);
+                    }));
+            }
+        } finally {
+            event.getOriginal().invalidateCaps();
+        }
     }
 }

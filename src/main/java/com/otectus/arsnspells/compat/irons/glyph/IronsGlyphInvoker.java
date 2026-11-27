@@ -76,6 +76,9 @@ final class IronsGlyphInvoker {
         int castLevel = invocation.nativeLevel();
         ICastData previous = data.getAdditionalCastData();
         IronTargetingScope.Scope scope = IronTargetingScope.push(invocation);
+        // Audit ANS-001: Covenant's native handlers see this execution's route while its events run.
+        com.otectus.arsnspells.glyph.ImportedExecutionScope.Frame route =
+            com.otectus.arsnspells.glyph.ImportedExecutionScope.push(player.getUUID(), invocation.payment().route());
         boolean effectStarted = false;
         try {
             data.setAdditionalCastData(null);
@@ -124,6 +127,7 @@ final class IronsGlyphInvoker {
                     data.getAdditionalCastData()));
             return new IronGlyphBridge.InvocationOutcome(IronGlyphBridge.InvocationOutcome.Status.EFFECT_APPLIED, "", event.getSpellLevel());
         } finally {
+            com.otectus.arsnspells.glyph.ImportedExecutionScope.pop(route);
             IronTargetingScope.pop(scope);
             // The execution's own cast data (a target marker, a targeting area) is spent;
             // whatever the slot held before goes back untouched.
@@ -177,20 +181,35 @@ final class IronsGlyphInvoker {
             refuse(player, invocation, refusal);
             return false;
         }
+        com.otectus.arsnspells.glyph.GlyphRoute paying = invocation.payment().route();
         invocation.payment().releaseForNativePipeline();
         IronTargetingScope.Scope scope = IronTargetingScope.push(invocation);
         scope.child = child;
         boolean started;
+        boolean auraCharged;
         GlyphChildren.initiating(child);
+        // Audit ANS-001: the initiation's pre-cast event is where Covenant takes an aura route's payment.
+        com.otectus.arsnspells.glyph.ImportedExecutionScope.Frame route =
+            com.otectus.arsnspells.glyph.ImportedExecutionScope.push(player.getUUID(), paying);
         try {
             ItemStack tool = invocation.casterTool() == null ? ItemStack.EMPTY : invocation.casterTool();
             // Iron's own callers apply getLevelFor before attemptInitiateCast, which does not apply
             // it again; the level frozen at admission is that value.
             started = spell.attemptInitiateCast(tool, invocation.nativeLevel(), player.level(), player,
                 CastSource.SPELLBOOK, true, child.slotTag);
+            auraCharged = route.auraCharged();
         } finally {
+            com.otectus.arsnspells.glyph.ImportedExecutionScope.pop(route);
             GlyphChildren.initiating(null);
             IronTargetingScope.pop(scope);
+        }
+        if (started && paying == com.otectus.arsnspells.glyph.GlyphRoute.AURA_NATIVE && !auraCharged) {
+            // Covenant did not charge the aura route: end the child before Iron's pipeline prices it in mana.
+            io.redspace.ironsspellbooks.api.util.Utils.serverSideCancelCast(player);
+            refuse(player, invocation, "message.ars_n_spells.glyph.refused.aura_not_charged");
+            child.started = false;
+            child.pendingStart = null;
+            return false;
         }
         if (!started && LOGGER.isDebugEnabled()) {
             var check = spell.canBeCastedBy(invocation.nativeLevel(), CastSource.SPELLBOOK, data, player);
@@ -240,6 +259,8 @@ final class IronsGlyphInvoker {
         }
         IronTargetingScope.Scope scope = IronTargetingScope.push(child.invocation);
         scope.child = child;
+        // Audit ANS-001: the release's or pulse's cost event runs under the child's admitted route.
+        scope.routeFrame = com.otectus.arsnspells.glyph.ImportedExecutionScope.push(player.getUUID(), child.invocation.payment().route());
         return scope;
     }
 
@@ -248,6 +269,7 @@ final class IronsGlyphInvoker {
         try {
             if (effectReached) deliver(scope, scope.invocation());
         } finally {
+            com.otectus.arsnspells.glyph.ImportedExecutionScope.pop(scope.routeFrame);
             IronTargetingScope.pop(scope);
         }
         GlyphChildren.Child child = scope.child;

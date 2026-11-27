@@ -21,6 +21,7 @@
     "irons.MixinInscriptionResultSlot",
     "sanctified.MixinSanctifiedAbstractSpell",
     "sanctified.MixinCovenantSpellEvents",
+    "sanctified.MixinCovenantAuraReceipt",
     "gametest.MixinCastProbe"
   ],
   "client": [

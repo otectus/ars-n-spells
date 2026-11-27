@@ -26,6 +26,10 @@
       "item": "ars_n_spells:iron/irons_spellbooks/firebolt/level_1",
       "title": "ars_n_spells.book.glyph_press.example.title",
       "text": "ars_n_spells.book.glyph_press.example"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "ars_n_spells.browser.help"
     }
   ],
   "flag": "mod:irons_spellbooks"

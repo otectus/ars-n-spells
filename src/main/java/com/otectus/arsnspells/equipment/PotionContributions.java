@@ -49,35 +49,38 @@ public final class PotionContributions {
         }
 
         ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        boolean redirecting = BridgeManager.isUnificationEnabled()
-            && mode != null && mode.isIssPrimary();
+        // Audit ANS-004: regeneration and capacity are reconciled separately.
+        // Regeneration follows pool ownership: in ISS_PRIMARY and HYBRID Iron's owns the shared pool
+        // and Ars's own regen tick is suppressed (MixinManaCapability), so an Ars regen potion has
+        // to reach Iron's regen or it does nothing. HYBRID used to drop it.
+        boolean transferRegen = BridgeManager.ironsOwnsSharedPool();
+        // Capacity only in ISS_PRIMARY: HYBRID's ceiling is Ars's real maximum
+        // (EquipmentIntegration.syncIronsMaxToArs), which already includes this potion's
+        // max-mana contribution, so adding it again would count it twice.
+        boolean transferCapacity = BridgeManager.isUnificationEnabled() && mode != null && mode.isIssPrimary();
 
-        // V14: removal is NOT gated on the redirect being on. This used to return above,
-        // before either helper ran, so switching away from ISS_PRIMARY (or disabling
-        // unification) left the last potion modifier sitting on the Iron's attributes with
-        // nothing left running that could take it off. The redirect is conditional; the
-        // cleanup is not.
-        if (!redirecting) {
-            arsnspells$clearPotionModifiers(player);
-            return;
-        }
-
-        // Check for Ars potion effects and apply them to Iron's mana system
-        arsnspells$redirectManaRegenPotions(player);
-        arsnspells$redirectMaxManaPotions(player);
+        // V14: removal is NOT gated on a redirect being on. Switching away from a mode that
+        // applied a modifier must take it off, or nothing left running ever would. Each
+        // redirect is conditional; its cleanup is not.
+        if (transferRegen) arsnspells$redirectManaRegenPotions(player);
+        else arsnspells$clearRegenModifier(player);
+        if (transferCapacity) arsnspells$redirectMaxManaPotions(player);
+        else arsnspells$clearMaxModifier(player);
     }
 
-    /**
-     * Drop both potion-derived modifiers, whatever the current mode. Cheap enough for the
-     * per-tick path: two attribute lookups and a null test each, and nothing is dirtied
-     * unless a modifier is genuinely present.
-     */
-    private static void arsnspells$clearPotionModifiers(Player player) {
+    private static void arsnspells$clearRegenModifier(Player player) {
         try {
             AttributeInstance regenAttr = player.getAttribute(AttributeRegistry.MANA_REGEN.get());
             if (regenAttr != null && regenAttr.getModifier(POTION_MANA_REGEN_ID) != null) {
                 regenAttr.removeModifier(POTION_MANA_REGEN_ID);
             }
+        } catch (Exception e) {
+            // Iron's absent or its attributes unresolvable: nothing of ours can be on them.
+        }
+    }
+
+    private static void arsnspells$clearMaxModifier(Player player) {
+        try {
             AttributeInstance maxManaAttr = player.getAttribute(AttributeRegistry.MAX_MANA.get());
             if (maxManaAttr != null && maxManaAttr.getModifier(POTION_MAX_MANA_ID) != null) {
                 maxManaAttr.removeModifier(POTION_MAX_MANA_ID);
@@ -99,12 +102,12 @@ public final class PotionContributions {
             if (regenAttr == null) return;
 
             if (arsRegenBonus > 0) {
-                // arsRegenBonus is absolute mana/sec; Iron's MANA_REGEN is a percentage-of-pool
-                // multiplier. Going through ManaRegenBridge converts units; the pool conversion
-                // rate is then layered on top.
+                // arsRegenBonus is in Ars's nominal regen units; Iron's MANA_REGEN is a
+                // percentage-of-pool multiplier. Going through ManaRegenBridge converts units at
+                // both mods' live schedules; the pool conversion rate is layered on top.
                 double conversionRate = AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
-                double absRegenPerSec = arsRegenBonus * conversionRate;
-                double ironRegenBonus = ManaRegenBridge.convertArsToIrons(absRegenPerSec, player);
+                double arsNominal = arsRegenBonus * conversionRate;
+                double ironRegenBonus = ManaRegenBridge.convertArsToIrons(arsNominal, player);
 
                 // OPT-008: this runs every server tick; only churn the attribute (which
                 // dirties the attribute map and forces a recompute) when the value changed.

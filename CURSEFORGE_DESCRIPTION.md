@@ -146,7 +146,7 @@ JEI shows every conversion, and the worn notebook has a Glyph Press chapter.
 
 **Also in 3.4.0:** Touch spells cast from exported scrolls, inscribed items and bound Iron's books now hit what you aim at exactly like a spell book. A miss no longer trains your school or starts a cooldown.
 
-Client and server both need 3.4.0.
+Client and server both need the same Ars 'n' Spells version: 3.4.2 for the current release (network protocol 11).
 
 ---
 

@@ -68,7 +68,10 @@ class MixinInjectionPointImmunityTest {
     private static final Set<String> INSTRUCTION_LEVEL_ALLOWLIST =
         Set.of("MixinResourceBarOverlay.java", "MixinIronsCastPayment.java",
         "MixinIronsCastTicker.java", "MixinCastProbe.java",
-            "MixinSanctifiedAbstractSpell.java");
+            "MixinSanctifiedAbstractSpell.java",
+            // Audit ANS-001: the Covenant aura receipt has no HEAD/RETURN formulation (only reaching
+            // the drain call proves Covenant charged); its failure refuses imported aura casts.
+            "MixinCovenantAuraReceipt.java");
 
     /** Matches both {@code @At("HEAD")} and {@code @At(value = "INVOKE", ...)}. */
     private static final Pattern AT_SIMPLE = Pattern.compile("@At\\s*\\(\\s*\"([A-Z_]+)\"");

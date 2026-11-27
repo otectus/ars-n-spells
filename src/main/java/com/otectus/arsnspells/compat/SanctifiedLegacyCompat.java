@@ -16,7 +16,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,11 +49,19 @@ public class SanctifiedLegacyCompat {
     //
     // Scanning the entire curio inventory runs once per spell cast per player
     // for ring/blasphemy detection. We scan once, cache the result for a short
-    // TTL, and serve subsequent queries from cache. Entries are evicted on
-    // player logout (see clearCacheFor / CursedRingHandler listener).
+    // TTL, and serve subsequent queries from cache.
+    //
+    // Audit ANS-003: the cache is partitioned by logical side and answers only the
+    // exact player object that produced an entry (held weakly). In an integrated
+    // server the client and server players share a UUID but not an inventory, so a
+    // client HUD scan must never answer a server payment decision, or the reverse.
+    // Entries are removed on server logout, clone, respawn, dimension change and
+    // stop (StateEvictionHandler), on client connect/disconnect
+    // (ClientSchoolSnapshotLifecycle), on equipment change, and by the periodic sweep.
+    // Payment boundaries read fresh equipment through freshState instead of the TTL.
     // ------------------------------------------------------------------
     private static final int CURIO_CACHE_TTL_TICKS = 20; // 1 second at 20 TPS
-    private static final ConcurrentHashMap<UUID, CurioState> CURIO_STATE_CACHE = new ConcurrentHashMap<>();
+    private static final SidedStateCache<CurioState> CURIO_STATE_CACHE = new SidedStateCache<>(CURIO_CACHE_TTL_TICKS);
 
     /**
      * Snapshot of the Covenant-of-the-Seven / Enigmatic Legacy curio state for
@@ -760,6 +767,42 @@ public class SanctifiedLegacyCompat {
             && isWearingVirtueRing(player);
     }
 
+    private static final ResourceLocation COVENANT_VIRTUE_RING = new ResourceLocation(MOD_ID, "virtue_ring");
+    private static final ResourceLocation ENIGMATIC_CURSED_RING = new ResourceLocation(ENIGMATIC_LEGACY_MOD_ID, "cursed_ring");
+
+    /**
+     * Whether Covenant of the Seven's own Virtue Ring handler will take aura for {@code player}'s
+     * next Iron's pre-cast (audit ANS-001), read from the worn curios now rather than the cache.
+     *
+     * <p>Mirrors the pinned Covenant 2.2.6-hotfix {@code ISSSpellEvents.virtueRingCastingEvent}: a
+     * server player wearing Covenant's registered {@code virtue_ring} item and not Enigmatic Legacy's
+     * {@code cursed_ring}; plus ANS's own {@code enable_virtue_aura_system}, without which
+     * {@code MixinCovenantSpellEvents} suppresses that handler. Membership of
+     * {@code #ars_n_spells:virtue_rings} is deliberately not enough: Covenant checks its own item.
+     */
+    public static boolean isCovenantNativeVirtueEligible(Player player) {
+        if (!isLoaded || !(player instanceof net.minecraft.server.level.ServerPlayer) || !AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get()) {
+            return false;
+        }
+        net.minecraft.world.item.Item virtue = ForgeRegistries.ITEMS.getValue(COVENANT_VIRTUE_RING);
+        if (virtue == null || virtue == net.minecraft.world.item.Items.AIR) return false;
+        net.minecraft.world.item.Item cursed = ForgeRegistries.ITEMS.getValue(ENIGMATIC_CURSED_RING);
+        boolean[] worn = {false, false};
+        try {
+            CuriosUtil.getAllWornItems(player).ifPresent(handler -> {
+                for (int i = 0; i < handler.getSlots(); i++) {
+                    ItemStack stack = handler.getStackInSlot(i);
+                    if (stack.isEmpty()) continue;
+                    if (stack.is(virtue)) worn[0] = true;
+                    if (cursed != null && cursed != net.minecraft.world.item.Items.AIR && stack.is(cursed)) worn[1] = true;
+                }
+            });
+        } catch (RuntimeException unreadable) {
+            return false;
+        }
+        return worn[0] && !worn[1];
+    }
+
     /**
      * True when either ring's cost path is active, i.e. ANS (not Ars) owns this cast's
      * resource accounting.
@@ -787,18 +830,21 @@ public class SanctifiedLegacyCompat {
         if (player == null) {
             return EMPTY_STATE;
         }
-        UUID id = player.getUUID();
         // ANS-HIGH-011: server-global gameTime (monotonic per world) instead of the
-        // per-player tickCount, for consistency with the ring handlers. The now >=
-        // cachedAtTick guard still cheaply rejects any non-monotonic edge (e.g. /time set).
+        // per-player tickCount, for consistency with the ring handlers. The cache's
+        // now >= cachedAt guard still cheaply rejects any non-monotonic edge (e.g. /time set).
         long now = player.level().getGameTime();
-        CurioState cached = CURIO_STATE_CACHE.get(id);
-        if (cached != null && now - cached.cachedAtTick < CURIO_CACHE_TTL_TICKS && now >= cached.cachedAtTick) {
-            return cached;
-        }
-        CurioState fresh = scanCurios(player, now);
-        CURIO_STATE_CACHE.put(id, fresh);
-        return fresh;
+        return CURIO_STATE_CACHE.get(player.level().isClientSide(), player.getUUID(), player, now, tick -> scanCurios(player, tick));
+    }
+
+    /**
+     * Re-read {@code player}'s worn rings now, replacing the cached state for its side. For decisions
+     * that move a resource (route admission and execution), which must not act on a TTL result.
+     */
+    public static void freshState(Player player) {
+        if (player == null || (!isLoaded && !isEnigmaticLegacyLoaded)) return;
+        long now = player.level().getGameTime();
+        CURIO_STATE_CACHE.refresh(player.level().isClientSide(), player.getUUID(), player, now, tick -> scanCurios(player, tick));
     }
 
     /**
@@ -842,13 +888,39 @@ public class SanctifiedLegacyCompat {
             Set.copyOf(schools), tick);
     }
 
-    /**
-     * Evict cached curio state for a player (call on logout).
-     */
+    /** Evict a player's cached curio state on both sides (tests and callers that hold only a UUID). */
     public static void clearCacheFor(UUID playerId) {
-        if (playerId != null) {
-            CURIO_STATE_CACHE.remove(playerId);
-        }
+        CURIO_STATE_CACHE.removeBoth(playerId);
+    }
+
+    /** Evict {@code player}'s cached curio state on its own logical side (an equipment change, a clone). */
+    public static void invalidate(Player player) {
+        if (player != null) CURIO_STATE_CACHE.remove(player.level().isClientSide(), player.getUUID());
+    }
+
+    /** Server logout: drop the server entry only; the integrated client clears its own on disconnect. */
+    public static void clearServerEntry(UUID playerId) {
+        CURIO_STATE_CACHE.remove(false, playerId);
+    }
+
+    /** Server stopping: an integrated-server JVM must not carry entries into the next world. */
+    public static void clearServerCache() {
+        CURIO_STATE_CACHE.clear(false);
+    }
+
+    /** Client connect or disconnect. */
+    public static void clearClientCache() {
+        CURIO_STATE_CACHE.clear(true);
+    }
+
+    /** The periodic sweep: keep server entries only for players still online. */
+    public static void retainServerEntries(java.util.Collection<UUID> online) {
+        CURIO_STATE_CACHE.retainServer(online);
+    }
+
+    /** Entries held for {@code clientSide}; diagnostics and tests. */
+    public static int cachedEntries(boolean clientSide) {
+        return CURIO_STATE_CACHE.size(clientSide);
     }
 
     /**

@@ -119,7 +119,8 @@ public final class AnsSettingsService {
     public static AnsSettings.Snapshot snapshotFor(ServerPlayer player, @Nullable Result outcome) {
         return new AnsSettings.Snapshot(AnsSettings.current(), BridgeManager.getCurrentMode().getConfigName(),
             BridgeManager.isIronsSpellbooksLoaded(), ConfigAuthority.mayChange(player),
-            outcome == null ? "" : outcome.resultKey(), outcome == null ? "" : outcome.detail());
+            outcome == null ? "" : outcome.resultKey(), outcome == null ? "" : outcome.detail(),
+            AnsSettings.ClientPolicy.current());
     }
 
     /** Send every connected player the settings in force. */
@@ -135,7 +136,11 @@ public final class AnsSettingsService {
             PacketHandler.sendToClient(new SettingsSyncPacket(snapshotFor(player, null)), player);
     }
 
-    /** A config file edit or reload: the values are already loaded; make everything else follow and tell clients. */
+    /**
+     * A config file edit or reload: the values are already loaded; make everything else follow and tell clients.
+     * Forge only sends SERVER configs at login, so this broadcast is how a connected remote client learns a
+     * changed presentation policy (audit ANS-007: the snapshot carries it).
+     */
     public static void onFileReloaded() {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server == null) return;

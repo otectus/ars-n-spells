@@ -2,6 +2,7 @@ package com.otectus.arsnspells.mixin.sanctified;
 
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.glyph.ImportedExecutionScope;
 import io.redspace.ironsspellbooks.api.events.SpellOnCastEvent;
 import io.redspace.ironsspellbooks.api.events.SpellPreCastEvent;
 import net.minecraft.world.entity.player.Player;
@@ -43,9 +44,11 @@ public abstract class MixinCovenantSpellEvents {
     private static void arsnspells$disableVirtuePreCastWhenOff(
         SpellPreCastEvent event, CallbackInfo ci) {
         Player player = event == null ? null : event.getEntity();
-        if (player != null
-            && SanctifiedLegacyCompat.isWearingVirtueRing(player)
-            && !AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get()) {
+        if (player == null) return;
+        // Audit ANS-001: an imported glyph admitted on the mana or LP route never pays aura, even
+        // if a Virtue Ring was equipped after admission. Native casts have no frame and are untouched.
+        if (ImportedExecutionScope.suppressesNativeAura(player)
+            || (SanctifiedLegacyCompat.isWearingVirtueRing(player) && !AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get())) {
             ci.cancel();
         }
     }
@@ -61,7 +64,8 @@ public abstract class MixinCovenantSpellEvents {
             && !AnsConfig.ENABLE_VIRTUE_AURA_SYSTEM.get();
         // Active Virtue aura deliberately remains Covenant-native: Covenant
         // owns the ambient-aura debit and ANS leaves its Iron's charge unset.
-        if (cursed || virtueDisabled) {
+        // ANS-001: except for an imported execution on the mana or LP route, whose cost must stand.
+        if (cursed || virtueDisabled || ImportedExecutionScope.suppressesNativeAura(player)) {
             ci.cancel();
         }
     }

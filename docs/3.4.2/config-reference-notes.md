@@ -1,0 +1,1 @@
+The table below describes world/server settings. The separate client setting `spellbook.iron_glyph_display_mode` defaults to `grouped` and also accepts `flat` or `hidden`. Each player can change it in Personal display. [Spellbook display guide](glyph-browser.md)

@@ -110,7 +110,8 @@ public class EquipmentHandler {
     public static void onCurioChange(top.theillusivec4.curios.api.event.CurioChangeEvent event) {
         if (event.getEntity() instanceof Player player && !player.level().isClientSide()) {
             EquipmentIntegration.clearCache(player);
-            com.otectus.arsnspells.compat.SanctifiedLegacyCompat.clearCacheFor(player.getUUID());
+            // ANS-003: the server's own entry; the client's copy is a separate, separately synced cache.
+            com.otectus.arsnspells.compat.SanctifiedLegacyCompat.invalidate(player);
             DIRTY.add(player.getUUID());
         }
     }

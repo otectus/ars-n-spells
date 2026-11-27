@@ -65,7 +65,7 @@ public final class ModeChangeCleanup {
      */
     @SubscribeEvent
     public static void onConfigReloading(final ModConfigEvent.Reloading event) {
-        if (!ArsNSpells.MODID.equals(event.getConfig().getModId())) {
+        if (!com.otectus.arsnspells.config.AnsClientConfig.isServerSpec(event.getConfig())) {
             return;
         }
         reconcileAll();

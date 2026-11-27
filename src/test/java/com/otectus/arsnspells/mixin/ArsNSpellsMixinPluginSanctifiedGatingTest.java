@@ -58,6 +58,14 @@ class ArsNSpellsMixinPluginSanctifiedGatingTest {
     }
 
     @Test
+    void covenantAuraReceiptMixin_appliesOnlyWhenBothPresent() throws Exception {
+        String fqn = "com.otectus.arsnspells.mixin.sanctified.MixinCovenantAuraReceipt";
+        assertTrue(plugin(true, true).shouldApplyMixin("any.target", fqn), "the aura receipt applies with Covenant and Iron's");
+        assertFalse(plugin(true, false).shouldApplyMixin("any.target", fqn), "the aura receipt skips without Covenant");
+        assertFalse(plugin(false, true).shouldApplyMixin("any.target", fqn), "the aura receipt skips without Iron's");
+    }
+
+    @Test
     void sanctifiedPresentField_exists() throws NoSuchFieldException {
         Field f = ArsNSpellsMixinPlugin.class.getDeclaredField("sanctifiedPresent");
         f.setAccessible(true);

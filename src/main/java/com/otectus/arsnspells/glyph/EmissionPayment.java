@@ -171,9 +171,18 @@ public final class EmissionPayment {
         }
         return switch (occurrence.route) {
             case AURA_NATIVE -> {
-                // Covenant took the aura at the pre-cast event; ANS takes nothing, as for a native cast.
+                // Audit ANS-001: paid only on Covenant's receipt. Covenant re-checks the caster's
+                // equipment at the pre-cast event and may have charged nothing; without the receipt
+                // the execution is refused, never marked paid and never repriced into mana or LP.
                 releaseHeld();
-                markPaid(null, "aura (Covenant)");
+                ImportedExecutionScope.Frame frame = ImportedExecutionScope.current(player);
+                if (frame == null || frame.route() != GlyphRoute.AURA_NATIVE || !frame.auraCharged()) {
+                    occurrence.redeemed = true;
+                    refusal = Component.translatable("message.ars_n_spells.glyph.refused.aura_not_charged",
+                        occurrence.definition.spellName() + " " + occurrence.definition.levelNumeral());
+                    yield false;
+                }
+                markPaid(null, "aura (Covenant receipt)");
                 yield true;
             }
             case LP -> payLp(finalIronsCost, finalLevel);
@@ -291,6 +300,8 @@ public final class EmissionPayment {
     }
 
     public boolean paid() { return paid; }
+    /** The resource route this execution pays through (audit ANS-001: the Covenant hooks consult it). */
+    public GlyphRoute route() { return occurrence.route; }
     public CostQuote settled() { return settled; }
     public NativePayment.Result shortage() { return shortage; }
 

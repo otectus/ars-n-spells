@@ -202,4 +202,31 @@ class CovenantJarSurfaceTest {
         assertNotNull(method(node, "manaCostModifier", onCast),
             "Covenant's native Iron's cost modifier is the surface guarded by MixinCovenantSpellEvents");
     }
+
+    /**
+     * Audit ANS-001: MixinCovenantAuraReceipt's injection point, and the native eligibility
+     * SanctifiedLegacyCompat.isCovenantNativeVirtueEligible mirrors: Covenant's own Virtue Ring item
+     * and Enigmatic's Cursed Ring, then exactly one aura drain.
+     */
+    @Test
+    void issSpellEvents_virtueHandlerDrainsAuraOnceAfterItsRingChecks() throws IOException {
+        ClassNode node = read(ISS_SPELL_EVENTS);
+        MethodNode m = method(node, "virtueRingCastingEvent", "(Lio/redspace/ironsspellbooks/api/events/SpellPreCastEvent;)V");
+        assertNotNull(m, "virtueRingCastingEvent is MixinCovenantAuraReceipt's target");
+        int drains = 0;
+        boolean virtueItem = false, cursedItem = false;
+        for (AbstractInsnNode insn : m.instructions) {
+            if (insn instanceof MethodInsnNode call && call.name.equals("drainAura")
+                && call.owner.equals("de/ellpeck/naturesaura/api/aura/chunk/IAuraChunk")
+                && call.desc.equals("(Lnet/minecraft/core/BlockPos;I)I")) {
+                drains++;
+            }
+            if (insn instanceof org.objectweb.asm.tree.FieldInsnNode field) {
+                if (field.name.equals("VIRTUE_RING") && field.owner.endsWith("/item/ModItems")) virtueItem = true;
+                if (field.name.equals("CURSED_RING") && field.owner.equals("com/aizistral/enigmaticlegacy/registries/EnigmaticItems")) cursedItem = true;
+            }
+        }
+        assertEquals(1, drains, "the Virtue handler must drain aura exactly once, at the receipt's injection point");
+        assertTrue(virtueItem && cursedItem, "the handler must still check Covenant's own Virtue Ring and Enigmatic's Cursed Ring");
+    }
 }

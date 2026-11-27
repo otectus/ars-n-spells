@@ -72,13 +72,14 @@ class SchoolResolverAddonTest {
     }
 
     @Test
-    void conjureTerrain_resolvesNatureByDeclarationOrder() {
-        // Declares both conjuration (→ EVOCATION) and earth (→ NATURE). NATURE is earlier in
-        // SpellSchoolId, so it wins — deliberately, and pinned here rather than overridden.
-        assertEquals(SpellSchoolId.NATURE,
+    void conjureTerrain_primaryIsItsFirstDeclaredSchool() {
+        // Declares both conjuration (→ EVOCATION) and earth (→ NATURE). Audit ANS-005: the primary is
+        // the first declared school, the same one affinity and progression credit; both stay members.
+        assertEquals(SpellSchoolId.EVOCATION,
             resolve("ars_elemental:glyph_conjure_terrain", "conjuration", "earth"),
-            "the multi-school tie-break is SpellSchoolId declaration order; reordering the enum "
-                + "silently reclassifies every multi-school addon glyph");
+            "the primary must match resolveKeys' first membership, which affinity and progression use");
+        assertEquals(java.util.Set.of(SpellSchoolId.EVOCATION, SpellSchoolId.NATURE),
+            SchoolResolver.resolveAll("ars_elemental:glyph_conjure_terrain", List.of("conjuration", "earth")));
     }
 
     @Test

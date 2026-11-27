@@ -2,9 +2,20 @@
 """Build original ANS icons, state variants and HD32 pack deterministically.
 
 SPDX-License-Identifier: GPL-3.0-only. Run: python tools/generate_icons.py
-Requires Pillow. --check compares all generated assets without writing them;
-ZIP contents are compared independently of Python's archive metadata and compression.
+Setup: python3 -m pip install -r tools/requirements-icons.txt (the pinned authoring toolchain).
+--check reports whether a regeneration would change any generated file, without writing.
 No downloaded art, dependency textures, random seeds or lossy resizes are used.
+
+Reproducibility contract (audit ANS-013). The art is identified by its decoded pixels, not by
+the bytes a particular PNG encoder emits: Pillow and its bundled zlib build may compress the
+same image differently. Every PNG is therefore encoded once and then kept. When the file (or
+pack member) already published decodes to exactly the rendered image (same mode, size and
+RGBA bytes), its existing encoded bytes are reused, so the manifest and pack provenance keep
+the SHA-256 of the published bytes and a different encoder neither fails --check nor rewrites
+hundreds of files. A real pixel change is encoded fresh, which changes the bytes, the recorded
+hashes and the check result until it is regenerated on purpose. Non-PNG outputs (manifest,
+catalog class, labels, pack metadata) are compared byte for byte; ZIP archives are compared
+member by member, in order, independently of archive timestamps and container compression.
 """
 from pathlib import Path
 import argparse, csv, hashlib, io, json, zipfile
@@ -13,6 +24,8 @@ from icon_art import VERSION, PALETTES, commands, draw_commands, palette_for
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = 'assets/ars_n_spells/'
+RESOURCES = 'src/main/resources/'
+HD_PACK = 'resourcepacks/ars-n-spells-icons-hd32.zip'
 STATES = ('normal', 'selected', 'disabled', 'high_contrast', 'monochrome')
 BACKGROUNDS = ('none','arcane','fire','ice','lightning','nature','holy','blood','ender','evocation','eldritch')
 AUTHOR = 'Ars n Spells contributors, with OpenAI Codex assistance'
@@ -24,6 +37,45 @@ ALIASES = {'spark':'spell/burst','flame':'spell/ignite','leaf':'school/nature',
 def png(im):
     out = io.BytesIO(); im.save(out, format='PNG', optimize=False, compress_level=9)
     return out.getvalue()
+
+def pixels(data):
+    """The decoded identity of PNG bytes: (mode, size, raw pixels), or None when unreadable."""
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            if im.format != 'PNG': return None
+            im.load()
+            return im.mode, im.size, im.tobytes()
+    except Exception:
+        return None
+
+def image_pixels(im):
+    return im.mode, im.size, im.tobytes()
+
+def keep_encoded(existing, im):
+    """PNG bytes for image `im`: the already published bytes when they decode to exactly `im`."""
+    if existing is not None and pixels(existing) == image_pixels(im):
+        return existing
+    return png(im)
+
+class Published:
+    """Read-only view of the generated files as they are now, for keep_encoded."""
+    def __init__(self, root):
+        self.root = root; self.archives = {}
+    def file(self, path):
+        path = self.root/path
+        return path.read_bytes() if path.is_file() else None
+    def member(self, archive, name):
+        if archive not in self.archives:
+            members = {}
+            path = self.root/archive
+            if path.is_file():
+                try:
+                    with zipfile.ZipFile(path) as z:
+                        for info in z.infolist(): members[info.filename] = z.read(info)
+                except (zipfile.BadZipFile, RuntimeError, NotImplementedError):
+                    members = {}
+            self.archives[archive] = members
+        return self.archives[archive].get(name)
 
 def generated_asset_matches(path, content):
     if not path.exists():
@@ -116,6 +168,7 @@ def build(check=False):
     rows=list(csv.DictReader(seed.open(encoding='utf-8')))
     assert len(rows)==274 and len({r['logical_id'] for r in rows})==274
     artifacts={}; hd={}; entries=[]; labels={}; images=[]
+    published=Published(ROOT)
     for row in rows:
         logical=row['logical_id']; family,name=logical.split(':')[1].split('/')
         normal=render(family,name,16); images.append((family+'/'+name,normal))
@@ -123,7 +176,8 @@ def build(check=False):
         for size, target in ((16,artifacts),(32,hd)):
             for state in STATES:
                 path=row['resource_path'] if state=='normal' else PREFIX+f'textures/gui/icons/v2/variants/{state}/{family}/{name}.png'
-                data=png(render(family,name,size,state)); target[path]=data
+                existing=published.file(RESOURCES+path) if size==16 else published.member(HD_PACK, path)
+                data=keep_encoded(existing, render(family,name,size,state)); target[path]=data
                 hashes[f'{size}/{state}']=hashlib.sha256(data).hexdigest()
         aliases=[a for a,v in ALIASES.items() if v==family+'/'+name]
         aliases += ['icon_'+a for a in list(aliases)]
@@ -144,7 +198,8 @@ def build(check=False):
     backgrounds=[]
     for name in BACKGROUNDS:
         path=PREFIX+f'textures/gui/icons/v2/background/{name}.png'
-        artifacts[path]=png(background(name)); hd[path]=png(background(name,32))
+        artifacts[path]=keep_encoded(published.file(RESOURCES+path), background(name))
+        hd[path]=keep_encoded(published.member(HD_PACK, path), background(name,32))
         backgrounds.append(dict(id=name,resource=path.removeprefix(PREFIX),dimensions=[16,16],
             source_file='tools/generate_icons.py',author=AUTHOR,license='GPL-3.0-only',provenance_url=SOURCE_URL.replace('icon_art.py','generate_icons.py'),
             sha256=hashlib.sha256(artifacts[path]).hexdigest(),hd_sha256=hashlib.sha256(hd[path]).hexdigest(),
@@ -213,28 +268,31 @@ public final class IconCatalog {
         for path,content in sorted(hd.items()):
             info=zipfile.ZipInfo(path,(2026,9,6,0,0,0));info.compress_type=zipfile.ZIP_DEFLATED
             z.writestr(info,content)
-    outputs[ROOT/'resourcepacks/ars-n-spells-icons-hd32.zip']=data.getvalue()
+    outputs[ROOT/HD_PACK]=data.getvalue()
     # Accessibility packs apply to native wheel/bar rendering as well as custom UI.
     # Runtime variants remain available for individual explicitly selected states.
     for state in ('high_contrast','monochrome'):
+        archive=f'resourcepacks/ars-n-spells-icons-{state.replace("_","-")}.zip'
         pack=io.BytesIO()
         with zipfile.ZipFile(pack,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
             contents={'pack.mcmeta':json.dumps({'pack':{'pack_format':15,'supported_formats':{'min_inclusive':15,'max_inclusive':34},'description':'ANS 3.3.0 — '+state.replace('_',' ')+' icons'}}).encode()}
             for row, entry in zip(rows, entries):
                 family,name=row['logical_id'].split(':')[1].split('/')
-                normal=png(render(family,name,16,theme=state))
+                normal=keep_encoded(published.member(archive, row['resource_path']), render(family,name,16,theme=state))
                 contents[row['resource_path']]=normal
                 for variant in STATES[1:]:
-                    contents[PREFIX+f'textures/gui/icons/v2/variants/{variant}/{family}/{name}.png']=png(render(family,name,16,variant,theme=state))
+                    member=PREFIX+f'textures/gui/icons/v2/variants/{variant}/{family}/{name}.png'
+                    contents[member]=keep_encoded(published.member(archive, member), render(family,name,16,variant,theme=state))
                 for legacy in entry['legacy_resources']: contents[PREFIX+legacy['resource']]=normal
             for name in BACKGROUNDS:
                 original=background(name)
                 gray=original.convert('L').convert('RGBA'); gray.putalpha(original.getchannel('A'))
-                contents[PREFIX+f'textures/gui/icons/v2/background/{name}.png']=png(gray)
+                member=PREFIX+f'textures/gui/icons/v2/background/{name}.png'
+                contents[member]=keep_encoded(published.member(archive, member), gray)
             add_pack_provenance(contents, state)
             for path,content in sorted(contents.items()):
                 info=zipfile.ZipInfo(path,(2026,9,6,0,0,0));info.compress_type=zipfile.ZIP_DEFLATED;z.writestr(info,content)
-        outputs[ROOT/f'resourcepacks/ars-n-spells-icons-{state.replace("_","-")}.zip']=pack.getvalue()
+        outputs[ROOT/archive]=pack.getvalue()
     mismatches=[]
     for path,content in outputs.items():
         if check:
@@ -262,14 +320,18 @@ def make_sheets(images):
             sheet.paste(im,(x+24,y+1),im)
             big=im.resize((48,48),Image.Resampling.NEAREST);sheet.paste(big,(x+48,y),big)
             d.text((x,y+54),name.split('/')[1],fill='#F1E9D8')
-        sheet.save(folder/f'{family}.png')
+        save_sheet(folder/f'{family}.png', sheet)
     sheet=Image.new('RGBA',(660,150),'#181A24');d=ImageDraw.Draw(sheet)
     for i,name in enumerate(BACKGROUNDS):
         x=i*60; bg=background(name);icon=render('spell','fireball',16)
         bg.alpha_composite(icon)
         sheet.alpha_composite(bg,(x+10,30));sheet.alpha_composite(bg.resize((48,48),Image.Resampling.NEAREST),(x+5,60))
         d.text((x+2,120),name,fill='#F1E9D8')
-    sheet.save(folder/'backgrounds.png')
+    save_sheet(folder/'backgrounds.png', sheet)
+
+def save_sheet(path, sheet):
+    """Review sheets follow the same contract: unchanged pixels keep their published bytes."""
+    path.write_bytes(keep_encoded(path.read_bytes() if path.is_file() else None, sheet))
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--check',action='store_true')

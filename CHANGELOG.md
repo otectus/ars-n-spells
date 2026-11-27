@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.4.2] - Unreleased
+
+**Client and server both need 3.4.2.** The network protocol changed again (version 11): the settings sync now carries the mana-bar display settings. 3.4.2 also contains every 3.4.1 change below, since 3.4.1 was never published. It is the remediation of the 2026-11-17 audit, findings ANS-001 to ANS-015.
+
+### Spellbook display
+
+- **Organized** is the default personal display for imported Iron's glyphs. The Ars spellbook's **Iron's glyphs** bookmark groups learned levels under the original spell. Search by spell or source, filter by school and book tier, and favorite a spell across worlds.
+- **Individual levels** restores available level entries to the ordinary palette. **Hidden** removes imported browsing and acquisition shortcuts for that player. Each mode preserves the exact glyphs in saved spells and all learned levels.
+- Open **Dormant** to inspect unavailable levels and their reasons. Newly learned levels and changes to the server's spell settings refresh the open editor. [Personal settings and configuration](docs/3.4.2/glyph-browser.md)
+
+### Fixed
+
+- **Imported glyphs could run for free after the Virtue Ring came off** (ANS-001). The resource route of an imported glyph is fixed when the cast is admitted. Each delayed, projectile, repeated, charged or channelled execution now checks again, before its effect, that the route is still the one native casting would use. If it is not, the execution is refused, and anything it still held is given back. It is never marked paid, and never charged in another resource. An aura execution counts as paid only when Covenant of the Seven actually takes the aura. Equipping a Virtue Ring after a cast paid in mana or LP no longer drains aura or makes the rest of that cast free. A ring that is only in `#ars_n_spells:virtue_rings` cannot pay imported glyphs in aura, because Covenant charges only for its own ring; such casts are refused with a message.
+- **Automation could cast imported glyphs** (ANS-002). Forge fake players are now refused, as Ars's already were, both when the cast is admitted and at every later stage.
+- **Ring state could leak between the integrated client and server, and outlived players** (ANS-003). The ring cache is now kept per side and per player body. It is cleared on logout, death or End return, respawn, dimension change, server stop and client disconnect, and payment decisions read equipment directly.
+- **HYBRID ignored Ars Mana Regen potions** (ANS-004). The potion's regeneration now reaches the paying pool once, as in ISS_PRIMARY. Max mana is still not added a second time.
+- **Multi-school glyphs could train one school and be discounted as another** (ANS-005). Discounts, LP discounts, progression, affinity and scaling now all use one primary school: the first school the glyph declares or a data pack lists. Every school stays a member for multi-school damage.
+- **Returning from the End reset category cooldowns** (ANS-006). Cooldowns now reset on death only.
+- **Remote clients kept a stale mana-bar setup after a config reload** (ANS-007). `hybrid_mana_bar`, `hide_mana_bar_with_ring`, `enable_lp_system` and `enable_virtue_aura_system` are now sent to clients on login, on every change and on every config file reload.
+- **A Virtue Ring hid the mana bars even with aura casting off** (ANS-008). A ring now hides them only while its LP or aura route actually replaces mana.
+- **The Spell Loom showed "Ready" after the server had refused** (ANS-009). A server refusal is now shown for Inscribe, Convert and Apply School until anything in the request changes. A temporary refusal keeps the button usable and asks again once, and a name the server would reject is flagged at once.
+- **The Spell Loom menu could build a different slot layout on the client** (ANS-012) when the block entity had not arrived yet. Both sides now always have the same 39 slots, and the client plans from its own synchronized copy.
+- **Books whose ANS sidecar was entirely gone kept dead wheel entries** (ANS-010). Reconciliation now removes ANS proxy slots that no entry backs, even when no entry is left. Native spells, other entries, future-schema items and data it cannot read are left alone.
+- **Cross-system regeneration was mis-converted away from the default settings** (ANS-011, measured against both mods' schedulers). The conversion now follows Ars's update interval and Iron's 10-tick cadence and its `manaRegenMultiplier`. With Iron's regeneration disabled it converts to nothing. At the default settings it returns exactly what it did before.
+- **Removed Iron's spells looked castable** (ANS-014). A stored spell id that Iron's no longer registers is now refused as not installed, instead of resolving to Iron's empty placeholder spell. The entry is kept, so reinstalling the addon restores it.
+- **Documentation and config comments** (ANS-015). They are corrected for insufficient LP, which refuses without damage; the Source Jar multiplier bounds (0.01-2000); the Mana Infusion recipient, the player who lit the brazier; and the existing Covenant GameTest profile.
+
+### For developers
+
+- 28 new required GameTests (372 in total). Imported-glyph tests now cast with real `ServerPlayer`s (`TestPlayers`) instead of Forge fake players.
+- `tools/generate_icons.py --check` compares decoded pixels and keeps the published PNG bytes when the pixels match, so a different PNG encoder no longer fails it. CI installs the pinned `tools/requirements-icons.txt` (ANS-013).
+- GameTest runs stop the file watchers on Iron's and Ars Nouveau's server configs as well as ANS's, so tests that change those configs no longer race a reload.
+- Evidence: [docs/3.4.2/testing.md](docs/3.4.2/testing.md). Config reference: [docs/3.4.2/config-reference.md](docs/3.4.2/config-reference.md).
+
 ## [3.4.1] - Unreleased
 
 **Client and server both need 3.4.1.** The network protocol changed (version 10): the server now sends Iron's live spell settings to clients, and settings changed from the in-game screen are applied and synced through the server.

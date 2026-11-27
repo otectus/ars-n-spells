@@ -4,6 +4,8 @@ import com.otectus.arsnspells.ArsNSpells;
 import com.otectus.arsnspells.bridge.BridgeManager;
 import com.otectus.arsnspells.compat.SanctifiedLegacyCompat;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.config.AnsSettings;
+import com.otectus.arsnspells.config.RingHudPolicy;
 import com.otectus.arsnspells.config.ManaUnificationMode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -52,20 +54,19 @@ public class ManaBarController {
                 return;
             }
 
-            // Hide mana bars when the Cursed/Virtue Ring is equipped — spells consume
-            // LP or Aura in that state, so showing a mana bar is misleading. This runs
-            // independently of mana unification so it still applies when unification is off.
-            if (AnsConfig.HIDE_MANA_BAR_WITH_RING.get()
-                && SanctifiedLegacyCompat.isAvailable()) {
+            // Hide mana bars while a ring's LP or aura route actually replaces mana: showing a mana
+            // bar then is misleading. Audit ANS-008: by the server's routing rules (a toggle that is
+            // off leaves the cast on mana, and the bar with it). Audit ANS-007: from the policy the
+            // server synchronizes on every change, not the client's login-time copy of the config.
+            // This runs independently of mana unification so it still applies when unification is off.
+            AnsSettings.ClientPolicy policy = ClientSettings.policy();
+            if (policy.hideManaBarWithRing() && SanctifiedLegacyCompat.isAvailable()) {
                 LocalPlayer localPlayer = Minecraft.getInstance().player;
-                if (localPlayer != null) {
-                    boolean cursed = AnsConfig.ENABLE_LP_SYSTEM.get()
-                        && SanctifiedLegacyCompat.isWearingCursedRing(localPlayer);
-                    boolean virtue = SanctifiedLegacyCompat.isWearingVirtueRing(localPlayer);
-                    if (cursed || virtue) {
-                        event.setCanceled(true);
-                        return;
-                    }
+                if (localPlayer != null && RingHudPolicy.hidesManaBars(policy, true,
+                        SanctifiedLegacyCompat.isWearingCursedRing(localPlayer),
+                        SanctifiedLegacyCompat.isWearingVirtueRing(localPlayer))) {
+                    event.setCanceled(true);
+                    return;
                 }
             }
 
@@ -85,8 +86,7 @@ public class ManaBarController {
             }
             
             // Determine which bar to show in hybrid mode
-            boolean hybridShowIrons = mode == ManaUnificationMode.HYBRID
-                && "irons".equalsIgnoreCase(AnsConfig.HYBRID_MANA_BAR.get());
+            boolean hybridShowIrons = mode == ManaUnificationMode.HYBRID && policy.hybridShowsIrons();
 
             // Handle Iron's Spellbooks mana bar
             if (isIronsManaOverlay(overlayNamespace, overlayPath)) {

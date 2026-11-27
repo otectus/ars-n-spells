@@ -20,7 +20,7 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  *       the gear term is what it measures.</li>
  *   <li>HYBRID keeps the shared-pool ceiling with {@code respect_armor_bonuses} off.</li>
  *   <li>An Ars Mana Regen potion is mirrored onto Iron's regen in ISS_PRIMARY, once, and taken
- *       off when the mode changes.</li>
+ *       off when the mode leaves the Iron's-owned pool modes.</li>
  *   <li>A curio in {@code #ars_n_spells:curio_spell_discount} discounts Ars and Iron's casts by
  *       the same arithmetic (new on Forge in 3.3.5).</li>
  * </ul>
@@ -241,10 +241,12 @@ public final class ParityBehaviourGameTests {
                         "ISS_PRIMARY must mirror a level-1 Ars Mana Regen potion onto Iron's regen as "
                             + expected + ", once; got " + (modifier == null ? "nothing" : modifier.getAmount()));
                 });
-                inMode(helper, "hybrid", 1.0, () -> {
+                // Audit ANS-004: HYBRID is also an Iron's-owned pool and keeps the regen transfer
+                // (PotionRegenGameTests); leaving the Iron's-owned modes takes it off.
+                inMode(helper, "ars_primary", 1.0, () -> {
                     com.otectus.arsnspells.equipment.PotionContributions.reconcile(player);
                     helper.assertTrue(regen.getModifier(id) == null,
-                        "leaving ISS_PRIMARY must take the mirrored potion modifier off");
+                        "leaving the Iron's-owned pool modes must take the mirrored potion modifier off");
                 });
             } finally {
                 player.removeAllEffects();
