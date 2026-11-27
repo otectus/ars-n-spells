@@ -1,6 +1,7 @@
 package com.otectus.arsnspells.compat.irons.glyph;
 
 import com.otectus.arsnspells.glyph.IronGlyphBridge;
+import com.otectus.arsnspells.glyph.IronGlyphBridge.Stage;
 import com.otectus.arsnspells.glyph.behavior.GlyphBehaviorSnapshot;
 import com.otectus.arsnspells.glyph.catalog.CatalogEntry;
 import com.otectus.arsnspells.glyph.catalog.SpellInventoryEntry;
@@ -92,15 +93,23 @@ public final class IronGlyphBridgeImpl implements IronGlyphBridge {
     }
 
     @Override
-    public GlyphBehaviorSnapshot.LiveSpell liveSpell(ResourceLocation spellId) {
+    public GlyphBehaviorSnapshot.LiveSpell liveSpell(ResourceLocation spellId, int registeredMax) {
         AbstractSpell spell = SpellRegistry.REGISTRY.get(spellId);
         if (spell == null || spell == SpellRegistry.none()) {
             return new GlyphBehaviorSnapshot.LiveSpell(false, false, 0, List.of());
         }
         int max = Math.max(1, spell.getMaxLevel());
-        List<String> rarities = new ArrayList<>(max);
-        for (int level = 1; level <= max; level++) rarities.add(spell.getRarity(level).name());
-        return new GlyphBehaviorSnapshot.LiveSpell(true, spell.isEnabled(), max, rarities);
+        // Rarity for the registered levels only: an extreme configured maximum costs nothing extra.
+        List<String> rarities = new ArrayList<>(Math.max(0, registeredMax));
+        for (int level = 1; level <= registeredMax; level++) rarities.add(spell.getRarity(level).name());
+        return new GlyphBehaviorSnapshot.LiveSpell(true, spell.isEnabled(), max, rarities, spell.getSchoolType().getId(),
+            spell.requiresLearning(), Math.max(1, spell.getMinLevel()));
+    }
+
+    @Override
+    public int levelFor(ResourceLocation spellId, int level, ServerPlayer player) {
+        AbstractSpell spell = spell(spellId);
+        return spell == null ? level : spell.getLevelFor(level, player);
     }
 
     @Override
@@ -234,9 +243,13 @@ public final class IronGlyphBridgeImpl implements IronGlyphBridge {
     }
 
     @Override
-    public void chargeStarted(GlyphRequest request) {
+    public com.otectus.arsnspells.glyph.runtime.GlyphCharge startCharge(GlyphRequest request, int ticks, Component[] refusalOut) {
         AbstractSpell spell = spell(request.key().ironSpellId());
-        if (spell != null) spell.playSound(spell.getCastStartSound(), request.caster());
+        if (spell == null) {
+            refusalOut[0] = Component.translatable("ars_n_spells.glyph.dormant.spell_not_registered");
+            return null;
+        }
+        return IronGlyphCharge.start(spell, request, ticks, refusalOut);
     }
 
     // ---- Execution ----
@@ -257,14 +270,21 @@ public final class IronGlyphBridgeImpl implements IronGlyphBridge {
         ServerPlayer player = request.caster();
         if (spell == null) return ExecutionResult.refused(Component.translatable("ars_n_spells.glyph.dormant.spell_not_registered"));
         ServerLevel level = player.serverLevel();
+        MagicData real = MagicData.getPlayerMagicData(player);
+        MagicData child = null;
+        // 3.4.1 review CAST-04: where the execution got to. Once the effect boundary is crossed it is
+        // paid, counted and owes its cooldown even if the native effect then throws.
+        boolean effectStarted = false;
+        boolean paid = false;
+        boolean hadRecast = false;
+        int finalLevel = -1;
         GlyphInvocationScope.enter(request.invocationId());
         try {
-            SpellPreCastEvent pre = new SpellPreCastEvent(player, spell.getSpellId(), request.effectiveLevel(), spell.getSchoolType(), SOURCE);
+            SpellPreCastEvent pre = new SpellPreCastEvent(player, spell.getSpellId(), request.nativeLevel(), spell.getSchoolType(), SOURCE);
             if (NeoForge.EVENT_BUS.post(pre).isCanceled()) {
                 return ExecutionResult.refused(Component.translatable("ars_n_spells.glyph.refused.vetoed", spell.getDisplayName(player)));
             }
-            MagicData real = MagicData.getPlayerMagicData(player);
-            MagicData child = childSlot(player);
+            child = childSlot(player);
             Family family = Family.of(request.entry());
             if (family == Family.TELEPORT && !request.selfHit()) {
                 Vec3 destination = teleportDestination(spell, request, level);
@@ -274,39 +294,64 @@ public final class IronGlyphBridgeImpl implements IronGlyphBridge {
                 child.setAdditionalCastData(new TeleportSpell.TeleportData(destination));
             }
             AdapterFrame frame = frame(family, request, player);
-            boolean ready = AdapterFrame.call(frame, () -> spell.checkPreCastConditions(level, request.effectiveLevel(), player, child));
+            MagicData slot = child;
+            boolean ready = AdapterFrame.call(frame, () -> spell.checkPreCastConditions(level, request.nativeLevel(), player, slot));
             if (!ready) {
                 return ExecutionResult.refused(Component.translatable("ars_n_spells.glyph.refused.native_condition", spell.getDisplayName(player)));
             }
-            boolean hadRecast = real.getPlayerRecasts().hasRecastForSpell(spell.getSpellId());
-            SpellOnCastEvent onCast = new SpellOnCastEvent(player, spell.getSpellId(), request.effectiveLevel(),
-                spell.getManaCost(request.effectiveLevel()), spell.getSchoolType(), SOURCE);
+            hadRecast = real.getPlayerRecasts().hasRecastForSpell(spell.getSpellId());
+            SpellOnCastEvent onCast = new SpellOnCastEvent(player, spell.getSpellId(), request.nativeLevel(),
+                spell.getManaCost(request.nativeLevel()), spell.getSchoolType(), SOURCE);
             NeoForge.EVENT_BUS.post(onCast);
-            int finalLevel = Math.max(1, onCast.getSpellLevel());
+            finalLevel = Math.max(1, onCast.getSpellLevel());
             if (!hadRecast && !gate.pay(Math.max(0, onCast.getManaCost()), finalLevel)) {
-                child.resetAdditionalCastData();
-                return new ExecutionResult(false, Component.translatable("ars_n_spells.glyph.refused.unpaid", spell.getDisplayName(player)), false);
+                return new ExecutionResult(Stage.REFUSED_AT_PAYMENT,
+                    Component.translatable("ars_n_spells.glyph.refused.unpaid", spell.getDisplayName(player)), false, finalLevel);
             }
-            AdapterFrame.run(frame, () -> spell.onCast(level, finalLevel, player, SOURCE, child));
+            paid = !hadRecast;
+            // The effect boundary, marked before onCast: a partial effect followed by an exception is
+            // not an unpaid refusal.
+            effectStarted = true;
+            com.otectus.arsnspells.casting.PaymentTimeline.record(player.getUUID(), -1,
+                com.otectus.arsnspells.casting.PaymentTimeline.Kind.NATIVE_EFFECT, spell.getSpellId(), "imported level=" + finalLevel);
+            int castLevel = finalLevel;
+            AdapterFrame.run(frame, () -> spell.onCast(level, castLevel, player, SOURCE, slot));
             place(family, request, frame.spawned, player);
             propagateVisualState(child, real);
-            boolean recastsLeft = real.getPlayerRecasts().hasRecastForSpell(spell.getSpellId());
-            if (hadRecast && recastsLeft) {
-                real.getPlayerRecasts().decrementRecastCount(spell.getSpellId());
-            } else if (!recastsLeft && request.applyCooldown() && (!player.isCreative() || ServerConfigs.CREATIVE_COOLDOWN.get())) {
-                MagicHelper.MAGIC_MANAGER.addCooldown(player, spell, SOURCE);
-            }
             ICastData castData = child.getAdditionalCastData();
             PacketDistributor.sendToPlayer(player, new OnClientCastPacket(spell.getSpellId(), finalLevel, SOURCE, castData),
                 new CustomPacketPayload[0]);
-            child.resetCastingState();
-            return new ExecutionResult(true, null, !hadRecast);
-        } catch (RuntimeException failure) {
-            LOGGER.warn("[ImportedGlyphs] {} failed while running: {}", request.key(), failure.toString());
+            return new ExecutionResult(Stage.COMPLETED, null, paid, finalLevel);
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.warn("[ImportedGlyphs] {} failed {} its effect began: {}", request.key(), effectStarted ? "after" : "before", failure.toString());
             LOGGER.debug("[ImportedGlyphs] failure", failure);
-            return ExecutionResult.refused(Component.translatable("ars_n_spells.glyph.refused.failed", spell.getDisplayName(player)));
+            Component why = Component.translatable("ars_n_spells.glyph.refused.failed", spell.getDisplayName(player));
+            return effectStarted ? new ExecutionResult(Stage.FAILED_AFTER_EFFECT, why, paid, finalLevel) : ExecutionResult.refused(why);
         } finally {
+            try {
+                if (effectStarted) commitRecastOrCooldown(spell, player, real, hadRecast, request.applyCooldown());
+            } catch (RuntimeException | LinkageError bookkeeping) {
+                LOGGER.warn("[ImportedGlyphs] {} cooldown bookkeeping failed: {}", request.key(), bookkeeping.toString());
+            }
+            // The detached slot is never the player's own: always clear it, success or failure.
+            if (child != null) {
+                try {
+                    child.resetCastingState();
+                } catch (RuntimeException | LinkageError cleanup) {
+                    LOGGER.debug("[ImportedGlyphs] detached slot cleanup failed", cleanup);
+                }
+            }
             GlyphInvocationScope.exit(request.invocationId());
+        }
+    }
+
+    /** Iron's own bookkeeping after an effect: spend a recast, or start the cooldown. */
+    static void commitRecastOrCooldown(AbstractSpell spell, ServerPlayer player, MagicData real, boolean hadRecast, boolean applyCooldown) {
+        boolean recastsLeft = real.getPlayerRecasts().hasRecastForSpell(spell.getSpellId());
+        if (hadRecast && recastsLeft) {
+            real.getPlayerRecasts().decrementRecastCount(spell.getSpellId());
+        } else if (!recastsLeft && applyCooldown && (!player.isCreative() || ServerConfigs.CREATIVE_COOLDOWN.get())) {
+            MagicHelper.MAGIC_MANAGER.addCooldown(player, spell, SOURCE);
         }
     }
 
@@ -476,7 +521,7 @@ public final class IronGlyphBridgeImpl implements IronGlyphBridge {
         }
         BlockPos at = BlockPos.containing(dest);
         if (!level.isLoaded(at) || !level.getWorldBorder().isWithinBounds(at)) return null;
-        float range = nativeRange(spell, request.effectiveLevel(), player);
+        float range = nativeRange(spell, request.nativeLevel(), player);
         if (dest.distanceTo(player.position()) > range + 1.0) return null;
         AABB box = player.getDimensions(player.getPose()).makeBoundingBox(dest);
         return level.noCollision(player, box) ? dest : null;
@@ -512,7 +557,7 @@ public final class IronGlyphBridgeImpl implements IronGlyphBridge {
         ServerPlayer player = request.caster();
         GlyphInvocationScope.enter(request.invocationId());
         try {
-            SpellPreCastEvent pre = new SpellPreCastEvent(player, spell.getSpellId(), request.effectiveLevel(), spell.getSchoolType(), SOURCE);
+            SpellPreCastEvent pre = new SpellPreCastEvent(player, spell.getSpellId(), request.nativeLevel(), spell.getSchoolType(), SOURCE);
             if (NeoForge.EVENT_BUS.post(pre).isCanceled()) {
                 player.displayClientMessage(Component.translatable("ars_n_spells.glyph.refused.vetoed", spell.getDisplayName(player))
                     .withStyle(ChatFormatting.RED), true);
@@ -521,6 +566,10 @@ public final class IronGlyphBridgeImpl implements IronGlyphBridge {
             IronGlyphChannel channel = new IronGlyphChannel(spell, request, childSlot(player),
                 frame(Family.CHANNEL, request, player), extraPulses, pulses);
             return channel.begin(gate) ? channel : null;
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.warn("[ImportedGlyphs] channel {} could not start: {}", request.key(), failure.toString());
+            LOGGER.debug("[ImportedGlyphs] channel failure", failure);
+            return null;
         } finally {
             GlyphInvocationScope.exit(request.invocationId());
         }

@@ -35,7 +35,7 @@ public abstract class MixinIronsCastPayment {
             if (!frame.started && !frame.aborted) IronsCastLifecycle.notReached(frame);
             else IronsCastLifecycle.afterEffect(frame);
         } catch (IronsCastLifecycle.PaymentRefused refused) { IronsCastLifecycle.abort(frame, null); }
-        catch (RuntimeException error) { IronsCastLifecycle.abort(frame, error); }
+        catch (RuntimeException | LinkageError error) { IronsCastLifecycle.abort(frame, error); }
         finally { IronsCastLifecycle.exit(frame); }
     }
     @Inject(method = "castSpell", at = @At(value = "INVOKE",

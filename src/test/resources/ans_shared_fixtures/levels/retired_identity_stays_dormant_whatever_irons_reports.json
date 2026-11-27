@@ -1,0 +1,18 @@
+{
+ "expect": {
+  "status": {
+   "irons_spellbooks:ice_block@1": "retired"
+  }
+ },
+ "live": {
+  "irons_spellbooks:firebolt": {
+   "max_level": 2
+  },
+  "irons_spellbooks:heal": {
+   "max_level": 2
+  },
+  "irons_spellbooks:ice_block": {
+   "max_level": 5
+  }
+ }
+}

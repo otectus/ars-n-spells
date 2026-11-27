@@ -178,7 +178,7 @@ public class GlyphPressScreen extends AbstractContainerScreen<GlyphPressMenu> {
         ScrollReading reading = IronGlyphBridges.get().readScroll(menu.getSlot(GlyphPressBlockEntity.SLOT_SCROLL).getItem());
         if (reading.kind() != ScrollReading.Kind.SPELL) return new View(null, null, null, null, reading);
         CatalogEntry entry = ImportedGlyphCatalog.get().entry(reading.spellId());
-        if (entry == null || reading.level() < entry.minLevel() || reading.level() > entry.maxLevel()) {
+        if (entry == null || reading.level() < entry.minLevel() || reading.level() > entry.registeredMax()) {
             return new View(entry, null, null, null, reading);
         }
         ImportedGlyphKey key = new ImportedGlyphKey(entry.spellId(), reading.level());

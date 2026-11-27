@@ -143,10 +143,12 @@ public class AnsConfig {
     public static final ModConfigSpec.IntValue GLYPH_PRESS_SOURCE_SCAN_INTERVAL_TICKS;
     public static final ModConfigSpec.IntValue GLYPH_PRESS_SOURCE_RADIUS;
 
-    /** Tested hard ceilings: a server setting can never exceed these. */
-    public static final int HARD_MAX_IMPORTED_EFFECTS_PER_SPELL = 8;
-    public static final int HARD_MAX_FOREIGN_EMISSIONS_PER_CAST = 64;
-    public static final int HARD_MAX_ACTIVE_GLYPH_SESSIONS_PER_PLAYER = 32;
+    /** Tested hard ceilings: a server setting is clamped to its range and can never exceed these. */
+    public static final int MAX_IMPORTED_EFFECTS_CEILING = 8;
+    public static final int MAX_FOREIGN_EMISSIONS_CEILING = 64;
+    public static final int MAX_GLYPH_SESSIONS_CEILING = 32;
+    public static final String MANA_BONUS_PER_SPELL = "per_spell";
+    public static final String MANA_BONUS_NATIVE_PER_VARIANT = "native_per_variant";
     public static final ModConfigSpec.IntValue INSCRIBED_ARS_DEFAULT_COOLDOWN_TICKS;
     /** The shipped value; a pre-3.3.5 file holding it received it from NeoForge's correction pass. */
     public static final int INSCRIBED_ARS_COOLDOWN_DEFAULT_TICKS = 40;
@@ -735,26 +737,26 @@ public class AnsConfig {
                 "  per_spell          - all level variants of one Iron's spell count as one glyph (DEFAULT).",
                 "  native_per_variant - every level variant counts, as Ars counts any glyph.",
                 "Every variant stays genuinely learned either way; only the bonus contribution differs.")
-            .define("iron_glyph_mana_bonus_policy", "per_spell", value -> value instanceof String text
-                && ("per_spell".equals(text) || "native_per_variant".equals(text)));
+            .define("iron_glyph_mana_bonus_policy", MANA_BONUS_PER_SPELL,
+                v -> MANA_BONUS_PER_SPELL.equals(v) || MANA_BONUS_NATIVE_PER_VARIANT.equals(v));
         MAX_IMPORTED_EFFECTS_PER_SPELL = BUILDER
             .comment("Most imported Iron's effects one Ars spell may contain. Tested ceiling "
-                + HARD_MAX_IMPORTED_EFFECTS_PER_SPELL + ".")
-            .defineInRange("max_imported_effects_per_spell", 4, 1, HARD_MAX_IMPORTED_EFFECTS_PER_SPELL);
+                + MAX_IMPORTED_EFFECTS_CEILING + ".")
+            .defineInRange("max_imported_effects_per_spell", 4, 1, MAX_IMPORTED_EFFECTS_CEILING);
         MAX_FOREIGN_EMISSIONS_PER_CAST = BUILDER
             .comment("Most imported-effect executions one root cast may make, counting every split, pierce,",
                 "area and repeated delivery. Each execution is paid separately. Tested ceiling "
-                + HARD_MAX_FOREIGN_EMISSIONS_PER_CAST + ".")
-            .defineInRange("max_foreign_emissions_per_cast", 16, 1, HARD_MAX_FOREIGN_EMISSIONS_PER_CAST);
+                + MAX_FOREIGN_EMISSIONS_CEILING + ".")
+            .defineInRange("max_foreign_emissions_per_cast", 16, 1, MAX_FOREIGN_EMISSIONS_CEILING);
         MAX_ACTIVE_GLYPH_SESSIONS_PER_PLAYER = BUILDER
             .comment("Most casts containing imported effects one player may have in flight at once (projectiles,",
                 "delays, charges and channels still to resolve). Tested ceiling "
-                + HARD_MAX_ACTIVE_GLYPH_SESSIONS_PER_PLAYER + ".")
-            .defineInRange("max_active_glyph_sessions_per_player", 8, 1, HARD_MAX_ACTIVE_GLYPH_SESSIONS_PER_PLAYER);
+                + MAX_GLYPH_SESSIONS_CEILING + ".")
+            .defineInRange("max_active_glyph_sessions_per_player", 8, 1, MAX_GLYPH_SESSIONS_CEILING);
         GLYPH_PRESS_SOURCE_CAPACITY = BUILDER
             .comment("Internal Source buffer of each Glyph Press. Must cover the most expensive enabled",
                 "conversion (3000 by default) or that conversion can never start; the Press reports it.")
-            .defineInRange("glyph_press_source_capacity", 4000, 500, 100000);
+            .defineInRange("glyph_press_source_capacity", 4000, 1000, 100000);
         GLYPH_PRESS_SOURCE_SCAN_INTERVAL_TICKS = BUILDER
             .comment("How often a Press that is short of Source for a waiting job pulls from nearby Source",
                 "jars. An idle Press never scans.")
@@ -883,25 +885,6 @@ public class AnsConfig {
         return flag(DEBUG_MODE, false);
     }
 
-    /** Daemon executor so config writes never block the caller (render / server thread). */
-    private static final java.util.concurrent.ExecutorService SAVE_EXEC =
-        java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "ans-config-save");
-            t.setDaemon(true);
-            return t;
-        });
-
-    /**
-     * Schedule an off-thread config save. Returns true once the write is queued
-     * (the log is the source of truth for completion). Async because the in-game
-     * config screen and {@code /ans} commands call this from the render / server
-     * thread, where a synchronous file write under lock contention would stall the
-     * tick — the old synchronous {@code Thread.sleep} retry loop (ANS-HIGH-017).
-     *
-     * <p>Returns void by design (audit D5): it only SCHEDULES the write, so any boolean it
-     * could return would describe the queueing, not the save, and would read at call sites as
-     * "the config was saved". The log is the source of truth for completion.
-     */
     /**
      * Migrate a config file written by an earlier schema.
      *
@@ -909,7 +892,15 @@ public class AnsConfig {
      * the average income independently of scan cadence. Schema 3 (3.3.5): the inscribed Ars spell
      * cooldown key; see {@link #resolveInscribedCooldownTicks}.
      */
+    private static volatile java.nio.file.Path loadedPath;
+
+    /** The SERVER config file this world loaded, or null before one has loaded. */
+    public static java.nio.file.Path loadedPath() {
+        return loadedPath;
+    }
+
     public static void onConfigLoaded(java.nio.file.Path configFile) {
+        loadedPath = configFile;
         int schemaRead = CONFIG_SCHEMA_VERSION.get();
         if (schemaRead >= CURRENT_SCHEMA_VERSION) return;
         var logger = org.slf4j.LoggerFactory.getLogger(AnsConfig.class);
@@ -992,18 +983,23 @@ public class AnsConfig {
         }
     }
 
+    /**
+     * Every write of the ANS server config that ANS itself starts goes through this lock (3.4.1 review
+     * CONFIG-01), as on Forge. NeoForge writes the file atomically, so overlapping writers cannot
+     * corrupt it, but a save on another thread could still serialise a half-applied request; one lock
+     * and one thread per write keep what is saved equal to what was applied.
+     */
+    public static final Object SAVE_LOCK = new Object();
+
+    /** Save the config now, on the caller's thread, serialised with every other ANS write. Failures are logged. */
     public static void safeSave() {
-        SAVE_EXEC.submit(() -> {
+        synchronized (SAVE_LOCK) {
             try {
                 SPEC.save();
-                org.slf4j.LoggerFactory.getLogger(AnsConfig.class).info("OK Config saved successfully");
             } catch (Exception e) {
-                // No retry: retrying on the save thread risks stalling under lock
-                // contention, and the next mutation saves again anyway.
-                org.slf4j.LoggerFactory.getLogger(AnsConfig.class).warn(
-                    "Config save failed (not retried): {}", e.getMessage(), e);
+                org.slf4j.LoggerFactory.getLogger(AnsConfig.class).warn("Config save failed: {}", e.getMessage(), e);
             }
-        });
+        }
     }
     public static com.otectus.arsnspells.contract.ConversionKind getConversionKind() {
         return parseConversionPolicy(CONVERSION_POLICY.get());

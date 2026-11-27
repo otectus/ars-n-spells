@@ -12,5 +12,6 @@ public final class ClientSchoolSnapshotLifecycle {
     private ClientSchoolSnapshotLifecycle() {}
     @SubscribeEvent public static void disconnect(ClientPlayerNetworkEvent.LoggingOut event) {
         SchoolMappings.reset();
+        ClientSettings.reset();
     }
 }

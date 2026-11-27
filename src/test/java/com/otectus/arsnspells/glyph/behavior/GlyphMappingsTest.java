@@ -51,7 +51,7 @@ class GlyphMappingsTest {
             "{\"schema_version\": 1, \"spell\": \"irons_spellbooks:firebolt\", \"levels\": {\"4\": {\"ars_tier\": 1}}}",
             "{\"schema_version\": 1, \"spell\": \"irons_spellbooks:heal\", \"levels\": {\"1\": {\"source_cost\": -5}}}",
             "{\"schema_version\": 1, \"spell\": \"irons_spellbooks:heal\", \"adapter\": \"ars_n_spells:summon\"}",
-            "{\"schema_version\": 1, \"spell\": \"irons_spellbooks:thunderstorm\"}",
+            "{\"schema_version\": 1, \"spell\": \"irons_spellbooks:not_catalogued\"}",
             "{\"schema_version\": 7, \"spell\": \"irons_spellbooks:firebolt\"}");
         assertFalse(mappings.valid());
         assertEquals(5, mappings.errors().size(), mappings.errors().toString());
@@ -62,13 +62,28 @@ class GlyphMappingsTest {
     }
 
     @Test
-    void aSecondFileForTheSameSpellIsIgnoredAndReported() {
+    void aSecondFileForTheSameSpellAtTheSamePriorityConflictsAndFailsClosed() {
+        // 3.4.1 canonical rule: two declarations at one pack priority conflict; neither silently wins.
         GlyphMappings.Result mappings = GlyphTestFixtures.mappings(
             "{\"schema_version\": 1, \"spell\": \"irons_spellbooks:heal\", \"defaults\": {\"source_cost\": 700}}",
             "{\"schema_version\": 1, \"spell\": \"irons_spellbooks:heal\", \"defaults\": {\"source_cost\": 100}}");
         GlyphBehaviorSnapshot snapshot = GlyphTestFixtures.snapshot(mappings, GlyphBehaviorSnapshot.Settings.DEFAULTS, Set.of());
-        assertEquals(700, variant(snapshot, "irons_spellbooks:heal", 1).pressSource(), "the lowest resource id wins");
+        assertEquals(Dormancy.DISABLED_BY_PACK, variant(snapshot, "irons_spellbooks:heal", 1).dormancy());
         assertEquals(1, mappings.errors().size());
+        assertTrue(mappings.failedClosed().contains(GlyphTestFixtures.HEAL));
+    }
+
+    @Test
+    void aHigherPriorityPackOverridesALowerOne() {
+        GlyphMappings.Result mappings = GlyphMappings.parse(java.util.List.of(
+            new GlyphMappings.Source(net.minecraft.resources.ResourceLocation.parse("low:heal"), "low", 1, com.google.gson.JsonParser.parseString(
+                "{\"schema_version\": 2, \"spell\": \"irons_spellbooks:heal\", \"defaults\": {\"source_cost\": 700}}")),
+            new GlyphMappings.Source(net.minecraft.resources.ResourceLocation.parse("high:heal"), "high", 2, com.google.gson.JsonParser.parseString(
+                "{\"schema_version\": 2, \"spell\": \"irons_spellbooks:heal\", \"defaults\": {\"source_cost\": 100}}"))),
+            GlyphTestFixtures.catalog());
+        assertTrue(mappings.valid(), mappings.errors().toString());
+        GlyphBehaviorSnapshot snapshot = GlyphTestFixtures.snapshot(mappings, GlyphBehaviorSnapshot.Settings.DEFAULTS, Set.of());
+        assertEquals(100, variant(snapshot, "irons_spellbooks:heal", 1).pressSource(), "the higher-priority pack wins");
     }
 
     @Test
@@ -102,7 +117,7 @@ class GlyphMappingsTest {
             }
 
             @Override
-            public GlyphBehaviorSnapshot.LiveSpell spell(net.minecraft.resources.ResourceLocation spellId) {
+            public GlyphBehaviorSnapshot.LiveSpell spell(net.minecraft.resources.ResourceLocation spellId, int registeredMax) {
                 return new GlyphBehaviorSnapshot.LiveSpell(true, true, 1, java.util.List.of("COMMON"));
             }
 

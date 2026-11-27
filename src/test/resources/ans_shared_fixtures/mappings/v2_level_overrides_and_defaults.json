@@ -1,0 +1,51 @@
+{
+ "expect": {
+  "allows": {
+   "irons_spellbooks:firebolt@1": true,
+   "irons_spellbooks:firebolt@2": true,
+   "irons_spellbooks:firebolt@3": false
+  },
+  "terms": {
+   "irons_spellbooks:firebolt@1": {
+    "catalyst_count": 1,
+    "duration_ticks": 60,
+    "source_cost": 500,
+    "tier": 1
+   },
+   "irons_spellbooks:firebolt@2": {
+    "catalyst_count": 2,
+    "duration_ticks": 60,
+    "source_cost": 1234,
+    "tier": 2
+   }
+  },
+  "tier": {
+   "irons_spellbooks:firebolt@2": 2
+  },
+  "valid": true
+ },
+ "files": [
+  {
+   "id": "test:bolt",
+   "json": {
+    "defaults": {
+     "duration_ticks": 60
+    },
+    "levels": {
+     "2": {
+      "ars_tier": 2,
+      "source_cost": 1234
+     },
+     "3": {
+      "enabled": false
+     }
+    },
+    "schema_version": 2,
+    "spell": "irons_spellbooks:firebolt",
+    "type": "ars_n_spells:spell"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

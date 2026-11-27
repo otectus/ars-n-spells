@@ -14,12 +14,13 @@ import java.util.TreeSet;
 public final class LoomInventoryRevision {
     private LoomInventoryRevision() {}
     public static String of(SpellLoomMenu menu) {
-        if (menu.getBlockEntity() == null || menu.slots.size() < 3) return "";
+        // ANS-012: both sides always hold the three working slots, the client's as a synchronized copy.
+        if (menu.slots.size() < 3) return "";
         try {
             CompoundTag inventory = new CompoundTag();
             for (int slot = 0; slot < 3; slot++) {
                 ItemStack stack = menu.getSlot(slot).getItem();
-                Tag saved = stack.saveOptional(menu.getBlockEntity().getLevel().registryAccess());
+                Tag saved = stack.saveOptional(menu.registries());
                 if (!PayloadBudget.tag(saved)) return "";
                 inventory.put(Integer.toString(slot), saved);
             }

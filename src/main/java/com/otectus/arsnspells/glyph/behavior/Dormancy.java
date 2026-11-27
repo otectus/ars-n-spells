@@ -24,7 +24,15 @@ public enum Dormancy {
     /** The catalog marks the spell unsupported. */
     UNSUPPORTED,
     /** The client has not received the server's glyph settings yet. */
-    NOT_SYNCED;
+    NOT_SYNCED,
+    /** 3.4.1: the catalog retired the spell; its identities stay registered and dormant. */
+    RETIRED,
+    /** 3.4.1 review CATALOG-02: the level is below the spell's live minimum (a minimum that rose after it was registered). */
+    LEVEL_BELOW_SERVER_MIN,
+    /** 3.4.1 review CATALOG-02: the catalog names an adapter contract version newer than this build implements. */
+    ADAPTER_TOO_NEW,
+    /** 3.4.1 review SAVE-01: only ANS's retained copy keeps this identity registered; its catalog package is not installed. */
+    PACKAGE_MISSING;
 
     public boolean available() {
         return this == AVAILABLE;

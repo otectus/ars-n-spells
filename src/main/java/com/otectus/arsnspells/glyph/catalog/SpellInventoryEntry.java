@@ -14,12 +14,14 @@ import java.util.List;
  * @param rarityByLevel Iron's rarity name for each level from {@code minLevel} to {@code maxLevel}
  * @param manaCostByLevel Iron's mana cost for each level, same indexing
  * @param castTimeByLevel Iron's base cast time in ticks for each level, same indexing
+ * @param icon          the spell's icon texture ({@code ns:textures/....png}), which the pack tool writes into an
+ *                      addon catalog so its glyphs show the real icon (3.4.1 review CATALOG-02)
  */
 public record SpellInventoryEntry(String spellId, String school, String castType, int minLevel, int maxLevel,
                                   List<String> rarityByLevel, List<Integer> manaCostByLevel,
                                   List<Integer> castTimeByLevel, int cooldownTicks, int recastCountAtMax,
                                   boolean requiresLearning, boolean enabled, boolean allowCrafting,
-                                  boolean allowLooting, boolean none, boolean ansProxy, String displayName) {
+                                  boolean allowLooting, boolean none, boolean ansProxy, String displayName, String icon) {
 
     public JsonObject toJson() {
         JsonObject o = new JsonObject();
@@ -40,6 +42,7 @@ public record SpellInventoryEntry(String spellId, String school, String castType
         o.addProperty("allow_looting", allowLooting);
         o.addProperty("none", none);
         o.addProperty("ans_proxy", ansProxy);
+        if (icon != null && !icon.isEmpty()) o.addProperty("icon", icon);
         return o;
     }
 

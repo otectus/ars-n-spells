@@ -1,0 +1,35 @@
+{
+ "expect": {
+  "catalyst_tags": [
+   "ars_n_spells:glyph_press_catalysts",
+   "test:custom_gems"
+  ],
+  "terms": {
+   "irons_spellbooks:heal@2": {
+    "catalyst_count": 3,
+    "catalyst_tag": "test:custom_gems",
+    "duration_ticks": 200,
+    "source_cost": 3000,
+    "tier": 3
+   }
+  },
+  "valid": true
+ },
+ "files": [
+  {
+   "id": "test:tag",
+   "json": {
+    "defaults": {
+     "catalyst": {
+      "count": 3,
+      "tag": "test:custom_gems"
+     }
+    },
+    "schema_version": 2,
+    "spell": "irons_spellbooks:heal"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

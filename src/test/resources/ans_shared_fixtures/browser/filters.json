@@ -1,0 +1,12 @@
+{
+  "mode": "grouped",
+  "view": "LEARNED",
+  "query": "fire",
+  "pending": false,
+  "source": "alpha",
+  "school": "irons:fire",
+  "fits": true,
+  "expected": [
+    "alpha:bolt#1"
+  ]
+}

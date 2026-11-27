@@ -1,0 +1,32 @@
+{
+ "expect": {
+  "allows": {
+   "irons_spellbooks:firebolt@1": false,
+   "irons_spellbooks:heal@1": true
+  },
+  "errors_contain": [
+   "levels.1.sourcecost",
+   "unknown field"
+  ],
+  "failed_closed": [
+   "irons_spellbooks:firebolt"
+  ],
+  "valid": false
+ },
+ "files": [
+  {
+   "id": "test:typo",
+   "json": {
+    "levels": {
+     "1": {
+      "sourcecost": 10
+     }
+    },
+    "schema_version": 2,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

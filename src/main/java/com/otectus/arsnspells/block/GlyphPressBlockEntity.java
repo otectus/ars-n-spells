@@ -507,18 +507,21 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider {
         super.loadAdditional(tag, registries);
         job = null;
         if (tag.contains("items")) items.deserializeNBT(registries, tag.getCompound("items"));
-        source.setFree(tag.getInt("source"));
+        // 3.4.1: saved Source is bounded; corrupt data is not value.
+        source.setFree(Math.max(0, Math.min(MAX_HELD_SOURCE, tag.getInt("source"))));
         color = tag.contains("color") ? tag.getInt("color") : color;
         int schema = tag.getInt("press_schema");
         if (!tag.contains("job")) return;
         CompoundTag saved = tag.getCompound("job");
-        int savedReserve = Math.max(0, saved.getInt("reserved"));
         GlyphPressJob loaded = schema == SCHEMA ? GlyphPressJob.load(saved) : null;
         Phase loadedPhase = parsePhase(saved.getString("phase"));
+        // A reservation is only recovered when it is a validated amount: no larger than the job's own
+        // cost, which is itself within the schema's bound. A corrupt field never mints Source.
+        int savedReserve = validatedReservation(saved, loaded);
         if (loaded == null || loadedPhase == Phase.NONE) {
             // An unreadable or future job is cancelled on load: its items are already in their
-            // slots, unlocked, and its reservation goes back to the buffer.
-            source.setFree(source.free() + savedReserve);
+            // slots, unlocked, and its validated reservation goes back to the buffer.
+            source.setFree(Math.min(MAX_HELD_SOURCE, source.free() + savedReserve));
             lastEnd = "ars_n_spells.glyph_press.cancel.unreadable";
             return;
         }
@@ -527,6 +530,17 @@ public class GlyphPressBlockEntity extends BlockEntity implements MenuProvider {
         progress = Math.max(0, Math.min(saved.getInt("progress"), loaded.ticks()));
         reserved = phase == Phase.WAITING_SOURCE ? 0 : savedReserve;
         if (phase == Phase.WAITING_SOURCE) source.setFree(source.free() + savedReserve);
+    }
+
+    /** Upper bound on Source a press can legitimately hold: the largest capacity plus one refunded reservation. */
+    static final int MAX_HELD_SOURCE = 100_000 + com.otectus.arsnspells.glyph.behavior.GlyphMappings.MAX_SOURCE_COST;
+
+    static int validatedReservation(CompoundTag saved, @Nullable GlyphPressJob loaded) {
+        if (!saved.contains("reserved", net.minecraft.nbt.Tag.TAG_INT)) return 0;
+        int reserved = saved.getInt("reserved");
+        int cost = loaded != null ? loaded.source() : saved.contains("source", net.minecraft.nbt.Tag.TAG_INT) ? saved.getInt("source") : -1;
+        return reserved >= 0 && cost >= 0 && reserved <= cost && cost <= com.otectus.arsnspells.glyph.behavior.GlyphMappings.MAX_SOURCE_COST
+            ? reserved : 0;
     }
 
     private static Phase parsePhase(String name) {

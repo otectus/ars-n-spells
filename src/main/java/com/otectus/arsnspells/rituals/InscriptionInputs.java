@@ -32,6 +32,14 @@ import java.util.List;
  * parsing stays isolated in {@link IronsInscriptionReader} so this class is safe
  * to classload on Iron's-less servers (uninscription is the Iron's-uninstall
  * recovery flow and must keep working).
+ *
+ * <h2>Precedence depends on the operation (3.4.1)</h2>
+ * An Iron's book bound through the normal workflow is both: it carries ANS inscriptions (the
+ * cross-cast component and its native proxy slots) and, often, ordinary native spells.
+ * Transcription asks whether the item holds a spell to copy, so a readable spell wins there.
+ * Uninscription asks whether it holds ANS inscriptions to remove, so the inscription wins:
+ * classifying the bound book as a source made the ritual refuse it with "spell-bearing items in
+ * range" (GitHub issue #14).
  */
 public final class InscriptionInputs {
     public final List<ItemEntity> sources;
@@ -45,7 +53,18 @@ public final class InscriptionInputs {
         this.blankTargets = Collections.unmodifiableList(blankTargets);
     }
 
+    /** Which ritual is asking: it decides whether a readable spell or an ANS inscription wins. */
+    public enum Operation {
+        TRANSCRIPTION,
+        UNINSCRIPTION
+    }
+
+    /** Transcription precedence; see {@link #classify(List, Operation)}. */
     public static InscriptionInputs classify(List<ItemEntity> entities) {
+        return classify(entities, Operation.TRANSCRIPTION);
+    }
+
+    public static InscriptionInputs classify(List<ItemEntity> entities, Operation operation) {
         List<ItemEntity> sources = new ArrayList<>();
         List<ItemEntity> inscribed = new ArrayList<>();
         List<ItemEntity> blanks = new ArrayList<>();
@@ -53,7 +72,9 @@ public final class InscriptionInputs {
             if (entity == null || !entity.isAlive()) continue;
             ItemStack stack = entity.getItem();
             if (stack.isEmpty()) continue;
-            if (readSource(stack) != null) {
+            if (operation == Operation.UNINSCRIPTION && isInscribed(stack)) {
+                inscribed.add(entity);
+            } else if (readSource(stack) != null) {
                 sources.add(entity);
             } else if (isInscribed(stack)) {
                 inscribed.add(entity);
@@ -65,7 +86,11 @@ public final class InscriptionInputs {
     }
 
     public static boolean isInscribed(ItemStack stack) {
-        return CrossModSpellComponents.has(stack);
+        if (CrossModSpellComponents.has(stack)) return true;
+        // 3.4.1 review UNBIND-01: a book left holding an ANS proxy whose entry was lost is still
+        // ANS-inscribed, so Spell Uninscription can repair it. Gated + FQN: Iron's only.
+        return com.otectus.arsnspells.compat.IronsCompat.isLoaded()
+            && !com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.nativeProxyPoolIds(stack).isEmpty();
     }
 
     /**

@@ -175,6 +175,19 @@ public class BridgeManager {
         publish(buildRouting(mode, ironsPresent, nativeArs, ironsPresent ? nativeIrons : null));
     }
 
+    /**
+     * 3.4.1 review CONFIG-01: a remote client follows the mode the server runs. Its own copy of the
+     * SERVER config arrived once, at login, so without this its routing (which mana bar shows, for one)
+     * kept the mode it joined with after the server changed it. Keeps the client's adapters.
+     */
+    public static void applyServerMode(String effectiveMode) {
+        ManaUnificationMode mode = ManaUnificationMode.fromString(effectiveMode);
+        Routing current = routing;
+        publish(buildRouting(mode, isIronsLoaded,
+            current != null ? current.nativeArs : FALLBACK_BRIDGE,
+            current != null ? current.nativeIrons : null));
+    }
+
     private static synchronized void publish(Routing next) {
         routing = next;
     }

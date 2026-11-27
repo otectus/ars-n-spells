@@ -129,10 +129,13 @@ public final class CrossCastValidator {
         return ironSpellResolvable(spellId);
     }
 
-    /** Isolated so Iron's classes are never resolved unless Iron's is loaded. */
+    /**
+     * Isolated so Iron's classes are never resolved unless Iron's is loaded. Audit ANS-014: an exact
+     * lookup, so the none sentinel never counts as an installed spell.
+     */
     private static boolean ironSpellResolvable(ResourceLocation spellId) {
         try {
-            return io.redspace.ironsspellbooks.api.registry.SpellRegistry.REGISTRY.get(spellId) != null;
+            return com.otectus.arsnspells.spell.irons.IronsSpellLookup.resolvable(spellId);
         } catch (Throwable t) {
             return false;
         }

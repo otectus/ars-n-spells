@@ -1,0 +1,14 @@
+{
+ "_comment": "Effective levels and dormancy against ../catalog.json. live lists Iron's live state per spell (max_level, enabled (default true), school (default the catalogued one)); a spell it omits is not registered. files are optional mapping files, as in ../mappings. Status names are loader-neutral: available, level_above_live_max, disabled_upstream, spell_missing, disabled_by_pack, retired, unsupported.",
+ "cases": [
+  "lowered_maximum_makes_higher_levels_dormant",
+  "maximum_beyond_the_envelope_reports_the_live_value",
+  "pack_disable_applies_within_the_live_maximum",
+  "policy_follows_the_live_school",
+  "raised_maximum_wakes_a_reserved_level",
+  "retired_identity_stays_dormant_whatever_irons_reports",
+  "the_live_maximum_is_checked_before_pack_rules",
+  "unregistered_spell_is_missing",
+  "upstream_disabled_spell_is_dormant_at_every_level"
+ ]
+}

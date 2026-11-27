@@ -57,7 +57,9 @@ public final class ImportedGlyphSmokeGameTests {
         List<TestFunction> tests = new ArrayList<>();
         java.util.Map<String, CatalogEntry> familyMax = new java.util.TreeMap<>();
         for (CatalogEntry entry : ImportedGlyphCatalog.get().entries()) {
-            if (!entry.supported()) continue;
+            // The shipped catalog's spells: a pack's catalog (the SAVE-01 experiment adds one) may name spells
+            // that are not installed, and has no smoke scenario of its own.
+            if (!entry.supported() || !entry.required()) continue;
             String path = entry.spellId().getPath();
             tests.add(new TestFunction("ans_glyph_smoke_" + path, "glyph_smoke_" + path, "ars_n_spells:platform", 400, 0L, true,
                 helper -> run(helper, entry, entry.minLevel(), "glyph_smoke_" + path)));
@@ -106,10 +108,12 @@ public final class ImportedGlyphSmokeGameTests {
             // The GameTest server creates no pocket-dimension level, so Iron's own onCast cannot run
             // here (a native cast fails the same way). The scenario proves the runtime survives it:
             // the charge completes, the native failure is caught and reported, and nothing crashes.
+            // 3.4.1 review CAST-04: the failure is after the effect boundary (the price was paid and
+            // onCast began), so it is FAILED_AFTER_EFFECT, kept paid, never an unpaid refusal.
             helper.succeedWhen(() -> {
                 var outcomes = GlyphSessions.outcomes(player.getUUID());
                 helper.assertTrue(outcomes.stream().anyMatch(o -> o.spell().equals(entry.spellId())
-                        && o.outcome() == GlyphOutcome.REJECTED && o.detail().contains("refused.failed")),
+                        && o.outcome() == GlyphOutcome.FAILED_AFTER_EFFECT && o.detail().contains("refused.failed")),
                     "without a pocket-dimension level the native failure must be caught and reported; outcomes " + outcomes);
                 LOGGER.info("[GlyphSmoke] spell={} level={} result=ENVIRONMENT (no pocket-dimension level in the GameTest server) outcomes={}",
                     entry.spellId(), level, outcomes);

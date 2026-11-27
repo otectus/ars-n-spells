@@ -57,7 +57,9 @@ public class SpellUninscriptionRitual extends AnsRitual {
             return;
         }
 
-        InscriptionInputs inputs = InscriptionInputs.classify(entities);
+        // Inscribed first: a bound Iron's book also holds native spells, and reading those as a
+        // transcription source used to make the ritual refuse it (issue #14).
+        InscriptionInputs inputs = InscriptionInputs.classify(entities, InscriptionInputs.Operation.UNINSCRIPTION);
 
         // Sources or blanks in range mean the player likely meant transcribe;
         // refuse early so we never accidentally strip an item the player
@@ -86,6 +88,13 @@ public class SpellUninscriptionRitual extends AnsRitual {
         ItemEntity inscribedEntity = inputs.inscribed.get(0);
         ItemStack stack = inscribedEntity.getItem();
         String displayName = stack.getHoverName().getString();
+
+        // Written by a newer ANS: its layout may hold data this build cannot tell apart from ours,
+        // so nothing is removed rather than risking a partial, destructive rewrite.
+        if (CrossModSpellComponents.schemaVersion(stack) > CrossModSpellComponents.SCHEMA_VERSION) {
+            error(LANG_PREFIX + "error.future_format", displayName, CrossModSpellComponents.schemaVersion(stack));
+            return;
+        }
 
         // Strip cleanly, and in the right order: native wheel slots first, then the sidecar,
         // then the export marker. A bare component clear loses the pool ids that say which

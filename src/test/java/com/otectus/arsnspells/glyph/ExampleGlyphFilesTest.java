@@ -49,7 +49,7 @@ class ExampleGlyphFilesTest {
                 }
 
                 @Override
-                public GlyphBehaviorSnapshot.LiveSpell spell(ResourceLocation spellId) {
+                public GlyphBehaviorSnapshot.LiveSpell spell(ResourceLocation spellId, int registeredMax) {
                     var entry = catalog.entry(spellId);
                     return new GlyphBehaviorSnapshot.LiveSpell(true, true, entry.maxLevel(), entry.rarity());
                 }

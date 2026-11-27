@@ -87,6 +87,11 @@ public final class GlyphSessions {
      * released; effects that already happened (a summon, a lingering area) are untouched.
      */
     public static final long MAX_SESSION_TICKS = 1800L;
+    /**
+     * 3.4.1 review CAST-05: charges and channels a player may have scheduled at once, whatever they
+     * cost: a zero-cost or creative cast is bounded too. Each session is also bounded by its permits.
+     */
+    public static final int MAX_CONTINUATIONS_PER_PLAYER = 16;
 
     private static final Map<UUID, GlyphCastSession> SESSIONS = new LinkedHashMap<>();
     private static final Map<UUID, Map<ResourceLocation, UUID>> COOLDOWN_PENDING = new HashMap<>();
@@ -130,12 +135,16 @@ public final class GlyphSessions {
         }
     }
 
-    /** The caster as a supported player route, or null (turrets, runes, entities, Ars's fake player). */
+    /**
+     * The caster as a supported player route, or null (turrets, runes, entities, fake players).
+     * Audit ANS-002: NeoForge's own {@code FakePlayer}, which other mods' automation uses, is refused
+     * as Ars's {@code ANFakePlayer} always was; the contract reserves imported glyphs for real players.
+     */
     @Nullable
     public static ServerPlayer supportedCaster(SpellContext context) {
         if (context == null) return null;
         LivingEntity caster = context.getUnwrappedCaster();
-        if (!(caster instanceof ServerPlayer player) || caster instanceof ANFakePlayer || context.castingTile != null) {
+        if (!(caster instanceof ServerPlayer player) || isAutomation(caster) || context.castingTile != null) {
             return null;
         }
         var wrapped = context.getCaster();
@@ -143,6 +152,11 @@ public final class GlyphSessions {
         var type = wrapped.getCasterType();
         if (type != SpellContext.CasterType.PLAYER && type != SpellContext.CasterType.LIVING_ENTITY) return null;
         return player;
+    }
+
+    /** Whether {@code entity} is a fake player of either kind (audit ANS-002). */
+    public static boolean isAutomation(@Nullable net.minecraft.world.entity.Entity entity) {
+        return entity instanceof net.neoforged.neoforge.common.util.FakePlayer || entity instanceof ANFakePlayer;
     }
 
     // ---- Admission ----
@@ -163,10 +177,19 @@ public final class GlyphSessions {
         return out;
     }
 
-    /** Base level, raised by Amplify (at most two levels) and lowered by Dampen, within the catalogued levels. */
+    /**
+     * Base level, raised by Amplify (at most two levels) and lowered by Dampen, bounded below by the
+     * spell's minimum. Not bounded above here: {@link #requestedAboveMax} refuses an Amplified level
+     * above Iron's live maximum instead of clamping it.
+     */
     public static int effectiveLevel(ImportedIronEffect effect, int amplify, int dampen) {
-        return GlyphArithmetic.effectiveLevel(effect.key().baseLevel(), effect.entry().minLevel(), effect.entry().maxLevel(),
+        return GlyphArithmetic.effectiveLevel(effect.key().baseLevel(), effect.entry().minLevel(), Integer.MAX_VALUE,
             amplify, dampen);
+    }
+
+    /** Whether {@code level} is above Iron's live maximum for the glyph's spell (a lowered maximum). */
+    public static boolean requestedAboveMax(ImportedIronEffect effect, int level) {
+        return level > GlyphBehavior.current().liveMax(effect.entry());
     }
 
     /** Runs before other listeners can act on a cast that will be refused anyway. */
@@ -212,6 +235,11 @@ public final class GlyphSessions {
                 return Component.translatable("ars_n_spells.glyph.validation.dormant", occurrence.effect().spellName(),
                     Component.translatable(behavior.dormancy().translationKey()));
             }
+            // A lowered maximum cannot be bypassed with Amplify: refused, never clamped.
+            if (requestedAboveMax(occurrence.effect(), occurrence.effectiveLevel())) {
+                return Component.translatable("ars_n_spells.glyph.refused.above_max", occurrence.effect().spellName(),
+                    occurrence.effectiveLevel(), snapshot.liveMax(occurrence.effect().entry()));
+            }
             ResourceLocation spellId = occurrence.effect().key().ironSpellId();
             if (spells.add(spellId)) {
                 Component nativeRefusal = bridge.nativeRefusal(player, spellId, !bridge.hasPendingRecast(player, spellId));
@@ -224,14 +252,19 @@ public final class GlyphSessions {
         }
         CostRules rules = QuoteService.currentRules();
         GlyphCastSession session = new GlyphCastSession(player, spell, rules,
-            snapshot.generation(), player.level().getGameTime(), MAX_SESSION_TICKS);
+            snapshot.generation(), player.level().getGameTime(), MAX_SESSION_TICKS, snapshot.settings().maxForeignEmissions());
         boolean charges = bridge.chargesMana(player);
         List<GlyphPayments.Reservation> made = new ArrayList<>();
         for (Occurrence occurrence : occurrences) {
             GlyphCastSession.Token token = new GlyphCastSession.Token(occurrence.index(), occurrence.effect().key());
-            if (charges) {
-                CostQuote quote = GlyphPayments.quote(player, bridge.manaCost(occurrence.effect().key().ironSpellId(),
-                    occurrence.effectiveLevel()), rules);
+            ResourceLocation spellId = occurrence.effect().key().ironSpellId();
+            // 3.4.1: Iron's own level modifiers, once per occurrence; the quote, the events and the
+            // effect all start from it (Iron's native callers apply getLevelFor the same way).
+            token.effectiveLevel = occurrence.effectiveLevel();
+            token.nativeLevel = bridge.levelFor(spellId, occurrence.effectiveLevel(), player);
+            // A native recast is free in Iron's: admit it without its original price.
+            if (charges && !bridge.hasPendingRecast(player, spellId)) {
+                CostQuote quote = GlyphPayments.quote(player, bridge.manaCost(spellId, token.nativeLevel), rules);
                 GlyphPayments.Shortage[] shortage = new GlyphPayments.Shortage[1];
                 GlyphPayments.Reservation reservation = GlyphPayments.reserve(player, quote,
                     "glyph:" + session.id + ":" + occurrence.index(), MAX_SESSION_TICKS + 200, shortage);
@@ -270,9 +303,22 @@ public final class GlyphSessions {
             return Component.translatable("message.ars_n_spells.cast.payment_failed");
         }
         Component unit = Component.translatable("ars_n_spells.resource." + shortage.unit().name().toLowerCase(java.util.Locale.ROOT));
-        return Component.translatable("message.ars_n_spells.cast.insufficient", unit, effect.spellName(),
-            PaymentMessages.amount(shortage.required()), PaymentMessages.amount(Math.max(0, shortage.available())));
+        return withManaOnlyNote(Component.translatable("message.ars_n_spells.cast.insufficient", unit, effect.spellName(),
+            PaymentMessages.amount(shortage.required()), PaymentMessages.amount(Math.max(0, shortage.available()))));
     }
+
+    /**
+     * 3.4.1 review PAYMENT-01: Animus pays native Iron's casts with Life Essence inside Iron's own mana
+     * block, which an imported glyph never runs through, so imported glyphs are paid only in mana. When
+     * Animus is installed, a mana shortage says so instead of leaving the player to wonder why a native
+     * cast of the same spell succeeds.
+     */
+    static Component withManaOnlyNote(Component shortage) {
+        if (!net.neoforged.fml.ModList.get().isLoaded(ANIMUS)) return shortage;
+        return shortage.copy().append(" ").append(Component.translatable("message.ars_n_spells.glyph.refused.mana_only_note", "Animus"));
+    }
+
+    static final String ANIMUS = "animus";
 
     // ---- Root lifecycle hooks (from MixinSpellResolverPreCast / MixinSpellResolverMana) ----
 
@@ -316,6 +362,18 @@ public final class GlyphSessions {
 
     static void unregister(GlyphContinuation continuation) {
         CONTINUATIONS.remove(continuation);
+    }
+
+    /** {@code player}'s charges and channels still running. */
+    public static int continuationsFor(UUID player) {
+        int count = 0;
+        for (GlyphContinuation continuation : CONTINUATIONS) if (continuation.session.owner.equals(player)) count++;
+        return count;
+    }
+
+    /** Every continuation still running, for diagnostics and the leak tests. */
+    public static int continuationCount() {
+        return CONTINUATIONS.size();
     }
 
     @SubscribeEvent
@@ -397,6 +455,15 @@ public final class GlyphSessions {
         }
     }
 
+    /**
+     * Close every open session: imported glyphs were turned off (3.4.1 review CAST-03). What is in
+     * flight stops promptly with its unspent funds returned; a channel that already pulsed keeps its
+     * native cooldown.
+     */
+    public static void closeEverything(String why) {
+        for (GlyphCastSession session : List.copyOf(SESSIONS.values())) close(session, GlyphOutcome.CANCELED, why);
+    }
+
     public static void closeAllFor(UUID player, String why) {
         for (GlyphCastSession session : List.copyOf(SESSIONS.values())) {
             if (session.owner.equals(player)) close(session, GlyphOutcome.CANCELED, why);
@@ -471,6 +538,11 @@ public final class GlyphSessions {
         java.util.Deque<OutcomeRecord> history = OUTCOMES.computeIfAbsent(player.getUUID(), k -> new java.util.ArrayDeque<>());
         if (history.size() >= OUTCOME_HISTORY) history.removeFirst();
         history.addLast(new OutcomeRecord(key.ironSpellId(), level, outcome, detail, player.level().getGameTime()));
+    }
+
+    /** One channel pulse as Iron's cast event settled it, for diagnostics and the pulse-level tests. */
+    public static void recordPulse(GlyphRequest request, int level, int cost) {
+        recordOutcome(request.caster(), request.key(), level, GlyphOutcome.EFFECT_APPLIED, "pulse at level " + level + ", cost " + cost);
     }
 
     /** The most recent outcomes for {@code player}, oldest first. */

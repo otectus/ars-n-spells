@@ -17,6 +17,7 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
     private boolean ironsPresent;
     private boolean arsManaCapPresent;
     private boolean arsSpellResolverPresent;
+    private boolean arsGlyphEditorPresent;
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -29,6 +30,8 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         arsManaCapPresent = resourceExists("com/hollingsworth/arsnouveau/common/capability/ManaCap.class")
             && resourceExists("com/hollingsworth/arsnouveau/common/capability/ManaData.class");
         arsSpellResolverPresent = resourceExists("com/hollingsworth/arsnouveau/api/spell/SpellResolver.class");
+        arsGlyphEditorPresent = resourceExists("com/hollingsworth/arsnouveau/client/gui/book/GuiSpellBook.class")
+            && resourceExists("com/hollingsworth/arsnouveau/client/gui/book/GlyphFormatter.class");
     }
 
     @Override
@@ -58,6 +61,7 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.endsWith("MagicDataAccessor")
             || mixinClassName.endsWith("MixinScrollItem")
             || mixinClassName.endsWith("MixinInscriptionTableMenu")
+            || mixinClassName.endsWith("MixinInscriptionResultSlot")
             || mixinClassName.endsWith("MixinInscriptionTableScreen")
             || mixinClassName.endsWith("MixinAbstractSpellArsIcon")
             || mixinClassName.endsWith("MixinItemStackIconContext")
@@ -67,6 +71,11 @@ public class ArsNSpellsMixinPlugin implements IMixinConfigPlugin {
         }
         if (mixinClassName.endsWith("MixinManaCapability")) {
             return arsManaCapPresent;
+        }
+        if (mixinClassName.endsWith("MixinGuiSpellBookGlyphBrowser")
+            || mixinClassName.endsWith("MixinGlyphUnlockMenuBrowser")
+            || mixinClassName.endsWith("MixinCraftingButtonImportedWarning")) {
+            return arsGlyphEditorPresent;
         }
         if (mixinClassName.endsWith("MixinSpellResolverMana")
             || mixinClassName.endsWith("MixinSpellResolverPreCast")) {

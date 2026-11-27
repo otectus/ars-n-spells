@@ -1,0 +1,1888 @@
+{
+ "_comment": "CATALOG-02: 83 spells reserving 99 levels each (8217 glyphs) exceed both loaders' variant caps; the source is rejected whole.",
+ "expect": {
+  "absent": [
+   "addon:s000"
+  ],
+  "errors_contain": [
+   "glyph"
+  ],
+  "fails_startup": false,
+  "identities": 3,
+  "rejected": [
+   "a_big"
+  ]
+ },
+ "sources": [
+  {
+   "json": {
+    "catalog_version": "fixture",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:firebolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "base",
+   "required": true
+  },
+  {
+   "json": {
+    "catalog_version": "a_big",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S000",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s000",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S001",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s001",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S002",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s002",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S003",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s003",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S004",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s004",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S005",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s005",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S006",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s006",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S007",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s007",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S008",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s008",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S009",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s009",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S010",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s010",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S011",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s011",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S012",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s012",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S013",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s013",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S014",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s014",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S015",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s015",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S016",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s016",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S017",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s017",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S018",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s018",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S019",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s019",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S020",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s020",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S021",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s021",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S022",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s022",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S023",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s023",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S024",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s024",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S025",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s025",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S026",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s026",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S027",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s027",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S028",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s028",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S029",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s029",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S030",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s030",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S031",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s031",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S032",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s032",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S033",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s033",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S034",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s034",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S035",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s035",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S036",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s036",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S037",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s037",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S038",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s038",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S039",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s039",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S040",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s040",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S041",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s041",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S042",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s042",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S043",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s043",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S044",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s044",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S045",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s045",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S046",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s046",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S047",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s047",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S048",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s048",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S049",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s049",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S050",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s050",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S051",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s051",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S052",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s052",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S053",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s053",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S054",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s054",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S055",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s055",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S056",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s056",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S057",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s057",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S058",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s058",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S059",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s059",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S060",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s060",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S061",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s061",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S062",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s062",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S063",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s063",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S064",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s064",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S065",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s065",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S066",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s066",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S067",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s067",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S068",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s068",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S069",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s069",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S070",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s070",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S071",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s071",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S072",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s072",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S073",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s073",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S074",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s074",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S075",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s075",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S076",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s076",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S077",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s077",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S078",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s078",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S079",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s079",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S080",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s080",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S081",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s081",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 1,
+       "min": 1,
+       "registered_max": 99
+      },
+      "name": "S082",
+      "rarity": [
+       "COMMON"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:s082",
+      "target": "any",
+      "tier": [
+       1
+      ]
+     }
+    ]
+   },
+   "name": "a_big",
+   "required": false
+  }
+ ]
+}

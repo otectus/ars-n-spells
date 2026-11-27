@@ -1,0 +1,96 @@
+{
+ "_comment": "CATALOG-02: a native minimum of 2 registers levels 2..registered_max; rarity[i] belongs to level min+i, reserved levels are Legendary.",
+ "expect": {
+  "accepted": [
+   "a_min"
+  ],
+  "fails_startup": false,
+  "first_level": {
+   "addon:bolt": 2
+  },
+  "glyphs_absent": [
+   "ars_n_spells:iron/addon/bolt/level_1"
+  ],
+  "identities": 8,
+  "rarity_at": {
+   "ars_n_spells:iron/addon/bolt/level_2": "UNCOMMON",
+   "ars_n_spells:iron/addon/bolt/level_4": "EPIC",
+   "ars_n_spells:iron/addon/bolt/level_5": "LEGENDARY"
+  },
+  "registered_max": {
+   "addon:bolt": 6
+  }
+ },
+ "sources": [
+  {
+   "json": {
+    "catalog_version": "fixture",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:firebolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "base",
+   "required": true
+  },
+  {
+   "json": {
+    "catalog_version": "a_min",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 4,
+       "min": 2,
+       "registered_max": 6
+      },
+      "name": "Bolt",
+      "rarity": [
+       "UNCOMMON",
+       "RARE",
+       "EPIC"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "addon:bolt",
+      "target": "any",
+      "tier": [
+       2,
+       2,
+       3
+      ]
+     }
+    ]
+   },
+   "name": "a_min",
+   "required": false
+  }
+ ]
+}

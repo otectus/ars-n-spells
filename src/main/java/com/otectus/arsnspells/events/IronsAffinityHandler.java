@@ -54,8 +54,11 @@ public class IronsAffinityHandler {
         if (key == null || key.isEmpty()) {
             return;
         }
-        AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
-        data.addLevel(key, 1);
-        PacketHandler.sendToClient(new AffinitySyncPayload(key, data.getLevel(key)), player);
+        // 3.4.1 review PROGRESSION-01: credited when the cast's effect is accepted, not at its event.
+        com.otectus.arsnspells.casting.IronsCastLifecycle.stageTraining(player, event.getSpellId(), () -> {
+            AffinityData data = player.getData(AttachmentTypes.AFFINITY.get());
+            data.addLevel(key, 1);
+            PacketHandler.sendToClient(new AffinitySyncPayload(key, data.getLevel(key)), player);
+        });
     }
 }

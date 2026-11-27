@@ -53,8 +53,10 @@ public class ArsNSpellsJeiPlugin implements IModPlugin {
 
     @Override
     public void registerRecipes(mezz.jei.api.registration.IRecipeRegistration registration) {
-        shown = com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.entries();
-        registration.addRecipes(GlyphPressRecipeCategory.TYPE, shown);
+        // A new recipe manager: nothing a previous runtime was given is registered in this one.
+        RECIPES.clear();
+        var plan = RECIPES.next(com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.entries());
+        if (!plan.add().isEmpty()) registration.addRecipes(GlyphPressRecipeCategory.TYPE, plan.add());
     }
 
     @Override
@@ -66,16 +68,25 @@ public class ArsNSpellsJeiPlugin implements IModPlugin {
     public void onRuntimeUnavailable() {
         com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.setViewerRefresh(null);
         com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.setViewerOpen(null);
+        RECIPES.clear();
     }
 
-    /** The conversions currently shown; replaced whole when the server's glyph behaviour changes. */
-    private static java.util.List<com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.Entry> shown = java.util.List.of();
+    /**
+     * 3.4.1 review VIEW-01: the conversions this JEI runtime holds, keyed by every material input. A
+     * refresh hides what left, unhides what returns and adds only what this runtime never had, so
+     * unchanged refreshes change nothing and a recurring state is never added twice. Used to hide every
+     * recipe and add a fresh copy on each refresh, which grew JEI's hidden recipes without bound.
+     */
+    private static final com.otectus.arsnspells.glyph.recipe.ViewerRecipeSet<com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.Entry> RECIPES =
+        new com.otectus.arsnspells.glyph.recipe.ViewerRecipeSet<>(com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.Entry::viewerKey);
 
     private static void refresh(IJeiRuntime runtime) {
+        var plan = RECIPES.next(com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.entries());
+        if (!plan.changes()) return;
         var manager = runtime.getRecipeManager();
-        if (!shown.isEmpty()) manager.hideRecipes(GlyphPressRecipeCategory.TYPE, shown);
-        shown = com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.entries();
-        if (!shown.isEmpty()) manager.addRecipes(GlyphPressRecipeCategory.TYPE, shown);
+        if (!plan.hide().isEmpty()) manager.hideRecipes(GlyphPressRecipeCategory.TYPE, plan.hide());
+        if (!plan.unhide().isEmpty()) manager.unhideRecipes(GlyphPressRecipeCategory.TYPE, plan.unhide());
+        if (!plan.add().isEmpty()) manager.addRecipes(GlyphPressRecipeCategory.TYPE, plan.add());
     }
 
     @Override
@@ -85,7 +96,12 @@ public class ArsNSpellsJeiPlugin implements IModPlugin {
             () -> net.minecraft.client.Minecraft.getInstance().execute(() -> refresh(runtime)));
         com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.setViewerOpen(
             () -> runtime.getRecipesGui().showTypes(java.util.List.of(GlyphPressRecipeCategory.TYPE)));
-        refresh(runtime);
+        try {
+            refresh(runtime);
+        } catch (RuntimeException failure) {
+            // A viewer failure must never touch the Press itself.
+            org.slf4j.LoggerFactory.getLogger(ArsNSpellsJeiPlugin.class).warn("Could not refresh Glyph Press conversions in JEI", failure);
+        }
         if (!IronsCompat.isLoaded()) {
             // No Iron's means no proxy spells and no Iron's recipe categories to filter.
             return;

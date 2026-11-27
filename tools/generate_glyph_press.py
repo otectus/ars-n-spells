@@ -422,10 +422,12 @@ def glyph_models():
     count = 0
     top = 1
     for entry in entries:
-        if entry.get("status") != "supported":
-            continue
+        # 3.4.1: every catalogued identity has an item, whatever its status (an unsupported or retired
+        # glyph is registered and dormant), up to its registered level envelope.
         namespace, path = entry["spell"].split(":", 1)
-        for level in range(entry["min_level"], entry["max_level"] + 1):
+        levels = entry.get("levels")
+        low, high = (levels["min"], levels["registered_max"]) if levels else (entry["min_level"], entry["max_level"])
+        for level in range(low, high + 1):
             top = max(top, level)
             model = {
                 "parent": "minecraft:item/generated",

@@ -1,0 +1,27 @@
+{
+ "expect": {
+  "allows": {
+   "irons_spellbooks:firebolt@1": false
+  },
+  "errors_contain": [
+   "level 4"
+  ],
+  "valid": false
+ },
+ "files": [
+  {
+   "id": "test:beyond",
+   "json": {
+    "levels": {
+     "4": {
+      "ars_tier": 1
+     }
+    },
+    "schema_version": 2,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

@@ -1,0 +1,12 @@
+{
+ "adapters": "adapters.json",
+ "description": "Reserves imported-glyph identities up to level XV for every Iron's spell of the shipped catalog, for a server that raises Iron's maximum levels to 15. Install on the server and every client, then restart.",
+ "envelope": 15,
+ "inventory": "inventory.json",
+ "mod_id": "ans_catalog_irons_envelope_15",
+ "mod_version": "1.0.0",
+ "name": "irons_envelope_15",
+ "namespaces": [
+  "irons_spellbooks"
+ ]
+}

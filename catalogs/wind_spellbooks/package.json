@@ -1,0 +1,12 @@
+{
+ "adapters": "adapters.json",
+ "description": "Imported glyphs for Wind's Spellbooks (wind_spellbooks) 1.0.1: 5 castable spells; Iron Slash and Tornado catalogued dormant (see adapters.json).",
+ "envelope": 10,
+ "inventory": "inventory.json",
+ "mod_id": "ans_catalog_wind_spellbooks",
+ "mod_version": "1.0.0",
+ "name": "wind_spellbooks",
+ "namespaces": [
+  "wind_spellbooks"
+ ]
+}

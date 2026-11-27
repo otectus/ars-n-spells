@@ -558,7 +558,8 @@ public final class TouchCastGameTests {
     /** A creative caster standing on the platform, private to {@code scenario}, empty-handed. */
     static ServerPlayer caster(GameTestHelper helper, String scenario) {
         String name = scenario.length() > 16 ? scenario.substring(0, 16) : scenario;
-        ServerPlayer player = FakePlayerFactory.get(helper.getLevel(), new GameProfile(
+        // ANS-002: a real player; imported glyphs refuse fake players.
+        ServerPlayer player = TestPlayers.get(helper.getLevel(), new GameProfile(
             UUID.nameUUIDFromBytes(("ans_gametest/" + scenario).getBytes(StandardCharsets.UTF_8)), name));
         player.moveTo(helper.absoluteVec(STAND));
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);

@@ -109,16 +109,20 @@ public final class GlyphPressPlan {
         CatalogEntry entry = catalog.entry(scroll.spellId());
         if (entry == null) return refuse(Reason.NO_ADAPTER);
         if (!entry.supported()) return new Plan(Reason.UNSUPPORTED_SPELL, null, entry, null);
-        if (scroll.level() < entry.minLevel() || scroll.level() > entry.maxLevel()) {
+        // Above the registered envelope there is no identity: reported (with the registered range), never downcast.
+        if (scroll.level() < entry.minLevel() || scroll.level() > entry.registeredMax()) {
             return new Plan(Reason.LEVEL_NOT_CATALOGUED, null, entry, null);
         }
         ImportedGlyphKey key = new ImportedGlyphKey(entry.spellId(), scroll.level());
         VariantBehavior behavior = snapshot.variant(key);
         Reason dormant = dormantReason(behavior.dormancy());
         if (dormant != null) return new Plan(dormant, key, entry, behavior);
-        if (entry.requiresLearning() && Boolean.FALSE.equals(in.learned())) return new Plan(Reason.NOT_LEARNED, key, entry, behavior);
+        // Iron's live learning rule (learned is false only when Iron's requires it now and it is not
+        // learned), whatever the catalog recorded.
+        if (Boolean.FALSE.equals(in.learned())) return new Plan(Reason.NOT_LEARNED, key, entry, behavior);
         if (!in.plate()) return new Plan(Reason.INSERT_PLATE, key, entry, behavior);
-        if (in.catalystCount() < behavior.pressGems() || !in.catalystInTag().test(behavior.catalyst())) {
+        // A zero-catalyst conversion needs nothing: an empty slot satisfies it and nothing is consumed.
+        if (behavior.pressGems() > 0 && (in.catalystCount() < behavior.pressGems() || !in.catalystInTag().test(behavior.catalyst()))) {
             return new Plan(Reason.NEEDS_CATALYST, key, entry, behavior);
         }
         if (behavior.pressSource() > in.sourceCapacity()) return new Plan(Reason.SOURCE_OVER_CAPACITY, key, entry, behavior);
@@ -137,8 +141,13 @@ public final class GlyphPressPlan {
             case SPELL_NOT_REGISTERED, SPELL_DISABLED_BY_IRONS -> Reason.SPELL_DISABLED;
             case DISABLED_BY_PACK -> Reason.DISABLED_BY_PACK;
             case LEVEL_ABOVE_SERVER_MAX -> Reason.LEVEL_ABOVE_SERVER_MAX;
-            case UNSUPPORTED -> Reason.UNSUPPORTED_SPELL;
+            case UNSUPPORTED, RETIRED -> Reason.UNSUPPORTED_SPELL;
             case NOT_SYNCED -> Reason.NOT_SYNCED;
+            // 3.4.1 review CATALOG-02: a level below the live minimum cannot be on a valid scroll, and a
+            // contract newer than this build has no adapter here.
+            case LEVEL_BELOW_SERVER_MIN -> Reason.INVALID_LEVEL;
+            case ADAPTER_TOO_NEW -> Reason.NO_ADAPTER;
+            case PACKAGE_MISSING -> Reason.UNSUPPORTED_SPELL;
         };
     }
 

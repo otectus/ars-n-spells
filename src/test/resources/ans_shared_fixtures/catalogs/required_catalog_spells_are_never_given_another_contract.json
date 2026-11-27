@@ -1,0 +1,113 @@
+{
+ "_comment": "CATALOG-02: a spell of ANS's required catalog keeps its contract; an optional source naming the same lineage cannot promote it.",
+ "expect": {
+  "errors_contain": [
+   "only a later version of the same optional catalog"
+  ],
+  "executable": {
+   "irons_spellbooks:dormant": false
+  },
+  "fails_startup": false,
+  "identities": 6,
+  "rejected": [
+   "a_pack"
+  ]
+ },
+ "sources": [
+  {
+   "json": {
+    "catalog_version": "fixture",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:firebolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 0,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Dormant",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "reason": "no adapter assigned",
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:dormant",
+      "status": "unsupported",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "base",
+   "required": true
+  },
+  {
+   "json": {
+    "catalog": "base",
+    "catalog_version": "a_pack",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:summon",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Dormant",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:dormant",
+      "target": "position",
+      "tier": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "name": "a_pack",
+   "required": false
+  }
+ ]
+}

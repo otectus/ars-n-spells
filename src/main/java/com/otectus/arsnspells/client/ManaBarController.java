@@ -111,17 +111,11 @@ public final class ManaBarController {
             case ARS_PRIMARY:
                 return !isArs;
             case HYBRID:
-                // The config validator restricts this to "irons"/"ars", so the only reachable
-                // values are the two the HUD understands; anything else was rejected at load
-                // and replaced by the default. Read defensively anyway - this is the render
-                // thread, and a config that is mid-reload must not throw here.
-                String preferred;
-                try {
-                    preferred = AnsConfig.HYBRID_MANA_BAR.get();
-                } catch (IllegalStateException configNotLoaded) {
-                    preferred = "irons";
-                }
-                boolean preferArs = "ars".equalsIgnoreCase(preferred);
+                // Audit ANS-007: from the policy the server synchronizes on login, on every change
+                // and on every config reload, not the client's login-time copy of the config;
+                // ClientSettings.policy() falls back to that copy (or the default) until the first
+                // snapshot arrives, and never throws on the render thread.
+                boolean preferArs = !ClientSettings.policy().hybridShowsIrons();
                 return isArs != preferArs;
             case SEPARATE:
             case DISABLED:

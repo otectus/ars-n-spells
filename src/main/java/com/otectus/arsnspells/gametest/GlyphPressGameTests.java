@@ -551,6 +551,8 @@ public final class GlyphPressGameTests {
     // ---- Server settings (own batch: they change shared state) ----
 
     /** Turning the Press off refuses new jobs and cancels a running one with everything returned. */
+    // 3.4.1 review: each test that changes a global (settings, mappings, Iron's readiness) across ticks owns its batch;
+    // sharing one let a concurrent test's restore land mid-job.
     @GameTest(template = "platform", batch = "ans_glyph_press_settings", timeoutTicks = 60)
     public static void ironsLoaded_press_disablingCancelsSafely(GameTestHelper helper) {
         if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
@@ -582,7 +584,7 @@ public final class GlyphPressGameTests {
      * reaches its end waits unchanged instead of being judged on Iron's fallbacks, and completes
      * once the config is ready.
      */
-    @GameTest(template = "platform", batch = "ans_glyph_press_settings", timeoutTicks = 300)
+    @GameTest(template = "platform", batch = "ans_glyph_press_settings_wait", timeoutTicks = 300)
     public static void ironsLoaded_press_waitsForIronsConfigInsteadOfCancelling(GameTestHelper helper) {
         if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
         GlyphPressBlockEntity press = press(helper);
@@ -625,7 +627,7 @@ public final class GlyphPressGameTests {
     }
 
     /** Turning imported glyphs off makes them dormant; turning them back on restores them without relearning. */
-    @GameTest(template = "platform", batch = "ans_glyph_press_settings")
+    @GameTest(template = "platform", batch = "ans_glyph_press_settings_dormant")
     public static void ironsLoaded_disablingGlyphsMakesThemDormantAndReenablingRestores(GameTestHelper helper) {
         if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
         boolean enabled = AnsConfig.ENABLE_IRON_GLYPHS.get();
@@ -653,7 +655,7 @@ public final class GlyphPressGameTests {
     }
 
     /** A reload that changes a running job's recipe cancels it cleanly instead of making an obsolete glyph. */
-    @GameTest(template = "platform", batch = "ans_glyph_press_settings", timeoutTicks = 400)
+    @GameTest(template = "platform", batch = "ans_glyph_press_settings_recipe", timeoutTicks = 400)
     public static void ironsLoaded_press_recipeChangeCancelsTheJob(GameTestHelper helper) {
         if (OptionalModGate.skipIfAbsent(helper, IronsCompat.MODID)) return;
         GlyphPressBlockEntity press = press(helper);

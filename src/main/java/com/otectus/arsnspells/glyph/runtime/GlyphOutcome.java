@@ -14,5 +14,10 @@ public enum GlyphOutcome {
     /** A charge or channel finished its whole lifecycle. */
     COMPLETED,
     /** A pending charge or channel was cancelled; unspent reservations were released. */
-    CANCELED
+    CANCELED,
+    /**
+     * 3.4.1 review CAST-04: the native effect began and then threw. It stays paid, counts against the
+     * emission budget and gets its cooldown: an effect may already have happened.
+     */
+    FAILED_AFTER_EFFECT
 }

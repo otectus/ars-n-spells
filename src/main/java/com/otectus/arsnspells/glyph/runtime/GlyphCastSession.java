@@ -38,6 +38,9 @@ public final class GlyphCastSession {
         @Nullable GlyphPayments.Reservation reservation;
         int executions;
         boolean cooldownCommitted;
+        /** The Ars level (Amplify/Dampen applied) admission saw, and Iron's level for it, evaluated once. */
+        int effectiveLevel;
+        int nativeLevel;
 
         Token(int rootIndex, ImportedGlyphKey key) {
             this.rootIndex = rootIndex;
@@ -67,6 +70,14 @@ public final class GlyphCastSession {
     final Set<ResourceLocation> cooldownPending = new LinkedHashSet<>();
     final Deque<String> log = new ArrayDeque<>();
     int emissions;
+    /**
+     * Emission permits held by work already scheduled but not yet past its effect boundary (a charge
+     * waiting for its cast time). 3.4.1 review CAST-05: {@code pendingEmissions + emissions} never
+     * exceeds the budget, so a split or burst cannot schedule more charges than the cast may run.
+     */
+    int pendingEmissions;
+    /** The emission budget agreed at admission; a reload can only tighten it, never widen it. */
+    final int emissionLimit;
     int pending;
     boolean launched;
     boolean rootFinished;
@@ -74,7 +85,8 @@ public final class GlyphCastSession {
     GlyphOutcome lastOutcome;
 
     GlyphCastSession(net.minecraft.server.level.ServerPlayer owner, Spell rootSpell, CostRules rules,
-                     int behaviorGeneration, long createdTick, long lifetimeTicks) {
+                     int behaviorGeneration, long createdTick, long lifetimeTicks, int emissionLimit) {
+        this.emissionLimit = Math.max(1, emissionLimit);
         this.owner = owner.getUUID();
         this.ownerRef = new java.lang.ref.WeakReference<>(owner);
         this.dimension = owner.level().dimension();
@@ -110,6 +122,33 @@ public final class GlyphCastSession {
 
     public int pending() {
         return pending;
+    }
+
+    public int pendingEmissions() {
+        return pendingEmissions;
+    }
+
+    /** The budget in force: the one agreed at admission, tightened by a lower current setting. */
+    int emissionLimit(int current) {
+        return Math.max(1, Math.min(emissionLimit, current));
+    }
+
+    /** Take a permit for one execution before scheduling it; false when the budget is spent. */
+    boolean tryReserveEmission(int currentLimit) {
+        if (emissions + pendingEmissions >= emissionLimit(currentLimit)) return false;
+        pendingEmissions++;
+        return true;
+    }
+
+    /** The execution reached its effect: its permit becomes a counted emission. */
+    void consumeEmission() {
+        if (pendingEmissions > 0) pendingEmissions--;
+        emissions++;
+    }
+
+    /** The execution was refused or cancelled before any effect: give its permit back. */
+    void releaseEmission() {
+        if (pendingEmissions > 0) pendingEmissions--;
     }
 
     public boolean closed() {

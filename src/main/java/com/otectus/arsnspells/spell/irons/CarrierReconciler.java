@@ -67,13 +67,17 @@ public final class CarrierReconciler {
         if (stack == null || stack.isEmpty() || !IronsCompat.isLoaded()) {
             return Outcome.UNCHANGED;
         }
+        // A future schema's contents are not guessed at: left exactly as it is.
+        if (CrossModSpellComponents.schemaVersion(stack) > CrossModSpellComponents.SCHEMA_VERSION) return Outcome.UNCHANGED;
         if (!CrossModSpellComponents.has(stack)) {
-            return Outcome.UNCHANGED;
+            // Audit ANS-010: a book whose whole sidecar is gone (or empty) can still carry ANS proxy
+            // slots, the most complete orphan case. The scroll repair needs a sidecar; this one does
+            // not. (A sidecar that does not decode cannot exist here: the component codec rejects it.)
+            return removeOrphanProxySlots(stack, true) ? Outcome.ORPHANS_REMOVED : Outcome.UNCHANGED;
         }
 
-        if (CrossModSpellComponents.schemaVersion(stack) > CrossModSpellComponents.SCHEMA_VERSION) return Outcome.UNCHANGED;
         boolean containerRepaired = repairCarrierContainer(stack);
-        boolean orphansRemoved = removeOrphanProxySlots(stack);
+        boolean orphansRemoved = removeOrphanProxySlots(stack, false);
 
         if (containerRepaired || orphansRemoved
             || CrossModSpellComponents.schemaVersion(stack) < CrossModSpellComponents.SCHEMA_VERSION) {
@@ -118,16 +122,19 @@ public final class CarrierReconciler {
      * Drop native proxy slots whose sidecar entry no longer exists.
      *
      * <p>Only pool ids ANS owns are considered, and only those absent from the sidecar, so a
-     * genuine Iron's spell can never be removed.
+     * genuine Iron's spell can never be removed. Audit ANS-010: the owned ids are read from the
+     * book's native container itself. When no ANS entry is left at all, the native capacity ANS
+     * added is handed back by the same rule uninscription uses ({@code restoreBaseCapacity}:
+     * trailing empty slots down to the recorded baseline, never below it, never a native spell).
      */
-    private static boolean removeOrphanProxySlots(ItemStack stack) {
+    private static boolean removeOrphanProxySlots(ItemStack stack, boolean noEntriesLeft) {
         if (!IronsBookBindingUtil.isIronsSpellBook(stack)) {
             return false;
         }
-        Set<Integer> live = CrossModSpellComponents.usedProxyPoolIds(
+        Set<Integer> live = noEntriesLeft ? Set.of() : CrossModSpellComponents.usedProxyPoolIds(
             CrossModSpellComponents.get(stack));
         boolean removedAny = false;
-        for (int poolId = 1; poolId <= CrossModSpellComponents.PROXY_POOL_SIZE; poolId++) {
+        for (int poolId : IronsProxySlotWriter.nativeProxyPoolIds(stack)) {
             if (live.contains(poolId)) {
                 continue;
             }
@@ -135,6 +142,10 @@ public final class CarrierReconciler {
                 removedAny = true;
                 LOGGER.debug("Removed orphan ars_cross_{} proxy slot with no sidecar entry", poolId);
             }
+        }
+        if (removedAny && noEntriesLeft) {
+            IronsProxySlotWriter.restoreBaseCapacity(stack);
+            stack.remove(com.otectus.arsnspells.spell.ModDataComponents.NATIVE_BASE_CAPACITY.get());
         }
         return removedAny;
     }

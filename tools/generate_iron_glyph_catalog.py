@@ -21,6 +21,8 @@ Utils.getTargetBlock, or the caster's own position.
 
 Usage
   python3 tools/generate_iron_glyph_catalog.py /tmp/iron_inventory.json
+  python3 tools/generate_iron_glyph_catalog.py pack ...                build an addon catalog (tools/glyph_catalog_pack.py)
+  python3 tools/generate_iron_glyph_catalog.py validate-mappings PACK...   dry-run mapping files (tools/validate_glyph_mappings.py)
 """
 import collections
 import json
@@ -29,6 +31,10 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CATALOG = ROOT / "src/main/resources/ans_glyph_catalog/irons_spellbooks.json"
+LEDGER = ROOT / "src/main/resources/ars_n_spells/glyph_identity_ledger.txt"
+# 3.4.1: every spell registers base levels up to at least this (reserved, dormant until Iron's live
+# maximum reaches them). Shared with the Forge build; see docs/3.4.1/identity-and-levels.md.
+ENVELOPE_FLOOR = 10
 LANG = ROOT / "src/main/resources/assets/ars_n_spells/lang/en_us.json"
 DOC_MD = ROOT / "docs/3.4.0/iron-glyph-coverage.md"
 DOC_JSON = ROOT / "docs/3.4.0/iron-glyph-coverage.json"
@@ -210,6 +216,25 @@ def augments(entry, target, adapter):
     return out
 
 
+def read_ledger():
+    """{spell id: highest published level}; seeded from the shipped catalog when the ledger is absent."""
+    published = {}
+    if LEDGER.exists():
+        for line in LEDGER.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            namespace, rest = line[len("ars_n_spells:iron/"):].split("/", 1)
+            path, level = rest.rsplit("/", 1)
+            spell = namespace + ":" + path
+            published[spell] = max(published.get(spell, 0), int(level[len("level_"):]))
+    elif CATALOG.exists():
+        for entry in json.loads(CATALOG.read_text(encoding="utf-8"))["spells"]:
+            levels = entry.get("levels")
+            published[entry["spell"]] = levels["registered_max"] if levels else entry["max_level"]
+    return published
+
+
 def main(inventory_path):
     inventory = json.loads(pathlib.Path(inventory_path).read_text(encoding="utf-8"))
     spells = [s for s in inventory["spells"] if s["spell"].startswith("irons_spellbooks:") and not s["none"]]
@@ -220,6 +245,7 @@ def main(inventory_path):
     if stale:
         sys.exit("classified spells absent from the inventory: " + ", ".join(stale))
 
+    published = read_ledger()
     catalog_spells = []
     lang = collections.OrderedDict()
     manifest = []
@@ -227,24 +253,25 @@ def main(inventory_path):
         path = s["spell"].split(":", 1)[1]
         adapter, target, note = CLASSIFICATION[path]
         tiers = [TIER_BY_RARITY[r] for r in s["rarity"]]
+        registered = max(s["max_level"], ENVELOPE_FLOOR, published.get(s["spell"], 0))
         record = collections.OrderedDict([
             ("spell", s["spell"]),
+            ("status", "supported"),
             ("name", s["name"]),
             ("school", s["school"]),
             ("cast_type", s["cast_type"]),
-            ("min_level", s["min_level"]),
-            ("max_level", s["max_level"]),
+            ("levels", collections.OrderedDict([("min", s["min_level"]), ("default_max", s["max_level"]), ("registered_max", registered)])),
             ("rarity", s["rarity"]),
-            ("default_tier", tiers),
+            ("tier", tiers),
             ("requires_learning", s["requires_learning"]),
             ("enabled_by_default", s["enabled"]),
             ("adapter", adapter),
+            ("adapter_version", 1),
             ("target", target),
             ("final_effect_only", path in FINAL_EFFECT_ONLY),
-            ("status", "supported"),
         ])
         catalog_spells.append(record)
-        for level in range(s["min_level"], s["max_level"] + 1):
+        for level in range(s["min_level"], registered + 1):
             # Ars names a spell part by "<namespace>.glyph_name.<part path>"; the part id is iron/...
             key = "ars_n_spells.glyph_name.iron/irons_spellbooks/%s/level_%d" % (path, level)
             lang[key] = "%s %s" % (s["name"], ROMAN[level] if level < len(ROMAN) else str(level))
@@ -272,8 +299,16 @@ def main(inventory_path):
                           for l in range(s["min_level"], s["max_level"] + 1)]),
         ]))
 
+    lost = [spell for spell, top in published.items() if not any(r["spell"] == spell and r["levels"]["registered_max"] >= top for r in catalog_spells)]
+    if lost:
+        sys.exit("published ids would be lost for: " + ", ".join(sorted(lost)) + " (keep them catalogued, status retired)")
+    ids = sorted("ars_n_spells:iron/%s/%s/level_%d" % (r["spell"].split(":")[0], r["spell"].split(":")[1], l)
+                 for r in catalog_spells for l in range(1, r["levels"]["registered_max"] + 1))
+    LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    LEDGER.write_text("\n".join(["# Every imported-glyph identity Ars 'n' Spells has published. Append-only: a release may add",
+                                  "# ids, never remove one. Startup refuses a catalog that lost any of them.", ""] + ids) + "\n", encoding="utf-8")
     catalog = collections.OrderedDict([
-        ("schema_version", 1),
+        ("schema_version", 2),
         ("catalog", "ars_n_spells:irons_spellbooks_base"),
         ("source", collections.OrderedDict([
             ("mod_id", inventory["mod_id"]),
@@ -325,6 +360,16 @@ def main(inventory_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    # The pack-author subcommands live in modules both loaders' builds share unchanged.
+    if len(sys.argv) > 1 and sys.argv[1] in ("pack", "validate-mappings"):
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+        if sys.argv[1] == "pack":
+            import glyph_catalog_pack
+            glyph_catalog_pack.main(sys.argv[2:])
+        else:
+            import validate_glyph_mappings
+            sys.exit(validate_glyph_mappings.main(sys.argv[2:]))
+    elif len(sys.argv) != 2:
         sys.exit(__doc__)
-    main(sys.argv[1])
+    else:
+        main(sys.argv[1])

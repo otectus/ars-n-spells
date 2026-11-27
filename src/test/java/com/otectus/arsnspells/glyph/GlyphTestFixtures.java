@@ -51,7 +51,7 @@ public final class GlyphTestFixtures {
             }
 
             @Override
-            public GlyphBehaviorSnapshot.LiveSpell spell(ResourceLocation spellId) {
+            public GlyphBehaviorSnapshot.LiveSpell spell(ResourceLocation spellId, int registeredMax) {
                 var entry = catalog().entry(spellId);
                 return entry == null ? null : new GlyphBehaviorSnapshot.LiveSpell(true, !disabled.contains(spellId), entry.maxLevel(), entry.rarity());
             }

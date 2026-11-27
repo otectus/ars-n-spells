@@ -35,7 +35,17 @@ public final class ImportedGlyphRegistration {
             return;
         }
         registered = true;
-        ImportedGlyphCatalog catalog = ImportedGlyphCatalog.fromManifests(CatalogManifests.discover());
+        // 3.4.1: assembled from required and optional manifests and checked against the published
+        // ledger; a broken required catalog stops startup here rather than registering fewer ids.
+        java.util.List<ImportedGlyphCatalog.Manifest> live = CatalogManifests.discoverAll();
+        // 3.4.1 review SAVE-01: every catalog ever accepted, read back as identities only (assembled after every live one).
+        java.nio.file.Path archive = com.otectus.arsnspells.glyph.catalog.RetainedCatalogs.directory();
+        java.util.List<ImportedGlyphCatalog.Manifest> manifests = new java.util.ArrayList<>(live);
+        manifests.addAll(com.otectus.arsnspells.glyph.catalog.RetainedCatalogs.sources(archive, live));
+        ImportedGlyphCatalog catalog = ImportedGlyphCatalog.assemble(manifests, ImportedGlyphCatalog.ledger());
+        com.otectus.arsnspells.glyph.catalog.RetainedCatalogs.retain(archive, live, catalog);
+        // A rejected optional catalog registers nothing; say so where a pack maker looks first.
+        for (String problem : catalog.errors()) LOGGER.error("[ImportedGlyphs] catalog {}", problem);
         ImportedGlyphCatalog.install(catalog);
         long started = System.nanoTime();
         for (ImportedGlyphKey key : catalog.keys()) {

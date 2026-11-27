@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "catalog": "ars_n_spells:irons_spellbooks_base",
   "source": {
     "mod_id": "irons_spellbooks",
@@ -28,17 +28,21 @@
   "spells": [
     {
       "spell": "irons_spellbooks:abyssal_shroud",
+      "status": "supported",
       "name": "Abyssal Shroud",
       "school": "irons_spellbooks:eldritch",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 3,
+      "levels": {
+        "min": 1,
+        "default_max": 3,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY",
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3
@@ -46,17 +50,21 @@
       "requires_learning": true,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:acid_orb",
+      "status": "supported",
       "name": "Acid Spit",
       "school": "irons_spellbooks:nature",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -67,7 +75,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         2,
@@ -80,17 +88,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:acupuncture",
+      "status": "supported",
       "name": "Acupuncture",
       "school": "irons_spellbooks:blood",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -103,7 +115,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -118,17 +130,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:angel_wing",
+      "status": "supported",
       "name": "Angel Wings",
       "school": "irons_spellbooks:holy",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY",
         "LEGENDARY",
@@ -136,7 +152,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -146,17 +162,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:arcane_shackle",
+      "status": "supported",
       "name": "Arcane Shackle",
       "school": "irons_spellbooks:ender",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -167,7 +187,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -180,17 +200,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:arrow_volley",
+      "status": "supported",
       "name": "Arrow Volley",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 6,
+      "levels": {
+        "min": 1,
+        "default_max": 6,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -199,7 +223,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -210,17 +234,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:ascension",
+      "status": "supported",
       "name": "Ascension",
       "school": "irons_spellbooks:lightning",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -233,7 +261,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -248,17 +276,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:ball_lightning",
+      "status": "supported",
       "name": "Ball Lightning",
       "school": "irons_spellbooks:lightning",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -271,7 +303,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -286,17 +318,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:black_hole",
+      "status": "supported",
       "name": "Black Hole",
       "school": "irons_spellbooks:ender",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 6,
+      "levels": {
+        "min": 1,
+        "default_max": 6,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY",
         "LEGENDARY",
@@ -305,7 +341,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -316,17 +352,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:blaze_storm",
+      "status": "supported",
       "name": "Blaze Storm",
       "school": "irons_spellbooks:fire",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -339,7 +379,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -354,17 +394,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:blessing_of_life",
+      "status": "supported",
       "name": "Blessing of Life",
       "school": "irons_spellbooks:holy",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -377,7 +421,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -392,17 +436,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:blight",
+      "status": "supported",
       "name": "Blight",
       "school": "irons_spellbooks:nature",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -413,7 +461,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -426,17 +474,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:blizzard",
+      "status": "supported",
       "name": "Blizzard",
       "school": "irons_spellbooks:ice",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -447,7 +499,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -460,17 +512,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:blood_needles",
+      "status": "supported",
       "name": "Blood Needles",
       "school": "irons_spellbooks:blood",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -483,7 +539,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -498,17 +554,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:blood_slash",
+      "status": "supported",
       "name": "Blood Slash",
       "school": "irons_spellbooks:blood",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -516,7 +576,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -526,17 +586,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:blood_step",
+      "status": "supported",
       "name": "Blood Step",
       "school": "irons_spellbooks:blood",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "RARE",
@@ -544,7 +608,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -554,17 +618,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:teleport",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:burning_dash",
+      "status": "supported",
       "name": "Burning Dash",
       "school": "irons_spellbooks:fire",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -577,7 +645,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -592,17 +660,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:chain_creeper",
+      "status": "supported",
       "name": "Chain Creeper",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 6,
+      "levels": {
+        "min": 1,
+        "default_max": 6,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -611,7 +683,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -622,17 +694,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:chain_lightning",
+      "status": "supported",
       "name": "Chain Lightning",
       "school": "irons_spellbooks:lightning",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -645,7 +721,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -660,23 +736,27 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:charge",
+      "status": "supported",
       "name": "Charge",
       "school": "irons_spellbooks:lightning",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 3,
+      "levels": {
+        "min": 1,
+        "default_max": 3,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         3,
         3
@@ -684,37 +764,45 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:cleanse",
+      "status": "supported",
       "name": "Cleanse",
       "school": "irons_spellbooks:holy",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 1,
+      "levels": {
+        "min": 1,
+        "default_max": 1,
+        "registered_max": 10
+      },
       "rarity": [
         "EPIC"
       ],
-      "default_tier": [
+      "tier": [
         3
       ],
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:cloud_of_regeneration",
+      "status": "supported",
       "name": "Cloud of Regeneration",
       "school": "irons_spellbooks:holy",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -722,7 +810,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -732,17 +820,21 @@
       "requires_learning": false,
       "enabled_by_default": false,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:cone_of_cold",
+      "status": "supported",
       "name": "Cone of Cold",
       "school": "irons_spellbooks:ice",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -755,7 +847,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -770,37 +862,45 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:counterspell",
+      "status": "supported",
       "name": "Counterspell",
       "school": "irons_spellbooks:ender",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 1,
+      "levels": {
+        "min": 1,
+        "default_max": 1,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE"
       ],
-      "default_tier": [
+      "tier": [
         2
       ],
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:devour",
+      "status": "supported",
       "name": "Devour",
       "school": "irons_spellbooks:blood",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -813,7 +913,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -828,17 +928,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:divine_smite",
+      "status": "supported",
       "name": "Divine Smite",
       "school": "irons_spellbooks:holy",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -846,7 +950,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -856,17 +960,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:dragon_breath",
+      "status": "supported",
       "name": "Dragon's Breath",
       "school": "irons_spellbooks:ender",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -879,7 +987,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -894,17 +1002,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:earthquake",
+      "status": "supported",
       "name": "Earthquake",
       "school": "irons_spellbooks:nature",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -917,7 +1029,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -932,17 +1044,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:echoing_strikes",
+      "status": "supported",
       "name": "Echoing Strikes",
       "school": "irons_spellbooks:ender",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -950,7 +1066,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -960,17 +1076,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:eldritch_blast",
+      "status": "supported",
       "name": "Eldritch Blast",
       "school": "irons_spellbooks:eldritch",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY",
         "LEGENDARY",
@@ -978,7 +1098,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -988,17 +1108,21 @@
       "requires_learning": true,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:electrocute",
+      "status": "supported",
       "name": "Electrocute",
       "school": "irons_spellbooks:lightning",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1011,7 +1135,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -1026,17 +1150,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:evasion",
+      "status": "supported",
       "name": "Evasion",
       "school": "irons_spellbooks:ender",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "EPIC",
         "EPIC",
@@ -1044,7 +1172,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -1054,17 +1182,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:fang_strike",
+      "status": "supported",
       "name": "Fang Strike",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1077,7 +1209,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -1092,17 +1224,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:fang_swirl",
+      "status": "supported",
       "name": "Fang Swirl",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "EPIC",
         "EPIC",
@@ -1113,7 +1249,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -1126,17 +1262,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:fang_ward",
+      "status": "supported",
       "name": "Fang Ward",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1147,7 +1287,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         2,
@@ -1160,17 +1300,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:fire_arrow",
+      "status": "supported",
       "name": "Fire Arrow",
       "school": "irons_spellbooks:fire",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -1183,7 +1327,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -1198,17 +1342,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:fire_breath",
+      "status": "supported",
       "name": "Fire Breath",
       "school": "irons_spellbooks:fire",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1221,7 +1369,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -1236,17 +1384,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:fireball",
+      "status": "supported",
       "name": "Fireball",
       "school": "irons_spellbooks:fire",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -1254,7 +1406,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -1264,17 +1416,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:firebolt",
+      "status": "supported",
       "name": "Firebolt",
       "school": "irons_spellbooks:fire",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1287,7 +1443,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -1302,17 +1458,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:firecracker",
+      "status": "supported",
       "name": "Firecracker",
       "school": "irons_spellbooks:evocation",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1325,7 +1485,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -1340,17 +1500,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:firefly_swarm",
+      "status": "supported",
       "name": "Firefly Swarm",
       "school": "irons_spellbooks:nature",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -1363,7 +1527,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -1378,17 +1542,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:flaming_barrage",
+      "status": "supported",
       "name": "Flaming Barrage",
       "school": "irons_spellbooks:fire",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -1396,7 +1564,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -1406,17 +1574,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:flaming_strike",
+      "status": "supported",
       "name": "Flaming Strike",
       "school": "irons_spellbooks:fire",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -1424,7 +1596,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -1434,17 +1606,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:fortify",
+      "status": "supported",
       "name": "Fortify",
       "school": "irons_spellbooks:holy",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1457,7 +1633,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -1472,17 +1648,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:frost_step",
+      "status": "supported",
       "name": "Frost Step",
       "school": "irons_spellbooks:ice",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -1493,7 +1673,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -1506,17 +1686,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:teleport",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:frostbite",
+      "status": "supported",
       "name": "Frostbite",
       "school": "irons_spellbooks:ice",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "EPIC",
         "EPIC",
@@ -1524,7 +1708,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -1534,17 +1718,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:frostwave",
+      "status": "supported",
       "name": "Frostwave",
       "school": "irons_spellbooks:ice",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1555,7 +1743,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         2,
@@ -1568,17 +1756,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:gluttony",
+      "status": "supported",
       "name": "Gluttony",
       "school": "irons_spellbooks:nature",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -1586,7 +1778,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -1596,17 +1788,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:gravity_fissure",
+      "status": "supported",
       "name": "Gravity Fissure",
       "school": "irons_spellbooks:ender",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "EPIC",
         "EPIC",
@@ -1614,7 +1810,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -1624,37 +1820,45 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:greater_heal",
+      "status": "supported",
       "name": "Greater Heal",
       "school": "irons_spellbooks:holy",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 1,
+      "levels": {
+        "min": 1,
+        "default_max": 1,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE"
       ],
-      "default_tier": [
+      "tier": [
         2
       ],
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:guiding_bolt",
+      "status": "supported",
       "name": "Guiding Bolt",
       "school": "irons_spellbooks:holy",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1667,7 +1871,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -1682,17 +1886,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:gust",
+      "status": "supported",
       "name": "Gust",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -1705,7 +1913,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -1720,24 +1928,28 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:haste",
+      "status": "supported",
       "name": "Haste",
       "school": "irons_spellbooks:holy",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 4,
+      "levels": {
+        "min": 1,
+        "default_max": 4,
+        "registered_max": 10
+      },
       "rarity": [
         "EPIC",
         "EPIC",
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -1746,17 +1958,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity_or_self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:heal",
+      "status": "supported",
       "name": "Heal",
       "school": "irons_spellbooks:holy",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -1767,7 +1983,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -1780,17 +1996,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:healing_circle",
+      "status": "supported",
       "name": "Healing Circle",
       "school": "irons_spellbooks:holy",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1803,7 +2023,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -1818,17 +2038,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:heartstop",
+      "status": "supported",
       "name": "Heartstop",
       "school": "irons_spellbooks:blood",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -1836,7 +2060,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -1846,17 +2070,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:heat_surge",
+      "status": "supported",
       "name": "Heat Surge",
       "school": "irons_spellbooks:fire",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 6,
+      "levels": {
+        "min": 1,
+        "default_max": 6,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -1865,7 +2093,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -1876,17 +2104,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:ice_block",
+      "status": "supported",
       "name": "Ice Block",
       "school": "irons_spellbooks:ice",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 6,
+      "levels": {
+        "min": 1,
+        "default_max": 6,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -1895,7 +2127,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -1906,17 +2138,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:ice_spikes",
+      "status": "supported",
       "name": "Ice Spikes",
       "school": "irons_spellbooks:ice",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -1929,7 +2165,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -1944,17 +2180,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:ice_tomb",
+      "status": "supported",
       "name": "Ice Tomb",
       "school": "irons_spellbooks:ice",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -1965,7 +2205,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -1978,17 +2218,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:icicle",
+      "status": "supported",
       "name": "Icicle",
       "school": "irons_spellbooks:ice",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -2001,7 +2245,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -2016,17 +2260,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:invisibility",
+      "status": "supported",
       "name": "Invisibility",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 6,
+      "levels": {
+        "min": 1,
+        "default_max": 6,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -2035,7 +2283,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -2046,17 +2294,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:lightning_bolt",
+      "status": "supported",
       "name": "Lightning Bolt",
       "school": "irons_spellbooks:lightning",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "EPIC",
         "EPIC",
@@ -2069,7 +2321,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -2084,17 +2336,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:lightning_lance",
+      "status": "supported",
       "name": "Lightning Lance",
       "school": "irons_spellbooks:lightning",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -2107,7 +2363,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2122,17 +2378,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:lob_creeper",
+      "status": "supported",
       "name": "Lob Creeper",
       "school": "irons_spellbooks:evocation",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -2145,7 +2405,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2160,17 +2420,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:magic_arrow",
+      "status": "supported",
       "name": "Magic Arrow",
       "school": "irons_spellbooks:ender",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -2183,7 +2447,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2198,17 +2462,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:magic_missile",
+      "status": "supported",
       "name": "Magic Missile",
       "school": "irons_spellbooks:ender",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -2221,7 +2489,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -2236,17 +2504,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:magma_bomb",
+      "status": "supported",
       "name": "Magma Bomb",
       "school": "irons_spellbooks:fire",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -2257,7 +2529,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2270,17 +2542,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:oakskin",
+      "status": "supported",
       "name": "Oakskin",
       "school": "irons_spellbooks:nature",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -2291,7 +2567,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         2,
@@ -2304,23 +2580,27 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:planar_sight",
+      "status": "supported",
       "name": "Planar Sight",
       "school": "irons_spellbooks:eldritch",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 3,
+      "levels": {
+        "min": 1,
+        "default_max": 3,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY",
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3
@@ -2328,37 +2608,45 @@
       "requires_learning": true,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:pocket_dimension",
+      "status": "supported",
       "name": "Pocket Dimension",
       "school": "irons_spellbooks:eldritch",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 1,
+      "levels": {
+        "min": 1,
+        "default_max": 1,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3
       ],
       "requires_learning": true,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": true,
-      "status": "supported"
+      "final_effect_only": true
     },
     {
       "spell": "irons_spellbooks:poison_arrow",
+      "status": "supported",
       "name": "Poison Arrow",
       "school": "irons_spellbooks:nature",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -2371,7 +2659,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -2386,17 +2674,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:poison_breath",
+      "status": "supported",
       "name": "Poison Spray",
       "school": "irons_spellbooks:nature",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -2409,7 +2701,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -2424,17 +2716,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:poison_splash",
+      "status": "supported",
       "name": "Poison Splash",
       "school": "irons_spellbooks:nature",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -2447,7 +2743,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2462,23 +2758,27 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:portal",
+      "status": "supported",
       "name": "Portal",
       "school": "irons_spellbooks:ender",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 3,
+      "levels": {
+        "min": 1,
+        "default_max": 3,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         3,
         3
@@ -2486,17 +2786,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:raise_dead",
+      "status": "supported",
       "name": "Raise Dead",
       "school": "irons_spellbooks:blood",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 6,
+      "levels": {
+        "min": 1,
+        "default_max": 6,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -2505,7 +2809,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2516,17 +2820,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:summon",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:raise_hell",
+      "status": "supported",
       "name": "Raise Hell",
       "school": "irons_spellbooks:fire",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY",
         "LEGENDARY",
@@ -2534,7 +2842,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -2544,17 +2852,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:ray_of_frost",
+      "status": "supported",
       "name": "Ray of Frost",
       "school": "irons_spellbooks:ice",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -2562,7 +2874,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -2572,17 +2884,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:ray_of_siphoning",
+      "status": "supported",
       "name": "Ray of Siphoning",
       "school": "irons_spellbooks:blood",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -2595,7 +2911,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -2610,37 +2926,45 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:recall",
+      "status": "supported",
       "name": "Recall",
       "school": "irons_spellbooks:ender",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 1,
+      "levels": {
+        "min": 1,
+        "default_max": 1,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON"
       ],
-      "default_tier": [
+      "tier": [
         2
       ],
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": true,
-      "status": "supported"
+      "final_effect_only": true
     },
     {
       "spell": "irons_spellbooks:root",
+      "status": "supported",
       "name": "Root",
       "school": "irons_spellbooks:nature",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -2653,7 +2977,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2668,17 +2992,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:sacrifice",
+      "status": "supported",
       "name": "Sacrifice",
       "school": "irons_spellbooks:blood",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -2686,7 +3014,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -2696,23 +3024,27 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:scapegoat",
+      "status": "supported",
       "name": "Scapegoat",
       "school": "irons_spellbooks:evocation",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 3,
+      "levels": {
+        "min": 1,
+        "default_max": 3,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         3,
         3
@@ -2720,17 +3052,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:scorch",
+      "status": "supported",
       "name": "Scorch",
       "school": "irons_spellbooks:fire",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -2743,7 +3079,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2758,24 +3094,28 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:sculk_tentacles",
+      "status": "supported",
       "name": "Sculk Tentacles",
       "school": "irons_spellbooks:eldritch",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 4,
+      "levels": {
+        "min": 1,
+        "default_max": 4,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY",
         "LEGENDARY",
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -2784,17 +3124,21 @@
       "requires_learning": true,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:shadow_slash",
+      "status": "supported",
       "name": "Shadow Slash",
       "school": "irons_spellbooks:ender",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -2802,7 +3146,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -2812,17 +3156,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:shield",
+      "status": "supported",
       "name": "Shield",
       "school": "irons_spellbooks:evocation",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -2835,7 +3183,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -2850,17 +3198,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:shockwave",
+      "status": "supported",
       "name": "Shockwave",
       "school": "irons_spellbooks:lightning",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -2871,7 +3223,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         2,
@@ -2884,24 +3236,28 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:slow",
+      "status": "supported",
       "name": "Slow",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 4,
+      "levels": {
+        "min": 1,
+        "default_max": 4,
+        "registered_max": 10
+      },
       "rarity": [
         "EPIC",
         "EPIC",
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -2910,17 +3266,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:snowball",
+      "status": "supported",
       "name": "Snowball",
       "school": "irons_spellbooks:ice",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "RARE",
@@ -2928,7 +3288,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2938,23 +3298,27 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:sonic_boom",
+      "status": "supported",
       "name": "Sonic Boom",
       "school": "irons_spellbooks:eldritch",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 3,
+      "levels": {
+        "min": 1,
+        "default_max": 3,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY",
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3
@@ -2962,17 +3326,21 @@
       "requires_learning": true,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:spectral_hammer",
+      "status": "supported",
       "name": "Spectral Hammer",
       "school": "irons_spellbooks:evocation",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "RARE",
@@ -2980,7 +3348,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -2990,17 +3358,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:block",
+      "adapter_version": 1,
       "target": "block",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:spider_aspect",
+      "status": "supported",
       "name": "Aspect of the Spider",
       "school": "irons_spellbooks:nature",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -3011,7 +3383,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -3024,17 +3396,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:starfall",
+      "status": "supported",
       "name": "Starfall",
       "school": "irons_spellbooks:ender",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -3047,7 +3423,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -3062,17 +3438,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:stomp",
+      "status": "supported",
       "name": "Stomp",
       "school": "irons_spellbooks:nature",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "RARE",
@@ -3080,7 +3460,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -3090,37 +3470,45 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:summon_ender_chest",
+      "status": "supported",
       "name": "Summon Ender Chest",
       "school": "irons_spellbooks:ender",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 1,
+      "levels": {
+        "min": 1,
+        "default_max": 1,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE"
       ],
-      "default_tier": [
+      "tier": [
         2
       ],
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:summon_horse",
+      "status": "supported",
       "name": "Summon Horse",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -3128,7 +3516,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -3138,17 +3526,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:summon",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:summon_polar_bear",
+      "status": "supported",
       "name": "Summon Polar Bear",
       "school": "irons_spellbooks:ice",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -3161,7 +3553,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -3176,17 +3568,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:summon",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:summon_swords",
+      "status": "supported",
       "name": "Summon Swords",
       "school": "irons_spellbooks:ender",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -3194,7 +3590,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -3204,17 +3600,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:summon",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:summon_vex",
+      "status": "supported",
       "name": "Summon Vex",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -3222,7 +3622,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         3,
@@ -3232,17 +3632,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:summon",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:sunbeam",
+      "status": "supported",
       "name": "Sunbeam",
       "school": "irons_spellbooks:holy",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -3255,7 +3659,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -3270,17 +3674,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:telekinesis",
+      "status": "supported",
       "name": "Telekinesis",
       "school": "irons_spellbooks:eldritch",
       "cast_type": "CONTINUOUS",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY",
         "LEGENDARY",
@@ -3288,7 +3696,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3,
         3,
         3,
@@ -3298,17 +3706,21 @@
       "requires_learning": true,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:channel",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:teleport",
+      "status": "supported",
       "name": "Teleport",
       "school": "irons_spellbooks:ender",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "RARE",
@@ -3316,7 +3728,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -3326,17 +3738,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:teleport",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:throw",
+      "status": "supported",
       "name": "Throw",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -3344,7 +3760,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -3354,17 +3770,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:thunderstorm",
+      "status": "supported",
       "name": "Thunderstorm",
       "school": "irons_spellbooks:lightning",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 8,
+      "levels": {
+        "min": 1,
+        "default_max": 8,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "RARE",
@@ -3375,7 +3795,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -3388,23 +3808,27 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:touch_dig",
+      "status": "supported",
       "name": "Touch Dig",
       "school": "irons_spellbooks:nature",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 3,
+      "levels": {
+        "min": 1,
+        "default_max": 3,
+        "registered_max": 10
+      },
       "rarity": [
         "RARE",
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         3,
         3
@@ -3412,17 +3836,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:block",
+      "adapter_version": 1,
       "target": "block",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:volt_strike",
+      "status": "supported",
       "name": "Volt Strike",
       "school": "irons_spellbooks:lightning",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -3435,7 +3863,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -3450,17 +3878,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:self",
+      "adapter_version": 1,
       "target": "self",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:wall_of_fire",
+      "status": "supported",
       "name": "Wall of Fire",
       "school": "irons_spellbooks:fire",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 5,
+      "levels": {
+        "min": 1,
+        "default_max": 5,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "UNCOMMON",
@@ -3468,7 +3900,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         2,
         2,
@@ -3478,17 +3910,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:position",
+      "adapter_version": 1,
       "target": "position",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:wisp",
+      "status": "supported",
       "name": "Wisp",
       "school": "irons_spellbooks:holy",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "COMMON",
         "COMMON",
@@ -3501,7 +3937,7 @@
         "EPIC",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         1,
         1,
         1,
@@ -3516,17 +3952,21 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:wither_skull",
+      "status": "supported",
       "name": "Wither Skull",
       "school": "irons_spellbooks:blood",
       "cast_type": "INSTANT",
-      "min_level": 1,
-      "max_level": 10,
+      "levels": {
+        "min": 1,
+        "default_max": 10,
+        "registered_max": 10
+      },
       "rarity": [
         "UNCOMMON",
         "UNCOMMON",
@@ -3539,7 +3979,7 @@
         "LEGENDARY",
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         2,
         2,
         2,
@@ -3554,29 +3994,33 @@
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
       "target": "any",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     },
     {
       "spell": "irons_spellbooks:wololo",
+      "status": "supported",
       "name": "Wololo",
       "school": "irons_spellbooks:evocation",
       "cast_type": "LONG",
-      "min_level": 1,
-      "max_level": 1,
+      "levels": {
+        "min": 1,
+        "default_max": 1,
+        "registered_max": 10
+      },
       "rarity": [
         "LEGENDARY"
       ],
-      "default_tier": [
+      "tier": [
         3
       ],
       "requires_learning": false,
       "enabled_by_default": true,
       "adapter": "ars_n_spells:entity",
+      "adapter_version": 1,
       "target": "entity",
-      "final_effect_only": false,
-      "status": "supported"
+      "final_effect_only": false
     }
   ]
 }

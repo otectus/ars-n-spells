@@ -20,10 +20,14 @@ class ImportedGlyphCatalogTest {
         ImportedGlyphCatalog catalog = GlyphTestFixtures.catalog();
         assertTrue(catalog.errors().isEmpty(), catalog.errors().toString());
         assertEquals(4, catalog.entries().size());
-        assertEquals(3 + 2 + 1, catalog.variantCount(), "the unsupported spell gets no identities");
+        // 3.4.1: an unsupported spell keeps its identities registered (dormant), so a status change
+        // can never remove an id that a world may already store.
+        int storm = catalog.entry(GlyphTestFixtures.STORM).registeredMax() - catalog.entry(GlyphTestFixtures.STORM).minLevel() + 1;
+        assertEquals(3 + 2 + 1 + storm, catalog.variantCount(), "every catalogued level of every status is registered");
         assertEquals(new ImportedGlyphKey(GlyphTestFixtures.FIREBOLT, 2),
             catalog.keyForPart(new ImportedGlyphKey(GlyphTestFixtures.FIREBOLT, 2).partId()));
-        assertNull(catalog.keyForPart(new ImportedGlyphKey(GlyphTestFixtures.STORM, 1).partId()));
+        assertEquals(new ImportedGlyphKey(GlyphTestFixtures.STORM, 1),
+            catalog.keyForPart(new ImportedGlyphKey(GlyphTestFixtures.STORM, 1).partId()), "the unsupported spell is registered, dormant");
     }
 
     @Test
@@ -49,9 +53,13 @@ class ImportedGlyphCatalogTest {
                "max_level": 1, "rarity": ["COMMON"], "default_tier": [4], "adapter": "ars_n_spells:self", "target": "self"}
             ]}""";
         ImportedGlyphCatalog catalog = ImportedGlyphCatalog.fromManifests(Map.of("addon", bad));
-        assertEquals(0, catalog.entries().size());
-        assertEquals(3, catalog.errors().size(), catalog.errors().toString());
-        ImportedGlyphCatalog future = ImportedGlyphCatalog.fromManifests(Map.of("future", "{\"schema_version\": 2, \"spells\": []}"));
+        assertEquals(0, catalog.entries().size(), "an invalid optional manifest is rejected whole");
+        assertEquals(1, catalog.errors().size(), catalog.errors().toString());
+        String reasons = catalog.errors().get(0);
+        // 3.4.1 review CATALOG-02: strict messages name the field and the value found.
+        assertTrue(reasons.contains("addon:custom") && reasons.contains("'rarity'") && reasons.contains("'default_tier' entry")
+            && reasons.contains("(found 4)"), reasons);
+        ImportedGlyphCatalog future = ImportedGlyphCatalog.fromManifests(Map.of("future", "{\"schema_version\": 3, \"spells\": []}"));
         assertEquals(1, future.errors().size(), "a future schema is reported and registers nothing");
     }
 
@@ -60,7 +68,9 @@ class ImportedGlyphCatalogTest {
         ImportedGlyphCatalog catalog = ImportedGlyphCatalog.fromManifests(Map.of("b_second", GlyphTestFixtures.manifest(),
             "a_first", GlyphTestFixtures.manifest()));
         assertEquals("a_first", catalog.entry(GlyphTestFixtures.FIREBOLT).sourceCatalog());
-        assertEquals(4, catalog.errors().size(), "each duplicate spell is reported: " + catalog.errors());
+        // 3.4.1: re-declaring a spell with the same adapter is harmless (it may only extend the
+        // registered levels); only a reassigning declaration is an error.
+        assertTrue(catalog.errors().isEmpty(), "an identical re-declaration is not a conflict: " + catalog.errors());
     }
 
     @Test
@@ -69,6 +79,8 @@ class ImportedGlyphCatalogTest {
         ImportedGlyphCatalog catalog = ImportedGlyphCatalog.fromManifests(Map.of("irons_spellbooks", shipped));
         assertTrue(catalog.errors().isEmpty(), catalog.errors().toString());
         assertEquals(111, catalog.entries().size());
-        assertEquals(777, catalog.variantCount());
+        // 777 default levels plus reserved levels up to 10 for every spell.
+        assertEquals(1110, catalog.variantCount());
+        for (CatalogEntry entry : catalog.entries()) assertTrue(entry.registeredMax() >= 10, entry.spellId() + " reserves the level-10 envelope");
     }
 }

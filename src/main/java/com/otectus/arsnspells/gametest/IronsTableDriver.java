@@ -94,6 +94,35 @@ final class IronsTableDriver {
      * Click the menu button Iron's screen sends: {@code id < 0} inscribes, {@code id >= 0}
      * selects that wheel index. This is the call the ANS router mixin injects into.
      */
+    /**
+     * Take the result slot the way a player does, through the menu's own click handling
+     * ({@code QUICK_MOVE} is shift-click, {@code PICKUP} puts it on the cursor, {@code THROW} drops it).
+     */
+    static void takeResult(Object menu, ServerPlayer player, String clickType) {
+        ((InscriptionTableMenu) menu).clicked(SLOT_RESULT, 0, net.minecraft.world.inventory.ClickType.valueOf(clickType), player);
+    }
+
+    /** What the player holds on the cursor in this menu. */
+    static ItemStack carried(Object menu) {
+        return ((InscriptionTableMenu) menu).getCarried();
+    }
+
+    /** Close the menu as a player does. */
+    static void close(Object menu, ServerPlayer player) {
+        ((InscriptionTableMenu) menu).removed(player);
+    }
+
+    /** Remove the payload of the entry for {@code poolId}, leaving its wheel slot: a damaged book. */
+    static void corruptPayload(ItemStack book, int poolId) {
+        var list = com.otectus.arsnspells.spell.CrossModSpellComponents.get(book);
+        var next = new java.util.ArrayList<com.otectus.arsnspells.spell.CrossModSpell>();
+        for (var e : list.spells()) next.add(e.proxyPoolId() != poolId ? e : new com.otectus.arsnspells.spell.CrossModSpell(
+            e.spellId(), e.level(), e.typeName(), java.util.Optional.empty(), e.castSource(), e.proxyPoolId(), e.customName(),
+            e.nature(), e.iconSymbol(), e.school(), e.unknownFields()));
+        book.set(com.otectus.arsnspells.spell.ModDataComponents.CROSS_SPELLS.get(),
+            new com.otectus.arsnspells.spell.CrossModSpellList(java.util.List.copyOf(next), list.selectedIndex()));
+    }
+
     static boolean click(Object menu, ServerPlayer player, int id) {
         return ((InscriptionTableMenu) menu).clickMenuButton(player, id);
     }

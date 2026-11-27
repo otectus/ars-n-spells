@@ -1,0 +1,72 @@
+{
+ "expect": {
+  "errors_contain": [
+   "published imported-glyph identities are missing"
+  ],
+  "fails_startup": true
+ },
+ "ledger": [
+  "ars_n_spells:iron/irons_spellbooks/firebolt/level_1",
+  "ars_n_spells:iron/irons_spellbooks/firebolt/level_4"
+ ],
+ "sources": [
+  {
+   "json": {
+    "catalog_version": "fixture",
+    "schema_version": 2,
+    "spells": [
+     {
+      "adapter": "ars_n_spells:projectile",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 3
+      },
+      "name": "Firebolt",
+      "rarity": [
+       "COMMON",
+       "RARE"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:fire",
+      "spell": "irons_spellbooks:firebolt",
+      "target": "any",
+      "tier": [
+       1,
+       2
+      ]
+     },
+     {
+      "adapter": "ars_n_spells:summon",
+      "adapter_version": 1,
+      "cast_type": "INSTANT",
+      "enabled_by_default": true,
+      "levels": {
+       "default_max": 2,
+       "min": 1,
+       "registered_max": 2
+      },
+      "name": "Heal",
+      "rarity": [
+       "COMMON",
+       "LEGENDARY"
+      ],
+      "requires_learning": false,
+      "school": "irons_spellbooks:holy",
+      "spell": "irons_spellbooks:heal",
+      "target": "position",
+      "tier": [
+       1,
+       3
+      ]
+     }
+    ]
+   },
+   "name": "base",
+   "required": true
+  }
+ ]
+}

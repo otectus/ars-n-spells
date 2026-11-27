@@ -58,10 +58,12 @@ public final class SpellAnalysis {
             this.firstEffect = firstEffect;
             this.castMethod = castMethod;
             this.allEffects = Collections.unmodifiableList(allEffects);
-            this.dominantSchool = dominantSchool;
             this.schools = Collections.unmodifiableSet(schools);
             this.category = category;
             this.schoolKeys = SchoolResolver.resolveKeys(firstEffect);
+            // Audit ANS-005: the legacy built-in projection is derived from the one ordered primary,
+            // never re-selected independently, so discounts and progression cannot disagree.
+            this.dominantSchool = SchoolKeys.builtin(this.schoolKeys.get(0)).id();
             this.mappingDigest = SchoolMappings.get().digest();
             this.allSchoolKeys = allEffects.stream().flatMap(effect -> SchoolResolver.resolveKeys(effect).stream())
                 .filter(key -> !SchoolKeys.GENERIC.equals(key)).distinct().toList();
@@ -124,13 +126,17 @@ public final class SpellAnalysis {
         public List<AbstractSpellPart> allEffects() { return allEffects; }
 
         /**
-         * The derived primary school: "fire", "ice", "holy", etc., or "generic" if unknown.
+         * The built-in projection of the primary school, {@link #schoolKey()}: "fire", "ice",
+         * "holy", etc., or "generic" when the primary is unknown or an addon/custom school.
          *
-         * <p>One school, deterministically chosen, and the value affinity and progression
-         * credit. It is unaffected by {@link #schools()}: a multi-school spell still has exactly
-         * one primary school and always has had.
+         * <p>It is unaffected by {@link #schools()}: a multi-school spell still has exactly one
+         * primary school (audit ANS-005: the first ordered membership, the one affinity and
+         * progression credit).
          */
         public String dominantSchool() { return dominantSchool; }
+
+        /** Enum-typed companion to {@link #dominantSchool()}; prefer this at new call sites. */
+        public SpellSchoolId school() { return SpellSchoolId.fromId(dominantSchool); }
         public List<String> schoolKeys() { return schoolKeys; }
         public String schoolKey() { return schoolKeys.get(0); }
         public String mappingDigest() { return mappingDigest; }

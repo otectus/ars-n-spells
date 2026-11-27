@@ -203,7 +203,7 @@ public final class SchoolMappings {
 
         // Ars Elemental 0.6.8.0. Everything else it ships resolves correctly from its own
         // declared schools, including glyph_conjure_terrain, which declares conjuration and
-        // earth and lands on NATURE through the declaration-order tie-break.
+        // earth: its primary is the first school it declares, and both stay members.
         // Life Link declares conjuration (it summons the link) but its payload is a drain.
         m.put("ars_elemental:glyph_life_link", SpellSchoolId.BLOOD);
         // The propagators chain a spell onward; they carry no payload of their own.

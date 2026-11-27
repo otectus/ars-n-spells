@@ -36,7 +36,7 @@ public final class AttemptLedger {
     private static final class Entry {
         final CastAttempt attempt;
         final long openedTick;
-        /** This attempt's own TTL, or 0 to use the sweep's default. */
+        /** 3.4.0: this attempt's own time-to-live in ticks; 0 uses the sweep's. */
         final long ttlTicks;
 
         Entry(CastAttempt attempt, long openedTick, long ttlTicks) {
@@ -59,18 +59,18 @@ public final class AttemptLedger {
     }
 
     /**
-     * As {@link #open(UUID, String, int, CostQuote, long)} with this attempt's own TTL, for a
-     * reservation that legitimately outlives the default sweep: an imported glyph's prepaid
-     * execution held while its projectile flies or its charge completes. Its owner still closes
-     * it at its own boundary; the TTL is only the leak guard.
+     * {@link #open(UUID, String, int, CostQuote, long)} with the attempt's own lifetime. 3.4.0:
+     * an imported glyph's reservation is held while its Ars delivery travels (a projectile, a
+     * delay), which can outlast the sweep's default; the owning session releases it earlier.
      */
     public CastAttempt open(UUID playerId, String carrierIdentity, int payloadRevision,
                             CostQuote quote, long openedTick, long ttlTicks) {
         Objects.requireNonNull(playerId, "playerId");
+        if (ttlTicks < 0) throw new IllegalArgumentException("ttlTicks must not be negative");
         CastAttempt attempt =
             new CastAttempt(UUID.randomUUID(), playerId, carrierIdentity, payloadRevision, quote);
         byPlayer.computeIfAbsent(playerId, k -> new LinkedHashMap<>())
-            .put(attempt.attemptId(), new Entry(attempt, openedTick, Math.max(0L, ttlTicks)));
+            .put(attempt.attemptId(), new Entry(attempt, openedTick, ttlTicks));
         return attempt;
     }
 
@@ -185,8 +185,7 @@ public final class AttemptLedger {
         List<CastAttempt> expired = new ArrayList<>();
         for (Map<UUID, Entry> open : byPlayer.values()) {
             for (Entry entry : new ArrayList<>(open.values())) {
-                long ttl = entry.ttlTicks > 0 ? entry.ttlTicks : ttlTicks;
-                if (nowTicks - entry.openedTick > ttl) {
+                if (nowTicks - entry.openedTick > (entry.ttlTicks > 0 ? entry.ttlTicks : ttlTicks)) {
                     expired.add(entry.attempt);
                 }
             }

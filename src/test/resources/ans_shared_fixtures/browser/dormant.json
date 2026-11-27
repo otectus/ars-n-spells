@@ -1,0 +1,12 @@
+{
+  "mode": "grouped",
+  "view": "DORMANT",
+  "query": "@alpha",
+  "pending": false,
+  "source": "",
+  "school": "",
+  "fits": true,
+  "expected": [
+    "alpha:bolt#8"
+  ]
+}

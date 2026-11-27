@@ -23,4 +23,10 @@ public interface GlyphChannel {
 
     /** The Iron's-unit price of one pulse at the channel's level. */
     int pulseCost();
+
+    /** Whether a pulse crossed its effect boundary: the channel then owes its native cooldown when it ends. */
+    boolean pulsedOnce();
+
+    /** Whether native code threw while the channel ran; the continuation ends it at once. */
+    boolean failed();
 }

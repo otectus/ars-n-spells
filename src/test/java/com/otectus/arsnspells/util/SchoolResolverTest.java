@@ -93,13 +93,42 @@ class SchoolResolverTest {
     }
 
     @Test
-    void multipleSchools_resolveDeterministicallyByDeclarationOrder() {
-        // Whatever order the addon declares them in, the answer must be identical.
-        SpellSchoolId a = resolve("some_addon:glyph_x", "water", "fire");
-        SpellSchoolId b = resolve("some_addon:glyph_x", "fire", "water");
-        assertEquals(a, b, "multi-school glyphs must not resolve by collection iteration order");
-        assertEquals(SpellSchoolId.FIRE, a,
-            "the winner is the school earliest in SpellSchoolId declaration order");
+    void multipleSchools_primaryIsTheFirstOrderedMembership() {
+        // Audit ANS-005: the primary is the first ordered membership, the same one affinity and
+        // progression read through resolveKeys; the enum-order tie-break disagreed with them.
+        assertEquals(SpellSchoolId.ICE, resolve("some_addon:glyph_x", "water", "fire"));
+        assertEquals(SpellSchoolId.FIRE, resolve("some_addon:glyph_x", "fire", "water"));
+        for (List<String> order : List.of(List.of("water", "fire"), List.of("fire", "water"))) {
+            List<String> keys = SchoolResolver.resolveKeys("some_addon:glyph_x", order);
+            assertEquals(SchoolKeys.builtin(keys.get(0)), SchoolResolver.resolve("some_addon:glyph_x", order),
+                "resolve is the built-in projection of resolveKeys' primary for " + order);
+            assertEquals(java.util.Set.of(SpellSchoolId.ICE, SpellSchoolId.FIRE),
+                SchoolResolver.resolveAll("some_addon:glyph_x", order), "every membership stays a member");
+        }
+    }
+
+    @Test
+    void conjurationThenEarth_agreesInBothOrders() {
+        // The audit's deterministic input: the old resolve chose NATURE while resolveKeys led with evocation.
+        assertEquals(SpellSchoolId.EVOCATION, resolve("audit:payload", "conjuration", "earth"));
+        assertEquals("irons_spellbooks:evocation", SchoolResolver.resolveKeys("audit:payload", List.of("conjuration", "earth")).get(0));
+        assertEquals(SpellSchoolId.NATURE, resolve("audit:payload", "earth", "conjuration"));
+        assertEquals("irons_spellbooks:nature", SchoolResolver.resolveKeys("audit:payload", List.of("earth", "conjuration")).get(0));
+    }
+
+    @Test
+    void orderedOverlay_definesThePrimary() {
+        SchoolMappings.applyKeyOverlay(Map.of("addon:glyph_ordered", List.of("irons_spellbooks:nature", "irons_spellbooks:fire")), Map.of(), Map.of());
+        assertEquals(SpellSchoolId.NATURE, resolve("addon:glyph_ordered", "fire"), "the datapack order is the priority");
+        assertEquals("irons_spellbooks:nature", SchoolResolver.resolveKeys("addon:glyph_ordered", List.of("fire")).get(0));
+    }
+
+    @Test
+    void customPrimary_projectsToGenericNotAnArbitraryBuiltIn() {
+        SchoolMappings.applyKeyOverlay(Map.of("addon:glyph_custom", List.of("traveloptics:aqua", "irons_spellbooks:fire")), Map.of(), Map.of());
+        assertEquals(SpellSchoolId.GENERIC, resolve("addon:glyph_custom"),
+            "an addon primary has no built-in school; fire stays a member, not the primary");
+        assertEquals(java.util.Set.of(SpellSchoolId.FIRE), SchoolResolver.resolveAll("addon:glyph_custom", List.of()));
     }
 
     @Test
@@ -215,11 +244,10 @@ class SchoolResolverTest {
     }
 
     @Test
-    void resolve_isStillTheDeterministicWinnerAmongResolveAll() {
-        // resolve() is now defined in terms of resolveAll(), so pin that it did not inherit
-        // declaration order: the winner is still earliest in SpellSchoolId order, whichever way
-        // round the addon declared the pair.
-        assertEquals(SpellSchoolId.FIRE, resolve("some_addon:glyph_x", "air", "fire"));
+    void resolve_isTheFirstDeclaredMemberOfResolveAll() {
+        // Audit ANS-005: resolve() is the primary school, the first one the glyph declares, so the
+        // credited track follows the addon's own order rather than SpellSchoolId order.
+        assertEquals(SpellSchoolId.LIGHTNING, resolve("some_addon:glyph_x", "air", "fire"));
         assertEquals(SpellSchoolId.FIRE, resolve("some_addon:glyph_x", "fire", "air"));
         assertEquals(SpellSchoolId.GENERIC, resolve("some_addon:glyph_nondescript"),
             "an empty resolveAll still means GENERIC to every existing caller");

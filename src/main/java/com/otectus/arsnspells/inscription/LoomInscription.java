@@ -79,7 +79,19 @@ public final class LoomInscription {
      * mutates nothing.
      */
     public static InscriptionPlan plan(SpellLoomBlockEntity loom) {
-        return plan(loom, false);
+        return plan(loom.getItems(), false);
+    }
+
+    /**
+     * The same plan over any three-slot view of a Loom: the client plans against its menu's
+     * synchronized copy (audit ANS-012), never the block entity it may not have.
+     */
+    public static InscriptionPlan plan(net.neoforged.neoforge.items.IItemHandler items) {
+        return plan(items, false);
+    }
+
+    public static InscriptionPlan planConversion(net.neoforged.neoforge.items.IItemHandler items) {
+        return plan(items, true);
     }
 
     /**
@@ -93,11 +105,10 @@ public final class LoomInscription {
      * destroyed by {@link #apply} with {@code convert} set, which no default path passes.
      */
     public static InscriptionPlan planConversion(SpellLoomBlockEntity loom) {
-        return plan(loom, true);
+        return plan(loom.getItems(), true);
     }
 
-    private static InscriptionPlan plan(SpellLoomBlockEntity loom, boolean convert) {
-        ItemStackHandler items = loom.getItems();
+    private static InscriptionPlan plan(net.neoforged.neoforge.items.IItemHandler items, boolean convert) {
         ItemStack source = items.getStackInSlot(SpellLoomBlockEntity.SLOT_SOURCE);
         ItemStack target = items.getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL);
         String failure = null;
@@ -177,10 +188,15 @@ public final class LoomInscription {
      * slots play no part, because the change happens in place.
      */
     public static String planSchoolChange(SpellLoomBlockEntity loom, String school) {
+        return planSchoolChange(loom.getItems(), school);
+    }
+
+    /** {@link #planSchoolChange(SpellLoomBlockEntity, String)} over any three-slot view (audit ANS-012). */
+    public static String planSchoolChange(net.neoforged.neoforge.items.IItemHandler items, String school) {
         if (!IronsCompat.isLoaded()) {
             return REASON_IRONS_MISSING;
         }
-        ItemStack target = loom.getItems().getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL);
+        ItemStack target = items.getStackInSlot(SpellLoomBlockEntity.SLOT_SCROLL);
         if (ScrollKind.classify(target) != ScrollKind.ANS_CARRIER) {
             return REASON_NOT_A_CARRIER;
         }
@@ -257,7 +273,7 @@ public final class LoomInscription {
         // The stack the plan is made against: the real target, or a blanked copy of it when the
         // player asked for a conversion. Either way this is a read -- the commit below rebuilds
         // the output from scratch.
-        InscriptionPlan plan = plan(loom, convert);
+        InscriptionPlan plan = plan(loom.getItems(), convert);
         if (!plan.isPermitted()) {
             return plan.reasonCode();
         }

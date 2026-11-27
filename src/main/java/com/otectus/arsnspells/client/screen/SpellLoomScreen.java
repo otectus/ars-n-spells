@@ -87,16 +87,18 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
     private String schoolChoice = "";
     private boolean pickerOpen;
     /**
-     * The last reason code the server sent back (audit V18). The client mirrors the plan
-     * locally to keep the button responsive, but this is the authoritative answer and it is
-     * what the status line under the buttons shows.
+     * The server's replies (audit V18, ANS-009). The client mirrors the plan locally to keep the
+     * buttons responsive, but a matching server refusal of the current draft takes precedence over
+     * the local plan in the status line, the tooltips and (unless it is retryable) the buttons.
      */
-    private String serverReason = InscriptionPlan.REASON_OK;
-    /** Whether {@link #serverReason} answered a preview or a real attempt. */
-    private boolean serverReasonIsPreview = true;
-    /** Fingerprint of the two input slots, so a preview is requested on change, not per tick. */
+    private final com.otectus.arsnspells.inscription.LoomFeedback feedback = new com.otectus.arsnspells.inscription.LoomFeedback();
+    /** Fingerprint of the inputs a preview judges, so a preview is requested on change, not per tick. */
     private String previewedInputs = null;
     private com.otectus.arsnspells.network.LoomRequestContext latestRequest;
+    /** The action and complete draft of {@link #latestRequest}, which its reply is kept against. */
+    private int latestAction = SpellLoomExportPayload.ACTION_PREVIEW;
+    private String latestDraft = "";
+    private long ticks;
 
     public SpellLoomScreen(SpellLoomMenu menu, Inventory inv, Component title) {
         super(menu, inv, title);
@@ -188,11 +190,11 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         iconIndex = Math.max(0, IconCatalog.IDS.indexOf(preset.icon()));
     }
     private InscriptionPlan displayedPlan() {
-        var be = menu.getBlockEntity();
-        if (be == null) return null;
-        InscriptionPlan plan = LoomInscription.plan(be);
+        // ANS-012: planned from the menu's synchronized slots, never the client's block entity.
+        var items = menu.workItems();
+        InscriptionPlan plan = LoomInscription.plan(items);
         if (InscriptionPlan.REASON_NOT_BLANK.equals(plan.reasonCode()) || InscriptionPlan.REASON_TARGET_NOT_EMPTY.equals(plan.reasonCode()))
-            return LoomInscription.planConversion(be);
+            return LoomInscription.planConversion(items);
         return plan;
     }
     private Component consumptionLine() {
@@ -201,21 +203,21 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         return Component.translatable("ars_n_spells.spell_loom.details.consumption", plan.consumedUnits(), 1, plan.outputCount());
     }
     private Component capacityLine() {
-        boolean occupied = menu.getBlockEntity() != null && menu.slots.size() >= 3 && menu.getSlot(2).hasItem();
+        boolean occupied = menu.slots.size() >= 3 && menu.getSlot(SpellLoomBlockEntity.SLOT_OUTPUT).hasItem();
         return Component.translatable(occupied ? "ars_n_spells.spell_loom.details.output_full" : "ars_n_spells.spell_loom.details.output_free");
     }
     private Component statusLine() {
         if (reschoolMode()) {
-            String reason = schoolChangeReason();
+            String reason = schoolDisplayReason();
             return InscriptionPlan.REASON_OK.equals(reason)
                 ? Component.translatable("ars_n_spells.spell_loom.details.reschool_ready", SpellSchoolNames.name(schoolChoice))
                 : reasonMessage(reason);
         }
-        String reason = currentReasonCode();
+        String reason = displayReason();
         return InscriptionPlan.REASON_OK.equals(reason) ? Component.translatable("ars_n_spells.spell_loom.details.ready") : reasonMessage(reason);
     }
     private Component compactStatus() {
-        String reason = reschoolMode() ? schoolChangeReason() : currentReasonCode();
+        String reason = reschoolMode() ? schoolDisplayReason() : displayReason();
         if (InscriptionPlan.REASON_OK.equals(reason)) return statusLine();
         Component full = reasonMessage(reason);
         if (full.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents text)
@@ -245,7 +247,7 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
 
     /** The single Ars entry of a carrier scroll in the target slot, or null. Read-only. */
     private CrossModSpell targetCarrierEntry() {
-        if (menu.getBlockEntity() == null || menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) return null;
+        if (menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) return null;
         ItemStack target = menu.getSlot(SpellLoomBlockEntity.SLOT_SCROLL).getItem();
         if (ScrollKind.classify(target) != ScrollKind.ANS_CARRIER) return null;
         return IronsBookBindingUtil.extractSingleEntry(target).orElse(null);
@@ -264,7 +266,7 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
      * there is one, otherwise the carrier waiting in the target slot for Apply.
      */
     private SpellAnalysis.Result subjectAnalysis() {
-        if (menu.getBlockEntity() != null && menu.slots.size() >= SpellLoomBlockEntity.SLOT_COUNT) {
+        if (menu.slots.size() >= SpellLoomBlockEntity.SLOT_COUNT) {
             var source = InscriptionInputs.readSource(menu.getSlot(SpellLoomBlockEntity.SLOT_SOURCE).getItem());
             if (source != null && source.arsSpell != null) return SpellAnalysis.analyze(source.arsSpell);
             CrossModSpell carrier = targetCarrierEntry();
@@ -297,11 +299,25 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
             && menu.getSlot(SpellLoomBlockEntity.SLOT_SOURCE).getItem().isEmpty();
     }
 
-    /** Client mirror of the server's set-school decision; the server answer is authoritative. */
+    /** Client mirror of the server's set-school decision, from the synchronized slots. */
     private String schoolChangeReason() {
-        SpellLoomBlockEntity be = menu.getBlockEntity();
-        if (be == null || menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) return LoomInscription.REASON_NOT_A_CARRIER;
-        return LoomInscription.planSchoolChange(be, schoolChoice);
+        if (menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) return LoomInscription.REASON_NOT_A_CARRIER;
+        return LoomInscription.planSchoolChange(menu.workItems(), schoolChoice);
+    }
+
+    /** ANS-009: what Apply School shows: a matching server refusal of this draft, else the local plan. */
+    private String schoolDisplayReason() {
+        return feedback.schoolDisplay(schoolChangeReason(), draftFingerprint());
+    }
+
+    /**
+     * Everything the server validates for a request, so a reply is only ever applied to the draft it
+     * answered: the slots, the school mappings, the requested school, the name and the cosmetics.
+     */
+    private String draftFingerprint() {
+        return com.otectus.arsnspells.inscription.LoomFeedback.draft(com.otectus.arsnspells.network.LoomInventoryRevision.of(menu),
+            com.otectus.arsnspells.util.SchoolMappings.get().digest(), schoolChoice,
+            nameField == null ? "" : nameField.getValue(), NATURES[natureIndex], ICONS[iconIndex]);
     }
 
     private Component natureLabel() {
@@ -332,6 +348,8 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         if (revision.isEmpty()) return;
         latestRequest = new com.otectus.arsnspells.network.LoomRequestContext(menu.containerId, menu.sessionId(),
             java.util.UUID.randomUUID(), revision, com.otectus.arsnspells.util.SchoolMappings.get().digest());
+        latestAction = action;
+        latestDraft = draftFingerprint();
         PacketHandler.sendToServer(new SpellLoomExportPayload(
             name, NATURES[natureIndex], ICONS[iconIndex], schoolChoice, action, latestRequest));
     }
@@ -347,8 +365,9 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
             && Minecraft.getInstance().player.containerMenu == loom.menu && request.equals(loom.latestRequest)
             && request.matches(loom.menu.containerId, loom.menu.sessionId(),
                 com.otectus.arsnspells.network.LoomInventoryRevision.of(loom.menu), com.otectus.arsnspells.util.SchoolMappings.get().digest())) {
-            loom.serverReason = reasonCode == null ? InscriptionPlan.REASON_OK : reasonCode;
-            loom.serverReasonIsPreview = preview;
+            // ANS-009: kept with the action and the complete draft it answered; it takes precedence
+            // over the local plan until anything in that draft changes.
+            loom.feedback.accept(loom.latestAction, reasonCode, loom.latestDraft, loom.ticks);
             loom.updateInscribeState();
         }
     }
@@ -360,8 +379,10 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         super.containerTick();
         // AbstractContainerScreen does not tick widgets; without this the
         // name field's caret never blinks.
-        
+        ticks++;
         requestPreviewOnInputChange();
+        // ANS-009: a retryable refusal (rate limit, stale revision) asks again once, after a pause.
+        if (feedback.retryDue(draftFingerprint(), ticks)) sendAction(SpellLoomExportPayload.ACTION_PREVIEW);
         updateInscribeState();
     }
 
@@ -404,12 +425,16 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         if (inscribeButton == null || convertButton == null) {
             return;
         }
-        String reasonCode = currentReasonCode();
+        String draft = draftFingerprint();
+        String local = currentReasonCode();
+        // ANS-009: the server's matching refusal is shown; only a non-retryable one disables.
+        String shown = feedback.inscribeDisplay(local, draft);
+        String reasonCode = feedback.inscribeEnablement(local, draft);
         boolean ok = InscriptionPlan.REASON_OK.equals(reasonCode);
         inscribeButton.active = ok;
-        inscribeButton.setTooltip(Tooltip.create(ok
+        inscribeButton.setTooltip(Tooltip.create(InscriptionPlan.REASON_OK.equals(shown)
             ? Component.translatable("ars_n_spells.spell_loom.tooltip.inscribe")
-            : reasonMessage(reasonCode)));
+            : reasonMessage(shown)));
         // Convert only offers itself for the one refusal it can actually fix, and it is the
         // only route by which a filled scroll is ever overwritten.
         convertButton.active = InscriptionPlan.REASON_NOT_BLANK.equals(reasonCode)
@@ -418,26 +443,29 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
             schoolButton.setMessage(schoolButtonLabel());
             schoolButton.setTooltip(Tooltip.create(Component.translatable("ars_n_spells.spell_loom.school.tooltip",
                 SpellSchoolNames.describe(schoolChoice, subjectAnalysis()))));
-            String schoolReason = schoolChangeReason();
-            boolean applicable = InscriptionPlan.REASON_OK.equals(schoolReason);
+            String schoolLocal = schoolChangeReason();
+            String schoolShown = feedback.schoolDisplay(schoolLocal, draft);
+            boolean applicable = InscriptionPlan.REASON_OK.equals(feedback.schoolEnablement(schoolLocal, draft));
             applySchoolButton.active = applicable;
-            applySchoolButton.setTooltip(Tooltip.create(applicable
+            applySchoolButton.setTooltip(Tooltip.create(InscriptionPlan.REASON_OK.equals(schoolShown)
                 ? Component.translatable("ars_n_spells.spell_loom.tooltip.apply_school", SpellSchoolNames.name(schoolChoice))
-                : reasonMessage(schoolReason)));
+                : reasonMessage(schoolShown)));
         }
     }
 
+    /** ANS-009: the Inscribe/Convert reason to show: a matching server refusal of this draft, else the local plan. */
+    private String displayReason() {
+        return feedback.inscribeDisplay(currentReasonCode(), draftFingerprint());
+    }
+
     /**
-     * The reason code to show: the plan for the slots as they stand, falling back to the
-     * server's last word when there is no client-side block entity to plan against.
+     * The local plan for the slots as they stand, provisional feedback until the server answers.
+     * ANS-012: planned from the menu's synchronized copy of the three slots, which the client
+     * always has, never from the client's block entity.
      */
     private String currentReasonCode() {
-        SpellLoomBlockEntity be = this.menu.getBlockEntity();
-        if (be == null || this.menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) {
-            // Desynced menu: nothing local to plan against. A reply to a finished attempt says
-            // nothing about what the slots hold now, so only a preview answer is reusable and
-            // anything else keeps the button disabled, as it was before.
-            return serverReasonIsPreview ? serverReason : LoomInscription.REASON_CARRIER_FAILED;
+        if (this.menu.slots.size() < SpellLoomBlockEntity.SLOT_COUNT) {
+            return LoomInscription.REASON_CARRIER_FAILED;
         }
         if (!this.menu.getSlot(SpellLoomBlockEntity.SLOT_OUTPUT).getItem().isEmpty()) {
             return LoomInscription.REASON_OUTPUT_OCCUPIED;
@@ -448,12 +476,16 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
         if (this.menu.getSlot(SpellLoomBlockEntity.SLOT_SOURCE).getItem().isEmpty()) {
             return LoomInscription.REASON_NO_ARS_SPELL;
         }
-        String plan = LoomInscription.plan(be).reasonCode();
+        String plan = LoomInscription.plan(this.menu.workItems()).reasonCode();
         // A school this server cannot use stops Inscribe and Convert alike, as the server will.
         if (InscriptionPlan.REASON_OK.equals(plan) || InscriptionPlan.REASON_NOT_BLANK.equals(plan)
                 || InscriptionPlan.REASON_TARGET_NOT_EMPTY.equals(plan)) {
             String schoolReason = LoomInscription.schoolReason(schoolChoice);
             if (schoolReason != null) return schoolReason;
+            // ANS-009: the name is validated by the server for Inscribe and Convert; mirror it, since
+            // a preview does not judge it.
+            String name = nameField == null ? "" : nameField.getValue().trim();
+            if (!com.otectus.arsnspells.util.PayloadBudget.name(name)) return com.otectus.arsnspells.inscription.LoomFeedback.NAME_INVALID;
         }
         return plan;
     }
@@ -478,6 +510,7 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
             case LoomInscription.REASON_SCHOOL_DISABLED -> "ars_n_spells.spell_loom.error.school_disabled";
             case LoomInscription.REASON_NOT_A_CARRIER -> "ars_n_spells.spell_loom.error.not_a_carrier";
             case LoomInscription.REASON_SCHOOL_UNCHANGED -> "ars_n_spells.spell_loom.error.school_unchanged";
+            case com.otectus.arsnspells.inscription.LoomFeedback.NAME_INVALID -> "ars_n_spells.spell_loom.error.name_invalid";
             default -> "ars_n_spells.spell_loom.error.failed";
         };
         return Component.translatable(key);
@@ -547,10 +580,8 @@ public class SpellLoomScreen extends AbstractContainerScreen<SpellLoomMenu> {
                 mouseX, mouseY);
             return;
         }
-        // When the block entity is missing client-side the menu holds only the
-        // 36 player slots, so indices 0..2 would be player slots — skip.
-        if (this.hoveredSlot == null || this.hoveredSlot.hasItem()
-            || this.menu.getBlockEntity() == null || this.menu.slots.size() < 3) {
+        // ANS-012: the menu always holds the three working slots first, on both sides.
+        if (this.hoveredSlot == null || this.hoveredSlot.hasItem() || this.menu.slots.size() < 3) {
             return;
         }
         String key = null;

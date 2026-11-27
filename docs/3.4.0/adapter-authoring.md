@@ -71,9 +71,9 @@ A mod that adds Iron's spells ships `ans_glyph_catalog/<name>.json` in its jar. 
 | `adapter` | One of the built-in adapters above. Anything else rejects the entry. |
 | `target` | `self`, `entity`, `entity_or_self`, `block`, `position` or `any`. The spell book editor enforces it against the form. |
 | `final_effect_only` | The spell moves the caster away, so it must be the last effect of a spell |
-| `status` | `supported`, or `unsupported` (no identities are registered for it) |
+| `status` | `supported`, or `unsupported` (no identities are registered for it). Changed in 3.4.1: `supported`, `unsupported` or `retired`, and every status registers its identities; see `docs/3.4.1/identity-and-levels.md` |
 
-Each supported level registers the spell part `ars_n_spells:iron/<namespace>/<path>/level_<n>` and its glyph item `ars_n_spells:glyph_iron/<namespace>/<path>/level_<n>`. For the example, these are `ars_n_spells:iron/example_addon/frost_lance/level_5` and `ars_n_spells:glyph_iron/example_addon/frost_lance/level_5`. Spell books and known-glyph lists store the part id, and inventories store the item id. This encoding is frozen. Never reuse an id for another spell. To retire a spell, set it `unsupported` or disable it in a mapping: either way its saved glyphs stay as dormant ANS parts and never turn into another glyph.
+Each supported level registers the spell part `ars_n_spells:iron/<namespace>/<path>/level_<n>` and its glyph item `ars_n_spells:glyph_iron/<namespace>/<path>/level_<n>`. For the example, these are `ars_n_spells:iron/example_addon/frost_lance/level_5` and `ars_n_spells:glyph_iron/example_addon/frost_lance/level_5`. Spell books and known-glyph lists store the part id, and inventories store the item id. This encoding is frozen. Never reuse an id for another spell. To retire a spell, set it `unsupported` (`retired` since 3.4.1) or disable it in a mapping: either way its saved glyphs stay as dormant ANS parts and never turn into another glyph.
 
 The rules, in full:
 

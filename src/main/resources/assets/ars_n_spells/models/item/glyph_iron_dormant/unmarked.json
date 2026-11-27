@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "ars_n_spells:item/iron_glyph/fallback_icon",
+    "layer1": "ars_n_spells:item/iron_glyph/frame_dormant"
+  }
+}

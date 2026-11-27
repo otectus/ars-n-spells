@@ -1,0 +1,29 @@
+{
+ "expect": {
+  "terms": {
+   "irons_spellbooks:firebolt@1": {
+    "catalyst_count": 1,
+    "duration_ticks": 72000,
+    "source_cost": 500,
+    "tier": 1
+   }
+  },
+  "valid": true
+ },
+ "files": [
+  {
+   "id": "test:long",
+   "json": {
+    "levels": {
+     "1": {
+      "duration_ticks": 72000
+     }
+    },
+    "schema_version": 2,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

@@ -59,6 +59,11 @@ public abstract class MixinInscriptionTableMenu {
     @Shadow
     private int selectedSpellIndex;
 
+    /** The player the menu belongs to: a refused extraction is explained to them. */
+    @Shadow
+    @Final
+    private Player player;
+
     /** The book being edited. Shadowed for the extraction guard's container read. */
     @Shadow
     @Final
@@ -115,45 +120,37 @@ public abstract class MixinInscriptionTableMenu {
     }
 
     /**
-     * Withdraw the extraction offer for ANS proxy entries.
+     * 3.4.1 review UNBIND-01: offer a selected ANS entry as a real carrier instead of a bare proxy.
      *
-     * <p>Iron's method is its own, so {@code remap = false}. Both sides run the menu, so
-     * client and server agree on the empty result slot without any packet of ours.
-     *
-     * <p>Iron's builds its result {@code Slot} on {@code resultContainer} at container index
-     * 2, but {@code ResultContainer} is one stack wide and ignores the index on both
-     * {@code getItem} and {@code setItem}, so clearing index 0 clears the offer.
+     * <p>Iron's would offer the proxy on a fresh scroll, a spell that resolves to nothing, and its
+     * result slot would then remove whatever sits at that wheel index. Here the offer is the carrier
+     * {@link com.otectus.arsnspells.spell.irons.IronsTableExtraction#preview} builds from the entry the
+     * proxy points to, staged for this menu; taking it commits through
+     * {@code MixinInscriptionResultSlot}. A refused entry offers nothing and tells the player why. Both
+     * sides run the menu, so client and server agree on the offer without a packet of ours.
      */
     @Inject(method = "setupResultSlot", at = @At("HEAD"), cancellable = true,
             remap = false, require = 0)
-    private void arsnspells$guardResultSlot(CallbackInfo ci) {
-        if (!arsnspells$selectedIsProxy()) {
-            return;
+    private void arsnspells$offerAnsExtraction(CallbackInfo ci) {
+        com.otectus.arsnspells.spell.irons.IronsTableExtraction.Preview preview;
+        try {
+            preview = spellBookSlot == null || selectedSpellIndex < 0 ? null
+                : com.otectus.arsnspells.spell.irons.IronsTableExtraction.preview(spellBookSlot.getItem(), selectedSpellIndex);
+        } catch (Throwable unreadable) {
+            preview = null;
         }
-        if (resultContainer != null) {
-            resultContainer.setItem(0, ItemStack.EMPTY);
-        }
+        com.otectus.arsnspells.spell.irons.IronsTableExtraction.Preview before =
+            com.otectus.arsnspells.spell.irons.IronsTableExtraction.staged(this);
+        com.otectus.arsnspells.spell.irons.IronsTableExtraction.stage(this, preview);
+        if (preview == null) return;
+        if (resultContainer != null) resultContainer.setItem(0, preview.ok() ? preview.result().copy() : ItemStack.EMPTY);
+        if (!preview.ok() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                && (before == null || before.poolId() != preview.poolId() || !java.util.Objects.equals(before.refusalKey(), preview.refusalKey())))
+            serverPlayer.displayClientMessage(net.minecraft.network.chat.Component.translatable(preview.refusalKey())
+                .withStyle(net.minecraft.ChatFormatting.RED), true);
         ci.cancel();
     }
 
-    private boolean arsnspells$selectedIsProxy() {
-        if (selectedSpellIndex < 0 || spellBookSlot == null) {
-            return false;
-        }
-        try {
-            ItemStack book = spellBookSlot.getItem();
-            if (book.isEmpty() || !ISpellContainer.isSpellContainer(book)) {
-                return false;
-            }
-            ISpellContainer container = ISpellContainer.getOrCreate(book);
-            SpellData data = container.getSpellAtIndex(selectedSpellIndex);
-            return data != null && data.getSpell() instanceof ArsCrossProxySpell;
-        } catch (Throwable ignored) {
-            // An unreadable container is Iron's problem to report, not a reason to throw out
-            // of a slot refresh; leave the offer to Iron's own code.
-            return false;
-        }
-    }
 
     private IronsInscriptionPolicy.Verdict arsnspells$verdict() {
         return IronsInscriptionPolicy.evaluate(arsnspells$scrollSlotItem());

@@ -128,6 +128,38 @@ public final class ArsSpellExportUtil {
         return out;
     }
 
+    /**
+     * 3.4.1 review UNBIND-01: a carrier holding exactly {@code entry}, an Ars entry taken off a bound
+     * book. The entry is copied whole (the serialized spell, its chosen name, nature, icon and school,
+     * and fields a later version added) with its proxy id cleared, so the carrier binds again to a
+     * fresh wheel slot exactly like one made at the Spell Loom. Empty when Iron's cannot build a
+     * scroll, which callers treat as "cannot extract".
+     */
+    public static ItemStack carrierFromEntry(CrossModSpell entry) {
+        if (entry == null || !IronsCompat.isLoaded()) return ItemStack.EMPTY;
+        Item item = BuiltInRegistries.ITEM.getOptional(IRONS_SCROLL_ID).orElse(null);
+        if (item == null) return ItemStack.EMPTY;
+        ItemStack out = new ItemStack(item);
+        if (!com.otectus.arsnspells.spell.irons.IronsScrollFactory.initializeCarrierContainer(out)) return ItemStack.EMPTY;
+        CrossModSpell copy = new CrossModSpell(entry.spellId(), entry.level(), entry.typeName(), entry.arsSpellTag(),
+            entry.castSource(), CrossModSpellComponents.NO_PROXY_POOL_ID, entry.customName(), entry.nature(),
+            entry.iconSymbol(), entry.school(), entry.unknownFields());
+        out.set(ModDataComponents.CROSS_SPELLS.get(), new CrossModSpellList(java.util.List.of(copy), 0));
+        CrossModSpellComponents.stampSchemaVersion(out);
+        String label = entry.customName().filter(name -> !name.isEmpty()).orElseGet(() -> labelOf(entry));
+        out.set(DataComponents.CUSTOM_NAME, Component.translatable("item.ars_n_spells.transcribed_ars_scroll", label));
+        out.set(ModDataComponents.EXPORT_MODE.get(), EXPORT_MODE_SCROLL_CARRIER);
+        return out;
+    }
+
+    private static String labelOf(CrossModSpell entry) {
+        try {
+            return entry.arsSpellTag().map(CrossCastingHandler::decodeArsSpell).map(ArsSpellExportUtil::buildDisplayLabel).orElse("Ars Spell");
+        } catch (RuntimeException unreadable) {
+            return "Ars Spell";
+        }
+    }
+
     /** True when {@code stack} was built by {@link #createIronsScrollCarrier}. */
     public static boolean isScrollCarrier(ItemStack stack) {
         return stack != null && !stack.isEmpty()

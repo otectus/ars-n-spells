@@ -40,19 +40,19 @@ public final class IronsInscriptionReader {
             if (container == null || container.isEmpty()) {
                 return null;
             }
-            SpellData data = container.getSpellAtIndex(0);
-            if (data == null) {
-                return null;
+            // The first real native spell in slot order: an empty or "none" slot 0 used to hide a real
+            // spell behind it, and on a bound book slot 0 can be an ANS proxy, a placeholder for an
+            // Ars inscription rather than a native spell.
+            for (io.redspace.ironsspellbooks.api.spells.SpellSlot slot : container.getActiveSpells()) {
+                SpellData data = slot == null ? null : slot.spellData();
+                AbstractSpell spell = data == null ? null : data.getSpell();
+                if (spell == null || spell == io.redspace.ironsspellbooks.api.registry.SpellRegistry.none() || spell.getSpellId() == null) continue;
+                if (com.otectus.arsnspells.spell.CrossModSpellComponents.isArsCrossProxyId(spell.getSpellId())) continue;
+                ResourceLocation id = ResourceLocation.tryParse(spell.getSpellId());
+                if (id == null || data.getLevel() < 1) continue;
+                return InscriptionSource.irons(id, data.getLevel());
             }
-            AbstractSpell spell = data.getSpell();
-            if (spell == null || spell.getSpellId() == null) {
-                return null;
-            }
-            ResourceLocation id = ResourceLocation.tryParse(spell.getSpellId());
-            if (id == null) {
-                return null;
-            }
-            return InscriptionSource.irons(id, Math.max(1, data.getLevel()));
+            return null;
         } catch (Exception ignored) {
             // Narrow to Exception (not Throwable) so LinkageError / OutOfMemoryError
             // still propagate instead of being silently masked.

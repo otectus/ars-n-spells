@@ -37,7 +37,8 @@ public final class IronsSpellInventory {
     static SpellInventoryEntry entry(AbstractSpell spell, boolean isNone) {
         String id = spell.getSpellId();
         int min = Math.max(1, spell.getMinLevel());
-        int max = Math.max(min, spell.getMaxLevel());
+        // Bounded: an extreme configured maximum must not become an extreme loop or list.
+        int max = Math.min(com.otectus.arsnspells.glyph.ImportedGlyphKey.MAX_LEVEL, Math.max(min, spell.getMaxLevel()));
         List<String> rarities = new ArrayList<>();
         List<Integer> costs = new ArrayList<>();
         List<Integer> castTimes = new ArrayList<>();
@@ -54,7 +55,7 @@ public final class IronsSpellInventory {
         return new SpellInventoryEntry(id, school, spell.getCastType().name(), min, max, rarities, costs, castTimes,
             spell.getSpellCooldown(), isNone ? 0 : spell.getRecastCount(max, null), spell.requiresLearning(),
             spell.isEnabled(), spell.allowCrafting(), spell.allowLooting(), isNone,
-            CrossModSpellComponents.isArsCrossProxyId(id), name);
+            CrossModSpellComponents.isArsCrossProxyId(id), name, isNone ? "" : spell.getSpellIconResource().toString());
     }
 
     static String titleCase(String path) {

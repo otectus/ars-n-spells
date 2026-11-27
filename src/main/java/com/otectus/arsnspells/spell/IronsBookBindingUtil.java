@@ -288,9 +288,11 @@ public final class IronsBookBindingUtil {
         }
         int removed = 0;
         if (IronsCompat.isLoaded()) {
-            // Read the pool ids BEFORE clearing - see the ordering note above.
-            for (int poolId : CrossModSpellComponents.usedProxyPoolIds(
-                    CrossModSpellComponents.get(stack))) {
+            // Read the pool ids BEFORE clearing - see the ordering note above. 3.4.1 review UNBIND-01:
+            // also any orphan ANS proxy in the native container whose entry was lost.
+            java.util.Set<Integer> poolIds = new java.util.TreeSet<>(CrossModSpellComponents.usedProxyPoolIds(CrossModSpellComponents.get(stack)));
+            poolIds.addAll(com.otectus.arsnspells.spell.irons.IronsProxySlotWriter.nativeProxyPoolIds(stack));
+            for (int poolId : poolIds) {
                 if (com.otectus.arsnspells.spell.irons.IronsProxySlotWriter
                         .removeProxySlot(stack, poolId)) {
                     removed++;

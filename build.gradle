@@ -20,6 +20,11 @@ java {
 
 repositories {
     mavenCentral()
+    // 3.4.1 review CATALOG-01: Modrinth's maven, for the opt-in Wind's Spellbooks profile only.
+    maven {
+        url = 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
     // Ars Nouveau + JEI.
     maven {
         name = 'BlameJared'
@@ -95,6 +100,9 @@ neoForge {
             gameDirectory = project.file(gametestRunDir)
             systemProperty 'ans.iconSmoke', project.hasProperty('withIconClientSmoke').toString()
             systemProperty 'ans.iconSmoke.packs', project.hasProperty('withIconPackReview').toString()
+            systemProperty 'ans.browserSmoke', project.hasProperty('withGlyphBrowserSmoke').toString()
+            systemProperty 'ans.browserInteractionProbe', project.hasProperty('withGlyphBrowserInteractionProbe').toString()
+            systemProperty 'ans.browserSmoke.address', (project.findProperty('browserSmokeAddress') ?: '').toString()
             systemProperty 'ans.worldUiSmoke', project.hasProperty('withWorldUiSmoke').toString()
             // Casting smoke (same flags as the Forge build): -PwithCastingClientSmoke opens only the
             // copied QA save, or -PcastingSmokeAddress=<host:port> a disposable QA server.
@@ -114,6 +122,7 @@ neoForge {
             // -PgametestRunDir gives a disposable dedicated-server directory, as on Forge.
             gameDirectory = project.file(project.findProperty('gametestRunDir') ?: 'run-server')
             programArgument '--nogui'
+            systemProperty 'ans.browserSmoke.server', project.hasProperty('withGlyphBrowserSmokeServer').toString()
             systemProperty 'ans.castingSmoke.server', project.hasProperty('withCastingServerSmoke').toString()
             systemProperty 'ans.glyphQa.server', project.hasProperty('withGlyphQaServer').toString()
             systemProperty 'ans.glyphQa.phase', (project.findProperty('glyphQaPhase') ?: '1').toString()
@@ -130,9 +139,13 @@ neoForge {
             systemProperty 'ans.gametest.expected.ars_affinity', project.hasProperty('withArsAffinity').toString()
             systemProperty 'ans.gametest.expected.ars_zero', project.hasProperty('withArsZero').toString()
             systemProperty 'ans.gametest.expected.ars_elemancy', project.hasProperty('withArsElemancy').toString()
+            systemProperty 'ans.gametest.expected.wind_spellbooks', project.hasProperty('withWindSpellbooks').toString()
             // -PglyphCatalogDump=<file>: write the loaded Iron's spell inventory, the input of
             // tools/generate_iron_glyph_catalog.py, which regenerates the shipped glyph catalog.
             systemProperty 'ans.glyphCatalogDump', (project.findProperty('glyphCatalogDump') ?: '').toString()
+            // 3.4.1 review SAVE-01: -Psave01Phase=<n> runs that phase of the package-removal experiment on this
+            // run directory's world (IdentityRecoveryGameTests); without it the experiment self-skips.
+            systemProperty 'ans.gametest.save01.phase', (project.findProperty('save01Phase') ?: '').toString()
         }
         data {
             data()
@@ -170,7 +183,15 @@ dependencies {
     // Ars Nouveau - hard dependency. Transitives are deliberately left ON so the dev runs get
     // Ars' real runtime graph (GeckoLib, Curios, Nuggets, Patchouli, JEI, TerraBlender, Jade,
     // Infiniverse) and `runClient` boots a genuine Ars install.
-    implementation "com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}"
+    implementation("com.hollingsworth.ars_nouveau:ars_nouveau-${minecraft_version}:${ars_nouveau_version}") {
+        // Patchouli 87's service provider does not load under the ModDev browser test launcher.
+        if (project.hasProperty('withGlyphBrowserSmoke') || project.hasProperty('withGlyphBrowserInteractionProbe')) {
+            exclude group: 'vazkii.patchouli', module: 'Patchouli'
+        }
+    }
+    // Ars declares Nuggets as runtime-only even though its public GUI hierarchy extends Nuggets
+    // classes. The glyph browser mixin and opt-in client smoke compile against that real hierarchy.
+    compileOnly("com.hollingsworth.nuggets:nuggets-neoforge-${minecraft_version}:1.1.0.48") { transitive = false }
 
     // Iron's Spells 'n Spellbooks - OPTIONAL, compileOnly by design. Keeping it off the default
     // run classpath is what makes `runGameTestServer` exercise the Iron's-LESS fallback path;
@@ -224,6 +245,10 @@ dependencies {
     // Optional Ars Nouveau addon profiles. Runtime-only and opt-in: ANS compiles against them in
     // no way, and the addon GameTests self-skip when the mod is absent. Ars Zero 2.0.2 declares
     // Ars Elemental as a required dependency, so the Zero profile implies the Elemental one.
+    // 3.4.1 review CATALOG-01: a real Iron's addon. Needs the Iron's profile.
+    if (project.hasProperty('withWindSpellbooks')) {
+        runtimeOnly "maven.modrinth:winds-spellbooks:${winds_spellbooks_modrinth_version}"
+    }
     if (project.hasProperty('withArsElemental') || project.hasProperty('withArsZero')
             || project.hasProperty('withArsElemancy') || project.hasProperty('withArsAffinity')) {
         runtimeOnly "curse.maven:ars-elemental-${ars_elemental_project}:${ars_elemental_file}"
@@ -307,3 +332,44 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 21
 }
+
+// 3.4.1 review CATALOG-01: the imported-glyph catalog packages Ars 'n' Spells ships, one per catalogs/<name>/,
+// built by the shared tools/build_catalog_packages.py into catalog-only jars and loose catalogs (validated
+// against this loader's own catalog rules before anything is written). Part of `build`.
+def catalogPackagesDir = layout.buildDirectory.dir('catalog-packages')
+tasks.register('catalogPackages', Exec) {
+    group = 'build'
+    description = 'Builds the imported-glyph catalog packages in catalogs/ (catalog-only jars and loose catalogs).'
+    inputs.dir('catalogs')
+    inputs.files('tools/glyph_catalog_pack.py', 'tools/build_catalog_packages.py')
+    outputs.dir(catalogPackagesDir)
+    doFirst {
+        project.delete(catalogPackagesDir)
+        catalogPackagesDir.get().asFile.mkdirs()
+    }
+    commandLine 'python3', '-I', 'tools/build_catalog_packages.py', '--loader', 'neoforge', '--catalogs', 'catalogs',
+        '--out', catalogPackagesDir.get().asFile.path
+}
+tasks.named('build') { dependsOn 'catalogPackages' }
+
+// -PwithCatalogPackages=<name>[,<name>...] installs those packages into the GameTest run directory's mods/
+// folder; every run first removes packages a previous run staged there (ans_catalog_*.jar only).
+tasks.register('stageCatalogPackages') {
+    def requested = (project.findProperty('withCatalogPackages') ?: '').toString().split(',').collect { it.trim() }.findAll { it }
+    if (!requested.isEmpty()) dependsOn 'catalogPackages'
+    def modsDir = file("${gametestRunDir}/mods")
+    doLast {
+        modsDir.mkdirs()
+        fileTree(modsDir) { include 'ans_catalog_*.jar' }.each { it.delete() }
+        requested.each { name ->
+            def definition = file("catalogs/${name}/package.json")
+            if (!definition.isFile()) throw new GradleException("no catalog package named ${name} in catalogs/")
+            def pkg = new groovy.json.JsonSlurper().parse(definition)
+            def jar = catalogPackagesDir.get().file("${pkg.mod_id}-${pkg.mod_version}.jar").asFile
+            if (!jar.isFile()) throw new GradleException("catalog package ${name} was not built: ${jar}")
+            copy { from jar; into modsDir }
+            logger.lifecycle("Staged catalog package ${name} into ${modsDir}")
+        }
+    }
+}
+tasks.matching { it.name == 'runGameTestServer' }.configureEach { dependsOn 'stageCatalogPackages' }

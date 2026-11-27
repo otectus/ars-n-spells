@@ -14,10 +14,11 @@ import java.util.Optional;
 
 /**
  * Atlas source for imported-glyph item icons: for every catalogued spell it adds the sprite
- * {@code ars_n_spells:item/iron_glyph_icon/<namespace>/<spell>}, read from the spell's own icon
- * ({@code <namespace>:textures/gui/spell_icons/<spell>.png}) when that resource exists and from the
- * ANS fallback icon when it does not, so a glyph item model never names a missing sprite: without
- * Iron's, or with a resource pack that drops an icon, the glyph still shows original ANS art.
+ * {@code ars_n_spells:item/iron_glyph_icon/<namespace>/<spell>}, read from the icon the catalog names
+ * (3.4.1 review CATALOG-02: an addon's icon may live anywhere), else from the spell's icon in Iron's
+ * standard place ({@code <namespace>:textures/gui/spell_icons/<spell>.png}), and from the ANS fallback
+ * icon when neither exists, so a glyph item model never names a missing sprite: without Iron's or the
+ * addon, or with a resource pack that drops an icon, the glyph still shows original ANS art.
  * Registered in the block atlas through {@code assets/minecraft/atlases/blocks.json}.
  */
 public final class IronGlyphIconSource implements SpriteSource {
@@ -38,7 +39,8 @@ public final class IronGlyphIconSource implements SpriteSource {
             ResourceLocation spell = entry.spellId();
             ResourceLocation sprite = ResourceLocation.fromNamespaceAndPath(ArsNSpells.MODID,
                 "item/iron_glyph_icon/" + spell.getNamespace() + "/" + spell.getPath());
-            Optional<Resource> icon = resources.getResource(ResourceLocation.fromNamespaceAndPath(spell.getNamespace(),
+            Optional<Resource> icon = entry.icon() == null ? Optional.empty() : resources.getResource(entry.icon());
+            if (icon.isEmpty()) icon = resources.getResource(ResourceLocation.fromNamespaceAndPath(spell.getNamespace(),
                 "textures/gui/spell_icons/" + spell.getPath() + ".png"));
             Optional<Resource> chosen = icon.isPresent() ? icon : fallback;
             chosen.ifPresent(resource -> output.add(sprite, resource));

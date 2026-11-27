@@ -70,6 +70,10 @@ public final class ImportedIronEffect extends AbstractEffect {
         this.augments = computeAugments(key, entry);
         // AbstractSpellPart's constructor read these before the fields above existed.
         this.compatibleAugments.addAll(augments);
+        // Ars's own school membership (its school lists, foci) is fixed when the part registers: Ars
+        // has no hook to move a registered part between schools on server and clients consistently,
+        // so it keeps the catalogued school. ANS's progression, discounts, policy and explanations
+        // use ironsSchool(), the live one.
         for (SpellSchool school : arsSchools(entry.school())) {
             school.addSpellPart(this);
             this.spellSchools.add(school);
@@ -83,7 +87,9 @@ public final class ImportedIronEffect extends AbstractEffect {
 
     private static Set<AbstractAugment> computeAugments(ImportedGlyphKey key, CatalogEntry entry) {
         Set<AbstractAugment> set = new LinkedHashSet<>();
-        if (key.baseLevel() < entry.maxLevel()) set.add(AugmentAmplify.INSTANCE);
+        // Always: whether Amplify may be used depends on Iron's live maximum, which getAugmentLimit
+        // reads each time; Ars caches this set at construction.
+        set.add(AugmentAmplify.INSTANCE);
         if (key.baseLevel() > entry.minLevel()) set.add(AugmentDampen.INSTANCE);
         if (entry.channelled()) {
             set.add(AugmentExtendTime.INSTANCE);
@@ -124,8 +130,13 @@ public final class ImportedIronEffect extends AbstractEffect {
         return entry;
     }
 
+    /**
+     * The spell's live Iron's school (3.4.1 B3): the one Iron's configuration gives it on this
+     * server, synced to clients; the catalogued school until the server's facts arrive.
+     */
     public ResourceLocation ironsSchool() {
-        return entry.school();
+        com.otectus.arsnspells.glyph.behavior.GlyphBehaviorSnapshot.SpellFacts facts = GlyphBehavior.current().spell(entry.spellId());
+        return facts != null && facts.school() != null ? facts.school() : entry.school();
     }
 
     /** The behaviour this glyph has on the calling side right now. */
@@ -182,7 +193,7 @@ public final class ImportedIronEffect extends AbstractEffect {
     @Override
     public int getAugmentLimit(ResourceLocation augmentTag) {
         if (AugmentAmplify.INSTANCE.getRegistryName().equals(augmentTag)) {
-            return Math.min(MAX_AMPLIFY_LEVELS, entry.maxLevel() - key.baseLevel());
+            return Math.max(0, Math.min(MAX_AMPLIFY_LEVELS, GlyphBehavior.current().liveMax(entry) - key.baseLevel()));
         }
         if (AugmentDampen.INSTANCE.getRegistryName().equals(augmentTag)) {
             return key.baseLevel() - entry.minLevel();
@@ -246,9 +257,9 @@ public final class ImportedIronEffect extends AbstractEffect {
 
     @Override
     public Component getBookDescLang() {
+        ResourceLocation school = ironsSchool();
         return Component.translatable("ars_n_spells.glyph.description", spellName(), key.baseLevel(),
-            Component.translatableWithFallback("school." + entry.school().getNamespace() + "." + entry.school().getPath(),
-                entry.school().getPath()),
+            Component.translatableWithFallback("school." + school.getNamespace() + "." + school.getPath(), school.getPath()),
             Component.translatable(restrictionKey()));
     }
 

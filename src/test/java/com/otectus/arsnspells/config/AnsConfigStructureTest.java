@@ -31,7 +31,7 @@ import java.util.stream.Stream;
  * <ul>
  *   <li>The new {@code IRONS_AURA_<RARITY>_MULTIPLIER} static fields exist (×5).</li>
  *   <li>The removed {@code ENABLE_PER_CAST_REAGENT} field is absent.</li>
- *   <li>{@code safeSave} is async (no Thread.sleep in the body).</li>
+ *   <li>{@code safeSave} writes once, without sleeping, under ANS's config lock.</li>
  *   <li>{@code ArsNSpells.java} registers the config as {@code ModConfig.Type.SERVER}.</li>
  * </ul>
  *
@@ -147,7 +147,7 @@ class AnsConfigStructureTest {
     }
 
     @Test
-    void safeSave_doesNotBlockCallerThread() throws IOException {
+    void safeSave_writesOnceUnderTheLockWithoutSleeping() throws IOException {
         // Source-text assertion: safeSave body must not contain Thread.sleep (ANS-HIGH-017).
         String source = Files.readString(TestPaths.of(
             "src/main/java/com/otectus/arsnspells/config/AnsConfig.java"));
@@ -161,10 +161,12 @@ class AnsConfigStructureTest {
         if (bodyEnd < 0) bodyEnd = source.length();
         String body = source.substring(bodyStart, bodyEnd);
         assertFalse(body.contains("Thread.sleep"),
-            "safeSave must not call Thread.sleep (ANS-HIGH-017 made it async); "
-                + "blocking the caller thread is the regressed behaviour");
-        assertTrue(body.contains("SAVE_EXEC.submit") || body.contains("submit("),
-            "safeSave must dispatch via an executor (async)");
+            "safeSave must not sleep and retry on the caller's thread (ANS-HIGH-017)");
+        // 3.4.1 review CONFIG-01: NeoForge saves atomically and only when asked, so one synchronous save
+        // under ANS's lock writes exactly what was applied; a queued save on another thread could not.
+        assertTrue(body.contains("synchronized (SAVE_LOCK)") && body.contains("SPEC.save()"),
+            "safeSave must write once, under ANS's config lock");
+        assertFalse(source.contains("SAVE_EXEC"), "no second, asynchronous config writer may exist");
     }
 
     @Test

@@ -1,0 +1,23 @@
+{
+ "_comment": "Shared by the Forge and NeoForge builds (tools/verify_loader_parity.py checks they are identical) and by tools/validate_glyph_mappings.py. They run against ../catalog.json: irons_spellbooks:firebolt (school fire, default levels 1-2 at tiers 1 and 2, registered 1-3), irons_spellbooks:heal (school holy, levels 1-2 at tiers 1 and 3) and the retired irons_spellbooks:ice_block. Terms list the tier the spell level is priced at.",
+ "cases": [
+  "custom_catalyst_tag_joins_the_union",
+  "deny_beats_allow",
+  "duration_above_the_shared_maximum_is_refused",
+  "duration_at_the_shared_maximum_is_valid",
+  "fractional_number_is_not_truncated",
+  "higher_pack_overrides_lower",
+  "huge_number_is_out_of_range",
+  "legacy_forge_spell_file",
+  "legacy_neoforge_policy_alias",
+  "level_beyond_registered_is_refused",
+  "press_tiers_v2",
+  "same_priority_duplicates_fail_closed",
+  "self_restriction",
+  "string_number_is_a_type_error",
+  "unknown_field_is_an_error_with_its_path",
+  "unknown_schema_is_rejected",
+  "v2_level_overrides_and_defaults",
+  "zero_catalyst_is_valid"
+ ]
+}

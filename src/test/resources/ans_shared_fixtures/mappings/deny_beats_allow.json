@@ -1,0 +1,26 @@
+{
+ "expect": {
+  "allows": {
+   "irons_spellbooks:firebolt@1": false,
+   "irons_spellbooks:heal@1": false
+  },
+  "valid": true
+ },
+ "files": [
+  {
+   "id": "test:p",
+   "json": {
+    "allow_spells": [
+     "irons_spellbooks:firebolt"
+    ],
+    "deny_schools": [
+     "irons_spellbooks:fire"
+    ],
+    "schema_version": 2,
+    "type": "ars_n_spells:policy"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

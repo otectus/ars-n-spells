@@ -41,6 +41,24 @@ public final class ClientGlyphEvents {
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         GlyphBehavior.clearClient();
+        com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.behaviourChanged();
+    }
+
+    /** 3.4.1 review SYNC-01: nothing of a previous server's glyph behaviour carries into a new connection. */
+    @SubscribeEvent
+    public static void onLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
+        GlyphBehavior.clearClient();
+    }
+
+    /**
+     * 3.4.1 review SYNC-01 / VIEW-01: a catalyst tag's members can change without the behaviour snapshot
+     * changing (it names the tag, not its items), so the recipe viewer and an open Press screen re-read
+     * them when the server's tags arrive.
+     */
+    @SubscribeEvent
+    public static void onTagsUpdated(net.neoforged.neoforge.event.TagsUpdatedEvent event) {
+        if (event.getUpdateCause() != net.neoforged.neoforge.event.TagsUpdatedEvent.UpdateCause.CLIENT_PACKET_RECEIVED) return;
+        com.otectus.arsnspells.glyph.recipe.GlyphPressRecipes.behaviourChanged();
     }
 
     /** Called from client setup (main thread). One shared function for every variant. */

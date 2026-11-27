@@ -1,0 +1,25 @@
+{
+ "expect": {
+  "errors_contain": [
+   "levels.1.source_cost",
+   "whole number"
+  ],
+  "valid": false
+ },
+ "files": [
+  {
+   "id": "test:frac",
+   "json": {
+    "levels": {
+     "1": {
+      "source_cost": 10.5
+     }
+    },
+    "schema_version": 2,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

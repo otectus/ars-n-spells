@@ -25,7 +25,12 @@ public final class AbsentIronGlyphBridge implements IronGlyphBridge {
     }
 
     @Override
-    public GlyphBehaviorSnapshot.LiveSpell liveSpell(ResourceLocation spellId) {
+    public int levelFor(ResourceLocation spellId, int level, net.minecraft.server.level.ServerPlayer player) {
+        return level;
+    }
+
+    @Override
+    public GlyphBehaviorSnapshot.LiveSpell liveSpell(ResourceLocation spellId, int registeredMax) {
         return null;
     }
 
@@ -70,7 +75,10 @@ public final class AbsentIronGlyphBridge implements IronGlyphBridge {
     }
 
     @Override
-    public void chargeStarted(com.otectus.arsnspells.glyph.runtime.GlyphRequest request) {
+    public com.otectus.arsnspells.glyph.runtime.GlyphCharge startCharge(com.otectus.arsnspells.glyph.runtime.GlyphRequest request, int ticks,
+                                                                     net.minecraft.network.chat.Component[] refusalOut) {
+        refusalOut[0] = absent();
+        return null;
     }
 
     @Override

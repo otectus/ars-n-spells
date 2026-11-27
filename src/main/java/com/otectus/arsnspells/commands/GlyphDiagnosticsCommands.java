@@ -108,7 +108,8 @@ public final class GlyphDiagnosticsCommands {
         CatalogEntry entry = effect.entry();
         VariantBehavior behavior = GlyphBehavior.current().variant(effect.key());
         line(source, effect.getRegistryName() + "  (" + entry.spellId() + " level " + effect.key().baseLevel()
-            + " of " + entry.minLevel() + ".." + entry.maxLevel() + ")", ChatFormatting.LIGHT_PURPLE);
+            + " of " + entry.minLevel() + ".." + entry.maxLevel() + ", registered to " + entry.registeredMax()
+            + ", live maximum " + GlyphBehavior.current().liveMax(entry) + ")", ChatFormatting.LIGHT_PURPLE);
         line(source, "  adapter " + entry.adapter() + ", target " + entry.target().name().toLowerCase(Locale.ROOT)
             + ", cast " + entry.castType().toLowerCase(Locale.ROOT) + (entry.requiresLearning() ? ", requires Iron's learning" : "")
             + (GlyphBehavior.current().selfOnly(entry.spellId()) ? ", restricted to Self by a pack" : ""), ChatFormatting.GRAY);

@@ -27,9 +27,18 @@ public interface IronGlyphBridge {
     /** The loaded Iron's spell registry as plain records, sorted by spell id; empty when absent. */
     List<SpellInventoryEntry> inventory();
 
-    /** Live registry and spell-config facts for one spell, or null when Iron's is absent. */
+    /**
+     * Live registry and spell-config facts for one spell, or null when Iron's is absent. Rarity is
+     * read only for levels {@code 1..registeredMax}: never a list proportional to the configured maximum.
+     */
     @Nullable
-    GlyphBehaviorSnapshot.LiveSpell liveSpell(ResourceLocation spellId);
+    GlyphBehaviorSnapshot.LiveSpell liveSpell(ResourceLocation spellId, int registeredMax);
+
+    /**
+     * Iron's own level for {@code level} ({@code AbstractSpell.getLevelFor}: Curios affinity and
+     * {@code ModifySpellLevelEvent}). Posts the event: call once per occurrence, never to preview.
+     */
+    int levelFor(ResourceLocation spellId, int level, ServerPlayer player);
 
     /** Whether {@code player} has learned {@code spellId} in Iron's (only Eldritch spells require it). */
     boolean hasLearned(ServerPlayer player, ResourceLocation spellId);
@@ -72,8 +81,13 @@ public interface IronGlyphBridge {
      */
     boolean interruptsCharge(ResourceLocation spellId, ServerPlayer player, net.minecraft.world.damagesource.DamageSource source);
 
-    /** Native feedback when a charge starts (Iron's cast-start sound). */
-    void chargeStarted(GlyphRequest request);
+    /**
+     * Start a charged execution on a detached slot in Iron's native order (see
+     * {@link com.otectus.arsnspells.glyph.runtime.GlyphCharge}). Null when Iron's refused it at
+     * initiation, with the reason in {@code refusalOut[0]}.
+     */
+    @Nullable
+    com.otectus.arsnspells.glyph.runtime.GlyphCharge startCharge(GlyphRequest request, int ticks, Component[] refusalOut);
 
     /** Run one instant execution. {@code gate} is asked to pay once the native events have run. */
     ExecutionResult execute(GlyphRequest request, PaymentGate gate);
@@ -95,10 +109,31 @@ public interface IronGlyphBridge {
         boolean payPulse(int ironsCost);
     }
 
-    /** The result of one execution. */
-    record ExecutionResult(boolean applied, @Nullable Component refusal, boolean paid) {
+    /**
+     * How far one execution got (3.4.1 review CAST-04). Before the payment boundary nothing was spent;
+     * once the effect boundary is crossed the execution is paid, counts as an emission and owes its
+     * cooldown, whether the native effect then completed or threw.
+     */
+    enum Stage {
+        /** Refused before anything was paid (a veto, a native condition, an unreadable spell). */
+        REFUSED_BEFORE_PAYMENT,
+        /** The payment gate refused it; nothing was taken. */
+        REFUSED_AT_PAYMENT,
+        /** The native effect ran. */
+        COMPLETED,
+        /** The native effect began and threw; it stays paid. */
+        FAILED_AFTER_EFFECT
+    }
+
+    /** The result of one execution; {@code finalLevel} is the level Iron's cast event settled on, or -1. */
+    record ExecutionResult(Stage stage, @Nullable Component refusal, boolean paid, int finalLevel) {
         public static ExecutionResult refused(Component reason) {
-            return new ExecutionResult(false, reason, false);
+            return new ExecutionResult(Stage.REFUSED_BEFORE_PAYMENT, reason, false, -1);
+        }
+
+        /** Whether the effect boundary was crossed: the execution is paid and counted. */
+        public boolean applied() {
+            return stage == Stage.COMPLETED || stage == Stage.FAILED_AFTER_EFFECT;
         }
     }
 }

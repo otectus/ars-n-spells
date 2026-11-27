@@ -1,0 +1,6 @@
+# Pinned icon authoring/verification toolchain (audit ANS-013), Python 3.12.
+# The art is verified by decoded pixels, so a different zlib/PNG encoder build cannot fail
+# tools/generate_icons.py --check on compression bytes alone; the Pillow pin keeps the
+# rasterization (ImageDraw/ImageFilter) that produces those pixels identical everywhere.
+# 13.0.0 is the version that verified the committed assets on 2026-11-18.
+Pillow==13.0.0

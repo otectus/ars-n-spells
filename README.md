@@ -2,6 +2,8 @@
 
 Ars 'n' Spells bridges **Ars Nouveau** and **Iron's Spells 'n Spellbooks** for Minecraft 1.21.1 on **NeoForge**. It unifies mana, scaling, and progression while keeping each mod playable on its own.
 
+3.4.2 is the remediation of the 2026-11-17 audit, ported from Forge, and also ships the never-published 3.4.1. Fake players can no longer cast imported Iron's glyphs. HYBRID honours Ars Mana Regen potions, and multi-school glyphs train and discount one primary school, the first they declare. A remote client's mana bar follows `hybrid_mana_bar` after a server config reload, and the Spell Loom shows the server's refusals and keeps one slot layout. Cross-system regeneration now delivers the same real mana per second in both directions, at every setting; before, NeoForge's defaults passed half the rate from Iron's to Ars and double from Ars to Iron's. Client and server both need 3.4.2 (network protocol 13). See [CHANGELOG.md](CHANGELOG.md) and [docs/3.4.2](docs/3.4.2/testing.md).
+
 3.4.0 fixes Ars spells with **Touch** cast from scrolls and other inscribed items: they now strike the block or creature you aim at. It also adds the **Glyph Press**, which turns a filled Iron's scroll into an Ars glyph for that spell at that level. You learn the glyph like any other and build it into your own Ars spells. Client and server both need 3.4.0 (network protocol 9). See [CHANGELOG.md](CHANGELOG.md) and [docs/3.4.0](docs/3.4.0/glyph-press.md).
 
 3.3.5 ends channelled Iron's spells cleanly on the last pulse the caster can pay for, instead of stopping them with a payment error, and stops Iron's regeneration from lowering the Ars pool in `ars_primary`. Shortage messages now name the resource, the amount needed and the amount available. A new setting, `inscribed_ars_default_cooldown_ticks`, gives Ars spells cast from Iron's spell wheel a native cooldown. This build is tested with Ars Affinity 1.1.1. See [CHANGELOG.md](CHANGELOG.md) and [docs/3.3.5](docs/3.3.5/testing.md).
@@ -21,8 +23,13 @@ Pinned development targets: **Ars Nouveau 5.13.1.1400**, **Iron's Spells 1.21.1-
 | Ars Nouveau | 5.13+ (built against 5.13.1.1400) | Yes |
 | Iron's Spells 'n Spellbooks | 1.21.1-3.16.3 up to, not including, 4.0.0 (built against 3.16.3) | No |
 | Ars Affinity | 1.1.1 tested (needs Ars Elemental) | No |
+| Wind's Spellbooks | 1.0.1 tested, with the `ans_catalog_wind_spellbooks` catalog package ([matrix](docs/3.4.1/catalog-packages.md#winds-spellbooks)) | No |
 
 If Iron's Spellbooks is not installed, Ars 'n' Spells falls back to native Ars behavior. The mod will not load on Forge or on Minecraft versions other than 1.21.1.
+
+## Personal spellbook display
+
+Converted Iron's glyphs have their own bookmark in the Ars spellbook. The default **Organized** view groups learned levels by their original spell. Choose **Individual levels** or **Hidden** under **Mods → Ars 'n' Spells → Config → Personal display**. Saved spells retain their exact glyphs in every mode. [Glyph library and config examples](docs/3.4.2/glyph-browser.md)
 
 ## Features
 
@@ -108,7 +115,7 @@ Right-click the target. Sneak-right-click cycles between multiple inscriptions o
 Cross-cast spells pay an overhead set by `cross_cast_cost_multiplier` (default `1.25`, range `0.5`–`5.0`). The multiplier applies to both Iron's spells cast from non-Iron's items and Ars spells cast from non-Ars items, once per cast, before mana deduction.
 
 **4. Strip an inscription.**
-Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank parchment (reagent), a water bucket, a source gem, and an archwood log — 500 source. Drop one inscribed item within three blocks of the brazier with no other items in range. Ash and smoke particles plus a fire-extinguish sound mark the strip; the result is bit-identical to a fresh blank target so the same item can be re-inscribed cleanly. The uninscribe ritual is Iron's-independent and remains useful for cleanup even if Iron's Spellbooks is later removed.
+Craft the Spell Uninscription tablet on the Enchanting Apparatus from a blank parchment (reagent), a water bucket, a source gem, and an archwood log — 500 source. Drop one inscribed item within three blocks of the brazier with no other items in range. Ash and smoke particles plus a fire-extinguish sound mark the strip. The ritual erases **every** Ars 'n' Spells inscription on that item: on an Iron's spellbook, all bound Ars spells and their wheel entries, not a chosen one, and nothing is returned. It keeps the item's own Iron's spells, its name, enchantments and other mods' data, so the item is not a factory-fresh copy, but it can be inscribed again. To take back a single bound Ars spell as a scroll, select its entry at the Inscription Table instead: the table offers it as an Ars 'n' Spells scroll carrier, and taking that scroll removes exactly that entry and its wheel slot. The uninscribe ritual is Iron's-independent and remains useful for cleanup even if Iron's Spellbooks is later removed.
 
 ### Ars spells in Iron's native spell wheel (3.0.x)
 
@@ -166,7 +173,9 @@ The **Glyph Press** turns a filled Iron's scroll into a learnable Ars glyph for 
 
 The Iron's spell keeps its own rules: cast time, channel pulses, cooldown, recasts, Eldritch learning and events. Each imported effect is charged once, in your mana mode.
 
-All 111 ordinary player spells in Iron's 3.16.3 have glyphs, 777 in all; [docs/3.4.0/iron-glyph-coverage.md](docs/3.4.0/iron-glyph-coverage.md) lists them. Without Iron's, pressed glyphs stay as dormant ANS glyphs and never turn into a different glyph. Guide: [docs/3.4.0/glyph-press.md](docs/3.4.0/glyph-press.md). Data-pack tuning and addon spells: [docs/3.4.0/adapter-authoring.md](docs/3.4.0/adapter-authoring.md).
+All 111 ordinary player spells in Iron's 3.16.3 have glyphs: 777 at Iron's default maximum levels and 1,110 registered, because every spell reserves levels up to 10 for servers that raise Iron's maximum ([docs/3.4.1/identity-and-levels.md](docs/3.4.1/identity-and-levels.md)). [docs/3.4.0/iron-glyph-coverage.md](docs/3.4.0/iron-glyph-coverage.md) lists the spells. Without Iron's, pressed glyphs stay as dormant ANS glyphs and never turn into a different glyph. Guide: [docs/3.4.0/glyph-press.md](docs/3.4.0/glyph-press.md). Data-pack tuning and addon spells: [docs/3.4.0/adapter-authoring.md](docs/3.4.0/adapter-authoring.md).
+
+**Addon spells and levels above X (3.4.1).** Spells from Iron's addons need a glyph catalog. Since 3.4.1, ANS builds two catalog packages alongside the mod jar: one for Wind's Spellbooks (five of its seven spells castable; Tornado and Iron Slash stay dormant, with the reason) and one that registers levels XI-XV of every Iron's spell for servers whose Iron's maximum goes past 10. Install a package on the server and every client, then restart. The support matrix (loader, addon version, spell, adapter, verdict and the tested effect), the level-15 steps and the tool for other addons are in [docs/3.4.1/catalog-packages.md](docs/3.4.1/catalog-packages.md). If a package is later removed, ANS's retained copy keeps its glyphs registered and dormant; a world whose glyph ids are missing altogether refuses to start instead of dropping them ([identity and levels](docs/3.4.1/identity-and-levels.md#the-world-identity-record)).
 
 ### Cross-cast storage (1.21.1)
 
@@ -180,9 +189,9 @@ Affinity, cooldown, and progression are stored as NeoForge entity attachments ([
 
 ## Configuration
 
-Config file: `<world>/serverconfig/ars_n_spells-server.toml` (a server config, sent to clients on login). `defaultconfigs/ars_n_spells-server.toml` seeds new worlds. The older global `config/ars_n_spells-common.toml` is no longer read. Every key, with its default and bounds: [docs/3.4.0/config-reference.md](docs/3.4.0/config-reference.md).
+NeoForge reads `<world>/serverconfig/ars_n_spells-server.toml` when the world supplies that override. Otherwise it reads `config/ars_n_spells-server.toml` in the server or single-player instance. The server sends the accepted values to clients on login. The reference lists every key, default and bound from `AnsConfig`. [3.4.2 configuration reference](docs/3.4.2/config-reference.md) · [3.4.0 configuration notes](docs/3.4.0/config-reference.md)
 
-An **in-game config screen** is available from the mod list (**Mods → Ars 'n' Spells → Config**), registered via NeoForge's `IConfigScreenFactory`. It exposes the master toggles, the mana-unification mode (click the row to cycle), and the gear/debug switches. Because the gameplay config is a SERVER config, the Save / Reset controls are active only in singleplayer; on a dedicated server, edit the server `.toml` or use `/ans`.
+An **in-game config screen** is available from the mod list (**Mods → Ars 'n' Spells → Config**), registered via NeoForge's `IConfigScreenFactory`. It exposes the master toggles, the mana-unification mode (click the row to cycle), and the gear/debug switches, for the world you are in. Changes are staged in the screen and take effect when you press **Apply**; Cancel or Esc discards them. The owner of a single-player world (with or without cheats), operators (permission level 2) and the server console can change them, from the screen or with `/ans mode set <mode>`; LAN guests and other players see them read-only. They are world settings and apply to every player in that world.
 
 ### Master toggles
 
@@ -241,7 +250,7 @@ An **in-game config screen** is available from the mod list (**Mods → Ars 'n' 
 | `max_imported_effects_per_spell` | `4` | Imported glyphs allowed in one Ars spell (1–8). |
 | `max_foreign_emissions_per_cast` | `16` | Imported-effect executions one cast may make, splits and repeats included (1–64). |
 | `max_active_glyph_sessions_per_player` | `8` | Casts with imported glyphs one player may have running at once (1–32). |
-| `glyph_press_source_capacity` | `4000` | Source a Press stores (500–100000). |
+| `glyph_press_source_capacity` | `4000` | Source a Press stores (1000–100000, as on Forge). |
 | `glyph_press_source_scan_interval_ticks` | `20` | How often a Press waiting for Source pulls from nearby jars (5–200). |
 | `glyph_press_source_radius` | `4` | How far it looks for loaded Source Jars (1–8). |
 
@@ -282,7 +291,7 @@ The mod hides redundant mana bars based on mode:
 
 - **iss_primary**: Hides Ars mana bar.
 - **ars_primary**: Hides Iron's mana bar.
-- **hybrid**: Shows the bar selected by `hybrid_mana_bar`.
+- **hybrid**: Shows the bar selected by `hybrid_mana_bar`. The server sends that setting to every connected client on login, on every change and on every config file reload.
 - **separate / disabled**: Both bars may show.
 
 Hiding is handled natively on NeoForge by `ManaBarController`, which cancels the redundant `RenderGuiLayerEvent.Pre` for `ars_nouveau:mana_bar` / `irons_spellbooks:mana_bar` per mode — the Forge-style overlay mixin is not needed.
@@ -306,6 +315,7 @@ With `debug_mode` enabled, `OverlayDiagnostics` logs every rendered GUI layer id
 | `/ans bind_scroll_to_irons_book` | Op 2 | Bind a held exported scroll into a held Iron's spellbook (requires Iron's). |
 | `/ans info <player>` | Op 2 | Show mana, resonance, and the player's per-school affinity (plus the registered Iron's school count). |
 | `/ans mode` | — | Show current mana unification mode. |
+| `/ans mode set <mode>` | Op 2, or the single-player world's owner | Switch the mana unification mode live (no restart); not open to LAN guests. |
 | `/ans glyph inspect` | — | Show the held imported glyph, or the imported glyphs in the held spell book's current spell: spell, level, adapter, target, tier, Press terms, augments and whether it is dormant. |
 | `/ans glyph coverage` | Op 2 | Imported-glyph catalog, adapter coverage, dormancy counts, and data-pack mapping winners and errors. |
 | `/ans glyph sessions [player]` | — (another player: Op 2) | Running casts with imported glyphs and their latest outcomes. |
@@ -330,7 +340,7 @@ Requires JDK 21.
 
 Dependencies (Ars Nouveau, Iron's Spellbooks) resolve automatically from CurseMaven (pinned file IDs in [`gradle.properties`](gradle.properties)); no manual jar placement required. The NeoForge `moddev` Gradle plugin handles deobf and run configuration.
 
-Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`. `runGameTestServer -PwithIronsRuntimeGameTests -PwithArsAffinity` adds Ars Affinity 1.1.1 and Ars Elemental to the GameTest runtime. The 3.4.0 commands and results are in [docs/3.4.0/testing.md](docs/3.4.0/testing.md).
+Useful Gradle tasks: `runClient`, `runServer`, `runGameTestServer`, `runData`. `runGameTestServer -PwithIronsRuntimeGameTests -PwithArsAffinity` adds Ars Affinity 1.1.1 and Ars Elemental to the GameTest runtime. The 3.4.2 commands and results are in [docs/3.4.2/testing.md](docs/3.4.2/testing.md); earlier evidence is kept in [docs/3.4.1/testing.md](docs/3.4.1/testing.md) and [docs/3.4.0/testing.md](docs/3.4.0/testing.md).
 
 Output jar: `build/libs/ars_n_spells-<mod_version>.jar`, where `<mod_version>` comes from `gradle.properties`.
 

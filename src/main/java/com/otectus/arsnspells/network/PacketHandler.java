@@ -38,7 +38,12 @@ public final class PacketHandler {
     // 9: 3.4.0. cross_cast_request carries the client's aim and claimed target (CastTargetHint),
     //    and the imported-glyph catalog/behaviour payloads and the Glyph Press payloads were added.
     //    An 8 client would misdecode the request, so negotiation must refuse it.
-    public static final String PROTOCOL_VERSION = "9";
+    // 10: 3.4.1. The glyph behaviour payload carries each spell's live facts (maximum, school,
+    //    learning) after the variants; a 9 client would misread them, so it is refused instead.
+    // 3.4.1 review CONFIG-01: 10 -> 11 for the settings apply/sync payloads.
+    // 12: 3.4.2 (audit ANS-007). The settings snapshot carries the client presentation policy.
+    // 13: 3.4.2. Imported spell facts also carry the authoritative live minimum for browser explanations.
+    public static final String PROTOCOL_VERSION = "13";
 
     private PacketHandler() {}
 
@@ -65,6 +70,9 @@ public final class PacketHandler {
         // 3.4.0: the Glyph Press's two buttons and their outcome.
         reg.playToServer(GlyphPressActionPayload.TYPE, GlyphPressActionPayload.STREAM_CODEC, GlyphPressActionPayload::handleOnServer);
         reg.playToClient(GlyphPressResultPayload.TYPE, GlyphPressResultPayload.STREAM_CODEC, GlyphPressResultPayload::handleOnClient);
+        // 3.4.1 review CONFIG-01: world settings, applied on the server and synced to every client.
+        reg.playToServer(SettingsApplyPayload.TYPE, SettingsApplyPayload.STREAM_CODEC, SettingsApplyPayload::handleOnServer);
+        reg.playToClient(SettingsSyncPayload.TYPE, SettingsSyncPayload.STREAM_CODEC, SettingsSyncPayload::handleOnClient);
 
         ArsNSpells.LOGGER.info("Registered payload handlers (protocol={})", PROTOCOL_VERSION);
     }

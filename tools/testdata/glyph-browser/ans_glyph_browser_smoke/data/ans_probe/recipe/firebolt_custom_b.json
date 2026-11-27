@@ -1,0 +1,11 @@
+{
+  "type": "ars_nouveau:glyph",
+  "exp": 3,
+  "inputs": [
+    { "item": "minecraft:diamond" }
+  ],
+  "output": {
+    "count": 1,
+    "id": "ars_n_spells:glyph_iron/irons_spellbooks/firebolt/level_4"
+  }
+}

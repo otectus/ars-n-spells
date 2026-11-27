@@ -13,6 +13,11 @@
     "ars.MixinImportedAugmentCost",
     "ars.MixinManaCapGlyphBonus"
   ],
+  "client": [
+    "ars.MixinCraftingButtonImportedWarning",
+    "ars.MixinGuiSpellBookGlyphBrowser",
+    "ars.MixinGlyphUnlockMenuBrowser"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

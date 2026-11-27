@@ -460,7 +460,8 @@ public class CrossCastingHandler {
         }
         AbstractSpell spell;
         try {
-            spell = SpellRegistry.REGISTRY.get(entry.spellId());
+            // ANS-014: exact; never Iron's none sentinel standing in for the requested spell.
+            spell = com.otectus.arsnspells.spell.irons.IronsSpellLookup.lookupExact(entry.spellId());
         } catch (Throwable t) {
             LOGGER.warn("Iron's spell registry lookup failed for {}: {}", entry.spellId(), t.toString());
             return false;

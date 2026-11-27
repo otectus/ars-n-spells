@@ -12,6 +12,7 @@
     "irons.MixinIronsMagicDataMana",
     "irons.MixinScrollItem",
     "irons.MixinInscriptionTableMenu",
+    "irons.MixinInscriptionResultSlot",
     "irons.MixinIronsCastTicker",
     "irons.MixinIronsManaRegen",
     "irons.MixinRaycastBuilderGlyph",

@@ -45,7 +45,11 @@ public class SpellLoomMenu extends AbstractContainerMenu {
 
     private final java.util.UUID sessionId;
     public java.util.UUID sessionId() { return sessionId; }
+    /** The authoritative Loom; the server's menu only. Null on the client, which never plans against it. */
     private final SpellLoomBlockEntity blockEntity;
+    /** The three working slots' contents: the block entity's on the server, a synchronized copy on the client. */
+    private final net.neoforged.neoforge.items.IItemHandler workItems;
+    private final net.minecraft.core.HolderLookup.Provider registries;
     private final ContainerLevelAccess access;
 
     public SpellLoomMenu(int id, Inventory inv, RegistryFriendlyByteBuf buf) {
@@ -56,27 +60,43 @@ public class SpellLoomMenu extends AbstractContainerMenu {
         this(id, inv, be, java.util.UUID.randomUUID());
     }
 
+    /**
+     * Audit ANS-012: both sides always build the same 39 slots, three working slots then the 36
+     * player slots. Only the server's Loom is authoritative; the client always works on its own
+     * three-slot copy, filled by the server's menu synchronization, as the Glyph Press does. Its
+     * layout therefore never depends on whether the client happened to have the block entity when
+     * the menu opened (it used to build only the 36 player slots then, so the server's slot indices
+     * described different slots on each side).
+     */
     public SpellLoomMenu(int id, Inventory inv, SpellLoomBlockEntity be, java.util.UUID sessionId) {
         super(ModMenus.SPELL_LOOM.get(), id);
         this.sessionId = sessionId;
-        this.blockEntity = be;
-        this.access = be == null
-            ? ContainerLevelAccess.NULL
-            : ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
+        this.registries = inv.player.level().registryAccess();
+        boolean server = be != null && be.getLevel() != null && !be.getLevel().isClientSide();
+        this.blockEntity = server ? be : null;
+        this.access = server ? ContainerLevelAccess.create(be.getLevel(), be.getBlockPos()) : ContainerLevelAccess.NULL;
+        this.workItems = server ? be.getItems() : new net.neoforged.neoforge.items.ItemStackHandler(SpellLoomBlockEntity.SLOT_COUNT) {
+            @Override
+            public boolean isItemValid(int slot, ItemStack stack) {
+                return switch (slot) {
+                    case SpellLoomBlockEntity.SLOT_SOURCE -> com.otectus.arsnspells.inscription.LoomInscription.isSource(stack);
+                    case SpellLoomBlockEntity.SLOT_SCROLL -> com.otectus.arsnspells.inscription.LoomInscription.isTarget(stack);
+                    default -> false;
+                };
+            }
+        };
 
-        if (be != null) {
-            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SOURCE,
-                SLOT_SOURCE_X, RECIPE_ROW_Y));
-            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_SCROLL,
-                SLOT_SCROLL_X, RECIPE_ROW_Y));
-            addSlot(new SlotItemHandler(be.getItems(), SpellLoomBlockEntity.SLOT_OUTPUT,
-                SLOT_OUTPUT_X, RECIPE_ROW_Y) {
-                @Override
-                public boolean mayPlace(ItemStack stack) {
-                    return false;
-                }
-            });
-        }
+        addSlot(new SlotItemHandler(workItems, SpellLoomBlockEntity.SLOT_SOURCE,
+            SLOT_SOURCE_X, RECIPE_ROW_Y));
+        addSlot(new SlotItemHandler(workItems, SpellLoomBlockEntity.SLOT_SCROLL,
+            SLOT_SCROLL_X, RECIPE_ROW_Y));
+        addSlot(new SlotItemHandler(workItems, SpellLoomBlockEntity.SLOT_OUTPUT,
+            SLOT_OUTPUT_X, RECIPE_ROW_Y) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return false;
+            }
+        });
 
         addPlayerInventory(inv);
     }
@@ -88,8 +108,22 @@ public class SpellLoomMenu extends AbstractContainerMenu {
         return null;
     }
 
+    /** The authoritative Loom: the server's menu only, null on the client. */
     public SpellLoomBlockEntity getBlockEntity() {
         return blockEntity;
+    }
+
+    /**
+     * The three working slots as this side knows them: the Loom's own inventory on the server, the
+     * synchronized copy on the client. What the client's planning and fingerprints read.
+     */
+    public net.neoforged.neoforge.items.IItemHandler workItems() {
+        return workItems;
+    }
+
+    /** The registries of the player's level, for item data on either side. */
+    public net.minecraft.core.HolderLookup.Provider registries() {
+        return registries;
     }
 
     private void addPlayerInventory(Inventory inv) {
@@ -108,11 +142,8 @@ public class SpellLoomMenu extends AbstractContainerMenu {
     public ItemStack quickMoveStack(Player player, int index) {
         ItemStack result = ItemStack.EMPTY;
         if (index < 0 || index >= this.slots.size()) return result;
-        // Audit E5 (defensive): if the client-side BE lookup failed, no working slots were
-        // added and this.slots holds only the 36 player slots - the index math below would
-        // then misclassify player slots 0-2 as loom slots and shift-click would move the
-        // wrong stacks. Unreachable on the authoritative server (createMenu always passes a
-        // BE), which is exactly why it needs to be handled rather than assumed away.
+        // Audit E5 / ANS-012: the layout is always the three working slots then the 36 player
+        // slots; this guard only protects the index math below against a future layout change.
         if (this.slots.size() < SpellLoomBlockEntity.SLOT_COUNT + 36) {
             return result;
         }

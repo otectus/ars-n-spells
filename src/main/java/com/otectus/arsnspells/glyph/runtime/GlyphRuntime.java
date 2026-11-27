@@ -73,14 +73,27 @@ public final class GlyphRuntime {
         }
         CatalogEntry entry = effect.entry();
         boolean selfHit = hit instanceof EntityHitResult e && e.getEntity() == player;
+        // 3.4.1 review CAST-03: the caster's world and the target's validity, as the Forge build checks them.
+        Component casterRefusal = GlyphAuthorization.casterRefusal(player, session, level, effect);
+        if (casterRefusal != null) {
+            refuse(player, session, effect, casterRefusal);
+            return;
+        }
         Component targetRefusal = targetRefusal(effect, entry, hit, selfHit, GlyphBehavior.current().selfOnly(entry.spellId()));
+        if (targetRefusal == null) targetRefusal = GlyphAuthorization.targetRefusal(level, hit, entry.target());
         if (targetRefusal != null) {
             refuse(player, session, effect, targetRefusal);
             return;
         }
-        if (session.emissions >= GlyphBehavior.current().settings().maxForeignEmissions()) {
-            refuse(player, session, effect, Component.translatable("ars_n_spells.glyph.refused.emissions",
-                GlyphBehavior.current().settings().maxForeignEmissions()));
+        // 3.4.1 review CAST-05: a permit before any work is scheduled, so pending charges count too.
+        int budget = GlyphBehavior.current().settings().maxForeignEmissions();
+        if (!session.tryReserveEmission(budget)) {
+            refuse(player, session, effect, Component.translatable("ars_n_spells.glyph.refused.emissions", session.emissionLimit(budget)));
+            return;
+        }
+        if (GlyphSessions.continuationsFor(player.getUUID()) >= GlyphSessions.MAX_CONTINUATIONS_PER_PLAYER && (entry.charged() || entry.channelled())) {
+            session.releaseEmission();
+            refuse(player, session, effect, Component.translatable("ars_n_spells.glyph.refused.emissions", GlyphSessions.MAX_CONTINUATIONS_PER_PLAYER));
             return;
         }
         GlyphCastSession.Token token = tokenFor(session, context, effect);
@@ -90,23 +103,47 @@ public final class GlyphRuntime {
         Component nativeRefusal = bridge.nativeRefusal(player, entry.spellId(),
             !sharedAdmission && !bridge.hasPendingRecast(player, entry.spellId()));
         if (nativeRefusal != null) {
+            session.releaseEmission();
             refuse(player, session, effect, nativeRefusal);
             return;
         }
         int level0 = GlyphSessions.effectiveLevel(effect, stats.getBuffCount(AugmentAmplify.INSTANCE),
             stats.getBuffCount(AugmentDampen.INSTANCE));
+        if (GlyphSessions.requestedAboveMax(effect, level0)) {
+            session.releaseEmission();
+            refuse(player, session, effect, Component.translatable("ars_n_spells.glyph.refused.above_max", effect.spellName(), level0,
+                GlyphBehavior.current().liveMax(entry)));
+            return;
+        }
+        // Iron's level modifiers were evaluated once for this occurrence at admission; an execution
+        // that is not that occurrence's (a rebuilt context, a changed augment count) evaluates its own.
+        int nativeLevel = token != null && token.effectiveLevel == level0 && token.nativeLevel > 0
+            ? token.nativeLevel : bridge.levelFor(entry.spellId(), level0, player);
         int speed = stats.getBuffCount(AugmentAccelerate.INSTANCE) - stats.getBuffCount(AugmentDecelerate.INSTANCE);
-        GlyphRequest request = new GlyphRequest(player, effect.key(), entry, hit, selfHit, level0,
+        GlyphRequest request = new GlyphRequest(player, effect.key(), entry, hit, selfHit, level0, nativeLevel,
             firstOfOccurrence || token == null, speed, session.id, UUID.randomUUID());
 
         if (entry.charged()) {
-            GlyphPayments.Reservation held = holdFor(player, session, token, effect, level0);
-            if (held == null && bridge.chargesMana(player)) return;
-            int ticks = chargeTicks(bridge.effectiveCastTime(entry.spellId(), level0, player), speed);
-            GlyphContinuation continuation = GlyphContinuation.charge(session, request, effect, hit, level, resolver, token, held, ticks);
+            // A native recast is free: nothing is held for it (Iron's skips its payment too).
+            boolean recast = bridge.hasPendingRecast(player, entry.spellId());
+            GlyphPayments.Reservation held = recast ? null : holdFor(player, session, token, effect, nativeLevel);
+            if (held == null && !recast && bridge.chargesMana(player)) {
+                session.releaseEmission();
+                return;
+            }
+            int ticks = chargeTicks(bridge.effectiveCastTime(entry.spellId(), nativeLevel, player), speed);
+            // 3.4.1 review CAST-04: the charge starts in Iron's native order on a detached slot.
+            Component[] refusalOut = new Component[1];
+            GlyphCharge charge = bridge.startCharge(request, ticks, refusalOut);
+            if (charge == null) {
+                if (held != null && (token == null || held != token.reservation)) GlyphPayments.release(held);
+                session.releaseEmission();
+                refuse(player, session, effect, refusalOut[0] == null ? Component.translatable("ars_n_spells.glyph.refused.native") : refusalOut[0]);
+                return;
+            }
+            GlyphContinuation continuation = GlyphContinuation.charge(session, request, effect, hit, level, resolver, token, held, ticks, charge);
             if (token != null && held == token.reservation) token.reservation = null; // the continuation owns it now
             start(session, context, continuation);
-            bridge.chargeStarted(request);
             session.lastOutcome = GlyphOutcome.ACCEPTED_PENDING;
             GlyphSessions.trace(player, session, "charge_started", "spell", entry.spellId(), "level", level0, "ticks", ticks);
             GlyphSessions.recordOutcome(player, effect.key(), level0, GlyphOutcome.ACCEPTED_PENDING, "charge " + ticks + " ticks");
@@ -122,12 +159,14 @@ public final class GlyphRuntime {
                 (cost, finalLevel) -> pay(player, session, useToken, effect, cost),
                 cost -> payFresh(player, session, effect, cost));
             if (channel == null) {
+                session.releaseEmission();
                 session.lastOutcome = GlyphOutcome.REJECTED;
                 GlyphSessions.trace(player, session, "channel_refused", "spell", entry.spellId());
                 return;
             }
             if (token != null) token.executions++;
-            session.emissions++;
+            // The first pulse ran: the channel is one emission; its later pulses are paid, not counted again.
+            session.consumeEmission();
             GlyphContinuation continuation = GlyphContinuation.channel(session, request, effect, hit, level, resolver, channel);
             start(session, context, continuation);
             session.lastOutcome = GlyphOutcome.ACCEPTED_PENDING;
@@ -135,7 +174,7 @@ public final class GlyphRuntime {
             GlyphSessions.recordOutcome(player, effect.key(), level0, GlyphOutcome.ACCEPTED_PENDING, "channel");
             return;
         }
-        executeNow(player, session, token, effect, request, null);
+        executeNow(player, session, token, effect, request, null, null);
     }
 
     /** Hold the price of a charged execution until it completes: the prepaid token, or a fresh reservation. */
@@ -164,50 +203,72 @@ public final class GlyphRuntime {
         GlyphSessions.pendingStarted(session);
     }
 
-    /** A charge reached its cast time: run the effect on the held reservation. */
+    /**
+     * A charge reached its cast time: authorize it again against the policy now (3.4.1 review CAST-03),
+     * then run the effect on the held reservation. A refusal releases the reservation and the permit.
+     */
     static boolean completeCharge(GlyphContinuation continuation, @Nullable GlyphCastSession.Token token,
                                   @Nullable GlyphPayments.Reservation held) {
         ServerPlayer player = continuation.request.caster();
         GlyphRequest request = continuation.request;
-        HitResult hit = request.hit();
-        if (hit instanceof EntityHitResult entityHit && (!entityHit.getEntity().isAlive() || entityHit.getEntity().isRemoved()
-                || entityHit.getEntity().level() != player.level())) {
+        Component refusal = GlyphAuthorization.refusal(player, continuation.session, continuation.effect, request, continuation.level());
+        if (refusal != null) {
+            continuation.charge().cancel();
             GlyphPayments.release(held);
-            refuse(player, continuation.session, continuation.effect, Component.translatable("ars_n_spells.glyph.refused.target_gone"));
+            continuation.session.releaseEmission();
+            refuse(player, continuation.session, continuation.effect, refusal);
             return false;
         }
-        Component nativeRefusal = IronGlyphBridges.get().nativeRefusal(player, request.key().ironSpellId(), false);
-        if (nativeRefusal != null) {
-            GlyphPayments.release(held);
-            refuse(player, continuation.session, continuation.effect, nativeRefusal);
-            return false;
-        }
-        return executeNow(player, continuation.session, token, continuation.effect, request, held);
+        return executeNow(player, continuation.session, token, continuation.effect, request, held, continuation.charge());
+    }
+
+    /** Whether a running channel may pulse now: the same authorization, before the pulse is paid. */
+    @Nullable
+    static Component pulseRefusal(GlyphContinuation continuation) {
+        return GlyphAuthorization.refusal(continuation.request.caster(), continuation.session, continuation.effect,
+            continuation.request, continuation.level());
     }
 
     /** Run an instant execution. {@code held} is a reservation already taken for it, if any. */
     private static boolean executeNow(ServerPlayer player, GlyphCastSession session, @Nullable GlyphCastSession.Token token,
-                                      ImportedIronEffect effect, GlyphRequest request, @Nullable GlyphPayments.Reservation held) {
+                                      ImportedIronEffect effect, GlyphRequest request, @Nullable GlyphPayments.Reservation held,
+                                      @Nullable GlyphCharge charge) {
         IronGlyphBridge bridge = IronGlyphBridges.get();
         GlyphPayments.Reservation[] holding = {held};
-        IronGlyphBridge.ExecutionResult result = bridge.execute(request, (cost, finalLevel) -> {
+        int[] settled = {-1};
+        IronGlyphBridge.PaymentGate gate = (cost, finalLevel) -> {
+            settled[0] = cost;
             GlyphPayments.Reservation own = holding[0];
             holding[0] = null;
             if (own != null) return settle(player, session, effect, cost, own);
             return pay(player, session, token, effect, cost);
-        });
+        };
+        IronGlyphBridge.ExecutionResult result = charge != null ? charge.complete(gate) : bridge.execute(request, gate);
         if (holding[0] != null) GlyphPayments.release(holding[0]); // never reached the payment boundary
+        // 3.4.1 review DOCS-01: the committed level is what Iron's cast event settled on, not the request.
+        int committed = result.finalLevel() > 0 ? result.finalLevel() : request.effectiveLevel();
+        com.otectus.arsnspells.casting.PaymentTimeline.record(player.getUUID(), -1, com.otectus.arsnspells.casting.PaymentTimeline.Kind.EMISSION,
+            "glyph:" + session.id, request.key() + " " + result.stage() + " final=" + result.finalLevel());
         if (result.applied()) {
+            // Crossed the effect boundary: counted and paid even when the native effect then threw.
             if (token != null) token.executions++;
-            session.emissions++;
+            session.consumeEmission();
             if (request.applyCooldown()) GlyphSessions.cooldownCommitted(session, request.key().ironSpellId());
-            session.lastOutcome = GlyphOutcome.EFFECT_APPLIED;
-            session.record("applied " + request.key() + " at level " + request.effectiveLevel());
-            GlyphSessions.recordOutcome(player, request.key(), request.effectiveLevel(), GlyphOutcome.EFFECT_APPLIED, hit(request.hit()));
-            GlyphSessions.trace(player, session, "effect_applied", "spell", request.key().ironSpellId(),
-                "level", request.effectiveLevel(), "hit", hit(request.hit()));
-            return true;
+            boolean failed = result.stage() == IronGlyphBridge.Stage.FAILED_AFTER_EFFECT;
+            GlyphOutcome outcome = failed ? GlyphOutcome.FAILED_AFTER_EFFECT : GlyphOutcome.EFFECT_APPLIED;
+            session.lastOutcome = outcome;
+            session.record((failed ? "failed after effect " : "applied ") + request.key() + " at level " + committed);
+            // 3.4.1 review DOCS-01: the record says what was paid at the effect boundary, not only that it ran.
+            // Iron's price as its cast event settled it; the mana mode decides which resources that debits.
+            String price = settled[0] < 0 ? "" : bridge.chargesMana(player) ? ", Iron's price " + settled[0] : ", free (creative)";
+            GlyphSessions.recordOutcome(player, request.key(), committed, outcome,
+                (failed && result.refusal() != null ? GlyphSessions.detail(result.refusal()) + " " + hit(request.hit()) : hit(request.hit())) + price);
+            GlyphSessions.trace(player, session, failed ? "failed_after_effect" : "effect_applied", "spell", request.key().ironSpellId(),
+                "level", committed, "hit", hit(request.hit()));
+            if (failed && result.refusal() != null) player.displayClientMessage(result.refusal().copy().withStyle(ChatFormatting.RED), true);
+            return !failed;
         }
+        session.releaseEmission();
         refuse(player, session, effect, result.refusal() == null
             ? Component.translatable("ars_n_spells.glyph.refused.native") : result.refusal());
         return false;

@@ -1,0 +1,30 @@
+{
+ "expect": {
+  "allows": {
+   "irons_spellbooks:firebolt@1": false
+  },
+  "errors_contain": [
+   "levels.1.duration_ticks"
+  ],
+  "failed_closed": [
+   "irons_spellbooks:firebolt"
+  ],
+  "valid": false
+ },
+ "files": [
+  {
+   "id": "test:long",
+   "json": {
+    "levels": {
+     "1": {
+      "duration_ticks": 72001
+     }
+    },
+    "schema_version": 2,
+    "spell": "irons_spellbooks:firebolt"
+   },
+   "pack": "p",
+   "rank": 1
+  }
+ ]
+}

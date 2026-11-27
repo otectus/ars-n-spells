@@ -12,12 +12,14 @@ import java.util.UUID;
  *
  * @param hit            where Ars resolved the effect (an entity hit or a block hit)
  * @param selfHit        whether that hit is the caster itself (Ars Self)
- * @param effectiveLevel the base level with Amplify/Dampen applied, already within native bounds
+ * @param effectiveLevel the base level with Amplify/Dampen applied (the Ars level), checked against Iron's live maximum
+ * @param nativeLevel    Iron's own level for it ({@code getLevelFor}: affinity and {@code ModifySpellLevelEvent}),
+ *                       evaluated once per occurrence; what Iron's events, conditions and cost start from
  * @param applyCooldown  whether this execution commits the spell's native cooldown (the first of
  *                       its occurrence; later fan-out executions share that admission)
  * @param speedSteps     Accelerate minus Decelerate on this effect
  */
 public record GlyphRequest(ServerPlayer caster, ImportedGlyphKey key, CatalogEntry entry, HitResult hit,
-                           boolean selfHit, int effectiveLevel, boolean applyCooldown, int speedSteps,
+                           boolean selfHit, int effectiveLevel, int nativeLevel, boolean applyCooldown, int speedSteps,
                            UUID sessionId, UUID invocationId) {
 }

@@ -1,0 +1,289 @@
+{
+ "_comment": "Exported by IronGlyphCatalogGameTests (-PglyphCatalogDump) with Wind's Spellbooks 1.0.1 and Iron's 1.21.1-3.16.3 loaded, trimmed to the wind_spellbooks namespace.",
+ "mod_id": "irons_spellbooks",
+ "mod_version": "1.21.1-3.16.3",
+ "spells": [
+  {
+   "allow_crafting": true,
+   "allow_looting": true,
+   "ans_proxy": false,
+   "cast_time": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "cast_type": "INSTANT",
+   "cooldown_ticks": 240,
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/aeropic.png",
+   "mana_cost": [
+    30,
+    35,
+    40,
+    45
+   ],
+   "max_level": 4,
+   "min_level": 1,
+   "name": "Aeropic",
+   "none": false,
+   "rarity": [
+    "UNCOMMON",
+    "RARE",
+    "EPIC",
+    "LEGENDARY"
+   ],
+   "recast_count_at_max": 3,
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:aeropic"
+  },
+  {
+   "allow_crafting": true,
+   "allow_looting": true,
+   "ans_proxy": false,
+   "cast_time": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "cast_type": "INSTANT",
+   "cooldown_ticks": 300,
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/almighty_push.png",
+   "mana_cost": [
+    40,
+    45,
+    50,
+    55,
+    60,
+    65,
+    70,
+    75,
+    80,
+    85
+   ],
+   "max_level": 10,
+   "min_level": 1,
+   "name": "Almighty Push",
+   "none": false,
+   "rarity": [
+    "UNCOMMON",
+    "UNCOMMON",
+    "UNCOMMON",
+    "RARE",
+    "RARE",
+    "RARE",
+    "EPIC",
+    "EPIC",
+    "LEGENDARY",
+    "LEGENDARY"
+   ],
+   "recast_count_at_max": 0,
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:almighty_push"
+  },
+  {
+   "allow_crafting": true,
+   "allow_looting": true,
+   "ans_proxy": false,
+   "cast_time": [
+    20,
+    20,
+    20,
+    20,
+    20
+   ],
+   "cast_type": "LONG",
+   "cooldown_ticks": 160,
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/iron_slash.png",
+   "mana_cost": [
+    30,
+    45,
+    60,
+    75,
+    90
+   ],
+   "max_level": 5,
+   "min_level": 1,
+   "name": "Iron Slash",
+   "none": false,
+   "rarity": [
+    "UNCOMMON",
+    "RARE",
+    "RARE",
+    "EPIC",
+    "LEGENDARY"
+   ],
+   "recast_count_at_max": 0,
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:iron_slash"
+  },
+  {
+   "allow_crafting": true,
+   "allow_looting": true,
+   "ans_proxy": false,
+   "cast_time": [
+    0,
+    0,
+    0
+   ],
+   "cast_type": "INSTANT",
+   "cooldown_ticks": 800,
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/tailwind.png",
+   "mana_cost": [
+    50,
+    75,
+    100
+   ],
+   "max_level": 3,
+   "min_level": 1,
+   "name": "Tailwind",
+   "none": false,
+   "rarity": [
+    "RARE",
+    "EPIC",
+    "LEGENDARY"
+   ],
+   "recast_count_at_max": 0,
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:tailwind"
+  },
+  {
+   "allow_crafting": true,
+   "allow_looting": true,
+   "ans_proxy": false,
+   "cast_time": [
+    60,
+    60,
+    60,
+    60,
+    60
+   ],
+   "cast_type": "LONG",
+   "cooldown_ticks": 2000,
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/tornado.png",
+   "mana_cost": [
+    200,
+    250,
+    300,
+    350,
+    400
+   ],
+   "max_level": 5,
+   "min_level": 1,
+   "name": "Tornado",
+   "none": false,
+   "rarity": [
+    "EPIC",
+    "EPIC",
+    "EPIC",
+    "LEGENDARY",
+    "LEGENDARY"
+   ],
+   "recast_count_at_max": 0,
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:tornado"
+  },
+  {
+   "allow_crafting": true,
+   "allow_looting": true,
+   "ans_proxy": false,
+   "cast_time": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "cast_type": "INSTANT",
+   "cooldown_ticks": 20,
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/wind_blade.png",
+   "mana_cost": [
+    15,
+    17,
+    19,
+    21,
+    23,
+    25,
+    27,
+    29,
+    31,
+    33
+   ],
+   "max_level": 10,
+   "min_level": 1,
+   "name": "Wind Blade",
+   "none": false,
+   "rarity": [
+    "COMMON",
+    "COMMON",
+    "COMMON",
+    "UNCOMMON",
+    "UNCOMMON",
+    "RARE",
+    "RARE",
+    "EPIC",
+    "EPIC",
+    "LEGENDARY"
+   ],
+   "recast_count_at_max": 0,
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:wind_blade"
+  },
+  {
+   "allow_crafting": true,
+   "allow_looting": true,
+   "ans_proxy": false,
+   "cast_time": [
+    0,
+    0,
+    0
+   ],
+   "cast_type": "INSTANT",
+   "cooldown_ticks": 100,
+   "enabled": true,
+   "icon": "wind_spellbooks:textures/gui/spell_icons/wind_jump.png",
+   "mana_cost": [
+    30,
+    30,
+    30
+   ],
+   "max_level": 3,
+   "min_level": 1,
+   "name": "Wind Jump",
+   "none": false,
+   "rarity": [
+    "UNCOMMON",
+    "RARE",
+    "LEGENDARY"
+   ],
+   "recast_count_at_max": 0,
+   "requires_learning": false,
+   "school": "wind_spellbooks:wind",
+   "spell": "wind_spellbooks:wind_jump"
+  }
+ ],
+ "wind_spellbooks": "1.0.1"
+}

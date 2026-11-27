@@ -57,7 +57,18 @@ public final class ImportedGlyphIdentityGameTests {
     @GameTest(template = "platform", batch = "ans_glyph_identity")
     public static void everyCatalogVariantIsARegisteredArsPartAndItem(GameTestHelper helper) {
         ImportedGlyphCatalog catalog = ImportedGlyphCatalog.get();
-        helper.assertTrue(catalog.variantCount() == 777, "the shipped catalog must register 777 variants, got " + catalog.variantCount());
+        // 3.4.1: 777 default levels plus reserved levels up to 10 for every spell. Counted from the shipped manifest
+        // alone (a run may add a pack's catalog, which may extend the shipped spells), and every one is registered.
+        ImportedGlyphCatalog shipped;
+        try (java.io.InputStream in = ImportedGlyphCatalog.class.getResourceAsStream("/ans_glyph_catalog/irons_spellbooks.json")) {
+            helper.assertTrue(in != null, "the shipped manifest is in the jar");
+            shipped = ImportedGlyphCatalog.assemble(java.util.List.of(new ImportedGlyphCatalog.Manifest("shipped",
+                new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8), true)), java.util.Set.of());
+        } catch (java.io.IOException unreadable) {
+            throw new IllegalStateException(unreadable);
+        }
+        helper.assertTrue(shipped.variantCount() == 1110, "the shipped catalog must register 1,110 variants, got " + shipped.variantCount());
+        helper.assertTrue(shipped.keys().stream().allMatch(catalog::contains), "every shipped identity is registered");
         helper.assertTrue(catalog.errors().isEmpty(), "the shipped catalog must load cleanly: " + catalog.errors());
         for (ImportedGlyphKey key : catalog.keys()) {
             AbstractSpellPart part = GlyphRegistry.getSpellPart(key.partId());

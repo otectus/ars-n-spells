@@ -2,6 +2,74 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.4.2] - Unreleased
+
+**Client and server both need 3.4.2.** The network protocol is now version 13. The server sends the live minimum spell level alongside the maximum and syncs the mana-bar display setting. 3.4.2 also contains every 3.4.1 change below, since 3.4.1 was never published. It ports the Forge remediation of the 2026-11-17 audit (findings ANS-001 to ANS-015) to NeoForge. ANS-001, ANS-003 and ANS-008 concern Covenant of the Seven and the Cursed and Virtue Rings, which have no 1.21.1 build, so they do not apply here. ANS-006 was already correct on NeoForge and now has a test.
+
+### Spellbook display
+
+- **Organized** is the default personal display for imported Iron's glyphs. The Ars spellbook's **Iron's glyphs** bookmark groups learned levels under the original spell. Search by spell or source, filter by school and book tier, and favorite a spell across worlds.
+- **Individual levels** restores available level entries to the ordinary palette. **Hidden** removes imported browsing and acquisition shortcuts for that player. Each mode preserves the exact glyphs in saved spells and all learned levels.
+- Open **Dormant** to inspect unavailable levels and their reasons. Newly learned levels and changes to the server's spell settings refresh the open editor. [Personal settings and configuration](docs/3.4.2/glyph-browser.md)
+
+### Fixed
+
+- **Automation could cast imported glyphs** (ANS-002). NeoForge fake players and Ars Nouveau's own fake player are now refused, both when the cast is admitted and at every later stage.
+- **HYBRID ignored Ars Mana Regen potions** (ANS-004). The potion's regeneration now reaches the paying pool once, as in ISS_PRIMARY. Max mana is still not added a second time.
+- **Multi-school glyphs could train one school and be discounted as another** (ANS-005). Discounts, progression, affinity and scaling now all use one primary school: the first school the glyph declares or a data pack lists. Before, the winner was the earliest school in ANS's own school order. Every school stays a member for multi-school damage.
+- **Remote clients kept a stale mana-bar setup after a config reload** (ANS-007). `hybrid_mana_bar` is now sent to clients on login, on every change and on every config file reload.
+- **The Spell Loom showed "Ready" after the server had refused** (ANS-009). A server refusal is now shown for Inscribe, Convert and Apply School until anything in the request changes. A temporary refusal keeps the button usable and asks again once, and a name the server would reject is flagged at once.
+- **The Spell Loom menu could build a different slot layout on the client** (ANS-012) when the block entity had not arrived yet. Both sides now always have the same slots, and the client plans from its own synchronized copy.
+- **Books whose ANS sidecar was entirely gone kept dead wheel entries** (ANS-010). Reconciliation now removes ANS proxy slots that no entry backs, even when the sidecar component is missing or empty. Native spells, other entries and future-schema items are left alone.
+- **Cross-system regeneration was mis-converted** (ANS-011, measured against both mods' schedulers). The conversion now follows Ars Nouveau 5's update interval and its once-per-tick handler, Iron's 10-tick cadence and its `manaRegenMultiplier`. With Iron's regeneration disabled it converts to nothing. On NeoForge this also changes the defaults: before, Iron's regeneration reached Ars at half its real rate, and Ars regeneration reached Iron's at double.
+- **Iron's empty placeholder spell could pass as a spell** (ANS-014). A stored Iron's spell id that Iron's no longer registers was already refused; Iron's own `none` id is now refused the same way, before any payment. The entry is kept, so reinstalling the addon restores it.
+
+### Changed
+
+- `glyph_press_source_capacity` accepts 1000-100000, as on Forge (was 500-100000). NeoForge corrects a saved value below 1000 when the config loads.
+- The Glyph Press engraving and completion sounds are now Forge's.
+
+### For developers
+
+- 21 new required GameTests (493 in total), with the same names as the Forge tests. Imported-glyph tests now cast with real `ServerPlayer`s (`TestPlayers`) instead of NeoForge fake players.
+- `AttemptLedger` is the shared Forge contract again: a negative attempt TTL is rejected instead of clamped.
+- `tools/generate_icons.py --check` compares decoded pixels, and CI installs the pinned `tools/requirements-icons.txt` (ANS-013). CI checks the real GameTest counts again.
+- `tools/verify_loader_parity.py` no longer lists the audit's GameTests as one-sided.
+- Evidence: [docs/3.4.2/testing.md](docs/3.4.2/testing.md). Config reference: [docs/3.4.2/config-reference.md](docs/3.4.2/config-reference.md).
+
+## [3.4.1] - Unreleased
+
+Client and server both need 3.4.1: the network protocol changed (version 11), because the server now also sends each spell's live maximum, school and learning rule, and settings changed from the in-game screen are applied and synced through the server.
+
+### Fixed
+
+- **Spell Uninscription works on bound books again** (#14). It refused with "spell-bearing item(s) in range" because the bound book itself was counted as a spell source. Native spells, the book's name and its capacity are kept; an unrelated item in range still refuses it, and nothing changes.
+- **Iron's server settings are respected by imported glyphs.**
+  - Amplify can no longer push a cast past Iron's maximum level for the spell. Such a cast is refused before anything is paid, instead of being quietly cast at a lower level.
+  - Amplify follows the server's maximum (at most two levels), so raising the maximum makes higher casts possible without a restart.
+  - A spell moved to another school in Iron's config counts as that school for allow and deny lists, progression, discounts and explanations.
+  - Learning requirements follow Iron's live rule in the Glyph Press as well as when casting.
+- **Equipment and events that change an Iron's spell's level apply to imported glyphs**, once per glyph (for example Curios affinity); before, they were ignored. The level Iron's cast event settles on is the level cast, and each pulse of a channelled spell uses its own event's level as well as its cost.
+- **Native recasts are free again.** Recasting an imported glyph whose Iron's spell grants recasts reserves nothing, as in Iron's; before, it was refused when you could not afford the original price.
+- **Glyph Press.**
+  - A conversion that needs no catalyst starts with an empty catalyst slot.
+  - A damaged saved job returns only a reservation it can prove, and the Source buffer is bounded on load. Damaged data can no longer create Source.
+
+### Added
+
+- **Every imported spell reserves levels up to 10.** Servers that raise Iron's maximum level get working glyphs without a new catalog: 1,110 glyph ids, up from 777. The extra levels stay dormant until the server allows them.
+- **Glyph ids are permanent.** ANS ships a ledger of every id it has published and refuses to start with a catalog that lost one. An `unsupported` spell now keeps its glyph ids too, and a spell that leaves its catalog stays as a dormant "retired" glyph. Each world remembers the glyph ids it has used and warns at startup if any go missing.
+- **Addon spells.** Catalogs are also read from `config/ars_n_spells/glyph_catalogs/`, besides `ans_glyph_catalog/*.json` in mod jars. A catalog may add spells and extend levels but never remove or reassign ids; a broken optional catalog is rejected whole with the reason, and a broken ANS catalog stops startup. `tools/generate_iron_glyph_catalog.py pack` builds an addon catalog, optionally as a catalog-only jar, from `/ans glyph inventory export`. Guide: `docs/3.4.1/catalog-packages.md`.
+- **One mapping schema on both loaders** (schema 2, 3.4.0 files still accepted): namespaced `ars_n_spells:policy` and `ars_n_spells:press_tiers` documents, a Self-only restriction (`"adapter": "ars_n_spells:self"`), and unknown fields reported with their file and field instead of ignored. A higher-priority pack overrides a lower one; two conflicting files at the same priority disable that spell until fixed. Reference: `docs/3.4.1/mapping-schema.md`.
+- **New operator commands.** `/ans glyph report`, `explain <spell> [level]`, `validate` (a dry run of the loaded mapping files) and `inventory export`. `/ans glyph inspect` shows the registered and live maximum. Offline: `tools/validate_glyph_mappings.py`.
+
+### For developers
+
+- New GameTests cover the zero catalyst, forged Press reservations, uninscription through the real brazier with a really bound book (and with a stray item in both drop orders), native level events, channel pulse levels, free recasts, live maximum and school changes and the registry order behind early identities: 419 required.
+- Shared fixtures in `src/test/resources/ans_shared_fixtures` (catalogs, mapping schema, effective levels, policies and Press terms) are run by both loaders' unit tests and by the offline validator. `tools/verify_loader_parity.py --section behaviour` checks that they and the shared tools are identical in both checkouts.
+- The ritual GameTests no longer drop items where they could fall out of range.
+- Evidence: `docs/3.4.1/testing.md`. Contracts: `docs/3.4.1/identity-and-levels.md`, `docs/3.4.1/casting-contract.md`.
+
 ## [3.4.0] - 2026-10-21
 
 Client and server both need 3.4.0: the network protocol changed (version 9). It includes every 3.3.7 change below.

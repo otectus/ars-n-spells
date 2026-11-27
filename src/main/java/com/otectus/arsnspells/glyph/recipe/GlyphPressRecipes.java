@@ -31,6 +31,17 @@ public final class GlyphPressRecipes {
     /** One conversion as a viewer shows it. */
     public record Entry(ImportedGlyphKey key, ItemStack scroll, List<ItemStack> catalysts, int gems, int source, int ticks,
                         int tier, ItemStack output, boolean requiresLearning) {
+        /**
+         * Every material input, as one string (3.4.1 review VIEW-01): the glyph, its terms, the catalyst
+         * tag's resolved members and the live learning rule. Two entries with the same key are the same
+         * recipe to a viewer; a change to any part (a tag reload that swaps a member, say) is a new one.
+         */
+        public String viewerKey() {
+            StringBuilder members = new StringBuilder();
+            for (ItemStack catalyst : catalysts)
+                members.append(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(catalyst.getItem())).append('x').append(catalyst.getCount()).append(',');
+            return key.partId() + "|" + tier + "|" + gems + "|" + source + "|" + ticks + "|" + requiresLearning + "|" + members;
+        }
     }
 
     /** Set by an optional recipe-viewer integration; run whenever the effective behaviour changes. */
@@ -73,14 +84,18 @@ public final class GlyphPressRecipes {
                 ItemStack scroll = IronGlyphBridges.get().scrollStack(key.ironSpellId(), key.baseLevel());
                 ImportedIronEffect effect = ImportedGlyphRegistration.effect(key);
                 if (scroll.isEmpty() || effect == null) continue;
+                // 3.4.1 review VIEW-01: the effective learning rule (it follows the spell's live school), not the catalog's.
+                GlyphBehaviorSnapshot.SpellFacts facts = snapshot.spell(entry.spellId());
+                boolean learning = facts != null ? facts.requiresLearning() : entry.requiresLearning();
                 out.add(new Entry(key, scroll, catalysts(behavior), behavior.pressGems(), behavior.pressSource(),
-                    behavior.pressTicks(), behavior.tier(), new ItemStack(effect.getGlyph()), entry.requiresLearning()));
+                    behavior.pressTicks(), behavior.tier(), new ItemStack(effect.getGlyph()), learning));
             }
         }
         return out;
     }
 
     private static List<ItemStack> catalysts(VariantBehavior behavior) {
+        if (behavior.pressGems() <= 0) return List.of();
         ResourceLocation id = ResourceLocation.tryParse(behavior.catalyst());
         if (id == null) return List.of();
         List<ItemStack> stacks = new ArrayList<>();

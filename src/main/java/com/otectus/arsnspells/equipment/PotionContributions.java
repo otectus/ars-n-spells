@@ -52,21 +52,31 @@ public final class PotionContributions {
             return;
         }
         ManaUnificationMode mode = BridgeManager.getCurrentMode();
-        boolean redirecting = BridgeManager.isUnificationEnabled()
-            && mode != null && mode.isIssPrimary();
-        // V14: the removal is not gated on the redirect. Switching away from ISS_PRIMARY
-        // must take the last potion modifier off, whatever turned the redirect off.
-        if (!redirecting) {
-            clearPotionModifiers(player);
-            return;
-        }
-        redirectManaRegenPotions(player);
-        redirectMaxManaPotions(player);
+        // Audit ANS-004: regeneration and capacity are reconciled separately. Regeneration follows
+        // pool ownership: in ISS_PRIMARY and HYBRID Iron's owns the shared pool and Ars's own regen
+        // tick is suppressed, so an Ars regen potion has to reach Iron's regen or it does nothing.
+        // HYBRID used to drop it. Capacity only in ISS_PRIMARY: HYBRID's ceiling is Ars's real
+        // maximum, which already includes the potion's contribution.
+        boolean transferRegen = BridgeManager.ironsOwnsSharedPool();
+        boolean transferCapacity = BridgeManager.isUnificationEnabled() && mode != null && mode.isIssPrimary();
+        // V14: removal is not gated on a redirect. Switching away from a mode that applied a
+        // modifier must take it off, whatever turned the redirect off.
+        if (transferRegen) redirectManaRegenPotions(player);
+        else clearRegenModifier(player);
+        if (transferCapacity) redirectMaxManaPotions(player);
+        else clearMaxModifier(player);
     }
 
-    private static void clearPotionModifiers(Player player) {
+    private static void clearRegenModifier(Player player) {
         try {
             remove(player.getAttribute(AttributeRegistry.MANA_REGEN), POTION_MANA_REGEN_ID);
+        } catch (Exception e) {
+            // Iron's attributes unresolvable: nothing of ours can be on them.
+        }
+    }
+
+    private static void clearMaxModifier(Player player) {
+        try {
             remove(player.getAttribute(AttributeRegistry.MAX_MANA), POTION_MAX_MANA_ID);
         } catch (Exception e) {
             // Iron's attributes unresolvable: nothing of ours can be on them.
@@ -79,10 +89,10 @@ public final class PotionContributions {
             if (regenAttr == null) return;
             double arsRegenBonus = arsRegenBonus(player);
             if (arsRegenBonus > 0) {
-                // Absolute mana/sec on the Ars side; Iron's MANA_REGEN is a percentage of the
-                // pool, so ManaRegenBridge converts units. The pool conversion rate goes on top.
-                double absRegenPerSec = arsRegenBonus * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
-                apply(regenAttr, POTION_MANA_REGEN_ID, ManaRegenBridge.convertArsToIrons(absRegenPerSec, player));
+                // Ars's nominal regen units; Iron's MANA_REGEN is a percentage of the pool, so
+                // ManaRegenBridge converts units at both mods' live schedules. The pool rate goes on top.
+                double arsNominal = arsRegenBonus * AnsConfig.CONVERSION_RATE_ARS_TO_IRON.get();
+                apply(regenAttr, POTION_MANA_REGEN_ID, ManaRegenBridge.convertArsToIrons(arsNominal, player));
             } else {
                 remove(regenAttr, POTION_MANA_REGEN_ID);
             }

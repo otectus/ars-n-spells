@@ -9,6 +9,7 @@ import com.otectus.arsnspells.compat.irons_spells.SchoolIndex;
 import com.otectus.arsnspells.combat.ArsDamageBridge;
 import com.otectus.arsnspells.combat.IronsDamageBridge;
 import com.otectus.arsnspells.config.AnsConfig;
+import com.otectus.arsnspells.config.AnsClientConfig;
 import com.otectus.arsnspells.data.AttachmentTypes;
 import com.otectus.arsnspells.events.AffinityDecayHandler;
 import com.otectus.arsnspells.events.AffinityHandler;
@@ -63,6 +64,8 @@ public class ArsNSpells {
         // present. Both must be registered before ITEMS.register(modBus) so
         // the DeferredRegister carries the entries when the item RegisterEvent
         // fires.
+        // 3.4.1: record registry fill order (GameTest evidence for the early identity catalog).
+        modBus.addListener(net.neoforged.bus.api.EventPriority.LOWEST, com.otectus.arsnspells.glyph.RegistrationOrderProbe::onRegister);
         ModItemsRegistry.registerCommonItems();
         // 3.4.0: imported Iron's glyphs. Registered with Ars before any registry event, with or
         // without Iron's installed: their ids never depend on the optional mod (dormant without it).
@@ -107,6 +110,7 @@ public class ArsNSpells {
         // The live file moves to <world>/serverconfig/ars_n_spells-server.toml; the old
         // global config/ars_n_spells-common.toml is ignored (re-apply settings once).
         container.registerConfig(ModConfig.Type.SERVER, AnsConfig.SPEC, "ars_n_spells-server.toml");
+        container.registerConfig(ModConfig.Type.CLIENT, AnsClientConfig.SPEC, "ars_n_spells-client.toml");
 
         // ---- Game-bus instance handlers (NeoForge.EVENT_BUS) ----
         // NeoForge 1.21.1 rejects EVENT_BUS.register(x) when x has zero
@@ -191,7 +195,11 @@ public class ArsNSpells {
     }
 
     private void onConfigLoading(final ModConfigEvent.Loading event) {
-        if (!event.getConfig().getModId().equals(MODID)) {
+        if (isClientConfig(event.getConfig())) {
+            AnsClientConfig.onConfigAccepted();
+            return;
+        }
+        if (!isServerConfig(event.getConfig())) {
             return;
         }
         AnsConfig.onConfigLoaded(event.getConfig().getFullPath());
@@ -207,7 +215,11 @@ public class ArsNSpells {
     }
 
     private void onConfigReloading(final ModConfigEvent.Reloading event) {
-        if (!event.getConfig().getModId().equals(MODID)) {
+        if (isClientConfig(event.getConfig())) {
+            AnsClientConfig.onConfigAccepted();
+            return;
+        }
+        if (!isServerConfig(event.getConfig())) {
             return;
         }
         // Pick up runtime config edits (e.g. mana_unification_mode changed on disk or via
@@ -216,6 +228,16 @@ public class ArsNSpells {
         syncClientDiagnostics();
         // 3.4.0: imported-glyph availability follows enable_iron_glyphs etc. at once.
         com.otectus.arsnspells.glyph.behavior.GlyphBehavior.onConfigChanged();
+        // 3.4.1 review CONFIG-01: connected clients follow a file edit too (configs sync only at login).
+        com.otectus.arsnspells.config.AnsSettingsService.onFileReloaded();
+    }
+
+    private static boolean isServerConfig(ModConfig config) {
+        return config.getType() == ModConfig.Type.SERVER && config.getSpec() == AnsConfig.SPEC;
+    }
+
+    private static boolean isClientConfig(ModConfig config) {
+        return config.getType() == ModConfig.Type.CLIENT && config.getSpec() == AnsClientConfig.SPEC;
     }
 
     /**

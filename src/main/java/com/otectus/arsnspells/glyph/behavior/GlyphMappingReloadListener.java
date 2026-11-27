@@ -22,10 +22,17 @@ import java.util.Map;
  * the result is handed to {@link GlyphBehavior#acceptMappings} on the server thread, and the next
  * data pack sync publishes it.
  */
-final class GlyphMappingReloadListener extends SimplePreparableReloadListener<GlyphMappings.Result> {
+public final class GlyphMappingReloadListener extends SimplePreparableReloadListener<GlyphMappings.Result> {
 
     @Override
     protected GlyphMappings.Result prepare(ResourceManager manager, ProfilerFiller profiler) {
+        return read(manager);
+    }
+
+    /** Read and parse every mapping file of {@code manager}; also the dry-run validation command's source. */
+    public static GlyphMappings.Result read(ResourceManager manager) {
+        java.util.Map<String, Integer> ranks = new java.util.HashMap<>();
+        manager.listPacks().forEach(pack -> ranks.putIfAbsent(pack.packId(), ranks.size()));
         List<GlyphMappings.Source> sources = new ArrayList<>();
         List<String> unreadable = new ArrayList<>();
         Map<ResourceLocation, List<Resource>> stacks = manager.listResourceStacks(GlyphMappings.DIRECTORY,
@@ -39,7 +46,7 @@ final class GlyphMappingReloadListener extends SimplePreparableReloadListener<Gl
                 path.substring(GlyphMappings.DIRECTORY.length() + 1, path.length() - ".json".length()));
             try (Reader reader = top.openAsReader()) {
                 JsonElement json = JsonParser.parseReader(reader);
-                sources.add(new GlyphMappings.Source(file, top.sourcePackId(), json));
+                sources.add(new GlyphMappings.Source(file, top.sourcePackId(), ranks.getOrDefault(top.sourcePackId(), -1), json));
             } catch (Exception e) {
                 unreadable.add(file + " (pack " + top.sourcePackId() + "): unreadable JSON (" + e.getMessage() + ")");
             }
@@ -48,7 +55,8 @@ final class GlyphMappingReloadListener extends SimplePreparableReloadListener<Gl
         if (unreadable.isEmpty()) return parsed;
         List<String> errors = new ArrayList<>(parsed.errors());
         errors.addAll(unreadable);
-        return new GlyphMappings.Result(parsed.mappings(), parsed.policy(), List.copyOf(errors), parsed.failedClosed(), parsed.winners());
+        return new GlyphMappings.Result(parsed.mappings(), parsed.policy(), List.copyOf(errors), parsed.failedClosed(), parsed.winners(),
+            parsed.tiers());
     }
 
     @Override

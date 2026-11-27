@@ -19,14 +19,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ConfigScreenFactoryGateTest {
 
     @Test
-    void source_gatesOnHasSingleplayerServer() throws IOException {
+    void source_editsADraftTheServerAuthorizes() throws IOException {
+        // 3.4.1 review CONFIG-01: the screen never writes the client's copy of the SERVER config; it
+        // sends a draft the server authorizes, and enables its controls from the server's answer.
         String src = Files.readString(TestPaths.of(
             "src/main/java/com/otectus/arsnspells/client/screen/ConfigScreenFactory.java"));
-        assertTrue(src.contains("hasSingleplayerServer()"),
-            "ConfigScreenFactory must check minecraft.hasSingleplayerServer() "
-                + "(ANS-HIGH-016 part 2)");
-        assertTrue(src.contains("canMutate"),
-            "the gating must produce a canMutate flag (or equivalent) used to disable the "
-                + "reset/save buttons");
+        assertTrue(src.contains("settings.canEdit()"), "the mutation gate must be the server's canEdit answer");
+        assertTrue(src.contains("new SettingsApplyPayload("), "Apply must send the draft to the server");
+        assertTrue(!src.contains("AnsConfig.") || !src.contains(".set("), "the screen must not write AnsConfig values directly");
     }
 }
