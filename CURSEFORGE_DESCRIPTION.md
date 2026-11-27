@@ -4,7 +4,21 @@
 
 Works with **Minecraft 1.21.1** on **NeoForge**.
 
-> **Version note (3.2.4, NeoForge 1.21.1).** This build is at feature parity with the Forge 1.20.1 **3.2.3** and **3.2.4** lines. Mana unification, cross-cast invocation, Ars spells in Iron's native spell wheel, the Spell Loom, rituals, cooldowns, progression, resonance and equipment scaling are all live. The **Covenant of the Seven** (Sanctified Legacy) integration — Ring of Seven Curses, Ring of Seven Virtues, Blasphemy curios, LP and aura systems — remains **removed**, because Covenant of the Seven has no NeoForge 1.21.1 build. Compile targets: Ars Nouveau 5.13.1.1400, Iron's Spells 1.21.1-3.16.3, NeoForge 21.1.248.
+> **Version note (3.4.3, NeoForge 1.21.1).** This build follows the Forge 1.20.1 **3.4.3** release. Mana unification, cross-cast invocation, Ars spells in Iron's native spell wheel, the Spell Loom, rituals, cooldowns, progression, resonance and equipment scaling are all live. The **Covenant of the Seven** (Sanctified Legacy) integration — Ring of Seven Curses, Ring of Seven Virtues, Blasphemy curios, LP and aura systems — remains **removed**, because Covenant of the Seven has no NeoForge 1.21.1 build. Compile targets: Ars Nouveau 5.13.1.1400, Iron's Spells 1.21.1-3.16.3, NeoForge 21.1.248.
+
+---
+
+## What's new in 3.4.3
+
+3.4.3 also ships 3.4.1 and 3.4.2, which were never published. Client and server both need 3.4.3.
+
+**Missed projectiles no longer lock the spell.** A Projectile spell with an imported Iron's glyph that hit nothing kept that Iron's spell blocked, and used up one of your active casts, until Ars removed the projectile, a minute by default. You can now cast it again at once. Iron's cooldown is checked where the glyph lands, so two projectiles give one effect and one payment, and the same glyph twice in one spell now runs twice.
+
+**An Iron's glyphs bookmark in the Ars spellbook.** By default it groups the levels you know under their original spell, with search, school and book-tier filters and favorites. Choose **Individual levels** or **Hidden** under Mods → Ars 'n' Spells → Config → Personal display.
+
+**Iron's server settings apply to imported glyphs.** Amplify can no longer take a cast past the server's maximum level, a spell moved to another school counts as that school, and Iron's learning rules and equipment level bonuses apply. Every spell reserves glyphs up to level 10, and Iron's addon spells can get glyphs through catalog packages; Wind's Spellbooks has one.
+
+**Fixes.** Spell Uninscription works on bound books again, native recasts are free again, and fake players can no longer cast imported glyphs. HYBRID honours Ars Mana Regen potions, and cross-system regeneration delivers the same mana per second in both directions.
 
 ---
 

@@ -106,10 +106,74 @@ test exercises.
   `run-343-simulated-s1` ("first bind: one Ars entry"). It passed in the ten other Forge runs with
   Iron's, before the fix and after it.
 
+## 2026-11-27: committed, CI and the release JARs
+
+The work was committed and pushed on 2026-11-27: Forge `96fefac` (the uncommitted 3.4.2 work) and
+`2f6b7d1` (3.4.3) on `main`, NeoForge `c9d08e5` (the uncommitted 3.4.1 and 3.4.2 work) and `90f1b2d`
+(3.4.3) on `port/neoforge-1.21.1`. Each backlog commit was compiled on its own before it was
+committed.
+
+GitHub Actions passed every job on both pushes (Forge run 45945096508, NeoForge run 45945100501), and
+the log verifier accepted the pinned counts. These are the first green runs on `main` since 3.2.2
+(2026-09-01) and the first on `port/neoforge-1.21.1`. On `main`, the 3.2.4 and 3.3.0 runs failed in
+their GameTest job. Every Forge run from 3.3.3 to 3.4.1 and every NeoForge run from 3.3.3 to 3.4.0
+failed before the GameTests, at the step "Verify tooling and icon assets". At first the runner had no
+Pillow. At 3.4.1, with Pillow installed, the regenerated icon files did not match the published ones
+byte for byte. 3.4.2 (ANS-013) pins the icon toolchain and compares decoded pixels. The first NeoForge
+run (3.3.0) failed to compile.
+
+| CI job | Required passed | Executed | Not exercised |
+|---|---:|---:|---:|
+| Forge, Iron's absent | 379 | 1 | 315 |
+| Forge, Iron's 3.15.0 and Ars Elemental | 379 | 275 | 41 |
+| Forge saved-world removal, its loaded preparation (informational) | 379 | 275 | 41 |
+| NeoForge, Iron's absent | 500 | 1 | 427 |
+| NeoForge, Iron's 3.16.3, Ars Elemental, Ars Zero and Ars Elemancy | 500 | 408 | 20 |
+
+The release JARs were built from those commits with `gradlew-quiet.sh <checkout> build --offline`:
+PASS, 1,108 unit tests on Forge and 1,092 on NeoForge, 0 failures, 0 errors. The release commit after
+them changes only documents and `update.json`, which no JAR contains.
+
+| Artifact | SHA-256 |
+|---|---|
+| Forge `build/libs/ars_n_spells-3.4.3.jar` | `dfa035dde967bfbe6ec292bbd483a55e12fa27a58e99b21a2893e21cfeed0bd0` |
+| Forge `build/libs/ars_n_spells-3.4.3-slim.jar` | `3573cca3a553a150aa2dac6cd83eb2d586423b81dbad78e5319e3ab62b0e816f` |
+| Forge `build/catalog-packages/ans_catalog_wind_spellbooks-1.0.0.jar` | `3e5fba0629df8627a54bd8d21a2abcdd788f0b8c8fbc3ab6c59ad70f8e99cb4d` |
+| Forge `build/catalog-packages/ans_catalog_irons_envelope_15-1.0.0.jar` | `39e25ca0c02fe5991f76d1f7053fdbe4eda0f397c3308a3768c025f9a7cff236` |
+| NeoForge `build/libs/ars_n_spells-3.4.3.jar` | `872c33575f3be24846c5a8f731f0bb79bcbdd39be4a43dce93e32953bb1192c4` |
+| NeoForge `build/libs/ars_n_spells-3.4.3-sources.jar` | `132b94713e0efff80aae89fc8a07fe2825ee1cb6d08004804c610df9e6457e71` |
+| NeoForge `build/catalog-packages/ans_catalog_wind_spellbooks-1.0.0.jar` | `f09994357f7f2571c884f5a7a99a47b0308c74307c2dc8cd769062d8f305e6d9` |
+| NeoForge `build/catalog-packages/ans_catalog_irons_envelope_15-1.0.0.jar` | `2f5921148b7070f64b2add892b1d818ba00ba184c8504cf1ea042df9f6ae947e` |
+
+### The release JARs on production servers
+
+Each JAR was booted on the production dedicated servers of the 3.4.1 review (Forge 47.4.10, NeoForge
+21.1.248). Every boot had a fresh world, a fresh `config/ars_n_spells` and a `mods/` holding exactly
+the profile's jars. The harness is a copy of `logs/3.4.1/review-1109/tools/boot_server.sh` that reads
+the version from `gradle.properties` (`logs/3.4.3/boot/boot_server.sh`, evidence in
+`logs/3.4.3/boot/evidence/`, git-ignored). Every boot reached Done, answered `ans glyph report` and
+stopped with exit 0. The ANS JAR in each `mods/` had the release SHA-256 above, and no crash report
+was written.
+
+| Profile | Mods | Catalog | Native spells accounted for | ERROR lines |
+|---|---:|---|---|---|
+| Forge, Iron's absent | 4 | 111 spells, 1,110 glyphs | 111: supported 111 | none |
+| Forge, Iron's 3.15.0 | 6 | 111 spells, 1,110 glyphs | 119: supported 111, excluded 8 | 3, Iron's own data: the `expulsion_ring` recipe and two loot tables |
+| Forge, Iron's 3.16.3 | 7 | 111 spells, 1,110 glyphs | 119: supported 111, excluded 8 | 2, Iron's own loot tables |
+| Forge, Iron's 3.16.3 and Wind's Spellbooks with its catalog package | 9 | 118 spells, 1,180 glyphs | 126: supported 116, unsupported 2, excluded 8 | 2, Iron's own loot tables |
+| Forge, Iron's 3.16.3 and the levels XI-XV package | 8 | 111 spells, 1,665 glyphs | 119: supported 111, excluded 8 | 2, Iron's own loot tables |
+| NeoForge, Iron's absent | 4 | 111 spells, 1,110 glyphs | 111: supported 111 | none |
+| NeoForge, Iron's 3.16.3 | 7 | 111 spells, 1,110 glyphs | 119: supported 111, excluded 8 | none |
+| NeoForge, Iron's 3.16.3 and Wind's Spellbooks with its catalog package | 9 | 118 spells, 1,180 glyphs | 126: supported 116, unsupported 2, excluded 8 | none |
+| NeoForge, Iron's 3.16.3 and the levels XI-XV package | 8 | 111 spells, 1,665 glyphs | 119: supported 111, excluded 8 | none |
+
+The two unsupported Wind's Spellbooks spells are Tornado and Iron Slash, which stay dormant with
+their reason. The Forge ERROR lines are the same Iron's data errors as in the earlier boots of these
+profiles: on 3.15.0 those of 2026-11-10, on 3.16.3 those of 2026-11-18.
+
 ## What this evidence does not cover
 
 - No game client was launched. The reproduction and the fix were exercised on the server through
   GameTests. The brief's own check is still to do: in a real survival client, cast Projectile and an
   imported glyph at the sky twice, and cast it twice at one target.
-- The packaged 3.4.3 JARs were built but not booted on a production server.
-- Nothing was committed, published, uploaded, merged or released.
+- Nothing was uploaded to CurseForge or Modrinth, and no GitHub Release was made.
