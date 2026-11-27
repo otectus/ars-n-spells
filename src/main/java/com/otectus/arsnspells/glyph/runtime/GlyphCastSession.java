@@ -28,6 +28,11 @@ import java.util.UUID;
  * occurrence's first execution. Further executions of the same occurrence (split, pierce, area
  * fan-out) pay for themselves and count against the emission budget. Nothing here holds a world
  * or a player: entities are looked up by id when needed.
+ *
+ * <p><b>Repeated casts (3.4.3).</b> A prepaid reservation no longer keeps a later cast of the same
+ * Iron's spell out: admitting that cast hands it back ({@link GlyphSessions}), and the occurrence's
+ * delivery, if it still arrives, pays fresh at its effect boundary. Iron's cooldown is checked at
+ * each execution instead, except for a spell in {@link #started}.
  */
 public final class GlyphCastSession {
 
@@ -37,7 +42,6 @@ public final class GlyphCastSession {
         final ImportedGlyphKey key;
         @Nullable GlyphPayments.Reservation reservation;
         int executions;
-        boolean cooldownCommitted;
         /** The Ars level (Amplify/Dampen applied) admission saw, and Iron's level for it, evaluated once. */
         int effectiveLevel;
         int nativeLevel;
@@ -65,9 +69,17 @@ public final class GlyphCastSession {
     final CostRules rules;
     final int behaviorGeneration;
     final long createdTick;
+    /** The lifetime bound this session was admitted with ({@link GlyphSessions#lifetimeTicks()}). */
+    final long lifetimeTicks;
     long expiresTick;
     final Map<Integer, Token> tokens = new LinkedHashMap<>();
-    final Set<ResourceLocation> cooldownPending = new LinkedHashSet<>();
+    /**
+     * 3.4.3: the Iron's spells this cast has begun executing (an effect applied, or a charge or channel
+     * started). A cooldown on one of them is this cast's own, so its later executions (a split, pierce,
+     * area fan-out, or the same glyph again in the recipe) still run; any other cooldown refuses an
+     * execution before its effect. Per spell id, not per occurrence: one cooldown covers every level.
+     */
+    final Set<ResourceLocation> started = new LinkedHashSet<>();
     final Deque<String> log = new ArrayDeque<>();
     int emissions;
     /**
@@ -94,6 +106,7 @@ public final class GlyphCastSession {
         this.rules = rules;
         this.behaviorGeneration = behaviorGeneration;
         this.createdTick = createdTick;
+        this.lifetimeTicks = lifetimeTicks;
         this.expiresTick = createdTick + lifetimeTicks;
     }
 
@@ -118,6 +131,21 @@ public final class GlyphCastSession {
 
     public int emissions() {
         return emissions;
+    }
+
+    public long lifetimeTicks() {
+        return lifetimeTicks;
+    }
+
+    /** Whether this cast has begun executing {@code spell}, so a cooldown on it is this cast's own (3.4.3). */
+    public boolean started(ResourceLocation spell) {
+        return started.contains(spell);
+    }
+
+    /** Whether any occurrence still holds its prepaid reservation (3.4.3: what the session limit counts). */
+    boolean holding() {
+        for (Token token : tokens.values()) if (token.prepaid()) return true;
+        return false;
     }
 
     public int pending() {

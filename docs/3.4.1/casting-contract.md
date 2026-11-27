@@ -23,11 +23,19 @@ imported glyph in the spell, in recipe order, admission checks the following:
   follows the spell's school). On NeoForge, learning is checked with Iron's other native conditions
   before each execution;
 - the spell is off its Iron's cooldown, or the player holds a native recast of it;
-- the spell is not already pending in another of the player's casts;
+- the spell is not charging or channelling for another of the player's casts (on Forge in Iron's
+  one cast slot, on NeoForge on its detached slot). Since 3.4.3 nothing else from an earlier cast
+  blocks a new one: an earlier cast of the same spell that is still travelling or delayed (a
+  projectile that missed flies on until Ars removes it, a minute by default) no longer refuses it.
+  What that earlier cast still holds for the spell is released when the new cast is admitted, and
+  its delivery stays live (see [Money](#money))
+  (`ironsLoaded_projectileMiss_theSpellCanBeCastAgainAtOnce` and
+  `ironsLoaded_chargingChild_stillRefusesItsSpell`, both builds);
 - the **augmented level** is within Iron's live maximum. It is refused (`above_max`), never clamped;
 - a data pack's Self-only restriction (`adapter: ars_n_spells:self`) allows the form. On NeoForge,
   the spell editor's validation refuses the combination, and so does the target check at the hit;
-- the configured limits: imported glyphs per spell and active sessions per player.
+- the configured limits: imported glyphs per spell and active sessions per player. A session is
+  active while it still holds a reservation or runs a charge or channel.
 
 The cast is admitted with every occurrence funded, or refused with none of them funded. A refusal
 tells the caster why and costs nothing.
@@ -75,6 +83,23 @@ without a restart.
    3.4.0 reserved the original price and so refused casters who could not afford a cast that costs
    nothing; fixed in 3.4.1 (`ironsLoaded_recast_isAdmittedWithoutItsOriginalPrice`).
 5. Unspent reservations are released when the session closes.
+6. **A newer cast takes over the hold (3.4.3).** When a cast is admitted, what the player's earlier
+   casts still hold for the same Iron's spell is released first, before the session limit is
+   counted and before the new reservations are taken. An earlier delivery that still arrives pays at
+   its effect boundary like any later execution, or is refused for a shortage. If the new cast is then
+   refused, the earlier holds stay released and those deliveries pay on arrival.
+7. **The cooldown is checked again at the effect boundary (3.4.3).** Immediately before each
+   execution's effect, the spell must be off Iron's cooldown. Three exemptions apply. A cooldown that
+   this same cast started does not count, so a split, pierce, linger or wall, or the same glyph twice in
+   the recipe, still runs. A native recast exempts the execution, and so does Iron's creative
+   no-cooldown rule, exactly as at admission. Otherwise the execution is refused (`cooldown`) before any
+   effect and gives back what it holds. Two projectiles of one spell therefore give one effect and one
+   payment. This also covers deliveries that hold no reservation (a free quote, and on Forge an aura
+   route or the LP death option), and a native cast of the spell started while the delivery travelled.
+   A charged release or a channel pulse is not checked again: it belongs to a cast that already passed
+   (`ironsLoaded_twoFlightsOfOneSpell_onlyTheFirstLandingRuns`,
+   `ironsLoaded_cooldownStartedInFlight_refusesTheLanding` and
+   `ironsLoaded_sameGlyphTwiceInOneCast_bothRun`, both builds).
 
 Channelled spells pay per pulse on both builds; see [Loader differences](#loader-differences-kept-as-versioned-exceptions).
 
@@ -100,7 +125,7 @@ waiting.
 | Event | Effect on the session |
 |---|---|
 | everything resolved | closes at once: instant casts return to baseline immediately (Forge GameTest `ironsLoaded_sessions_instantCastsReturnToBaselineAtOnce`) |
-| timeout | an expired session closes and releases its hold; Forge checks expiry every 20 ticks (NeoForge GameTest `ironsLoaded_expiredSession_closesAndReturnsItsHold`) |
+| timeout | an expired session closes and releases its hold; both builds check expiry every 20 ticks (NeoForge GameTest `ironsLoaded_expiredSession_closesAndReturnsItsHold`). Since 3.4.3 a session lives as long as Ars's projectile lifespan (`max_lifespan`, a server setting, 60 seconds by default) plus 15 seconds, at least 60 seconds on Forge and 90 seconds on NeoForge and at most 10 minutes, so a projectile that lands late still finds its cast (`ironsLoaded_longProjectileLifespan_aLateLandingStillRuns`). A delivery that arrives after its session expired is refused with `expired` (`ironsLoaded_lateDelivery_afterItsSessionExpired_saysSo`) |
 | dimension change, death, logout | every session of that player closes |
 | server stop | every session closes |
 | `enable_iron_glyphs` turned off on a config reload (Forge) | every session closes |

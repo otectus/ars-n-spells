@@ -263,6 +263,28 @@ final class IronsProxyCastDriver {
             && MagicData.getPlayerMagicData(player).getPlayerCooldowns().isOnCooldown(SpellRegistry.getSpell(spellId));
     }
 
+    /** Put {@code spellId} on the player's Iron's cooldown exactly as a native spellbook cast of it does. */
+    static void startCooldown(ServerPlayer player, String spellId) {
+        io.redspace.ironsspellbooks.api.magic.MagicHelper.MAGIC_MANAGER.addCooldown(player, SpellRegistry.getSpell(spellId), CastSource.SPELLBOOK);
+    }
+
+    /**
+     * Record the spell id of every Iron's {@code SpellOnCastEvent} {@code player} posts into {@code sink}, until
+     * {@link #stopWatching}: the observable that Iron's cast a spell at all, whenever a delivery lands.
+     */
+    static Object watchCasts(ServerPlayer player, java.util.List<String> sink) {
+        java.util.function.Consumer<io.redspace.ironsspellbooks.api.events.SpellOnCastEvent> listener = event -> {
+            if (event.getEntity() == player) sink.add(event.getSpellId());
+        };
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOWEST, false,
+            io.redspace.ironsspellbooks.api.events.SpellOnCastEvent.class, listener);
+        return listener;
+    }
+
+    static void stopWatching(Object listener) {
+        NeoForge.EVENT_BUS.unregister(listener);
+    }
+
     /** The native Iron's pool, read through the ANS adapter. */
     private static final java.util.Map<java.util.UUID, net.minecraft.world.phys.Vec3> TELEPORTS = new java.util.concurrent.ConcurrentHashMap<>();
     private static volatile boolean teleportsRecorded;

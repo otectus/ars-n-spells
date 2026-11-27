@@ -614,7 +614,7 @@ Default: `true`. Declaration arguments after default: `none`.
 
 Allow imported Iron's glyphs to be learned and to resolve in Ars spells. Off: learned glyphs stay known but are dormant, spells containing them are refused with an explanation, and no imported effect runs. Server-owned; live reload.
 
-Runtime readers: `src/main/java/com/otectus/arsnspells/gametest/CastReviewGameTests.java`, `src/main/java/com/otectus/arsnspells/gametest/GlyphPressGameTests.java`, `src/main/java/com/otectus/arsnspells/glyph/behavior/GlyphBehavior.java`.
+Runtime readers: `src/main/java/com/otectus/arsnspells/client/glyph/GlyphBrowserSmoke.java`, `src/main/java/com/otectus/arsnspells/gametest/CastReviewGameTests.java`, `src/main/java/com/otectus/arsnspells/gametest/GlyphPressGameTests.java`, `src/main/java/com/otectus/arsnspells/glyph/behavior/GlyphBehavior.java`.
 
 Direct test references: `src/main/java/com/otectus/arsnspells/gametest/CastReviewGameTests.java`, `src/main/java/com/otectus/arsnspells/gametest/GlyphPressGameTests.java`.
 
@@ -642,7 +642,7 @@ Direct test references: none found; behavior may be covered indirectly, not cert
 
 Default: `4`. Declaration arguments after default: `1 ; MAX_IMPORTED_EFFECTS_CEILING`.
 
-Most imported Iron's effects one Ars spell may contain. Tested ceiling  .
+Most imported Iron's effects one Ars spell may contain. Tested ceiling 8.
 
 Runtime readers: `src/main/java/com/otectus/arsnspells/gametest/ImportedGlyphPaymentGameTests.java`, `src/main/java/com/otectus/arsnspells/glyph/behavior/GlyphBehavior.java`.
 
@@ -652,7 +652,7 @@ Direct test references: `src/main/java/com/otectus/arsnspells/gametest/ImportedG
 
 Default: `16`. Declaration arguments after default: `1 ; MAX_FOREIGN_EMISSIONS_CEILING`.
 
-Most imported-effect executions one root cast may make, counting every split, pierce, area and repeated delivery. Each execution is paid separately. Tested ceiling  .
+Most imported-effect executions one root cast may make, counting every split, pierce, area and repeated delivery. Each execution is paid separately. Tested ceiling 64.
 
 Runtime readers: `src/main/java/com/otectus/arsnspells/gametest/CastReviewGameTests.java`, `src/main/java/com/otectus/arsnspells/gametest/ImportedGlyphPaymentGameTests.java`, `src/main/java/com/otectus/arsnspells/glyph/behavior/GlyphBehavior.java`.
 
@@ -662,7 +662,7 @@ Direct test references: `src/main/java/com/otectus/arsnspells/gametest/CastRevie
 
 Default: `8`. Declaration arguments after default: `1 ; MAX_GLYPH_SESSIONS_CEILING`.
 
-Most casts containing imported effects one player may have in flight at once (projectiles, delays, charges and channels still to resolve). Tested ceiling  .
+Most casts containing imported effects one player may have in flight at once (projectiles, delays, charges and channels still to resolve). Tested ceiling 32.
 
 Runtime readers: `src/main/java/com/otectus/arsnspells/gametest/ImportedGlyphPaymentGameTests.java`, `src/main/java/com/otectus/arsnspells/glyph/behavior/GlyphBehavior.java`.
 

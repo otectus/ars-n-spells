@@ -273,7 +273,8 @@ public final class ImportedGlyphPaymentGameTests {
                 GlyphSessions.clearOutcomes(holder.getUUID());
                 cast(holder, spell(MethodTouch.INSTANCE, glyph("slow", 1)));
                 double pending = ImportedGlyphGameTests.pools(holder);
-                cast(holder, spell(MethodTouch.INSTANCE, glyph("slow", 1)));
+                // 3.4.3: a different spell, since the charging Slow itself refuses a second Slow as pending first.
+                cast(holder, spell(MethodSelf.INSTANCE, glyph("heal", 1)));
                 helper.assertTrue(GlyphSessions.outcomes(holder.getUUID()).stream().anyMatch(o -> o.outcome() == GlyphOutcome.REJECTED
                     && o.detail().contains("refused.sessions")), "a second session over a bound of one is refused: "
                     + GlyphSessions.outcomes(holder.getUUID()));

@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.4.3] - Unreleased
+
+**The fixes are server-side.** The network protocol is unchanged (version 13), so a 3.4.2 client can still join a 3.4.3 server, but update clients too: a 3.4.2 client shows the new "expired" message as its translation key and the old wording of the changed one. 3.4.3 also contains every 3.4.2 and 3.4.1 change below, since neither was published. It is the NeoForge port of the Forge 3.4.3 fix.
+
+### Fixed
+
+- **A missed projectile no longer blocks its spell.** A projectile carrying an imported Iron's glyph that hits nothing flies on until Ars removes it, a minute by default. Every cast of that Iron's spell in that time was refused with "… is already waiting to go off from an earlier cast." Each miss also took one of the player's `max_active_glyph_sessions_per_player` slots. The new cast now goes ahead at once, and what the missed one still held for the spell is given back. If the earlier projectile does land later, it pays then, like any later hit. The session limit now counts only casts that still hold a payment or run a charge or channel. Only a charge or channel of the same spell still blocks a second cast while it runs. That message now reads "… is still being cast from an earlier spell."
+- **Imported glyphs follow Iron's cooldown where they land, once per cast.** Two projectiles of one spell give one effect and one payment, and the second is refused on the cooldown the first started. The same glyph twice in one recipe now runs twice, as it does on Forge. Before, the second occurrence was refused on the cooldown the first had just started. A spell's further hits in the same cast (a split, pierce or area fan-out) still run, as before.
+- **Projectiles that fly for more than 90 seconds still cast their glyph.** Servers can raise Ars's projectile lifespan (`max_lifespan`). A cast now stays valid for that long plus 15 seconds, at least 90 seconds and at most 10 minutes. Before, a projectile that landed after 90 seconds was refused with "That imported glyph was not part of an accepted cast." Anything that arrives after its cast has expired now says so: "… did nothing: it arrived after its cast had expired."
+
+### For developers
+
+- 7 new required GameTests (500 in total), with the same names as the Forge tests, every one cast by a paying survival player. `ironsLoaded_glyphBoundsRefuseWithoutCharging` now fills the session limit with a different spell, since a second cast of a charging spell is refused as pending first.
+- Evidence: [docs/3.4.3/testing.md](docs/3.4.3/testing.md). The rules are in [docs/3.4.1/casting-contract.md](docs/3.4.1/casting-contract.md).
+- `tools/generate_release_references.py` keeps numeric constants written into config comments. The 3.4.2 configuration reference showed "Tested ceiling  ." with no value for `max_imported_effects_per_spell`, `max_foreign_emissions_per_cast` and `max_active_glyph_sessions_per_player`; it now gives 8, 64 and 32, and lists the glyph library's smoke check among the readers of `enable_iron_glyphs`.
+
 ## [3.4.2] - Unreleased
 
 **Client and server both need 3.4.2.** The network protocol is now version 13. The server sends the live minimum spell level alongside the maximum and syncs the mana-bar display setting. 3.4.2 also contains every 3.4.1 change below, since 3.4.1 was never published. It ports the Forge remediation of the 2026-11-17 audit (findings ANS-001 to ANS-015) to NeoForge. ANS-001, ANS-003 and ANS-008 concern Covenant of the Seven and the Cursed and Virtue Rings, which have no 1.21.1 build, so they do not apply here. ANS-006 was already correct on NeoForge and now has a test.

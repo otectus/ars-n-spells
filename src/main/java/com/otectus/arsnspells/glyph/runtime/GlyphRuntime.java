@@ -41,15 +41,20 @@ import java.util.UUID;
  *       available; the hit must be one the glyph's target accepts (a caster-only glyph resolves
  *       only on its caster, a living-target glyph only on another living entity, a block glyph only
  *       on a block); the cast's emission budget must not be spent;</li>
- *   <li>Iron's native conditions are checked again (learning, adventure mode, and the cooldown,
- *       except for further executions of an occurrence that already passed admission);</li>
+ *   <li>Iron's native conditions are checked again (learning, adventure mode, and the cooldown).
+ *       3.4.3: a cooldown this same cast started does not count, so its further executions (a split,
+ *       pierce, area fan-out, or the same glyph again in the recipe) still run; any other cooldown
+ *       refuses the execution before its effect and hands back the occurrence's held price. Admission
+ *       no longer keeps a second cast of a spell out while an earlier one is only travelling, so two
+ *       deliveries of one spell give one effect;</li>
  *   <li>instant effects run now through the Iron's bridge, which posts Iron's own cast events and
  *       asks for payment just before the effect: the occurrence's prepaid reservation if its price
  *       still matches, otherwise a fresh one;</li>
  *   <li>charged and continuous effects suspend the branch in a {@link GlyphContinuation}.</li>
  * </ol>
- * A refusal releases nothing that later executions of the same occurrence may still use; the
- * session releases unspent reservations when it closes.
+ * A refusal releases nothing that later executions of the same occurrence may still use, except a
+ * cooldown refusal (3.4.3), which hands the occurrence's held price back at once; the session
+ * releases unspent reservations when it closes.
  */
 public final class GlyphRuntime {
 
@@ -62,6 +67,11 @@ public final class GlyphRuntime {
         ServerPlayer player = GlyphSessions.supportedCaster(context);
         GlyphCastSession session = GlyphSessions.of(context);
         if (player == null || session == null || !player.getUUID().equals(session.owner)) {
+            // 3.4.3: a delivery that outlived its cast's lifetime bound is told so, not that it was never admitted.
+            if (player != null && session == null && GlyphSessions.expiredFor(context, player.getUUID())) {
+                refuse(player, null, effect, Component.translatable("ars_n_spells.glyph.refused.expired", effect.spellName()));
+                return;
+            }
             if (player != null) refuse(player, null, effect, Component.translatable("ars_n_spells.glyph.refused.not_admitted"));
             return;
         }
@@ -98,10 +108,18 @@ public final class GlyphRuntime {
         }
         GlyphCastSession.Token token = tokenFor(session, context, effect);
         boolean firstOfOccurrence = token != null && token.executions == 0;
-        boolean sharedAdmission = token != null && token.executions > 0;
         IronGlyphBridge bridge = IronGlyphBridges.get();
-        Component nativeRefusal = bridge.nativeRefusal(player, entry.spellId(),
-            !sharedAdmission && !bridge.hasPendingRecast(player, entry.spellId()));
+        Component nativeRefusal = bridge.nativeRefusal(player, entry.spellId(), false);
+        // 3.4.3: the cooldown, unless this cast started it itself or a native recast is pending. A cooldown
+        // from another cast (an earlier delivery of the spell landed first, or a native cast) refuses the
+        // execution before its effect, and the occurrence's held price goes back at once.
+        if (nativeRefusal == null && !session.started(entry.spellId()) && !bridge.hasPendingRecast(player, entry.spellId())) {
+            nativeRefusal = bridge.nativeRefusal(player, entry.spellId(), true);
+            if (nativeRefusal != null && token != null && token.prepaid()) {
+                GlyphPayments.release(token.reservation);
+                token.reservation = null;
+            }
+        }
         if (nativeRefusal != null) {
             session.releaseEmission();
             refuse(player, session, effect, nativeRefusal);
@@ -144,6 +162,7 @@ public final class GlyphRuntime {
             GlyphContinuation continuation = GlyphContinuation.charge(session, request, effect, hit, level, resolver, token, held, ticks, charge);
             if (token != null && held == token.reservation) token.reservation = null; // the continuation owns it now
             start(session, context, continuation);
+            session.started.add(entry.spellId());
             session.lastOutcome = GlyphOutcome.ACCEPTED_PENDING;
             GlyphSessions.trace(player, session, "charge_started", "spell", entry.spellId(), "level", level0, "ticks", ticks);
             GlyphSessions.recordOutcome(player, effect.key(), level0, GlyphOutcome.ACCEPTED_PENDING, "charge " + ticks + " ticks");
@@ -165,6 +184,7 @@ public final class GlyphRuntime {
                 return;
             }
             if (token != null) token.executions++;
+            session.started.add(entry.spellId());
             // The first pulse ran: the channel is one emission; its later pulses are paid, not counted again.
             session.consumeEmission();
             GlyphContinuation continuation = GlyphContinuation.channel(session, request, effect, hit, level, resolver, channel);
@@ -187,7 +207,7 @@ public final class GlyphRuntime {
         CostQuote quote = GlyphPayments.quote(player, bridge.manaCost(effect.key().ironSpellId(), level), session.rules);
         GlyphPayments.Shortage[] shortage = new GlyphPayments.Shortage[1];
         GlyphPayments.Reservation fresh = GlyphPayments.reserve(player, quote, "glyph:" + session.id + ":charge",
-            GlyphSessions.MAX_SESSION_TICKS + 200, shortage);
+            session.lifetimeTicks + 200, shortage);
         if (fresh == null) refuse(player, session, effect, GlyphSessions.shortageMessage(effect, shortage[0]));
         return fresh;
     }
@@ -253,7 +273,8 @@ public final class GlyphRuntime {
             // Crossed the effect boundary: counted and paid even when the native effect then threw.
             if (token != null) token.executions++;
             session.consumeEmission();
-            if (request.applyCooldown()) GlyphSessions.cooldownCommitted(session, request.key().ironSpellId());
+            // 3.4.3: from here on a cooldown on this spell is this cast's own.
+            session.started.add(request.key().ironSpellId());
             boolean failed = result.stage() == IronGlyphBridge.Stage.FAILED_AFTER_EFFECT;
             GlyphOutcome outcome = failed ? GlyphOutcome.FAILED_AFTER_EFFECT : GlyphOutcome.EFFECT_APPLIED;
             session.lastOutcome = outcome;
